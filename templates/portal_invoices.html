@@ -1,0 +1,16 @@
+{% extends "base_portal.html" %}
+
+{% block content %}
+  <div class="card">
+    <div class="card-title-row">
+      <h3>Mis facturas</h3>
+    </div>
+    <p class="muted" style="margin:0;">
+      Aquí vas a poder ver lo emitido y lo recibido. Por ahora es MVP; en las siguientes pantallas dejé tablas listas para conectar.
+    </p>
+    <div style="display:flex; gap:10px; margin-top:14px; flex-wrap:wrap;">
+      <a class="btn-secondary" href="/portal/invoices/issued">Ver emitidas</a>
+      <a class="btn-secondary" href="/portal/invoices/received">Ver recibidas</a>
+    </div>
+  </div>
+{% endblock %}

@@ -1,0 +1,286 @@
+{% extends "base_portal.html" %}
+{% set title = 'Inicio' %}
+{% set page_icon = '<svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M5.5 10.5V21h13V10.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 21v-6h4v6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>' %}
+{% block content %}
+
+<div class="app-header fade-in mb-22">
+  <div class="app-header__left">
+    <div class="app-title"></div>
+    <div class="app-subtitle muted">Hola <b>{{ issuer_alias }}</b> 👋</div>
+  </div>
+</div>
+
+<p class="muted" style="margin:0 0 12px; font-size:13px;">Resumen del mes en curso ({{ ym_label }})</p>
+
+<div class="dashboard-metrics fade-in mb-20">
+  <div class="card metric-card">
+    <div class="metric-label">
+      <svg class="icon" viewBox="0 0 24 24" fill="none"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Ingresos (sin IVA)
+    </div>
+    <div class="metric-value">
+      <span class="metric-value-full">${{ '{:,.2f}'.format(ingresos_sin_iva|default(0)) }}</span>
+      {% set _v = (ingresos_sin_iva|default(0))|float %}
+      {% if _v >= 1000000 %}<span class="metric-value-short">${{ "%.1f"|format(_v/1000000) }}M</span>{% elif _v >= 100000 %}<span class="metric-value-short">${{ "%.0f"|format(_v/1000) }}k</span>{% elif _v <= -1000000 %}<span class="metric-value-short">-${{ "%.1f"|format(-_v/1000000) }}M</span>{% elif _v <= -100000 %}<span class="metric-value-short">-${{ "%.0f"|format(-_v/1000) }}k</span>{% endif %}
+    </div>
+    <div class="metric-sub">Del mes ({{ ym_label }})</div>
+  </div>
+
+  <div class="card metric-card">
+    <div class="metric-label">
+      <svg class="icon" viewBox="0 0 24 24" fill="none"><path d="M12 22v-20M7 19h5a3.5 3.5 0 0 0 0-7H7M14 5H9.5a3.5 3.5 0 0 0 0 7H6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Gastos (sin IVA)
+    </div>
+    <div class="metric-value">
+      <span class="metric-value-full">${{ '{:,.2f}'.format(gastos_sin_iva|default(0)) }}</span>
+      {% set _v = (gastos_sin_iva|default(0))|float %}
+      {% if _v >= 1000000 %}<span class="metric-value-short">${{ "%.1f"|format(_v/1000000) }}M</span>{% elif _v >= 100000 %}<span class="metric-value-short">${{ "%.0f"|format(_v/1000) }}k</span>{% elif _v <= -1000000 %}<span class="metric-value-short">-${{ "%.1f"|format(-_v/1000000) }}M</span>{% elif _v <= -100000 %}<span class="metric-value-short">-${{ "%.0f"|format(-_v/1000) }}k</span>{% endif %}
+    </div>
+    <div class="metric-sub">Del mes ({{ ym_label }})</div>
+  </div>
+
+  <div class="card metric-card">
+    <div class="metric-label">
+      <svg class="icon" viewBox="0 0 24 24" fill="none"><path d="M21 12a9 9 0 1 1-9-9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M21 3v6h-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      IVA recibido (neto)
+    </div>
+    <div class="metric-value">
+      <span class="metric-value-full">${{ '{:,.2f}'.format(iva_recibido_neto|default(0)) }}</span>
+      {% set _v = (iva_recibido_neto|default(0))|float %}
+      {% if _v >= 1000000 %}<span class="metric-value-short">${{ "%.1f"|format(_v/1000000) }}M</span>{% elif _v >= 100000 %}<span class="metric-value-short">${{ "%.0f"|format(_v/1000) }}k</span>{% elif _v <= -1000000 %}<span class="metric-value-short">-${{ "%.1f"|format(-_v/1000000) }}M</span>{% elif _v <= -100000 %}<span class="metric-value-short">-${{ "%.0f"|format(-_v/1000) }}k</span>{% endif %}
+    </div>
+    <div class="metric-sub">{% if iva_retenciones|default(0) != 0 %}
+      {% set _r = (iva_retenciones|default(0))|float %}
+      {% set _r_abs = -_r if _r < 0 else _r %}
+      <span class="metric-sub-full">(– ${{ '{:,.2f}'.format(_r_abs) }} retenciones)</span>
+      {% if _r_abs >= 1000000 %}<span class="metric-sub-short">(– ${{ "%.1f"|format(_r_abs/1000000) }}M ret.)</span>{% elif _r_abs >= 100000 %}<span class="metric-sub-short">(– ${{ "%.0f"|format(_r_abs/1000) }}k ret.)</span>{% endif %}
+      {% else %}Del mes ({{ ym_label }}){% endif %}</div>
+  </div>
+
+  <div class="card metric-card">
+    <div class="metric-label">
+      <svg class="icon" viewBox="0 0 24 24" fill="none"><path d="M22 12h-4l-3 9L9 3l-3 9H2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      IVA pagado
+    </div>
+    <div class="metric-value">
+      <span class="metric-value-full">${{ '{:,.2f}'.format(iva_pagado|default(0)) }}</span>
+      {% set _v = (iva_pagado|default(0))|float %}
+      {% if _v >= 1000000 %}<span class="metric-value-short">${{ "%.1f"|format(_v/1000000) }}M</span>{% elif _v >= 100000 %}<span class="metric-value-short">${{ "%.0f"|format(_v/1000) }}k</span>{% elif _v <= -1000000 %}<span class="metric-value-short">-${{ "%.1f"|format(-_v/1000000) }}M</span>{% elif _v <= -100000 %}<span class="metric-value-short">-${{ "%.0f"|format(-_v/1000) }}k</span>{% endif %}
+    </div>
+    <div class="metric-sub">Del mes ({{ ym_label }})</div>
+  </div>
+</div>
+
+<div class="dashboard-half-row fade-in mb-20">
+  <div class="card p-20 quick-invoice-card">
+    <h3 class="section-title mb-14">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 2v5h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 12h8M8 16h8M8 8h3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Factura rápida
+    </h3>
+    <p class="muted" style="margin:0 0 14px; font-size:13px;">Elige cliente y producto para abrir la factura con datos precargados.</p>
+    <p id="quickInvoiceHint" class="muted" style="margin:0 0 10px; font-size:12px; display:none;">Añade clientes y productos en sus secciones para usar la factura rápida.</p>
+    <div class="quick-invoice-form">
+      <div class="quick-invoice-row">
+        <label class="quick-invoice-label" for="quickCustomer">Cliente</label>
+        <select id="quickCustomer" class="quick-invoice-select" aria-label="Cliente">
+          <option value="">— Seleccionar cliente —</option>
+        </select>
+      </div>
+      <div class="quick-invoice-row">
+        <label class="quick-invoice-label" for="quickProduct">Producto</label>
+        <select id="quickProduct" class="quick-invoice-select" aria-label="Producto">
+          <option value="">— Seleccionar producto —</option>
+        </select>
+      </div>
+      <div class="quick-invoice-row quick-invoice-actions">
+        <button type="button" id="quickInvoiceBtn" class="btn btn-primary" disabled>Generar factura</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card p-20">
+    <div class="card-title-row mb-14">
+      <h3 class="section-title">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"></circle><path d="M12 7v6l4 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path></svg>
+        Actividad reciente
+      </h3>
+    </div>
+    <div class="activity-list">
+      {% for a in activities %}
+      <div class="activity-row">
+        <div>
+          <div class="activity-title">
+            {% if a.direction == 'issued' %}{{ icon_issued() }}{% else %}{{ icon_received() }}{% endif %}
+            Factura {{ 'emitida' if a.direction == 'issued' else 'recibida' }}
+          </div>
+          <div class="activity-sub">{{ a.nombre or 'Sin nombre' }}</div>
+        </div>
+        <div class="activity-sub">{{ a.time_ago }}</div>
+      </div>
+      {% else %}
+      <p class="muted">No hay actividad reciente.</p>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<div class="dashboard-grid fade-in">
+  <div class="card p-20">
+    <div class="card-title-row mb-14">
+      <h3 class="section-title">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 10-12 0c0 7-3 7-3 7h18s-3 0-3-7"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+        Alertas
+      </h3>
+    </div>
+
+    <div class="dashboard-alerts">
+      <p class="muted" style="margin:0; font-size:13px;">Sin alertas pendientes.</p>
+    </div>
+  </div>
+
+</div>
+
+<!-- Modal: factura rápida (formulario con montos para completar y emitir) -->
+<div id="quickInvoiceModal" class="quick-invoice-modal" hidden aria-hidden="true" role="dialog" aria-labelledby="quickInvoiceModalTitle">
+  <div class="quick-invoice-modal__backdrop" id="quickInvoiceModalBackdrop"></div>
+  <div class="quick-invoice-modal__panel">
+    <div class="quick-invoice-modal__head">
+      <h2 id="quickInvoiceModalTitle" class="quick-invoice-modal__title">Factura rápida — completar y emitir</h2>
+      <button type="button" class="quick-invoice-modal__close" id="quickInvoiceModalClose" aria-label="Cerrar">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      </button>
+    </div>
+    <div class="quick-invoice-modal__body">
+      <iframe id="quickInvoiceFrame" class="quick-invoice-modal__frame" title="Formulario de factura"></iframe>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const token = "{{ token }}";
+  const customerSelect = document.getElementById('quickCustomer');
+  const productSelect = document.getElementById('quickProduct');
+  const btn = document.getElementById('quickInvoiceBtn');
+  const modal = document.getElementById('quickInvoiceModal');
+  const modalBackdrop = document.getElementById('quickInvoiceModalBackdrop');
+  const modalClose = document.getElementById('quickInvoiceModalClose');
+  const frame = document.getElementById('quickInvoiceFrame');
+  let customers = [];
+  let products = [];
+
+  function buildCreateUrl(){
+    const cIdx = customerSelect && customerSelect.value ? parseInt(customerSelect.value, 10) : -1;
+    const pIdx = productSelect && productSelect.value ? parseInt(productSelect.value, 10) : -1;
+    if (cIdx < 0 || pIdx < 0 || !customers[cIdx] || !products[pIdx]) return null;
+    const c = customers[cIdx];
+    const p = products[pIdx];
+    const params = new URLSearchParams({ token });
+    params.set('customer_rfc', c.rfc || '');
+    params.set('customer_legal_name', c.legal_name || '');
+    params.set('customer_zip', c.zip || '');
+    params.set('customer_tax_system', c.tax_system || '');
+    params.set('customer_email', c.email || '');
+    params.set('concept_desc', p.description || '');
+    params.set('concept_key', p.product_key || '');
+    params.set('concept_unit', p.unit_key || '');
+    params.set('concept_price', String(p.unit_price != null ? p.unit_price : ''));
+    params.set('concept_iva', String(p.iva_rate != null ? p.iva_rate : '0.16'));
+    return '/portal/create?' + params.toString();
+  }
+
+  function openQuickInvoiceModal(){
+    const url = buildCreateUrl();
+    if (!url || !frame || !modal) return;
+    frame.src = url;
+    modal.hidden = false;
+    modal.setAttribute('aria-hidden', 'false');
+    modal.classList.add('quick-invoice-modal--open');
+    document.body.classList.add('no-scroll');
+  }
+
+  function closeQuickInvoiceModal(){
+    if (!modal) return;
+    modal.hidden = true;
+    modal.setAttribute('aria-hidden', 'true');
+    modal.classList.remove('quick-invoice-modal--open');
+    document.body.classList.remove('no-scroll');
+    if (frame) frame.src = 'about:blank';
+  }
+
+  function updateBtn(){
+    if (!btn) return;
+    const url = buildCreateUrl();
+    btn.disabled = !url;
+  }
+
+  async function loadCustomers(){
+    try {
+      const res = await fetch('/api/customers');
+      if (!res.ok) return;
+      customers = await res.json() || [];
+      if (!customerSelect) return;
+      customerSelect.innerHTML = '<option value="">— Seleccionar cliente —</option>';
+      customers.forEach((c, i) => {
+        const opt = document.createElement('option');
+        opt.value = String(i);
+        opt.textContent = (c.legal_name || c.rfc || 'Sin nombre').trim();
+        customerSelect.appendChild(opt);
+      });
+    } catch (_) {}
+  }
+
+  async function loadProducts(){
+    try {
+      const res = await fetch('/api/products');
+      if (!res.ok) return;
+      products = await res.json() || [];
+      if (!productSelect) return;
+      productSelect.innerHTML = '<option value="">— Seleccionar producto —</option>';
+      products.forEach((p, i) => {
+        const opt = document.createElement('option');
+        opt.value = String(i);
+        opt.textContent = (p.description || p.product_key || 'Sin descripción').trim();
+        productSelect.appendChild(opt);
+      });
+    } catch (_) {}
+  }
+
+  if (btn) btn.addEventListener('click', function(e){ e.preventDefault(); openQuickInvoiceModal(); });
+  if (customerSelect) customerSelect.addEventListener('change', updateBtn);
+  if (productSelect) productSelect.addEventListener('change', updateBtn);
+  if (modalClose) modalClose.addEventListener('click', closeQuickInvoiceModal);
+  if (modalBackdrop) modalBackdrop.addEventListener('click', closeQuickInvoiceModal);
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape' && modal && !modal.hidden) closeQuickInvoiceModal(); });
+
+  (async function init(){
+    await loadCustomers();
+    await loadProducts();
+    updateBtn();
+    const hint = document.getElementById('quickInvoiceHint');
+    if (hint && (customers.length === 0 || products.length === 0)) hint.style.display = 'block';
+  })();
+})();
+</script>
+
+<style>
+.quick-invoice-form { display: flex; flex-direction: column; gap: 14px; max-width: 100%; }
+.quick-invoice-row { display: flex; flex-direction: column; gap: 6px; }
+.quick-invoice-label { font-size: 12px; font-weight: 700; color: var(--muted); }
+.quick-invoice-select { width: 100%; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); font-size: 14px; color: var(--text); }
+.quick-invoice-actions { margin-top: 6px; }
+/* Modal factura rápida */
+.quick-invoice-modal{ position: fixed; inset: 0; z-index: 90; display: none; align-items: center; justify-content: center; padding: 16px; box-sizing: border-box; pointer-events: none; }
+.quick-invoice-modal:not([hidden]){ display: flex !important; pointer-events: auto; }
+.quick-invoice-modal__backdrop{ position: absolute; inset: 0; background: rgba(0,0,0,.45); opacity: 0; transition: opacity .2s ease; pointer-events: auto; }
+.quick-invoice-modal--open .quick-invoice-modal__backdrop{ opacity: 1; }
+.quick-invoice-modal__panel{ position: relative; width: 100%; max-width: 720px; max-height: 90vh; background: var(--surface); border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,.2); display: flex; flex-direction: column; overflow: hidden; pointer-events: auto; }
+.quick-invoice-modal__head{ display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.quick-invoice-modal__title{ margin: 0; font-size: 15px; font-weight: 700; }
+.quick-invoice-modal__close{ width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border: none; border-radius: 12px; background: transparent; color: var(--muted); cursor: pointer; }
+.quick-invoice-modal__close:hover{ background: rgba(0,0,0,.06); color: var(--text); }
+.quick-invoice-modal__body{ flex: 1; min-height: 0; display: flex; }
+.quick-invoice-modal__frame{ width: 100%; height: 75vh; min-height: 400px; border: none; display: block; }
+</style>
+
+{% endblock %}

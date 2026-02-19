@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Cotización — {{ quotation.issuer_name or 'Emisor' }}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root { --bg: #f7f7f8; --surface: #fff; --text: #111; --muted: #6b6f76; --border: rgba(0,0,0,.08); --radius: 14px; --shadow: 0 6px 18px rgba(17,17,17,.06); }
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 24px; font-family: Inter, system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+    .wrap { max-width: 480px; margin: 0 auto; }
+    .card { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 28px; text-align: center; }
+    h1 { font-size: 20px; font-weight: 700; margin: 0 0 12px; }
+    p { color: var(--muted); margin: 0; font-size: 15px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>Esta cotización ya fue respondida</h1>
+      <p>El estatus actual es: <strong>{% if quotation.status == 'accepted' %}Aceptada{% elif quotation.status == 'rejected' %}Rechazada{% else %}{{ quotation.status }}{% endif %}</strong>. No es posible cambiar la respuesta.</p>
+    </div>
+  </div>
+</body>
+</html>

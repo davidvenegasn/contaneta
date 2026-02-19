@@ -1,0 +1,471 @@
+{% extends "base_portal.html" %}
+
+{% block content %}
+<section class="page-section page-section--clients">
+  <div class="card">
+    <div class="card-header card-header--with-tools">
+      <div class="card-header__left">
+        <div class="table-tools table-tools--inline">
+          <div class="table-tools__search">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M16.2 16.2 21 21" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            </svg>
+            <input id="prodSearch" class="input" type="search" placeholder="Buscar por descripción o clave" autocomplete="off" />
+          </div>
+          <button id="prodNewBtn" type="button" class="btn btn-primary">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M12 5v14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+              <path d="M5 12h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            </svg>
+            Agregar producto
+          </button>
+        </div>
+      </div>
+      <div class="card-header__right">
+        <h3 class="section-title">Listado</h3>
+        <p class="muted" style="margin:0;"><span id="prodCount">Cargando…</span></p>
+      </div>
+    </div>
+    <p class="card-legend muted">Guarda productos y servicios (conceptos) para reutilizarlos al generar facturas. Incluye descripción, Clave ProdServ, unidad SAT, precio e IVA.</p>
+
+    <div class="card-list-sep">
+    <div style="overflow:auto;" id="prodTableWrap">
+      <table class="table" id="prodTable" style="min-width:1000px;">
+        <thead>
+          <tr>
+            <th style="min-width:220px;">Descripción</th>
+            <th style="min-width:160px;">Clave ProdServ</th>
+            <th style="min-width:120px;">Unidad</th>
+            <th style="min-width:120px;">Precio unit.</th>
+            <th style="min-width:90px;">IVA</th>
+            <th style="min-width:200px;">Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="prodTbody">
+          <tr>
+            <td colspan="6"><div class="skeleton" style="height: 46px; border-radius: 14px;"></div></td>
+          </tr>
+          <tr>
+            <td colspan="6"><div class="skeleton" style="height: 46px; border-radius: 14px;"></div></td>
+          </tr>
+          <tr>
+            <td colspan="6"><div class="skeleton" style="height: 46px; border-radius: 14px;"></div></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="empty-state" id="prodEmpty" hidden>
+      <div class="empty-state__icon" aria-hidden="true">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="empty-state__title">Aún no tienes productos guardados</div>
+      <div class="empty-state__desc">Agrega productos o servicios con descripción, Clave ProdServ (catálogo SAT), unidad, precio e IVA. Luego úsalos al generar facturas.</div>
+      <button type="button" class="btn btn-primary" id="prodEmptyBtn">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M12 5v14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          <path d="M5 12h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        </svg>
+        Agregar primer producto
+      </button>
+    </div>
+    </div>
+  </div>
+
+  <!-- Modal: agregar producto -->
+  <div class="modal" id="prodModal" hidden aria-hidden="true">
+    <div class="modal__backdrop" data-close="true"></div>
+    <div class="modal__panel" role="dialog" aria-modal="true" aria-labelledby="prodModalTitle">
+      <div class="modal__head">
+        <div>
+          <div class="modal__title" id="prodModalTitle">Agregar producto</div>
+          <div class="modal__subtitle">Descripción, Clave ProdServ (SAT), unidad, precio unitario e IVA. Al facturar solo ingresarás cantidad y descuento.</div>
+        </div>
+        <button type="button" class="icon-btn" data-close="true" aria-label="Cerrar">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M6 6l12 12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M18 6 6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="modal__body">
+        <div class="field">
+          <label class="label">Descripción *</label>
+          <input id="prodDesc" class="input" type="text" placeholder="Ej. Asesoría contable mensual" autocomplete="off" />
+          <div class="help" id="prodDescHelp" hidden>La descripción es obligatoria.</div>
+        </div>
+
+        <div class="field">
+          <label class="label">Clave ProdServ (SAT) *</label>
+          <div style="position:relative;">
+            <input id="prodKey" class="input" type="text" placeholder="Buscar en catálogo SAT (ej. asesoría, 80141600)" autocomplete="off" />
+            <div id="prodKeyResults" class="prod-results" hidden></div>
+          </div>
+          <div class="help" id="prodKeyHelp" hidden>Selecciona una clave del catálogo SAT.</div>
+        </div>
+
+        <div class="field">
+          <label class="label">Unidad (SAT) *</label>
+          <select id="prodUnit" class="input">
+            <option value="E48">E48 — Unidad de servicio</option>
+            <option value="H87">H87 — Pieza</option>
+            <option value="ACT">ACT — Actividad</option>
+            <option value="HUR">HUR — Hora</option>
+            <option value="DAY">DAY — Día</option>
+            <option value="KGM">KGM — Kilogramo</option>
+            <option value="LTR">LTR — Litro</option>
+            <option value="XBX">XBX — Caja</option>
+          </select>
+        </div>
+
+        <div class="grid-2">
+          <div class="field">
+            <label class="label">Precio unitario *</label>
+            <input id="prodPrice" class="input" type="number" step="0.01" min="0" placeholder="0.00" />
+            <div class="help" id="prodPriceHelp" hidden>Precio unitario inválido.</div>
+          </div>
+          <div class="field">
+            <label class="label">IVA *</label>
+            <select id="prodIva" class="input">
+              <option value="0.16" selected>16%</option>
+              <option value="0.08">8%</option>
+              <option value="0.00">0%</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal__foot">
+        <button type="button" class="btn btn-ghost" data-close="true">Cancelar</button>
+        <button type="button" class="btn btn-primary" id="prodSaveBtn">Guardar</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+(function(){
+  function getToken(){
+    var p = new URLSearchParams(window.location.search);
+    return p.get('token') || "{{ token }}";
+  }
+  const token = getToken();
+  const tbody = document.getElementById('prodTbody');
+  const countEl = document.getElementById('prodCount');
+  const emptyEl = document.getElementById('prodEmpty');
+  const tableWrap = document.getElementById('prodTableWrap');
+  const searchEl = document.getElementById('prodSearch');
+
+  const modal = document.getElementById('prodModal');
+  const openBtn = document.getElementById('prodNewBtn');
+  const emptyBtn = document.getElementById('prodEmptyBtn');
+  const saveBtn = document.getElementById('prodSaveBtn');
+  const descEl = document.getElementById('prodDesc');
+  const keyEl = document.getElementById('prodKey');
+  const keyResults = document.getElementById('prodKeyResults');
+  const unitEl = document.getElementById('prodUnit');
+  const priceEl = document.getElementById('prodPrice');
+  const ivaEl = document.getElementById('prodIva');
+
+  const UNIT_LABELS = {
+    'E48': 'E48 — Unidad de servicio',
+    'H87': 'H87 — Pieza',
+    'ACT': 'ACT — Actividad',
+    'HUR': 'HUR — Hora',
+    'DAY': 'DAY — Día',
+    'KGM': 'KGM — Kilogramo',
+    'LTR': 'LTR — Litro',
+    'XBX': 'XBX — Caja'
+  };
+
+  let allRows = [];
+  let prodservDebounce = null;
+
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+  function setCount(n){
+    countEl.textContent = (n === 1) ? 'Total: 1 producto' : `Total: ${n} productos`;
+  }
+
+  function ivaPct(rate) {
+    const r = parseFloat(rate);
+    if (r === 0) return '0%';
+    if (Math.abs(r - 0.08) < 0.001) return '8%';
+    return '16%';
+  }
+
+  function buildCreateUrl(p) {
+    return '/portal/create?' +
+      'concept_desc=' + encodeURIComponent(String(p.description || '')) +
+      '&concept_key=' + encodeURIComponent(String(p.product_key || '')) +
+      '&concept_unit=' + encodeURIComponent(String(p.unit_key || 'E48')) +
+      '&concept_price=' + encodeURIComponent(String(p.unit_price ?? '')) +
+      '&concept_iva=' + encodeURIComponent(String(p.iva_rate ?? '0.16'));
+  }
+
+  function rowHTML(r){
+    const desc = esc(r.description);
+    const key = esc(r.product_key);
+    const unitLabel = UNIT_LABELS[r.unit_key] || r.unit_key;
+    const price = Number(r.unit_price);
+    const priceStr = Number.isFinite(price) ? price.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00';
+    const iva = ivaPct(r.iva_rate);
+    const createUrl = buildCreateUrl(r);
+
+    return `
+      <tr>
+        <td><div style="font-weight:650;">${desc}</div></td>
+        <td><code>${key}</code></td>
+        <td class="muted">${esc(unitLabel)}</td>
+        <td>$${priceStr}</td>
+        <td class="muted">${iva}</td>
+        <td>
+          <button type="button" class="btn btn-small btn-ghost" data-copy="${esc(r.product_key)}">Copiar clave</button>
+          <a href="${createUrl}" class="btn btn-small" style="text-decoration:none;">Usar en factura</a>
+        </td>
+      </tr>
+    `;
+  }
+
+  function render(rows){
+    const n = rows.length;
+    setCount(n);
+    if (n === 0) {
+      tbody.innerHTML = '';
+      if (tableWrap) { tableWrap.hidden = true; tableWrap.style.display = 'none'; }
+      if (emptyEl) { emptyEl.hidden = false; emptyEl.removeAttribute('hidden'); emptyEl.style.display = ''; }
+      return;
+    }
+    if (tableWrap) { tableWrap.hidden = false; tableWrap.style.display = ''; }
+    if (emptyEl) { emptyEl.hidden = true; emptyEl.setAttribute('hidden', ''); emptyEl.style.display = 'none'; }
+    tbody.innerHTML = rows.map(rowHTML).join('');
+  }
+
+  function filter(){
+    const q = (searchEl.value || '').trim().toLowerCase();
+    if (!q) return render(allRows);
+    const filtered = allRows.filter(r => {
+      return String(r.description || '').toLowerCase().includes(q)
+        || String(r.product_key || '').toLowerCase().includes(q);
+    });
+    render(filtered);
+  }
+
+  async function load(){
+    try {
+      const res = await fetch('/api/products');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        allRows = data;
+      } else if (data && Array.isArray(data.data)) {
+        allRows = data.data;
+      } else if (data && Array.isArray(data.products)) {
+        allRows = data.products;
+      } else {
+        allRows = [];
+      }
+      render(allRows);
+    } catch (e) {
+      allRows = [];
+      tbody.innerHTML = '';
+      if (tableWrap) tableWrap.hidden = true;
+      emptyEl.hidden = false;
+      window.portalToast && window.portalToast({ type: 'danger', title: 'Error', message: 'No se pudo cargar productos' });
+    }
+  }
+
+  // ProdServ búsqueda catálogo SAT
+  async function searchProdserv(q) {
+    const term = (q || '').trim();
+    if (term.length < 2) {
+      keyResults.hidden = true;
+      keyResults.innerHTML = '';
+      return;
+    }
+    try {
+      const res = await fetch(`/api/catalogs/prodserv?q=${encodeURIComponent(term)}&limit=15`);
+      if (!res.ok) return;
+      const data = await res.json();
+      const items = Array.isArray(data) ? data : [];
+      keyResults.innerHTML = items.map(it => {
+        const k = (it.key || it.clave || it.code || '').toString();
+        const d = (it.label || it.descripcion || it.texto || '').toString();
+        const text = d ? `${k} — ${d}` : k;
+        return `<button type="button" class="prod-results-item" data-key="${esc(k)}" data-label="${esc(text)}">${esc(text)}</button>`;
+      }).join('');
+      keyResults.hidden = items.length === 0;
+    } catch (err) {
+      keyResults.hidden = true;
+      keyResults.innerHTML = '';
+    }
+  }
+
+  keyEl.addEventListener('input', () => {
+    clearTimeout(prodservDebounce);
+    prodservDebounce = setTimeout(() => searchProdserv(keyEl.value), 280);
+  });
+  keyEl.addEventListener('focus', () => { if (keyEl.value.trim().length >= 2) searchProdserv(keyEl.value); });
+  keyResults.addEventListener('click', (e) => {
+    const btn = e.target.closest('.prod-results-item');
+    if (!btn) return;
+    keyEl.value = btn.getAttribute('data-label') || btn.getAttribute('data-key') || '';
+    keyResults.hidden = true;
+    keyResults.innerHTML = '';
+  });
+  document.addEventListener('click', () => { keyResults.hidden = true; });
+  keyEl.addEventListener('click', (e) => e.stopPropagation());
+
+  function openModal() {
+    descEl.value = '';
+    keyEl.value = '';
+    keyResults.hidden = true;
+    keyResults.innerHTML = '';
+    unitEl.value = 'E48';
+    priceEl.value = '';
+    ivaEl.value = '0.16';
+    document.getElementById('prodDescHelp').hidden = true;
+    document.getElementById('prodKeyHelp').hidden = true;
+    document.getElementById('prodPriceHelp').hidden = true;
+    modal.hidden = false;
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+    setTimeout(() => descEl.focus(), 30);
+  }
+
+  function closeModal() {
+    modal.hidden = true;
+    modal.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+  }
+
+  [openBtn, emptyBtn].forEach(b => b && b.addEventListener('click', openModal));
+  modal.addEventListener('click', (e) => {
+    if (e.target.closest('[data-close="true"]') || e.target.classList.contains('modal__backdrop')) closeModal();
+  });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !modal.hidden) closeModal(); });
+
+  function validate() {
+    let ok = true;
+    const desc = (descEl.value || '').trim();
+    const keyRaw = (keyEl.value || '').trim();
+    const key = keyRaw.includes(' — ') ? keyRaw.split(' — ')[0].trim() : keyRaw;
+    const price = parseFloat(priceEl.value);
+    if (!desc) {
+      document.getElementById('prodDescHelp').hidden = false;
+      ok = false;
+    } else document.getElementById('prodDescHelp').hidden = true;
+    if (!key) {
+      document.getElementById('prodKeyHelp').hidden = false;
+      ok = false;
+    } else document.getElementById('prodKeyHelp').hidden = true;
+    if (!Number.isFinite(price) || price < 0) {
+      document.getElementById('prodPriceHelp').hidden = false;
+      ok = false;
+    } else document.getElementById('prodPriceHelp').hidden = true;
+    return ok;
+  }
+
+  async function save() {
+    if (!validate()) {
+      window.portalToast && window.portalToast({ type: 'danger', title: 'Faltan datos', message: 'Completa descripción, Clave ProdServ y precio unitario.' });
+      return;
+    }
+    const keyRaw = (keyEl.value || '').trim();
+    const product_key = keyRaw.includes(' — ') ? keyRaw.split(' — ')[0].trim() : keyRaw;
+    const payload = {
+      token,
+      description: (descEl.value || '').trim(),
+      product_key,
+      unit_key: (unitEl.value || 'E48').trim(),
+      unit_price: parseFloat(priceEl.value),
+      iva_rate: parseFloat(ivaEl.value) || 0.16,
+    };
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Guardando…';
+    try {
+      const res = await fetch('/api/products/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
+      window.portalToast && window.portalToast({ type: 'success', title: 'Guardado', message: 'Producto guardado correctamente' });
+      closeModal();
+      await load();
+    } catch (e) {
+      window.portalToast && window.portalToast({ type: 'danger', title: 'Error', message: String(e.message || e) });
+    } finally {
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Guardar';
+    }
+  }
+
+  saveBtn.addEventListener('click', save);
+
+  document.addEventListener('click', async (e) => {
+    const copyBtn = e.target && e.target.closest ? e.target.closest('[data-copy]') : null;
+    if (!copyBtn) return;
+    const value = copyBtn.getAttribute('data-copy') || '';
+    try {
+      await navigator.clipboard.writeText(value);
+      window.portalToast && window.portalToast({ type: 'success', title: 'Copiado', message: 'Clave copiada al portapapeles' });
+    } catch (_) {
+      window.portalToast && window.portalToast({ type: 'danger', title: 'No se pudo copiar', message: 'Tu navegador bloqueó el portapapeles' });
+    }
+  });
+
+  searchEl.addEventListener('input', () => filter());
+
+  load();
+})();
+</script>
+
+<style>
+.page-section{ display:flex; flex-direction:column; gap: 14px; }
+.page-section--clients .card-list-sep{ margin-top: 20px; }
+.card-legend{ margin: 0 16px 12px; padding: 0; font-size: 13px; line-height: 1.4; }
+.table-tools__search .icon{ position:absolute; left: 12px; width:18px; height:18px; opacity:.75; }
+.table-tools__search input{ padding-left: 40px; }
+
+#prodTable td { vertical-align: middle; }
+#prodTable .btn { margin-right: 6px; }
+#prodTable .btn:last-child { margin-right: 0; }
+
+.prod-results{ position:absolute; left:0; right:0; top:100%; margin-top:4px; background:#fff; border:1px solid var(--border); border-radius:12px; box-shadow: var(--shadow-md); max-height:220px; overflow:auto; z-index:10; }
+.prod-results-item{ display:block; width:100%; text-align:left; padding:10px 12px; border:none; background:0; font-size:13px; cursor:pointer; color: var(--text); }
+.prod-results-item:hover{ background: rgba(0,0,0,.05); }
+
+.empty-state{ padding: 24px; text-align:center; display:flex; flex-direction:column; align-items:center; gap: 10px; }
+.empty-state[hidden]{ display: none !important; }
+.empty-state__icon{ width: 44px; height: 44px; display:grid; place-items:center; border-radius: 14px; background: rgba(0,0,0,.04); border: 1px solid rgba(0,0,0,.06); }
+.empty-state__icon .icon{ width: 22px; height: 22px; opacity:.85; }
+.empty-state__title{ font-weight: 850; }
+.empty-state__desc{ color: var(--muted); font-size: 13px; max-width: 520px; }
+
+.modal[hidden]{ display:none !important; }
+.modal__backdrop{ position:absolute; inset:0; background: rgba(0,0,0,.35); cursor:pointer; }
+.modal__panel{ position:relative; width: min(560px, calc(100vw - 28px)); min-width: 320px; background: rgba(255,255,255,.94); backdrop-filter: blur(12px); border: 1px solid rgba(0,0,0,.10); border-radius: 18px; box-shadow: var(--shadow-md); overflow:hidden; }
+.modal__head{ display:flex; justify-content:space-between; align-items:flex-start; padding: 14px 14px 10px; border-bottom: 1px solid var(--border); }
+.modal__title{ font-weight: 900; }
+.modal__subtitle{ color: var(--muted); font-size: 12px; margin-top: 2px; }
+.modal__body{ padding: 14px; display:flex; flex-direction:column; gap: 12px; }
+.modal__foot{ padding: 12px 14px 14px; border-top: 1px solid var(--border); display:flex; justify-content:flex-end; gap: 10px; }
+.icon-btn{ width: 36px; height: 36px; display:grid; place-items:center; border-radius: 12px; border: 1px solid var(--border); background: rgba(255,255,255,.8); }
+.icon-btn:hover{ background: rgba(0,0,0,.03); }
+.grid-2{ display:grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.field{ display:flex; flex-direction:column; gap: 8px; }
+.label{ font-size: 12px; color: var(--muted); font-weight: 700; }
+.help{ font-size: 12px; color: #b42318; }
+
+@media (max-width: 860px){
+  .table-tools__search input{ width: 100%; }
+  .grid-2{ grid-template-columns: 1fr; }
+}
+</style>
+{% endblock %}

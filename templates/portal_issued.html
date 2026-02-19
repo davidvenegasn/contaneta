@@ -1,0 +1,148 @@
+{% extends "base_portal.html" %}
+
+{% set title = 'Facturas emitidas' %}
+{% set page_icon = '<svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 2v5a1 1 0 0 0 1 1h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 12v6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="m15 15-3-3-3 3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>' %}
+
+{% macro short_uuid(u) %}
+  {% if u %}{{ u[:8] }}…{{ u[-4:] }}{% else %}-{% endif %}
+{% endmacro %}
+
+{% macro date_dd_mm_yyyy(dt) %}
+  {% if dt and dt|length >= 10 %}{{ dt[8:10] }}/{{ dt[5:7] }}/{{ dt[:4] }}{% else %}-{% endif %}
+{% endmacro %}
+
+{% macro money(x, m) %}
+  {% if x is not none %}{{ '{:,.2f}'.format(x|float) }} {{ m or '' }}{% else %}-{% endif %}
+{% endmacro %}
+
+{% macro concepto_trunc(txt, maxlen=60) %}
+  {% if txt %}{{ (txt[:maxlen] + '…') if txt|length > maxlen else txt }}{% else %}—{% endif %}
+{% endmacro %}
+
+{% macro status_pill(s) %}
+  {% set st = (s|default('')|string)|upper %}
+  {% if st in ['V','VIGENTE','1'] %}
+    <span class="pill" style="border-color:#cfead9; background:#f3fcf6;">Vigente</span>
+  {% elif st in ['C','CANCELADO','CANCELADA','0'] %}
+    <span class="pill" style="border-color:#f2c9c9; background:#fff4f4;">Cancelada</span>
+  {% elif 'CANCELACION' in st or 'CANCELACIÓN' in st or st == 'EN CANCELACION' or st == 'EN CANCELACIÓN' %}
+    <span class="pill" style="border-color:#f0d9a8; background:#fef9e8;">En cancelación</span>
+  {% elif st in ['NO ENCONTRADO','NO ENCONTRADA',''] or not s %}
+    <span class="pill" style="border-color:#e0e0e0; background:#f5f5f5;">{{ s or 'Sin estatus' }}</span>
+  {% else %}
+    <span class="pill">{{ s }}</span>
+  {% endif %}
+{% endmacro %}
+
+{% block content %}
+  <header class="app-header" style="margin-bottom:14px;">
+    <div class="app-header__left">
+      <div class="app-title"></div>
+      <div class="app-subtitle">Historial de CFDI timbrados (SAT) para este emisor.</div>
+    </div>
+  </header>
+
+  <div class="card ym-card" style="margin-bottom:14px;">
+    <div class="ym-selector" style="margin-bottom:14px;">
+      {{ month_picker('/portal/invoices/issued', token, ym, ym_label) }}
+    </div>
+    {% set mt = month_totals|default({}) %}
+    <div class="dashboard-metrics" style="margin:0;">
+      <div class="card metric-card">
+        <div class="metric-label">Total ingresos</div>
+        <div class="metric-value">${{ '{:,.2f}'.format(mt.total_base|default(0)) }}</div>
+        <div class="metric-sub">{{ ym_label }} (subtotal)</div>
+      </div>
+      <div class="card metric-card">
+        <div class="metric-label">IVA recibido (neto)</div>
+        <div class="metric-value">${{ '{:,.2f}'.format(mt.total_iva_neto|default(0)) }}</div>
+        <div class="metric-sub">{% if (mt.total_retenciones|default(0)) > 0 %}(– ${{ '{:,.2f}'.format(mt.total_retenciones|default(0)) }} retenciones){% else %}{{ ym_label }}{% endif %}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title-row">
+      <h3 class="section-title">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v16H4z"></path><path d="M8 8h8"></path><path d="M8 12h8"></path><path d="M8 16h5"></path></svg>
+        Listado
+      </h3>
+    </div>
+
+    {% if rows and rows|length > 0 %}
+    <div style="overflow:auto;">
+      <table class="table" style="min-width:1200px;">
+        <thead>
+          <tr>
+            <th style="min-width:100px;">Fecha</th>
+            <th>Receptor</th>
+            <th style="min-width:220px;">Concepto</th>
+            <th style="min-width:140px;">UUID</th>
+            <th style="min-width:110px;">Total</th>
+            <th style="min-width:100px;">IVA recibido</th>
+            <th style="min-width:80px;">Pago</th>
+            <th style="min-width:100px;">Estatus</th>
+            <th style="min-width:200px;">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+            {% for r in rows %}
+              <tr>
+                <td class="muted">{{ date_dd_mm_yyyy(r.fecha_emision) }}</td>
+                <td>
+                  <div style="font-weight:650;">{{ r.nombre_receptor or '—' }}</div>
+                  <div class="muted" style="font-size:12px;">{{ r.rfc_receptor or '' }}</div>
+                </td>
+                <td class="concepto-cell">{{ concepto_trunc(r.concepto) }}</td>
+                <td>
+                  <div style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; font-size:12px;">
+                    {{ short_uuid(r.uuid) }}
+                  </div>
+                </td>
+                <td style="font-weight:650;">{{ money(r.total, r.moneda) }}</td>
+                <td class="muted">{{ money((r.impuestos|default(0)|float) - (r.retenciones|default(0)|float), r.moneda) }}</td>
+                <td>
+                  {% if r.metodo_pago %}
+                    <span class="pill" style="font-size:11px; padding:2px 6px;">
+                      {{ r.metodo_pago }}
+                    </span>
+                  {% else %}
+                    <span class="muted">—</span>
+                  {% endif %}
+                </td>
+                <td>{{ status_pill(r.status) }}</td>
+                <td style="text-align:right;">
+                  <span class="btn-group">
+                    <a class="btn btn-ghost" href="/portal/cfdi/issued/{{ r.uuid }}" style="text-decoration:none;">Ver detalle</a>
+                    {% if r.xml_path %}
+                      <a class="btn" href="/portal/sat/xml/{{ r.uuid }}" target="_blank" rel="noopener" style="text-decoration:none;">XML</a>
+                      <button type="button" class="btn" data-pdf-url="/portal/sat/pdf/{{ r.uuid }}">PDF</button>
+                    {% elif r.xml_status == 'pending' %}
+                      <span class="muted" style="font-size:11px;">Descargando...</span>
+                    {% elif r.xml_status == 'error' %}
+                      <span class="muted" style="font-size:11px; color:#d32f2f;">Error XML</span>
+                    {% else %}
+                      <span class="muted">(sin XML)</span>
+                    {% endif %}
+                  </span>
+                </td>
+              </tr>
+            {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="empty-state" style="padding:32px 20px;">
+      <div class="empty-state__icon" aria-hidden="true">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/><path d="M14 2v5a1 1 0 0 0 1 1h5"/><path d="M12 12v6"/><path d="m15 15-3-3-3 3"/></svg>
+      </div>
+      <div class="empty-state__title">No hay facturas emitidas en {{ ym_label }}</div>
+      <div class="empty-state__desc muted">Cuando timbres facturas aparecerán aquí. Puedes cambiar de mes con el selector arriba.</div>
+      <a href="/portal/create" class="btn btn-primary" style="text-decoration:none; margin-top:12px;">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width:18px;height:18px;"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+        Generar factura
+      </a>
+    </div>
+    {% endif %}
+  </div>
+{% endblock %}

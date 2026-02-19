@@ -1,0 +1,73 @@
+{% extends "base_portal.html" %}
+
+{% set title = 'Resumen' %}
+{% set page_icon = '<svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M13 17V9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M18 17V5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M3 3v16a2 2 0 0 0 2 2h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 17v-3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>' %}
+
+{% block content %}
+  <header class="app-header" style="margin-bottom:14px;">
+    <div class="app-header__left">
+      <div class="app-title"></div>
+      <div class="app-subtitle muted">Resumen del mes con ingresos, gastos e IVA (sin IVA y neto de retenciones).</div>
+    </div>
+  </header>
+
+  <div class="card ym-card" style="margin-bottom:14px;">
+    <div class="ym-selector" style="margin-bottom:14px;">
+      {{ month_picker('/portal/summary', token, ym, ym_label) }}
+    </div>
+  </div>
+
+  <div class="dashboard-metrics fade-in mb-20">
+    <div class="card metric-card">
+      <div class="metric-label">
+        <svg class="icon" viewBox="0 0 24 24" fill="none"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Ingresos (sin IVA)
+      </div>
+      <div class="metric-value">${{ '{:,.2f}'.format(ingresos_sin_iva|default(0)) }}</div>
+      <div class="metric-sub">Del mes ({{ ym_label }})</div>
+    </div>
+
+    <div class="card metric-card">
+      <div class="metric-label">
+        <svg class="icon" viewBox="0 0 24 24" fill="none"><path d="M12 22v-20M7 19h5a3.5 3.5 0 0 0 0-7H7M14 5H9.5a3.5 3.5 0 0 0 0 7H6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Gastos (sin IVA)
+      </div>
+      <div class="metric-value">${{ '{:,.2f}'.format(gastos_sin_iva|default(0)) }}</div>
+      <div class="metric-sub">Del mes ({{ ym_label }})</div>
+    </div>
+
+    <div class="card metric-card">
+      <div class="metric-label">
+        <svg class="icon" viewBox="0 0 24 24" fill="none"><path d="M21 12a9 9 0 1 1-9-9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M21 3v6h-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        IVA recibido (neto)
+      </div>
+      <div class="metric-value">${{ '{:,.2f}'.format(iva_recibido_neto|default(0)) }}</div>
+      <div class="metric-sub">{% if iva_retenciones|default(0) > 0 %}(– ${{ '{:,.2f}'.format(iva_retenciones) }} retenciones){% else %}Del mes ({{ ym_label }}){% endif %}</div>
+    </div>
+
+    <div class="card metric-card">
+      <div class="metric-label">
+        <svg class="icon" viewBox="0 0 24 24" fill="none"><path d="M22 12h-4l-3 9L9 3l-3 9H2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        IVA pagado
+      </div>
+      <div class="metric-value">${{ '{:,.2f}'.format(iva_pagado|default(0)) }}</div>
+      <div class="metric-sub">Del mes ({{ ym_label }})</div>
+    </div>
+  </div>
+
+  <div class="card p-20">
+    <div class="card-title-row mb-14">
+      <h3 class="section-title">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v16H4z"></path><path d="M8 8h8"></path><path d="M8 12h8"></path><path d="M8 16h5"></path></svg>
+        Detalle del mes
+      </h3>
+    </div>
+    <p class="muted" style="margin:0;">
+      Los montos anteriores provienen de tus CFDI emitidos y recibidos (SAT). IVA recibido es el IVA cobrado menos las retenciones que te aplicaron. Para cálculos fiscales (RESICO / Act. Empresarial) consulta a tu contador.
+    </p>
+    <div style="margin-top:14px; display:flex; gap:12px; flex-wrap:wrap;">
+      <a href="/portal/invoices/issued" class="btn btn-ghost" style="text-decoration:none;">Ver facturas emitidas</a>
+      <a href="/portal/invoices/received" class="btn btn-ghost" style="text-decoration:none;">Ver facturas recibidas</a>
+    </div>
+  </div>
+{% endblock %}

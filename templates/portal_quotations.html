@@ -1,0 +1,564 @@
+{% extends "base_portal.html" %}
+
+{% set title = 'Cotizaciones' %}
+{% set page_icon = '<svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M8 4h8v2H8z" stroke="currentColor" stroke-width="1.8"/><path d="M8 10h8v2H8z" stroke="currentColor" stroke-width="1.8"/><path d="M8 16h5" stroke="currentColor" stroke-width="1.8"/><path d="M6 2a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6H6z" stroke="currentColor" stroke-width="1.8"/><path d="M14 2v6h6" stroke="currentColor" stroke-width="1.8"/></svg>' %}
+
+{% macro status_pill(s) %}
+  {% set st = (s|default('')|string)|lower %}
+  {% if st == 'draft' %}
+    <span class="pill" style="border-color:#e0e0e0; background:#f5f5f5;">Borrador</span>
+  {% elif st == 'sent' %}
+    <span class="pill" style="border-color:#c9daf8; background:#eef4fc;">Enviada</span>
+  {% elif st == 'accepted' %}
+    <span class="pill" style="border-color:#cfead9; background:#f3fcf6;">Aceptada</span>
+  {% elif st == 'rejected' %}
+    <span class="pill" style="border-color:#f2c9c9; background:#fff4f4;">Rechazada</span>
+  {% elif st == 'converted' %}
+    <span class="pill" style="border-color:#d4c9f2; background:#f4f0fc;">Facturada</span>
+  {% elif st == 'expired' %}
+    <span class="pill" style="border-color:#ccc; background:#f5f5f5; color:#666;">Expirada</span>
+  {% else %}
+    <span class="pill">{{ s or '-' }}</span>
+  {% endif %}
+{% endmacro %}
+
+{% block content %}
+<section class="page-section page-section--quotations">
+  <header class="app-header" style="margin-bottom:14px;">
+    <div class="app-header__left">
+      <div class="app-title"></div>
+      <div class="app-subtitle">Crea cotizaciones y comparte el link para que tu cliente acepte o rechace.</div>
+    </div>
+  </header>
+
+  <div class="card">
+    <div class="card-header card-header--with-tools">
+      <div class="card-header__left">
+        <button type="button" class="btn btn-primary" id="quotNewBtn">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M12 5v14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M5 12h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
+          Nueva cotización
+        </button>
+      </div>
+      <div class="card-header__right">
+        <h3 class="section-title">Listado</h3>
+        <p class="muted" style="margin:0;"><span id="quotCount">Cargando…</span></p>
+      </div>
+    </div>
+
+    <div class="card-list-sep">
+      <div style="overflow:auto;" id="quotTableWrap">
+        <table class="table" id="quotTable" style="min-width:1000px;">
+          <thead>
+            <tr>
+              <th style="min-width:100px;">Fecha</th>
+              <th style="min-width:200px;">Cliente</th>
+              <th style="min-width:100px;">Total</th>
+              <th style="min-width:110px;">Estatus</th>
+              <th style="min-width:180px;">Link para cliente</th>
+              <th style="min-width:100px;">Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="quotTbody">
+            <tr><td colspan="6"><div class="skeleton" style="height:46px; border-radius:14px;"></div></td></tr>
+            <tr><td colspan="6"><div class="skeleton" style="height:46px; border-radius:14px;"></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="empty-state" id="quotEmpty" hidden>
+        <div class="empty-state__icon" aria-hidden="true">
+          <svg class="icon" viewBox="0 0 24 24" fill="none"><path d="M8 4h8v2H8z" stroke="currentColor" stroke-width="1.8"/><path d="M8 10h8v2H8z" stroke="currentColor" stroke-width="1.8"/><path d="M8 16h5" stroke="currentColor" stroke-width="1.8"/><path d="M6 2a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6H6z" stroke="currentColor" stroke-width="1.8"/><path d="M14 2v6h6" stroke="currentColor" stroke-width="1.8"/></svg>
+        </div>
+        <div class="empty-state__title">Aún no tienes cotizaciones</div>
+        <div class="empty-state__desc">Crea una cotización, comparte el link con tu cliente y él podrá aceptar o rechazarla desde el navegador.</div>
+        <button type="button" class="btn btn-primary" id="quotEmptyBtn">Nueva cotización</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: nueva cotización -->
+  <div class="modal" id="quotModal" hidden aria-hidden="true">
+    <div class="modal__backdrop" data-close="true"></div>
+    <div class="modal__panel modal__panel--wide" role="dialog" aria-modal="true" aria-labelledby="quotModalTitle">
+      <div class="modal__head">
+        <div>
+          <div class="modal__title" id="quotModalTitle">Nueva cotización</div>
+          <div class="modal__subtitle">Cliente y conceptos. Luego guarda como borrador o envía y comparte el link.</div>
+        </div>
+        <button type="button" class="icon-btn" data-close="true" aria-label="Cerrar">
+          <svg class="icon" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12" stroke="currentColor" stroke-width="1.8"/><path d="M18 6 6 18" stroke="currentColor" stroke-width="1.8"/></svg>
+        </button>
+      </div>
+
+      <div class="modal__body">
+        <div class="field">
+          <label class="label">Cliente *</label>
+          <select id="quotCustomer" class="input" aria-describedby="quotCustomerHelp">
+            <option value="">— Selecciona un cliente —</option>
+            <option value="__manual__">— Ingresar nombre manualmente —</option>
+          </select>
+          <div id="quotClientManualWrap" class="quot-manual-wrap" style="display:none; margin-top:10px;">
+            <div class="field">
+              <label class="label" for="quotClientNameManual">Nombre del cliente *</label>
+              <input type="text" id="quotClientNameManual" class="input" placeholder="Razón social o nombre" />
+            </div>
+            <div class="field">
+              <label class="label" for="quotClientEmailManual">Email (opcional)</label>
+              <input type="email" id="quotClientEmailManual" class="input" placeholder="correo@ejemplo.com" />
+            </div>
+          </div>
+          <div class="help" id="quotCustomerHelp" hidden>Indica el cliente: selecciona uno de la lista o elige "Ingresar nombre manualmente" y escribe el nombre.</div>
+        </div>
+
+        <div class="field">
+          <label class="label">Conceptos *</label>
+          <div class="quot-lines-wrap">
+            <table class="table" id="quotLinesTable" style="margin-bottom:10px;">
+              <thead>
+                <tr>
+                  <th style="width:40%;">Descripción</th>
+                  <th style="width:12%;">Cant.</th>
+                  <th style="width:18%;">P. unit.</th>
+                  <th style="width:12%;">IVA</th>
+                  <th style="width:12%;">Importe</th>
+                  <th style="width:6%;"></th>
+                </tr>
+              </thead>
+              <tbody id="quotLinesBody"></tbody>
+            </table>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <button type="button" class="btn btn-ghost btn-small" id="quotAddLine">+ Línea manual</button>
+              <select id="quotAddProduct" class="input" style="width:auto; max-width:280px;">
+                <option value="">+ Agregar desde producto</option>
+              </select>
+            </div>
+          </div>
+          <div class="help" id="quotLinesHelp" hidden>Agrega al menos un concepto.</div>
+        </div>
+
+        <div class="field">
+          <label class="label">Notas (opcional)</label>
+          <textarea id="quotNotes" class="input" rows="2" placeholder="Condiciones, vigencia, etc."></textarea>
+        </div>
+      </div>
+
+      <div class="modal__foot">
+        <button type="button" class="btn btn-ghost" data-close="true">Cancelar</button>
+        <button type="button" class="btn btn-ghost" id="quotSaveDraft">Guardar borrador</button>
+        <button type="button" class="btn btn-primary" id="quotSend">Enviar y obtener link</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: link generado (después de crear); modal--top para quedar por encima del de nueva cotización -->
+  <div class="modal modal--top" id="quotLinkModal" hidden aria-hidden="true">
+    <div class="modal__backdrop" data-close="true"></div>
+    <div class="modal__panel" role="dialog" aria-modal="true" aria-labelledby="quotLinkModalTitle">
+      <div class="modal__head">
+        <div>
+          <div class="modal__title" id="quotLinkModalTitle">Link para tu cliente</div>
+          <div class="modal__subtitle">Comparte este link. Tu cliente podrá ver la cotización y aceptar o rechazar.</div>
+        </div>
+        <button type="button" class="icon-btn" data-close="true" aria-label="Cerrar">
+          <svg class="icon" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12" stroke="currentColor" stroke-width="1.8"/><path d="M18 6 6 18" stroke="currentColor" stroke-width="1.8"/></svg>
+        </button>
+      </div>
+      <div class="modal__body">
+        <div class="field">
+          <label class="label">URL</label>
+          <div style="display:flex; gap:8px;">
+            <input type="text" id="quotLinkInput" class="input" readonly style="flex:1;" />
+            <button type="button" class="btn btn-primary" id="quotCopyLink">Copiar</button>
+          </div>
+        </div>
+      </div>
+      <div class="modal__foot">
+        <button type="button" class="btn btn-primary" data-close="true">Listo</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+(function(){
+  const token = "{{ token }}";
+  const baseUrl = window.location.origin;
+
+  const tbody = document.getElementById('quotTbody');
+  const countEl = document.getElementById('quotCount');
+  const emptyEl = document.getElementById('quotEmpty');
+  const tableWrap = document.getElementById('quotTableWrap');
+
+  const modal = document.getElementById('quotModal');
+  const linkModal = document.getElementById('quotLinkModal');
+  const openBtn = document.getElementById('quotNewBtn');
+  const emptyBtn = document.getElementById('quotEmptyBtn');
+  const quotCustomer = document.getElementById('quotCustomer');
+  const quotLinesBody = document.getElementById('quotLinesBody');
+  const quotAddLine = document.getElementById('quotAddLine');
+  const quotAddProduct = document.getElementById('quotAddProduct');
+  const quotNotes = document.getElementById('quotNotes');
+  const quotSaveDraft = document.getElementById('quotSaveDraft');
+  const quotSend = document.getElementById('quotSend');
+  const quotLinkInput = document.getElementById('quotLinkInput');
+  const quotCopyLink = document.getElementById('quotCopyLink');
+
+  let allRows = [];
+  let customers = [];
+  let products = [];
+  let lines = []; // { description, quantity, unit_price, iva_rate }
+
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+  function statusLabel(s){
+    const map = { draft:'Borrador', sent:'Enviada', accepted:'Aceptada', rejected:'Rechazada', converted:'Facturada' };
+    return map[s] || s;
+  }
+
+  function formatDate(createdAt){
+    if (!createdAt) return '-';
+    const d = createdAt.slice(0,10);
+    const [y,m,day] = d.split('-');
+    return day + '/' + m + '/' + y;
+  }
+
+  function formatMoney(n){
+    return '$' + Number(n).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function publicLink(publicToken){
+    return baseUrl + '/q/' + publicToken;
+  }
+
+  function setCount(n){
+    countEl.textContent = (n === 1) ? '1 cotización' : (n + ' cotizaciones');
+  }
+
+  function rowHTML(r){
+    const total = formatMoney(r.total);
+    const status = statusLabel(r.status);
+    const link = (r.status === 'draft' || r.status === 'sent' || r.status === 'accepted' || r.status === 'rejected')
+      ? publicLink(r.public_token) : '';
+    const canCopy = link && (r.status === 'draft' || r.status === 'sent');
+    return `
+      <tr>
+        <td class="muted">${esc(formatDate(r.created_at))}</td>
+        <td><div style="font-weight:600;">${esc(r.customer_legal_name)}</div><div class="muted" style="font-size:12px;">${esc(r.customer_rfc || '')}</div></td>
+        <td>${total}</td>
+        <td><span class="pill">${esc(status)}</span></td>
+        <td style="font-size:12px;">
+          ${canCopy ? `<button type="button" class="btn btn-small btn-ghost" data-copy-link="${esc(r.public_token)}" title="Copiar link">Copiar link</button>` : '-'}
+        </td>
+        <td>
+          <a href="/portal/quotations/${r.id}" class="btn btn-small">Ver detalle</a>
+          ${link ? ` <a href="${esc(link)}" target="_blank" rel="noopener" class="btn btn-small btn-ghost">Ver como cliente</a>` : ''}
+        </td>
+      </tr>
+    `;
+  }
+
+  function render(rows){
+    const n = rows.length;
+    setCount(n);
+    if (n === 0) {
+      tbody.innerHTML = '';
+      tableWrap.hidden = true;
+      emptyEl.hidden = false;
+      return;
+    }
+    tableWrap.hidden = false;
+    emptyEl.hidden = true;
+    tbody.innerHTML = rows.map(rowHTML).join('');
+  }
+
+  async function load(){
+    try {
+      const res = await fetch('/api/quotations');
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      allRows = Array.isArray(data) ? data : [];
+      render(allRows);
+    } catch (e) {
+      allRows = [];
+      render([]);
+      window.portalToast && window.portalToast({ type: 'danger', title: 'Error', message: 'No se pudo cargar cotizaciones' });
+    }
+  }
+
+  async function loadCustomers(){
+    try {
+      const res = await fetch('/api/customers');
+      if (!res.ok) return;
+      const data = await res.json();
+      customers = Array.isArray(data) ? data : [];
+      quotCustomer.innerHTML = '<option value="">— Selecciona un cliente —</option><option value="__manual__">— Ingresar nombre manualmente —</option>' +
+        customers.map(c => '<option value="' + esc(c.rfc) + '" data-name="' + esc(c.legal_name) + '" data-email="' + esc(c.email || '') + '">' + esc(c.legal_name || c.rfc) + (c.rfc ? ' (' + esc(c.rfc) + ')' : '') + '</option>').join('');
+    } catch (_) {}
+  }
+
+  async function loadProducts(){
+    try {
+      const res = await fetch('/api/products');
+      if (!res.ok) return;
+      const data = await res.json();
+      products = Array.isArray(data) ? data : [];
+      quotAddProduct.innerHTML = '<option value="">+ Agregar desde producto</option>' +
+        products.map(p => '<option value="' + p.id + '" data-desc="' + esc(p.description) + '" data-price="' + (p.unit_price || 0) + '" data-iva="' + (p.iva_rate || 0.16) + '">' + esc(p.description) + '</option>').join('');
+    } catch (_) {}
+  }
+
+  const quotClientNameManual = document.getElementById('quotClientNameManual');
+  const quotClientEmailManual = document.getElementById('quotClientEmailManual');
+  const quotClientManualWrap = document.getElementById('quotClientManualWrap');
+
+  function getSelectedCustomer(){
+    const sel = quotCustomer.options[quotCustomer.selectedIndex];
+    if (!sel) return null;
+    if (sel.value === '__manual__') {
+      const name = (quotClientNameManual && quotClientNameManual.value || '').trim();
+      return name ? { rfc: '', legal_name: name, email: (quotClientEmailManual && quotClientEmailManual.value || '').trim() } : null;
+    }
+    if (!sel.value) return null;
+    return {
+      rfc: sel.value,
+      legal_name: sel.getAttribute('data-name') || sel.value,
+      email: sel.getAttribute('data-email') || '',
+    };
+  }
+
+  function toggleManualClientFields(){
+    const isManual = quotCustomer.value === '__manual__';
+    if (quotClientManualWrap) quotClientManualWrap.style.display = isManual ? 'block' : 'none';
+    if (isManual && quotClientNameManual) quotClientNameManual.focus();
+  }
+
+  function addLine(desc, qty, unitPrice, ivaRate){
+    lines.push({
+      description: desc || '',
+      quantity: Number(qty) || 1,
+      unit_price: Number(unitPrice) || 0,
+      iva_rate: Number(ivaRate) || 0.16,
+    });
+    renderLines();
+  }
+
+  function renderLines(){
+    quotLinesBody.innerHTML = lines.map((line, i) => {
+      const subtotal = line.quantity * line.unit_price;
+      const totalLine = subtotal * (1 + line.iva_rate);
+      return `
+        <tr data-i="${i}">
+          <td><input type="text" class="input input--sm quot-line-desc" value="${esc(line.description)}" placeholder="Descripción" /></td>
+          <td><input type="number" class="input input--sm quot-line-qty" min="0.001" step="0.01" value="${line.quantity}" style="width:70px;" /></td>
+          <td><input type="number" class="input input--sm quot-line-price" min="0" step="0.01" value="${line.unit_price}" style="width:90px;" /></td>
+          <td><input type="number" class="input input--sm quot-line-iva" min="0" max="1" step="0.01" value="${line.iva_rate}" style="width:60px;" /></td>
+          <td class="muted">${formatMoney(totalLine)}</td>
+          <td><button type="button" class="btn btn-ghost btn-small quot-line-remove" data-i="${i}" aria-label="Quitar">×</button></td>
+        </tr>
+      `;
+    }).join('');
+
+    quotLinesBody.querySelectorAll('.quot-line-remove').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const i = parseInt(btn.getAttribute('data-i'), 10);
+        lines.splice(i, 1);
+        renderLines();
+      });
+    });
+
+    quotLinesBody.querySelectorAll('input').forEach(inp => {
+      inp.addEventListener('input', () => syncLinesFromDom());
+    });
+  }
+
+  function syncLinesFromDom(){
+    quotLinesBody.querySelectorAll('tr[data-i]').forEach(tr => {
+      const i = parseInt(tr.getAttribute('data-i'), 10);
+      const desc = (tr.querySelector('.quot-line-desc') || {}).value || '';
+      const qty = parseFloat((tr.querySelector('.quot-line-qty') || {}).value) || 1;
+      const price = parseFloat((tr.querySelector('.quot-line-price') || {}).value) || 0;
+      let iva = parseFloat((tr.querySelector('.quot-line-iva') || {}).value) || 0.16;
+      if (iva > 1) iva = iva / 100;
+      if (lines[i]) {
+        lines[i] = { description: desc, quantity: qty, unit_price: price, iva_rate: iva };
+      }
+    });
+  }
+
+  function openModal(){
+    lines = [];
+    addLine('', 1, 0, 0.16);
+    quotCustomer.selectedIndex = 0;
+    if (quotClientNameManual) quotClientNameManual.value = '';
+    if (quotClientEmailManual) quotClientEmailManual.value = '';
+    toggleManualClientFields();
+    quotNotes.value = '';
+    document.getElementById('quotCustomerHelp').hidden = true;
+    document.getElementById('quotLinesHelp').hidden = true;
+    modal.hidden = false;
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('no-scroll');
+  }
+
+  function closeModal(){
+    modal.hidden = true;
+    modal.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('no-scroll');
+  }
+
+  function openLinkModal(publicToken){
+    closeModal();
+    quotLinkInput.value = publicLink(publicToken);
+    linkModal.hidden = false;
+    linkModal.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('no-scroll');
+    quotCopyLink.onclick = () => {
+      navigator.clipboard.writeText(quotLinkInput.value).then(() => {
+        window.portalToast && window.portalToast({ type: 'success', title: 'Copiado', message: 'Link copiado al portapapeles' });
+      }).catch(() => {});
+    };
+  }
+
+  function closeLinkModal(){
+    linkModal.hidden = true;
+    linkModal.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('no-scroll');
+  }
+
+  function validate(){
+    syncLinesFromDom();
+    const cust = getSelectedCustomer();
+    const validLines = lines.filter(l => (l.description || '').trim() && Number.isFinite(Number(l.unit_price)));
+    const helpCustomer = document.getElementById('quotCustomerHelp');
+    const helpLines = document.getElementById('quotLinesHelp');
+    if (helpCustomer) helpCustomer.hidden = !!cust;
+    if (helpLines) helpLines.hidden = validLines.length > 0;
+    return !!cust && validLines.length > 0;
+  }
+
+  async function save(sendAsSent){
+    syncLinesFromDom();
+    if (!validate()) {
+      const cust = getSelectedCustomer();
+      const validLines = lines.filter(l => (l.description || '').trim() && Number.isFinite(Number(l.unit_price)));
+      if (!cust) window.portalToast && window.portalToast({ type: 'danger', title: 'Cliente requerido', message: 'Selecciona un cliente de la lista o elige "Ingresar nombre manualmente" y escribe el nombre.' });
+      else if (validLines.length === 0) window.portalToast && window.portalToast({ type: 'danger', title: 'Conceptos requeridos', message: 'Agrega al menos un concepto con descripción y precio unitario.' });
+      return;
+    }
+    const cust = getSelectedCustomer();
+    const items = lines
+      .filter(l => (l.description || '').trim() && Number.isFinite(Number(l.unit_price)))
+      .map(l => ({
+        description: (l.description || '').trim(),
+        quantity: Number(l.quantity) || 1,
+        unit_price: Number(l.unit_price) || 0,
+        iva_rate: Number(l.iva_rate) || 0.16,
+      }));
+    if (!items.length) {
+      window.portalToast && window.portalToast({ type: 'danger', title: 'Conceptos', message: 'Agrega al menos un concepto con descripción y precio.' });
+      return;
+    }
+
+    const payload = {
+      token,
+      customer_rfc: cust.rfc || '',
+      customer_legal_name: cust.legal_name,
+      customer_email: (cust.email || '').trim() || null,
+      notes: (quotNotes.value || '').trim() || null,
+      status: sendAsSent ? 'sent' : 'draft',
+      items,
+    };
+
+    const btn = sendAsSent ? quotSend : quotSaveDraft;
+    btn.disabled = true;
+    btn.textContent = 'Guardando…';
+
+    try {
+      const res = await fetch('/api/quotations/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || 'Error al guardar');
+
+      window.portalToast && window.portalToast({ type: 'success', title: 'Listo', message: sendAsSent ? 'Cotización enviada. Comparte el link con tu cliente.' : 'Cotización guardada como borrador.' });
+      closeModal();
+      await load();
+
+      if (sendAsSent && data.public_token) {
+        openLinkModal(data.public_token);
+      }
+    } catch (e) {
+      window.portalToast && window.portalToast({ type: 'danger', title: 'Error', message: String(e.message || e) });
+    } finally {
+      btn.disabled = false;
+      btn.textContent = sendAsSent ? 'Enviar y obtener link' : 'Guardar borrador';
+    }
+  }
+
+  if (quotCustomer) quotCustomer.addEventListener('change', toggleManualClientFields);
+
+  quotAddLine.addEventListener('click', () => addLine('', 1, 0, 0.16));
+  quotAddProduct.addEventListener('change', function(){
+    const opt = this.options[this.selectedIndex];
+    if (!opt || !opt.value) return;
+    addLine(opt.getAttribute('data-desc'), 1, opt.getAttribute('data-price'), opt.getAttribute('data-iva'));
+    this.selectedIndex = 0;
+  });
+
+  quotSaveDraft.addEventListener('click', () => save(false));
+  quotSend.addEventListener('click', () => save(true));
+
+  openBtn.addEventListener('click', openModal);
+  emptyBtn.addEventListener('click', openModal);
+
+  modal.addEventListener('click', function(e){
+    if (e.target.getAttribute('data-close') === 'true' || e.target.closest('[data-close="true"]') || e.target.classList.contains('modal__backdrop')) closeModal();
+  });
+  linkModal.addEventListener('click', function(e){
+    if (e.target.getAttribute('data-close') === 'true' || e.target.closest('[data-close="true"]') || e.target.classList.contains('modal__backdrop')) closeLinkModal();
+  });
+
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape') { if (!modal.hidden) closeModal(); if (!linkModal.hidden) closeLinkModal(); }
+  });
+
+  document.addEventListener('click', async function(e){
+    const copyBtn = e.target && e.target.closest ? e.target.closest('[data-copy-link]') : null;
+    if (copyBtn) {
+      const pt = copyBtn.getAttribute('data-copy-link');
+      const url = publicLink(pt);
+      try {
+        await navigator.clipboard.writeText(url);
+        window.portalToast && window.portalToast({ type: 'success', title: 'Copiado', message: 'Link copiado al portapapeles' });
+      } catch (_) {}
+    }
+  });
+
+  load();
+  loadCustomers();
+  loadProducts();
+})();
+</script>
+
+<style>
+.page-section--quotations { margin-top: 8px; }
+.page-section--quotations .card-list-sep { margin-top: 20px; }
+/* Panel ancho para el modal de nueva cotización (cliente + conceptos + notas) */
+.modal__panel--wide {
+  width: min(720px, calc(100vw - 28px));
+  min-width: 320px;
+  max-width: 720px;
+}
+/* Asegurar cabeza y pie del modal no se compriman */
+.modal__head { flex-shrink: 0; }
+.modal__foot { flex-shrink: 0; }
+.quot-lines-wrap .input--sm { padding: 6px 10px; font-size: 13px; }
+#quotTable td { vertical-align: middle; }
+#quotTable .btn { margin-right: 6px; }
+</style>
+{% endblock %}

@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Entrar al portal · ContaNeta</title>
+  <link rel="stylesheet" href="/static/css/form.css">
+  <style>
+    body { max-width: 420px; margin: 2rem auto; padding: 0 1rem; }
+    .login-card { padding: 1.5rem; border: 1px solid #e0e0e0; border-radius: 8px; }
+    .login-card h1 { margin: 0 0 1rem; font-size: 1.25rem; }
+    .login-card .danger { color: #c00; margin-bottom: 1rem; }
+    .login-card input { width: 100%; padding: 0.5rem; margin-bottom: 1rem; }
+    .login-card button { width: 100%; padding: 0.6rem; }
+  </style>
+</head>
+<body>
+  <div class="login-card">
+    <h1>Entrar al portal</h1>
+    <p class="muted">Ingresa tu token de acceso (solo una vez; después navegarás con sesión).</p>
+    {% if error %}
+      <p class="danger">{{ error }}</p>
+    {% endif %}
+    <form method="GET" action="/login">
+      <input type="text" name="token" placeholder="Token de acceso" autocomplete="off" required />
+      <button type="submit" class="btn btn-primary">Entrar</button>
+    </form>
+  </div>
+</body>
+</html>

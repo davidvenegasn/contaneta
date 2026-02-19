@@ -1,0 +1,914 @@
+* { box-sizing: border-box; }
+
+:root{
+  --bg: #f6f7fb;
+  --card-bg:#fff;
+  --text:#0f172a;
+  --muted:#64748b;
+  --border:#e6e8ef;
+  --border-strong:#d7dbe6;
+  --primary:#16a34a;         /* green */
+  --primary-hover:#15803d;
+  --focus: rgba(22,163,74,.22);
+  --radius: 14px;
+  --shadow: 0 10px 30px rgba(15, 23, 42, .06);
+
+  /* Columns: Cantidad | Descripción | ProdServ | Precio | Desc% | Unidad | ✕ */
+  --concept-cols: 120px minmax(260px, 2.2fr) minmax(220px, 1.6fr) 170px 140px 200px 44px;
+
+  /* Portal layout vars (used by action-bar) */
+  --sidebar-w: 260px;
+  --main-pad: 22px;
+  /* Safe areas (iPhone notch, home indicator) */
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+}
+
+html, body{ background: var(--bg); }
+
+body{
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+  margin: 0;
+  padding: 0;
+  color: var(--text);
+}
+
+h2{ font-size: 28px; letter-spacing:-.02em; margin: 8px 0 6px; }
+h3{ font-size: 16px; margin: 0 0 10px; }
+
+.row{ display:grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+label{ font-size: 12px; font-weight: 700; display:block; margin-bottom:6px; color: #334155; }
+
+input, select, textarea{
+  width:100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  font-size: 14px;
+  line-height: 1.2;
+  background: #fff;
+  height: 44px;
+  transition: box-shadow .15s ease, border-color .15s ease;
+}
+
+input:focus, select:focus, textarea:focus{
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: none;
+  transform: translateY(-1px);
+}
+
+input::placeholder, textarea::placeholder{ color:#94a3b8; }
+
+.card{
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  box-shadow: var(--shadow);
+  transition: box-shadow 180ms ease, transform 180ms ease, border-color 180ms ease;
+  will-change: transform;
+}
+
+.card:hover{
+  border-color: var(--border-strong);
+  box-shadow: 0 12px 36px rgba(15,23,42,.08);
+}
+
+.items{ margin-top: 10px; overflow-x: visible; }
+
+/* Concept rows are now composed of .item-row-top and .item-row-bottom grids */
+.items .item { display:block; }
+
+.muted{ color: var(--muted); font-size: 12px; }
+.danger { color:#b00020; font-weight:700; }
+.hidden { display:none; }
+
+button{
+  padding: 10px 16px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: var(--primary);
+  color:#fff;
+  font-weight:800;
+  cursor:pointer;
+  transition: transform .08s ease, box-shadow .18s ease, background .18s ease;
+}
+
+button:hover{
+  background: var(--primary-hover);
+  box-shadow: none;
+}
+
+button:active{
+  transform: translateY(1px);
+}
+
+/* ===== Conceptos layout (Excel-like) ===== */
+.item-head{
+  font-size:12px;
+  font-weight:700;
+  color:#333;
+  display:grid;
+  grid-template-columns: var(--concept-cols);
+  gap:12px;
+  align-items:center;
+}
+
+.item-head > div,
+.item-head-bottom > div{
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.btn-secondary{
+  background:#fff;
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+  font-weight:800;
+}
+.btn-secondary:hover{ filter:brightness(.98); }
+
+.pill{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding: 4px 10px;
+  border:1px solid var(--border);
+  border-radius:999px;
+  font-size:12px;
+  color:#334155;
+  background:#f8fafc;
+}
+
+.cust-item { display:flex; align-items:flex-start; gap:10px; padding:8px 8px; border-radius:8px; }
+.cust-item:hover { background:#fafafa; }
+.cust-meta { font-size:12px; color:#444; }
+.cust-sub { font-size:12px; color:#666; margin-top:2px; }
+.cust-check { width:auto; margin-top:2px; }
+
+details.card > summary::-webkit-details-marker { display: none; }
+details.card > summary::before { content: "▶"; display:inline-block; margin-right:8px; transition: transform .15s ease; }
+details.card[open] > summary::before { transform: rotate(90deg); }
+details.card > summary { user-select:none; }
+
+.unit-wrap { display:flex; flex-direction:column; gap:6px; }
+.unit-wrap select, .unit-wrap input { width:100%; }
+.unit-back { font-size:12px; color:#2b6; text-decoration:none; }
+.unit-back:hover { text-decoration:underline; }
+
+/* ====== Conceptos: retenciones abajo + buscador ProdServ ====== */
+.item-row { display:block; }
+/* Ensure legacy .item styles never override the new layout */
+.item.item-row { display:block !important; }
+
+.item-row-top{
+  display:grid;
+  grid-template-columns: var(--concept-cols);
+  gap:12px;
+  align-items:center;
+}
+
+/* Each concept cell wrapper */
+.field{ display:block; min-width:0; }
+
+/* Hide mobile labels by default (desktop) */
+.field::before{ content:""; display:none; }
+
+/* Allow grid children to shrink properly (prevents overflow/collapsing) */
+.item-row-top > *,
+.item-row-bottom > *,
+.item-head > *{ min-width: 0; }
+
+/* Ensure the remove (✕) button stays compact */
+.item-row-top .removeItemBtn{
+  width:44px;
+  height:44px;
+  padding:0;
+  border-radius:12px;
+  background:#fff;
+  color:#0f172a;
+  border:1px solid var(--border-strong);
+  font-weight:900;
+}
+.item-row-top .removeItemBtn:hover{ background:#f8fafc; }
+
+.small-head{ font-size:12px; }
+
+.mini-label{
+  display:block;
+  font-size:12px;
+  margin:0 0 6px;
+}
+
+.ret-wrap{ justify-self:start; }
+.ret-wrap select{ max-width:180px; height:44px; }
+
+/* $ prefijo en Precio unitario */
+.price-wrap{
+  display:flex;
+  align-items:center;
+  border:1px solid var(--border-strong);
+  border-radius:12px;
+  padding:0 12px;
+  height:44px;
+  background:#fff;
+}
+.price-prefix{ font-weight:700; margin-right:8px; opacity:.8; }
+.price-wrap input{
+  border:0 !important;
+  outline:none;
+  height:42px;
+  width:100%;
+  padding:0 !important;
+  background:transparent;
+}
+
+/* ProdServ grid alignment fix */
+.prodserv-wrap{ width:100%; }
+.prodserv-input{ display:flex; gap:8px; align-items:center; min-width:0; }
+.prodserv-input > input{ flex:1 1 auto; }
+.prodservBtn{
+  flex: 0 0 40px;
+  height:40px;
+  width:40px;
+  border-radius:10px;
+  border:1px solid var(--border-strong);
+  background:#f7f7f7;
+  color: var(--text);
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:0;
+  font-weight:900;
+}
+.prodservBtn:hover{ background:#f3f4f6; }
+
+/* Modal ProdServ */
+.modal{ position:fixed; inset:0; z-index:9999; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.modal-backdrop{ position:absolute; inset:0; background:rgba(0,0,0,.35); }
+.modal-panel{
+  position:relative;
+  width:min(860px, calc(100% - 24px));
+  margin:60px auto;
+  background:#fff;
+  border-radius:16px;
+  border:1px solid var(--border);
+  overflow:hidden;
+}
+.modal-header{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+  padding:16px;
+  border-bottom:1px solid var(--border);
+}
+.modal-title{ font-weight:800; font-size:16px; }
+.modal-close{
+  height:40px;
+  width:40px;
+  min-width:44px;
+  min-height:44px;
+  border-radius:12px;
+  border:1px solid var(--border-strong);
+  background:#fff;
+  color: var(--text);
+  cursor:pointer;
+  padding:0;
+  font-weight:900;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+}
+.modal-close:hover{ background:#f8fafc; }
+
+.modal-body{ padding:16px; }
+#prodservModalInput{
+  width:100%;
+  height:44px;
+  min-height:44px;
+  border-radius:12px;
+  border:1px solid var(--border-strong);
+  padding:0 14px;
+}
+.modal-results{
+  margin-top:12px;
+  max-height:420px;
+  overflow:auto;
+  -webkit-overflow-scrolling: touch;
+  border:1px solid var(--border);
+  border-radius:12px;
+}
+.result-row{
+  width:100%;
+  display:grid;
+  grid-template-columns:130px 1fr;
+  gap:12px;
+  text-align:left;
+  padding:14px 12px;
+  min-height:48px;
+  border:0;
+  background:#fff;
+  cursor:pointer;
+  color: var(--text);
+}
+
+.result-row + .result-row{ border-top:1px solid var(--border); }
+
+.result-row:hover{
+  background:#fff;
+  filter:brightness(0.98);
+}
+
+.result-code{ font-weight:800; }
+.result-desc{ color:#333; }
+
+/* Modal y formulario: móvil */
+@media (max-width: 768px){
+  .modal-panel{
+    width: min(100%, calc(100vw - 24px - var(--safe-left) - var(--safe-right)));
+    margin: calc(20px + env(safe-area-inset-top, 0)) auto 20px;
+    max-height: calc(100vh - 40px - env(safe-area-inset-top, 0) - env(safe-area-inset-bottom, 0));
+    max-height: calc(100dvh - 40px - env(safe-area-inset-top, 0) - env(safe-area-inset-bottom, 0));
+    display:flex;
+    flex-direction:column;
+  }
+  .modal-body{
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    flex:1;
+    min-height:0;
+  }
+  .modal-results{ max-height: 50vh; }
+  .result-row{
+    grid-template-columns: 1fr;
+    gap: 4px;
+    padding: 12px;
+  }
+}
+
+@media (max-width: 520px){
+  .row{ grid-template-columns: 1fr; }
+  .app-content{ padding-left: calc(12px + var(--safe-left)); padding-right: calc(12px + var(--safe-right)); }
+  .app-header{ padding-left: 12px; padding-right: 12px; flex-wrap: wrap; }
+}
+
+/* Responsive: reflow Conceptos instead of horizontal scroll */
+@media (max-width:1200px){
+  /* Switch from “table headers” to per-field labels */
+  .item-head{ display:none; }
+
+  .item-row-top{
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    align-items:start;
+  }
+
+  .field{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+
+  .field::before{
+    content: attr(data-label);
+    display:block;
+    font-size:12px;
+    font-weight:700;
+    color:#333;
+  }
+
+  .field[data-label=""]::before{ display:none; }
+
+  /* Keep remove button neat inside a grid cell */
+  .field[data-label=""]{
+    align-items:flex-end;
+    justify-content:flex-end;
+  }
+}
+
+@media (max-width:980px){
+  .item-row-top{ grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (max-width:760px){
+  .item-row-top{ grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width:520px){
+  .item-row-top{ grid-template-columns: 1fr; }
+}
+
+/* ===== App header ===== */
+.app-header{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:14px;
+  padding:14px 16px;
+  margin: 12px auto 12px;
+  max-width: 1100px;
+}
+
+.app-title{
+  font-size:18px;
+  font-weight:800;
+  letter-spacing:.2px;
+}
+
+.app-subtitle{
+  margin-top:4px;
+  font-size:12px;
+  opacity:.75;
+}
+
+.status-pill{
+  display:inline-flex;
+  align-items:center;
+  padding:6px 10px;
+  border-radius:999px;
+  font-size:12px;
+  font-weight:700;
+  border:1px solid rgba(0,0,0,.08);
+  background: rgba(0,0,0,.03);
+}
+
+/* ===== Main container ===== */
+.app-content{
+  max-width:1100px;
+  margin: 0 auto;
+  padding: 0 16px 88px; /* espacio para action-bar fixed (más corto) */
+}
+
+/* ===== Card title row ===== */
+.card-title-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:6px;
+}
+
+.action-label{
+  font-size:12px;
+  opacity:.7;
+  font-weight:700;
+}
+
+.action-total{
+  font-size:18px;
+  font-weight:900;
+  margin-top:2px;
+}
+
+.action-hint, .action-note{
+  font-size:12px;
+  opacity:.7;
+  margin-top:2px;
+}
+
+.action-bar__right{
+  display:flex;
+  flex-direction:column;
+  align-items:flex-end;
+  gap:6px;
+}
+
+.btn-primary{
+  appearance:none;
+  border:0;
+  border-radius:12px;
+  padding:10px 14px;
+  font-weight:800;
+  cursor:pointer;
+}
+
+/* ===== Action bar (sticky bottom) ===== */
+.action-bar{
+  position: fixed;
+  bottom: calc(10px + var(--safe-bottom));
+  z-index: 9999;
+
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:16px;
+
+  /* Mobile-first: full width with gutters + safe area */
+  left: calc(16px + var(--safe-left));
+  right: calc(16px + var(--safe-right));
+  width: auto;
+  max-width: 860px;
+
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(0,0,0,.10);
+  background: rgba(255,255,255,.96);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 18px 40px rgba(0,0,0,.18);
+}
+
+/* Tighten on small screens */
+@media (max-width: 520px){
+  .action-bar{
+    flex-direction:column;
+    align-items:stretch;
+    left: calc(12px + var(--safe-left));
+    right: calc(12px + var(--safe-right));
+  }
+  .action-bar__right{
+    align-items:stretch;
+  }
+  .btn-primary{
+    width:100%;
+    min-height: 48px;
+  }
+}
+
+/* App content: extra bottom padding on mobile for action bar + safe area */
+@media (max-width: 768px){
+  .app-content{
+    padding-bottom: calc(100px + var(--safe-bottom));
+  }
+}
+
+/* Desktop: center the bar within the content area (shifted right by half sidebar) */
+@media (min-width: 981px){
+  .action-bar{
+    left: calc(50% + (var(--sidebar-w) / 2));
+    right: auto;
+    transform: translateX(-50%);
+
+    /* Match the card/content column width (a bit tighter than before) */
+    width: min(860px, calc(100vw - var(--sidebar-w) - 48px));
+  }
+}
+
+/* Sticky action card (Factura nueva) */
+.sticky-action-card{
+  position: sticky;
+  bottom: 16px;
+  z-index: 30;
+  margin-top: 14px;
+  box-shadow: 0 16px 40px rgba(15,23,42,.12);
+}
+/* When drawer overlay is open, dim the sticky card too */
+body.sidebar-open #stickyActionCard{
+  filter: brightness(.86);
+}
+
+/* =========================
+   PRO polish (Factura Nueva)
+   ========================= */
+
+/* Consistencia vertical entre cards dentro del contenido */
+.app-content .card + .card{
+  margin-top: 14px;
+}
+
+/* Card padding más consistente (secciones se sienten premium) */
+.card{
+  padding: 18px;
+}
+
+/* Separador sutil dentro de cards (cuando quieras dividir bloques) */
+.hr{
+  height: 1px;
+  background: var(--border);
+  margin: 14px 0;
+}
+
+/* Labels más pro */
+label{
+  letter-spacing: .01em;
+}
+
+/* Inputs: look más limpio */
+input, select, textarea{
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: #fff;
+}
+
+/* Focus: un poco más “Apple” */
+input:focus, select:focus, textarea:focus{
+  border-color: var(--primary);
+  box-shadow: none;
+}
+
+/* Estados de validación (para después usar con JS o server-side) */
+.field-ok input,
+.field-ok select,
+.field-ok textarea{
+  border-color: rgba(22,163,74,.35);
+}
+
+.field-err input,
+.field-err select,
+.field-err textarea{
+  border-color: rgba(176,0,32,.35);
+  box-shadow: 0 0 0 4px rgba(176,0,32,.10);
+}
+
+.help{
+  margin-top:6px;
+  font-size:12px;
+  color: var(--muted);
+}
+.help.err{ color:#b00020; font-weight:650; }
+
+/* Botones secundarios más suaves */
+.btn-secondary{
+  transition: background .18s ease, border-color .18s ease, transform .08s ease;
+}
+.btn-secondary:hover{
+  background:#fafafb;
+  border-color: var(--border-strong);
+}
+.btn-secondary:active{
+  transform: translateY(1px);
+}
+
+/* Conceptos: headers y filas un poco más “tabla” */
+.item-head{
+  color: var(--muted);
+}
+.item-row-top{
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: #fff;
+  transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease;
+}
+.item-row-top:hover{
+  border-color: var(--border-strong);
+  box-shadow: 0 10px 30px rgba(15,23,42,.06);
+  transform: translateY(-1px);
+}
+
+/* Animación suave al insertar conceptos */
+.anim-in{
+  animation: fadeInUp .22s ease forwards;
+}
+@keyframes fadeInUp{
+  from{ opacity:0; transform: translateY(6px); }
+  to{ opacity:1; transform: translateY(0); }
+}
+
+/* Modal ProdServ: entrada más pro */
+.modal-panel{
+  box-shadow: 0 22px 70px rgba(0,0,0,.18);
+  animation: modalIn .18s ease forwards;
+}
+@keyframes modalIn{
+  from{ opacity:0; transform: translateY(8px) scale(.99); }
+  to{ opacity:1; transform: translateY(0) scale(1); }
+}
+
+/* Sticky total: más “Stripe” */
+.sticky-action-card{
+  background: rgba(255,255,255,.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(0,0,0,.10);
+}
+
+/* ===== Inline checkbox rows (receptor / guardar cliente) ===== */
+.inline-check{
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+
+.inline-check input[type="checkbox"]{
+  width:auto;
+  height:auto;
+  transform: translateY(0.5px);
+}
+
+.inline-check__label{
+  margin:0;
+  font-size:12px;
+  font-weight:800;
+}
+
+.inline-check__label--normal{
+  font-weight:700;
+}
+
+.inline-check__hint{
+  font-size:12px;
+}
+
+/* ===== Icon buttons (search / close / remove) ===== */
+.icon-btn{
+  width:40px;
+  height:44px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:12px;
+  border:1px solid var(--border);
+  background:#fff;
+  color: var(--muted);
+  padding:0;
+}
+
+.icon-btn:hover{
+  border-color: var(--border-strong);
+  background:#fafafb;
+  color: var(--text);
+}
+
+.icon-btn:active{
+  transform: translateY(1px);
+}
+
+/* Make modal close compact */
+.modal-close.icon-btn{
+  width:40px;
+  height:40px;
+}
+
+/* ===== Concept list spacing ===== */
+.items-head{ margin-top:10px; }
+.item-row{ margin-top:8px; }
+
+/* ===== Sticky action layout helpers ===== */
+.sticky-action-head{ align-items:center; }
+.sticky-action-title{ margin:0; }
+.sticky-action-row{ align-items:center; }
+.sticky-action-note{ margin:0; }
+.sticky-action-actions{
+  display:flex;
+  justify-content:flex-end;
+  gap:10px;
+}
+
+/* =========================
+   Live edit alignment (form.html new classes)
+   ========================= */
+
+/* SVG icons inside buttons */
+.icon{
+  width:18px;
+  height:18px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Checkbox inline rows (new HTML uses checkline) */
+.checkline{
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+
+.checkline input[type="checkbox"]{
+  width:auto;
+  height:auto;
+  transform: translateY(0.5px);
+}
+
+.checkline__label{
+  margin:0;
+  font-size:12px;
+  font-weight:700;
+}
+
+.checkline__label--bold{
+  font-weight:800;
+}
+
+.checkline__hint{
+  font-size:12px;
+}
+
+/* Small margin helpers (replacing inline styles) */
+.mt-6{ margin-top:6px; }
+.mt-8{ margin-top:8px; }
+.mt-10{ margin-top:10px; }
+.m-0{ margin:0; }
+
+/* Sticky action card class alignment (sac-*) */
+.sac-title{ align-items:center; }
+.sac-h{ margin:0; }
+.sac-row{ align-items:center; }
+.sac-actions{
+  display:flex;
+  justify-content:flex-end;
+  gap:10px;
+}
+
+/* =========================
+   Next polish pass (3 items)
+   1) Unified icon buttons
+   2) Sticky total more "Stripe"
+   3) Concept row focus glow
+   ========================= */
+
+/* 1) Unified icon buttons (ProdServ / Remove / Modal close)
+   Keep existing classes in HTML; unify their look here.
+*/
+.prodservBtn,
+.item-row-top .removeItemBtn,
+.modal-close{
+  width:40px;
+  height:40px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:12px;
+  border:1px solid var(--border);
+  background:#fff;
+  color: var(--muted);
+  padding:0;
+  box-shadow:none;
+}
+
+/* Ensure remove keeps a consistent column size */
+.item-row-top .removeItemBtn{
+  width:44px;
+  height:44px;
+}
+
+.prodservBtn:hover,
+.item-row-top .removeItemBtn:hover,
+.modal-close:hover{
+  border-color: var(--border-strong);
+  background:#fafafb;
+  color: var(--text);
+}
+
+.prodservBtn:active,
+.item-row-top .removeItemBtn:active,
+.modal-close:active{
+  transform: translateY(1px);
+}
+
+/* SVG icons inherit color nicely */
+.prodservBtn .icon,
+.item-row-top .removeItemBtn .icon,
+.modal-close .icon{
+  width:18px;
+  height:18px;
+}
+
+/* 2) Sticky total: more Stripe-like hierarchy */
+.sticky-action-card{
+  border: 1px solid rgba(0,0,0,.10);
+  box-shadow: 0 18px 52px rgba(15,23,42,.14);
+}
+
+.sticky-action-card .pill#action_total_text{
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: .01em;
+  padding: 8px 12px;
+  border-color: rgba(22,163,74,.18);
+  background: rgba(22,163,74,.08);
+  color: var(--text);
+}
+
+.sticky-action-card .section-title{
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+/* 3) Concept row focus (when any input inside is focused) – sin halo verde */
+.item-row-top:focus-within{
+  border-color: rgba(22,163,74,.45);
+  box-shadow: 0 12px 32px rgba(15,23,42,.10);
+  transform: translateY(-1px);
+}
+
+/* Optional: calm the hover a bit so focus feels special */
+.item-row-top:hover{
+  box-shadow: 0 10px 28px rgba(15,23,42,.07);
+}
+
+/* ===== Modal close button tweak (size + perfect centering) ===== */
+.modal-close{
+  width:36px;
+  height:36px;
+  border-radius:12px;
+  line-height:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+
+.modal-close .icon{
+  width:20px;
+  height:20px;
+  display:block;
+}

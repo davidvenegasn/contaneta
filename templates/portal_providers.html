@@ -1,0 +1,577 @@
+{% extends "base_portal.html" %}
+
+{% block content %}
+<section class="page-section">
+  <div class="card">
+    <div class="card-header card-header--with-tools">
+      <div class="card-header__left">
+        <div class="table-tools table-tools--inline">
+          <div class="table-tools__search">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M16.2 16.2 21 21" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            </svg>
+            <input id="provSearch" class="input" type="search" placeholder="Buscar por RFC o razón social" autocomplete="off" />
+          </div>
+          <button id="provNewBtn" type="button" class="btn btn-primary">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M12 5v14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+              <path d="M5 12h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            </svg>
+            Agregar proveedor
+          </button>
+        </div>
+      </div>
+      <div class="card-header__right">
+        <h3 class="section-title">Listado</h3>
+        <p class="muted" style="margin:0;"><span id="provCount">Cargando…</span></p>
+      </div>
+    </div>
+
+    <div style="overflow:auto;" id="provTableWrap">
+      <table class="table" id="provTable" style="min-width:900px;">
+        <thead>
+          <tr>
+            <th style="min-width:140px;">RFC</th>
+            <th style="min-width:260px;">Razón social</th>
+            <th style="min-width:100px;">Facturas</th>
+            <th style="min-width:140px;">Total recibido</th>
+            <th style="min-width:200px;">Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="provTbody">
+          <tr>
+            <td colspan="5">
+              <div class="skeleton" style="height: 46px; border-radius: 14px;"></div>
+            </td>
+          </tr>
+          <tr>
+            <td colspan="5">
+              <div class="skeleton" style="height: 46px; border-radius: 14px;"></div>
+            </td>
+          </tr>
+          <tr>
+            <td colspan="5">
+              <div class="skeleton" style="height: 46px; border-radius: 14px;"></div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="empty-state" id="provEmpty" hidden>
+      <div class="empty-state__icon" aria-hidden="true">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <circle cx="8" cy="9" r="3.5" stroke="currentColor" stroke-width="1.8"/>
+          <circle cx="16" cy="11" r="3" stroke="currentColor" stroke-width="1.8"/>
+          <path d="M2 20c0-3 3-5 6-5" stroke="currentColor" stroke-width="1.8"/>
+          <path d="M13 20c0-2.5 2-4 4.5-4S22 17.5 22 20" stroke="currentColor" stroke-width="1.8"/>
+        </svg>
+      </div>
+      <div class="empty-state__title">Aún no hay proveedores</div>
+      <div class="empty-state__desc">Agrega proveedores manualmente o sincroniza facturas recibidas desde el SAT para que aparezcan aquí.</div>
+      <button type="button" class="btn btn-primary" id="provEmptyBtn">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M12 5v14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          <path d="M5 12h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        </svg>
+        Agregar primer proveedor
+      </button>
+      <a href="/portal/invoices/received" class="btn btn-ghost" style="text-decoration:none;">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" stroke="currentColor" stroke-width="1.8"/>
+          <path d="M14 2v5a1 1 0 0 0 1 1h5"/>
+          <path d="M12 18v-6"/><path d="m9 15 3 3 3-3"/>
+        </svg>
+        Ver facturas recibidas
+      </a>
+    </div>
+  </div>
+
+  <!-- Panel lateral: facturas del proveedor -->
+  <div id="providerInvoicesPanel" class="provider-invoices-panel" aria-hidden="true" hidden>
+    <div class="provider-invoices-panel__backdrop" id="providerInvoicesBackdrop"></div>
+    <div class="provider-invoices-panel__drawer" role="dialog" aria-labelledby="providerInvoicesTitle">
+      <div class="provider-invoices-panel__head">
+        <h2 id="providerInvoicesTitle" class="provider-invoices-panel__title">Facturas del proveedor</h2>
+        <button type="button" class="provider-invoices-panel__close" id="providerInvoicesClose" aria-label="Cerrar">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
+      </div>
+      <div class="provider-invoices-panel__body">
+        <div id="providerInvoicesLoading" class="provider-invoices-panel__loading" hidden>Cargando…</div>
+        <div id="providerInvoicesList" class="provider-invoices-panel__list"></div>
+        <div id="providerInvoicesEmpty" class="provider-invoices-panel__empty muted" hidden>Sin facturas.</div>
+      </div>
+      <div id="providerInvoicesPagination" class="provider-invoices-panel__pagination" hidden>
+        <span class="provider-invoices-panel__page-info" id="providerInvoicesPageInfo"></span>
+        <div class="provider-invoices-panel__page-btns">
+          <button type="button" class="btn btn-small btn-ghost" id="providerInvoicesPrev" aria-label="Página anterior">Anterior</button>
+          <button type="button" class="btn btn-small btn-ghost" id="providerInvoicesNext" aria-label="Página siguiente">Siguiente</button>
+        </div>
+      </div>
+      <div id="providerInvoicesDownloads" class="provider-invoices-panel__downloads" hidden>
+        <a id="providerInvoicesDownloadPdf" href="#" class="btn btn-small" target="_blank" rel="noopener" style="text-decoration:none;">Descargar PDF</a>
+        <a id="providerInvoicesDownloadExcel" href="#" class="btn btn-small btn-ghost" target="_blank" rel="noopener" style="text-decoration:none;">Descargar Excel</a>
+      </div>
+      <div class="provider-invoices-panel__foot">
+        <a id="providerInvoicesVerTodas" href="#" class="btn btn-ghost" style="text-decoration:none;">Ver todas en Facturas recibidas</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: agregar proveedor -->
+  <div class="modal" id="provModal" hidden aria-hidden="true">
+    <div class="modal__backdrop" data-close="true"></div>
+    <div class="modal__panel" role="dialog" aria-modal="true" aria-labelledby="provModalTitle">
+      <div class="modal__head">
+        <div>
+          <div class="modal__title" id="provModalTitle">Agregar proveedor</div>
+          <div class="modal__subtitle">Guarda el RFC y datos para tenerlo a mano.</div>
+        </div>
+        <button type="button" class="icon-btn" data-close="true" aria-label="Cerrar">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M6 6l12 12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M18 6 6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+      <div class="modal__body">
+        <div class="grid-2">
+          <div class="field">
+            <label class="label">RFC *</label>
+            <input id="provRfc" class="input" type="text" placeholder="XAXX010101000" autocomplete="off" />
+          </div>
+          <div class="field">
+            <label class="label">Alias (opcional)</label>
+            <input id="provAlias" class="input" type="text" placeholder="Ej. Proveedor frecuente" autocomplete="off" />
+          </div>
+        </div>
+        <div class="field">
+          <label class="label">Razón social *</label>
+          <input id="provName" class="input" type="text" placeholder="Nombre / Razón social" autocomplete="off" />
+        </div>
+        <div class="grid-2">
+          <div class="field">
+            <label class="label">Email (opcional)</label>
+            <input id="provEmail" class="input" type="email" placeholder="correo@dominio.com" autocomplete="off" />
+          </div>
+          <div class="field">
+            <label class="label">C.P. / Régimen (opcional)</label>
+            <input id="provZip" class="input" type="text" placeholder="64000 / 601" autocomplete="off" />
+          </div>
+        </div>
+      </div>
+      <div class="modal__foot">
+        <button type="button" class="btn btn-ghost" data-close="true">Cancelar</button>
+        <button type="button" class="btn btn-primary" id="provSaveBtn">Guardar</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+(function(){
+  function getToken(){
+    var p = new URLSearchParams(window.location.search);
+    return p.get('token') || "{{ token }}";
+  }
+  const token = getToken();
+  const tbody = document.getElementById('provTbody');
+  const countEl = document.getElementById('provCount');
+  const emptyEl = document.getElementById('provEmpty');
+  const tableWrap = document.getElementById('provTableWrap');
+  const searchEl = document.getElementById('provSearch');
+
+  let allRows = [];
+
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+  function fmtMoney(v) {
+    const n = parseFloat(v);
+    return Number.isFinite(n) ? n.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00';
+  }
+
+  function setCount(n){
+    countEl.textContent = (n === 1) ? 'Total: 1 proveedor' : `Total: ${n} proveedores`;
+  }
+
+  const modal = document.getElementById('provModal');
+  const openBtn = document.getElementById('provNewBtn');
+  const emptyBtn = document.getElementById('provEmptyBtn');
+  const saveBtn = document.getElementById('provSaveBtn');
+  const rfcEl = document.getElementById('provRfc');
+  const aliasEl = document.getElementById('provAlias');
+  const nameEl = document.getElementById('provName');
+  const emailEl = document.getElementById('provEmail');
+  const zipEl = document.getElementById('provZip');
+
+  function openModal(){
+    rfcEl.value = ''; aliasEl.value = ''; nameEl.value = ''; emailEl.value = ''; zipEl.value = '';
+    modal.hidden = false;
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+    rfcEl.focus();
+  }
+  function closeModal(){
+    modal.hidden = true;
+    modal.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+  }
+
+  function handleEscape(e){
+    if (e.key === 'Escape' && !modal.hidden) closeModal();
+  }
+
+  (openBtn || {}).addEventListener('click', openModal);
+  (emptyBtn || {}).addEventListener('click', openModal);
+  modal.querySelectorAll('[data-close]').forEach(el => el.addEventListener('click', closeModal));
+  document.addEventListener('keydown', handleEscape);
+
+  saveBtn.addEventListener('click', async () => {
+    const rfc = (rfcEl.value || '').trim().toUpperCase();
+    const legal_name = (nameEl.value || '').trim();
+    if (!rfc || !legal_name) {
+      window.portalToast && window.portalToast({ type:'warning', title:'Datos requeridos', message:'RFC y razón social son obligatorios' });
+      return;
+    }
+    saveBtn.disabled = true;
+    try {
+      const res = await fetch('/api/providers/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token,
+          rfc,
+          legal_name,
+          alias: (aliasEl.value || '').trim() || undefined,
+          email: (emailEl.value || '').trim() || undefined,
+          zip: (zipEl.value || '').trim() || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || data.message || 'Error');
+      window.portalToast && window.portalToast({ type:'success', title:'Guardado', message:'Proveedor agregado correctamente' });
+      closeModal();
+      load();
+    } catch (e) {
+      window.portalToast && window.portalToast({ type:'danger', title:'Error', message: e.message || 'No se pudo guardar' });
+    } finally {
+      saveBtn.disabled = false;
+    }
+  });
+
+  function rowHTML(r){
+    const rfc = esc(r.rfc);
+    const name = esc(r.legal_name || '—');
+    const count = Number(r.facturas_count) || 0;
+    const total = fmtMoney(r.total_recibido);
+
+    return `
+      <tr>
+        <td><code>${rfc}</code></td>
+        <td><div style="font-weight:650;">${name}</div></td>
+        <td>${count}</td>
+        <td class="muted">$${total} MXN</td>
+        <td>
+          <button type="button" class="btn btn-small btn-ghost" data-copy="${rfc}">Copiar RFC</button>
+          <button type="button" class="btn btn-small" data-provider-rfc="${rfc}" data-provider-name="${name}">Ver facturas</button>
+        </td>
+      </tr>
+    `;
+  }
+
+  function render(rows){
+    const n = rows.length;
+    setCount(n);
+
+    if (n === 0) {
+      tbody.innerHTML = '';
+      if (tableWrap) { tableWrap.hidden = true; tableWrap.style.display = 'none'; }
+      if (emptyEl) { emptyEl.hidden = false; emptyEl.removeAttribute('hidden'); emptyEl.style.display = ''; }
+      return;
+    }
+
+    if (tableWrap) { tableWrap.hidden = false; tableWrap.style.display = ''; }
+    if (emptyEl) { emptyEl.hidden = true; emptyEl.setAttribute('hidden', ''); emptyEl.style.display = 'none'; }
+    tbody.innerHTML = rows.map(rowHTML).join('');
+  }
+
+  function filter(){
+    const q = (searchEl.value || '').trim().toLowerCase();
+    if (!q) return render(allRows);
+    const filtered = allRows.filter(r => {
+      return String(r.rfc || '').toLowerCase().includes(q)
+        || String(r.legal_name || '').toLowerCase().includes(q);
+    });
+    render(filtered);
+  }
+
+  async function load(){
+    try{
+      const res = await fetch('/api/providers');
+      if(!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        allRows = data;
+      } else if (data && Array.isArray(data.data)) {
+        allRows = data.data;
+      } else if (data && Array.isArray(data.providers)) {
+        allRows = data.providers;
+      } else {
+        allRows = [];
+      }
+      render(allRows);
+    }catch(e){
+      allRows = [];
+      tbody.innerHTML = '';
+      if (tableWrap) tableWrap.hidden = true;
+      emptyEl.hidden = false;
+      if (window.portalToast) {
+        window.portalToast({ type:'danger', title:'Error', message:'No se pudo cargar proveedores' });
+      }
+    }
+  }
+
+  // Copy RFC
+  document.addEventListener('click', async (e) => {
+    const btn = e.target && e.target.closest ? e.target.closest('[data-copy]') : null;
+    if (!btn) return;
+    const value = btn.getAttribute('data-copy') || '';
+    try{
+      await navigator.clipboard.writeText(value);
+      window.portalToast && window.portalToast({ type:'success', title:'Copiado', message:'RFC copiado al portapapeles' });
+    }catch(_){
+      window.portalToast && window.portalToast({ type:'danger', title:'No se pudo copiar', message:'Tu navegador bloqueó el portapapeles' });
+    }
+  });
+
+  // Panel: Ver facturas del proveedor (10 por página, más reciente primero; solo el panel hace scroll)
+  const PAGE_SIZE = 10;
+  const panel = document.getElementById('providerInvoicesPanel');
+  const panelBackdrop = document.getElementById('providerInvoicesBackdrop');
+  const panelClose = document.getElementById('providerInvoicesClose');
+  const panelTitle = document.getElementById('providerInvoicesTitle');
+  const panelLoading = document.getElementById('providerInvoicesLoading');
+  const panelList = document.getElementById('providerInvoicesList');
+  const panelEmpty = document.getElementById('providerInvoicesEmpty');
+  const panelVerTodas = document.getElementById('providerInvoicesVerTodas');
+  const panelPagination = document.getElementById('providerInvoicesPagination');
+  const panelPageInfo = document.getElementById('providerInvoicesPageInfo');
+  const panelPrev = document.getElementById('providerInvoicesPrev');
+  const panelNext = document.getElementById('providerInvoicesNext');
+  const panelDownloads = document.getElementById('providerInvoicesDownloads');
+  const panelDownloadPdf = document.getElementById('providerInvoicesDownloadPdf');
+  const panelDownloadExcel = document.getElementById('providerInvoicesDownloadExcel');
+
+  let allInvoicesList = [];
+  let currentProviderRfc = '';
+  let currentProviderName = '';
+  let currentPage = 1;
+
+  function formatDate(s) {
+    if (!s) return '—';
+    const part = String(s).split('T')[0];
+    const [y, m, d] = part.split('-');
+    return d && m && y ? `${d}/${m}/${y}` : part;
+  }
+
+  function renderInvoiceRow(inv) {
+    const totalStr = inv.moneda === 'MXN' ? '$' + fmtMoney(inv.total) : fmtMoney(inv.total) + ' ' + (inv.moneda || '');
+    const pdfUrl = inv.uuid ? '/portal/sat/pdf/' + inv.uuid : '';
+    const statusCls = inv.status === '1' ? 'status-pill status-pill--ok' : 'status-pill';
+    const statusTxt = inv.status === '1' ? 'Vigente' : (inv.status === '0' ? 'Cancelada' : (inv.status || '—'));
+    const row = document.createElement('div');
+    row.className = 'provider-invoice-row';
+    row.innerHTML = '<div class="provider-invoice-row__main">' +
+      '<span class="provider-invoice-row__date">' + formatDate(inv.fecha_emision) + '</span>' +
+      '<span class="provider-invoice-row__total">' + totalStr + '</span></div>' +
+      '<div class="provider-invoice-row__concepto">' + esc(inv.concepto || '—') + '</div>' +
+      '<div class="provider-invoice-row__meta">' +
+      '<span class="' + statusCls + '">' + statusTxt + '</span>' +
+      (pdfUrl && inv.has_pdf ? '<a href="' + pdfUrl + '" target="_blank" rel="noopener" class="btn btn-small">Ver PDF</a>' : '') +
+      '</div>';
+    return row;
+  }
+
+  function renderPage(page) {
+    currentPage = page;
+    const total = allInvoicesList.length;
+    const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+    const from = (page - 1) * PAGE_SIZE;
+    const slice = allInvoicesList.slice(from, from + PAGE_SIZE);
+    panelList.innerHTML = '';
+    slice.forEach(function(inv) { panelList.appendChild(renderInvoiceRow(inv)); });
+    if (panelPageInfo) panelPageInfo.textContent = 'Página ' + page + ' de ' + totalPages;
+    if (panelPrev) { panelPrev.disabled = page <= 1; }
+    if (panelNext) { panelNext.disabled = page >= totalPages; }
+    panelList.scrollTop = 0;
+  }
+
+  function openProviderInvoices(rfc, name) {
+    if (!panel || !panelTitle || !panelList) return;
+    currentProviderRfc = rfc || '';
+    currentProviderName = name || 'Proveedor';
+    panelTitle.textContent = 'Facturas de ' + currentProviderName;
+    panelVerTodas.href = '/portal/invoices/received';
+    panel.hidden = false;
+    panel.setAttribute('aria-hidden', 'false');
+    panel.classList.add('provider-invoices-panel--open');
+    document.body.classList.add('no-scroll');
+    panelList.innerHTML = '';
+    panelEmpty.hidden = true;
+    panelEmpty.textContent = 'Sin facturas.';
+    if (panelPagination) panelPagination.hidden = true;
+    if (panelDownloads) panelDownloads.hidden = true;
+    if (panelLoading) panelLoading.hidden = false;
+
+    const url = '/api/provider-invoices?rfc=' + encodeURIComponent(rfc || '');
+    fetch(url)
+      .then(function(res) {
+        return res.json().then(function(data) {
+          if (!res.ok) throw new Error(data.detail || data.message || 'HTTP ' + res.status);
+          return data;
+        });
+      })
+      .then(function(data) {
+        if (panelLoading) panelLoading.hidden = true;
+        const list = Array.isArray(data) ? data : [];
+        list.sort(function(a, b) {
+          const da = (a.fecha_emision || '').replace('T', '');
+          const db = (b.fecha_emision || '').replace('T', '');
+          return db.localeCompare(da);
+        });
+        allInvoicesList = list;
+        if (list.length === 0) {
+          panelEmpty.hidden = false;
+          panelEmpty.textContent = 'Sin facturas de este proveedor.';
+          return;
+        }
+        panelEmpty.hidden = true;
+        if (panelPagination) panelPagination.hidden = false;
+        if (panelDownloads) panelDownloads.hidden = false;
+        if (panelDownloadPdf) panelDownloadPdf.href = '/api/provider-invoices/report?rfc=' + encodeURIComponent(currentProviderRfc) + '&format=pdf';
+        if (panelDownloadExcel) panelDownloadExcel.href = '/api/provider-invoices/report?rfc=' + encodeURIComponent(currentProviderRfc) + '&format=xlsx';
+        renderPage(1);
+      })
+      .catch(function(err) {
+        if (panelLoading) panelLoading.hidden = true;
+        panelEmpty.hidden = false;
+        panelEmpty.textContent = 'Error al cargar. ' + (err && err.message ? err.message : 'Vuelve a intentar.');
+        if (window.portalToast) window.portalToast({ type: 'danger', title: 'Error', message: err && err.message ? err.message : 'No se pudieron cargar las facturas.' });
+      });
+  }
+
+  function closeProviderInvoices() {
+    if (!panel) return;
+    panel.hidden = true;
+    panel.setAttribute('aria-hidden', 'true');
+    panel.classList.remove('provider-invoices-panel--open');
+    document.body.classList.remove('no-scroll');
+  }
+
+  if (panelPrev) panelPrev.addEventListener('click', function() { if (currentPage > 1) renderPage(currentPage - 1); });
+  if (panelNext) panelNext.addEventListener('click', function() {
+    const totalPages = Math.max(1, Math.ceil(allInvoicesList.length / PAGE_SIZE));
+    if (currentPage < totalPages) renderPage(currentPage + 1);
+  });
+
+  document.addEventListener('click', (e) => {
+    const btn = e.target && e.target.closest ? e.target.closest('[data-provider-rfc]') : null;
+    if (btn) {
+      e.preventDefault();
+      const rfc = btn.getAttribute('data-provider-rfc') || '';
+      const name = btn.getAttribute('data-provider-name') || '';
+      openProviderInvoices(rfc, name);
+    }
+  });
+  if (panelClose) panelClose.addEventListener('click', closeProviderInvoices);
+  if (panelBackdrop) panelBackdrop.addEventListener('click', closeProviderInvoices);
+
+  // Search
+  searchEl.addEventListener('input', () => filter());
+
+  load();
+})();
+</script>
+
+<style>
+/* Page local layout helpers (keep minimal) */
+.page-section{ display:flex; flex-direction:column; gap: 14px; }
+.page-head{ display:flex; justify-content:space-between; align-items:flex-end; gap: 14px; margin-bottom: 2px; }
+.page-title{ margin:0; font-size: 20px; font-weight: 850; letter-spacing: -.02em; }
+.page-subtitle{ margin: 6px 0 0; color: var(--muted); font-size: 13px; }
+.table-tools{ display:flex; align-items:center; gap: 10px; }
+.table-tools__search{ position:relative; display:flex; align-items:center; gap: 8px; }
+.table-tools__search .icon{ position:absolute; left: 12px; width:18px; height:18px; opacity:.75; }
+.table-tools__search input{ padding-left: 40px; width: 320px; }
+/* Proveedores: misma estructura que facturas emitidas/recibidas */
+#provTable td { vertical-align: middle; }
+#provTable .btn { margin-right: 6px; }
+#provTable .btn:last-child { margin-right: 0; }
+
+.empty-state{ padding: 24px; text-align:center; display:flex; flex-direction:column; align-items:center; gap: 10px; }
+.empty-state[hidden]{ display: none !important; }
+.empty-state__icon{ width: 44px; height: 44px; display:grid; place-items:center; border-radius: 14px; background: rgba(0,0,0,.04); border: 1px solid rgba(0,0,0,.06); }
+.empty-state__icon .icon{ width: 22px; height: 22px; opacity:.85; }
+.empty-state__title{ font-weight: 850; }
+.empty-state__desc{ color: var(--muted); font-size: 13px; max-width: 520px; }
+
+/* Modal (small, neutral) */
+.modal[hidden]{ display:none !important; }
+.modal__backdrop{ position:absolute; inset:0; background: rgba(0,0,0,.35); cursor: pointer; }
+.modal__panel{ position:relative; width: min(640px, calc(100vw - 28px)); min-width: 320px; background: rgba(255,255,255,.94); backdrop-filter: blur(12px);
+  border: 1px solid rgba(0,0,0,.10); border-radius: 18px; box-shadow: var(--shadow-3); overflow:hidden; }
+.modal__head{ display:flex; justify-content:space-between; align-items:flex-start; padding: 14px 14px 10px; border-bottom: 1px solid var(--border); }
+.modal__title{ font-weight: 900; }
+.modal__subtitle{ color: var(--muted); font-size: 12px; margin-top: 2px; }
+.modal__body{ padding: 14px; display:flex; flex-direction:column; gap: 12px; }
+.modal__foot{ padding: 12px 14px 14px; border-top: 1px solid var(--border); display:flex; justify-content:flex-end; gap: 10px; }
+.icon-btn{ width: 36px; height: 36px; display:grid; place-items:center; border-radius: 12px; border: 1px solid var(--border); background: rgba(255,255,255,.8); }
+.icon-btn:hover{ background: rgba(0,0,0,.03); }
+.grid-2{ display:grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.grid-3{ display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+.field{ display:flex; flex-direction:column; gap: 8px; }
+.label{ font-size: 12px; color: var(--muted); font-weight: 700; }
+
+/* Panel lateral: facturas del proveedor (no ocupa todo el alto; solo el body hace scroll) */
+.provider-invoices-panel{ position: fixed; inset: 0; z-index: 85; display: none; justify-content: flex-end; align-items: center; pointer-events: none; }
+.provider-invoices-panel.provider-invoices-panel--open,
+.provider-invoices-panel:not([hidden]){ display: flex !important; pointer-events: auto; }
+.provider-invoices-panel[hidden]{ display: none !important; }
+.provider-invoices-panel__backdrop{ position: absolute; inset: 0; background: rgba(0,0,0,.4); opacity: 0; transition: opacity .25s ease; pointer-events: auto; }
+.provider-invoices-panel--open .provider-invoices-panel__backdrop{ opacity: 1; }
+.provider-invoices-panel__drawer{ position: relative; width: min(380px, 75vw); max-width: 75vw; max-height: 88vh; margin: 12px; background: var(--surface); border-left: 1px solid var(--border); border-radius: 14px; box-shadow: -8px 0 32px rgba(0,0,0,.15); display: flex; flex-direction: column; transform: translateX(100%); transition: transform .3s ease; pointer-events: auto; overflow: hidden; }
+.provider-invoices-panel--open .provider-invoices-panel__drawer{ transform: translateX(0); }
+.provider-invoices-panel__head{ display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.provider-invoices-panel__title{ margin: 0; font-size: 15px; font-weight: 700; letter-spacing: -.02em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 8px; }
+.provider-invoices-panel__close{ width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border: none; border-radius: 10px; background: transparent; color: var(--muted); cursor: pointer; }
+.provider-invoices-panel__close:hover{ background: rgba(0,0,0,.06); color: var(--text); }
+.provider-invoices-panel__body{ flex: 1; overflow-y: auto; overflow-x: hidden; padding: 12px; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; min-height: 0; }
+.provider-invoices-panel__loading{ padding: 20px; text-align: center; color: var(--muted); }
+.provider-invoices-panel__empty{ padding: 20px; text-align: center; font-size: 13px; }
+.provider-invoices-panel__list{ display: flex; flex-direction: column; gap: 10px; }
+.provider-invoice-row{ padding: 12px; border-radius: 12px; border: 1px solid var(--border); background: rgba(0,0,0,.02); }
+.provider-invoice-row__main{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.provider-invoice-row__date{ font-size: 12px; color: var(--muted); font-weight: 600; }
+.provider-invoice-row__total{ font-weight: 700; font-size: 14px; }
+.provider-invoice-row__concepto{ font-size: 11px; color: var(--muted); line-height: 1.35; margin-bottom: 8px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.provider-invoice-row__meta{ display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.provider-invoice-row__meta .status-pill{ font-size: 11px; }
+.provider-invoices-panel__pagination{ padding: 10px 16px; border-top: 1px solid var(--border); flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.provider-invoices-panel__page-info{ font-size: 12px; color: var(--muted); }
+.provider-invoices-panel__page-btns{ display: flex; gap: 8px; }
+.provider-invoices-panel__downloads{ padding: 10px 16px; border-top: 1px solid var(--border); flex-shrink: 0; display: flex; gap: 10px; flex-wrap: wrap; }
+.provider-invoices-panel__downloads .btn{ flex: 1; min-width: 120px; justify-content: center; }
+.provider-invoices-panel__foot{ padding: 12px 16px; border-top: 1px solid var(--border); flex-shrink: 0; }
+.provider-invoices-panel__foot .btn{ width: 100%; justify-content: center; }
+
+@media (max-width: 860px){
+  .page-head{ flex-direction:column; align-items:stretch; }
+  .table-tools{ justify-content:space-between; }
+  .table-tools__search input{ width: 100%; }
+  .grid-2{ grid-template-columns: 1fr; }
+  .grid-3{ grid-template-columns: 1fr; }
+}
+</style>
+{% endblock %}

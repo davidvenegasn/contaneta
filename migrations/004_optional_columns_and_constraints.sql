@@ -1,0 +1,21 @@
+-- 004_optional_columns_and_constraints.sql
+-- Asegura columnas opcionales e índices para compatibilidad y calidad sin romper DBs viejas.
+--
+-- NOTA: Esta migración es ejecutada por el runner con lógica Python
+-- (_apply_004_optional_columns_and_constraints) para ser idempotente y reintentable.
+-- El archivo SQL existe para documentación.
+--
+-- A) invoices (ALTA, no-crash pero recomendable):
+--    export_code, tipo_comprobante, series, folio_number, order_ref, notes, status, cancelled (INTEGER DEFAULT 0)
+--
+-- B) invoice_items (ALTA):
+--    unit_key TEXT, discount REAL
+--
+-- C) customer_profiles (CONSTRAINT):
+--    Si zip o tax_system son NOT NULL, se reconstruye la tabla con ambas nullable (sin perder datos).
+--
+-- D) Índices (CREATE INDEX IF NOT EXISTS):
+--    idx_invoices_issuer_uuid, idx_invoices_issuer_payment_method, idx_invoices_issuer_issue_date
+--
+-- Tablas temporales (customer_profiles_new) se limpian al inicio con DROP TABLE IF EXISTS
+-- para que la migración sea reintentable.

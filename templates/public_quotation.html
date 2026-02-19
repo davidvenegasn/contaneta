@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Cotización — {{ quotation.issuer_name }}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #f7f7f8;
+      --surface: #ffffff;
+      --text: #111;
+      --muted: #6b6f76;
+      --border: rgba(0,0,0,.08);
+      --accent: #21c16b;
+      --radius: 14px;
+      --shadow: 0 6px 18px rgba(17,17,17,.06);
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 0; font-family: Inter, system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; padding: 24px; }
+    .wrap { max-width: 640px; margin: 0 auto; }
+    .card { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 28px; margin-bottom: 20px; }
+    h1 { font-size: 22px; font-weight: 700; margin: 0 0 6px; }
+    .subtitle { color: var(--muted); font-size: 14px; margin-bottom: 24px; }
+    .meta { font-size: 13px; color: var(--muted); margin-bottom: 20px; }
+    table { width: 100%; border-collapse: collapse; }
+    th { text-align: left; padding: 10px 12px; font-size: 12px; color: var(--muted); font-weight: 600; border-bottom: 1px solid var(--border); }
+    td { padding: 12px; border-bottom: 1px solid var(--border); font-size: 14px; }
+    tr:last-child td { border-bottom: none; }
+    .total-row td { font-weight: 700; font-size: 16px; padding-top: 16px; border-top: 2px solid var(--border); }
+    .notes { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); font-size: 13px; color: var(--muted); white-space: pre-wrap; }
+    .actions { margin-top: 28px; display: flex; gap: 12px; flex-wrap: wrap; }
+    .btn { display: inline-flex; align-items: center; justify-content: center; padding: 12px 24px; font-size: 15px; font-weight: 600; border-radius: 12px; border: none; cursor: pointer; text-decoration: none; font-family: inherit; transition: transform .15s, box-shadow .15s; }
+    .btn:active { transform: scale(0.98); }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { box-shadow: 0 4px 14px rgba(33, 193, 107, .4); }
+    .btn-ghost { background: #f0f0f0; color: var(--text); }
+    .btn-ghost:hover { background: #e5e5e5; }
+    .btn-danger { background: #fef2f2; color: #b91c1c; }
+    .btn-danger:hover { background: #fee2e2; }
+    form { margin: 0; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>{{ quotation.issuer_name }}</h1>
+      <p class="subtitle">Cotización</p>
+      <div class="meta">
+        <strong>Cliente:</strong> {{ quotation.customer_legal_name }}
+        {% if quotation.customer_rfc %}<br /><span style="color: var(--muted);">RFC {{ quotation.customer_rfc }}</span>{% endif %}
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Concepto</th>
+            <th style="text-align:right;">Cant.</th>
+            <th style="text-align:right;">P. unit.</th>
+            <th style="text-align:right;">Importe</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in quotation.items %}
+          <tr>
+            <td>{{ item.description }}</td>
+            <td style="text-align:right;">{{ '{:,.2f}'.format(item.quantity) }}</td>
+            <td style="text-align:right;">${{ '{:,.2f}'.format(item.unit_price) }}</td>
+            <td style="text-align:right;">${{ '{:,.2f}'.format(item.total_line) }}</td>
+          </tr>
+          {% endfor %}
+          <tr class="total-row">
+            <td colspan="3" style="text-align:right;">Total</td>
+            <td style="text-align:right;">${{ '{:,.2f}'.format(quotation.total) }}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      {% if quotation.notes %}
+      <div class="notes">{{ quotation.notes }}</div>
+      {% endif %}
+
+      <div class="actions">
+        <form method="post" action="/public/cotizacion/respond" style="display:inline;">
+          <input type="hidden" name="public_token" value="{{ quotation.public_token }}" />
+          <input type="hidden" name="action" value="aceptar" />
+          <button type="submit" class="btn btn-primary">Aceptar cotización</button>
+        </form>
+        <form method="post" action="/public/cotizacion/respond" class="reject-form" style="display:inline;">
+          <input type="hidden" name="public_token" value="{{ quotation.public_token }}" />
+          <input type="hidden" name="action" value="rechazar" />
+          <div class="reject-reason-wrap" style="margin-top:12px; display:none;">
+            <label for="rejection_reason" style="display:block; font-size:13px; margin-bottom:6px;">Motivo del rechazo (opcional)</label>
+            <textarea name="rejection_reason" id="rejection_reason" rows="2" placeholder="Indique el motivo si lo desea." style="width:100%; max-width:400px; padding:10px; border-radius:8px; border:1px solid var(--border); font-family:inherit; font-size:14px;"></textarea>
+          </div>
+          <button type="button" class="btn btn-danger btn-reject-toggle" style="margin-top:8px;">Rechazar</button>
+          <button type="submit" class="btn btn-danger btn-reject-confirm" style="margin-top:8px; display:none;">Confirmar rechazo</button>
+        </form>
+      </div>
+    </div>
+  </div>
+  <script>
+  (function(){
+    var form = document.querySelector('.reject-form');
+    if (form) {
+      var wrap = form.querySelector('.reject-reason-wrap');
+      var toggle = form.querySelector('.btn-reject-toggle');
+      var confirm = form.querySelector('.btn-reject-confirm');
+      if (toggle) toggle.addEventListener('click', function(){ wrap.style.display = 'block'; toggle.style.display = 'none'; if (confirm) confirm.style.display = 'inline-flex'; });
+    }
+  })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,469 @@
+{% extends "base_portal.html" %}
+{% set title = title|default('Clientes') %}
+
+{% block content %}
+<section class="page-section page-section--clients">
+  <div class="card">
+    <div class="card-header card-header--with-tools">
+      <div class="card-header__left">
+        <div class="table-tools table-tools--inline">
+          <div class="table-tools__search">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M16.2 16.2 21 21" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            </svg>
+            <input id="custSearch" class="input" type="search" placeholder="Buscar por RFC, razón social o alias" autocomplete="off" />
+          </div>
+          <button id="custNewBtn" type="button" class="btn btn-primary">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M12 5v14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+              <path d="M5 12h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            </svg>
+            Nuevo cliente
+          </button>
+        </div>
+      </div>
+      <div class="card-header__right">
+        <h3 class="section-title">Listado</h3>
+        <p class="muted" style="margin:0;"><span id="custCount">Cargando…</span></p>
+      </div>
+    </div>
+
+    <div class="card-list-sep">
+    <div style="overflow:auto;" id="custTableWrap">
+      <table class="table" id="custTable" style="min-width:1000px;">
+        <thead>
+          <tr>
+            <th style="min-width:140px;">RFC</th>
+            <th style="min-width:240px;">Razón social</th>
+            <th style="min-width:120px;">Alias</th>
+            <th style="min-width:80px;">C.P.</th>
+            <th style="min-width:90px;">Régimen</th>
+            <th style="min-width:200px;">Email</th>
+            <th style="min-width:180px;">Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="custTbody">
+          <tr>
+            <td colspan="7"><div class="skeleton" style="height: 46px; border-radius: 14px;"></div></td>
+          </tr>
+          <tr>
+            <td colspan="7"><div class="skeleton" style="height: 46px; border-radius: 14px;"></div></td>
+          </tr>
+          <tr>
+            <td colspan="7"><div class="skeleton" style="height: 46px; border-radius: 14px;"></div></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="empty-state" id="custEmpty" hidden>
+      <div class="empty-state__icon" aria-hidden="true">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <circle cx="9" cy="8" r="4" stroke="currentColor" stroke-width="1.8"/>
+          <path d="M3 20c0-3 3-5 6-5s6 2 6 5" stroke="currentColor" stroke-width="1.8"/>
+          <path d="M16 12l2 2 4-4" stroke="currentColor" stroke-width="1.8"/>
+        </svg>
+      </div>
+      <div class="empty-state__title">Aún no tienes clientes guardados</div>
+      <div class="empty-state__desc">Agrega clientes y reutilízalos para facturar más rápido (RFC, razón social, CP y régimen).</div>
+      <button type="button" class="btn btn-primary" id="custEmptyBtn">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M12 5v14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          <path d="M5 12h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        </svg>
+        Crear primer cliente
+      </button>
+    </div>
+    </div>
+  </div>
+
+  <!-- Modal: create/update (MVP) -->
+  <div class="modal" id="custModal" hidden aria-hidden="true">
+    <div class="modal__backdrop" data-close="true"></div>
+    <div class="modal__panel" role="dialog" aria-modal="true" aria-labelledby="custModalTitle">
+      <div class="modal__head">
+        <div>
+          <div class="modal__title" id="custModalTitle">Nuevo cliente</div>
+          <div class="modal__subtitle">Guarda datos para reutilizar al facturar.</div>
+        </div>
+        <button type="button" class="icon-btn" data-close="true" aria-label="Cerrar">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M6 6l12 12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M18 6 6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="modal__body">
+        <div class="grid-2">
+          <div class="field">
+            <label class="label">RFC *</label>
+            <input id="custRfc" class="input" type="text" placeholder="XAXX010101000" autocomplete="off" />
+            <div class="help" id="custRfcHelp" hidden>RFC requerido.</div>
+          </div>
+          <div class="field">
+            <label class="label">Alias (opcional)</label>
+            <input id="custAlias" class="input" type="text" placeholder="Ej. Cliente frecuente" autocomplete="off" />
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="label">Razón social *</label>
+          <input id="custName" class="input" type="text" placeholder="Nombre / Razón social" autocomplete="off" />
+          <div class="help" id="custNameHelp" hidden>Razón social requerida.</div>
+        </div>
+
+        <div class="grid-3">
+          <div class="field">
+            <label class="label">C.P. (opcional)</label>
+            <input id="custZip" class="input" type="text" placeholder="64000" autocomplete="off" />
+          </div>
+          <div class="field">
+            <label class="label">Régimen (opcional)</label>
+            <input id="custTax" class="input" type="text" placeholder="601, 612, etc" autocomplete="off" />
+          </div>
+          <div class="field">
+            <label class="label">Email (opcional)</label>
+            <input id="custEmail" class="input" type="email" placeholder="correo@dominio.com" autocomplete="off" />
+          </div>
+        </div>
+
+        <div class="hint">
+          Tip: en el futuro, desde aquí podrás seleccionar un cliente y abrir <b>Factura rápida</b> con sus datos precargados.
+        </div>
+      </div>
+
+      <div class="modal__foot">
+        <button type="button" class="btn btn-ghost" data-close="true">Cancelar</button>
+        <button type="button" class="btn btn-primary" id="custSaveBtn">Guardar</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+(function(){
+  function getToken(){
+    var p = new URLSearchParams(window.location.search);
+    return p.get('token') || "{{ token }}";
+  }
+  const token = getToken();
+
+  const tbody = document.getElementById('custTbody');
+  const countEl = document.getElementById('custCount');
+  const emptyEl = document.getElementById('custEmpty');
+  const tableWrap = document.getElementById('custTableWrap');
+  const searchEl = document.getElementById('custSearch');
+
+  const modal = document.getElementById('custModal');
+  const openBtn = document.getElementById('custNewBtn');
+  const emptyBtn = document.getElementById('custEmptyBtn');
+  const saveBtn = document.getElementById('custSaveBtn');
+
+  const rfcEl = document.getElementById('custRfc');
+  const aliasEl = document.getElementById('custAlias');
+  const nameEl = document.getElementById('custName');
+  const zipEl = document.getElementById('custZip');
+  const taxEl = document.getElementById('custTax');
+  const emailEl = document.getElementById('custEmail');
+  const rfcHelp = document.getElementById('custRfcHelp');
+  const nameHelp = document.getElementById('custNameHelp');
+
+  let allRows = [];
+
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+  function setCount(n){
+    countEl.textContent = (n === 1) ? 'Total: 1 cliente' : `Total: ${n} clientes`;
+  }
+
+  function rowHTML(r){
+    const rfc = esc(r.rfc);
+    const name = esc(r.legal_name);
+    const alias = esc(r.alias || '');
+    const zip = esc(r.zip || '');
+    const ts = esc(r.tax_system || '');
+    const email = esc(r.email || '');
+
+    const createUrl = '/portal/create?' +
+      'customer_rfc=' + encodeURIComponent(String(r.rfc || '')) +
+      '&customer_legal_name=' + encodeURIComponent(String(r.legal_name || '')) +
+      '&customer_zip=' + encodeURIComponent(String(r.zip || '')) +
+      '&customer_tax_system=' + encodeURIComponent(String(r.tax_system || '')) +
+      '&customer_email=' + encodeURIComponent(String(r.email || ''));
+    return `
+      <tr>
+        <td><code>${rfc}</code></td>
+        <td><div style="font-weight:650;">${name}</div></td>
+        <td>${alias}</td>
+        <td class="muted">${zip}</td>
+        <td class="muted">${ts}</td>
+        <td style="font-size:12px;">${email}</td>
+        <td>
+          <button type="button" class="btn btn-small btn-ghost" data-copy="${rfc}">Copiar RFC</button>
+          <a href="${createUrl}" class="btn btn-small" style="text-decoration:none;">Generar factura</a>
+          <button type="button" class="btn btn-small btn-ghost btn-danger-icon" data-delete-rfc="${rfc}" data-delete-name="${name}" title="Eliminar cliente" aria-label="Eliminar cliente">
+            <svg class="icon icon-trash" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M4 7h16v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M9 11v6M15 11v6M3 7l2-3h14l2 3M10 4v1M14 4v1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            </svg>
+          </button>
+        </td>
+      </tr>
+    `;
+  }
+
+  function render(rows){
+    const n = rows.length;
+    setCount(n);
+
+    if (n === 0) {
+      tbody.innerHTML = '';
+      if (tableWrap) { tableWrap.hidden = true; tableWrap.style.display = 'none'; }
+      if (emptyEl) { emptyEl.hidden = false; emptyEl.removeAttribute('hidden'); emptyEl.style.display = ''; }
+      return;
+    }
+
+    if (tableWrap) { tableWrap.hidden = false; tableWrap.style.display = ''; }
+    if (emptyEl) { emptyEl.hidden = true; emptyEl.setAttribute('hidden', ''); emptyEl.style.display = 'none'; }
+    tbody.innerHTML = rows.map(rowHTML).join('');
+  }
+
+  function filter(){
+    const q = (searchEl.value || '').trim().toLowerCase();
+    if (!q) return render(allRows);
+    const filtered = allRows.filter(r => {
+      return String(r.rfc || '').toLowerCase().includes(q)
+        || String(r.legal_name || '').toLowerCase().includes(q)
+        || String(r.alias || '').toLowerCase().includes(q);
+    });
+    render(filtered);
+  }
+
+  async function load(){
+    try{
+      const res = await fetch('/api/customers');
+      if(!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        allRows = data;
+      } else if (data && Array.isArray(data.data)) {
+        allRows = data.data;
+      } else if (data && Array.isArray(data.customers)) {
+        allRows = data.customers;
+      } else {
+        allRows = [];
+      }
+      render(allRows);
+    }catch(e){
+      allRows = [];
+      tbody.innerHTML = '';
+      if (tableWrap) tableWrap.hidden = true;
+      emptyEl.hidden = false;
+      window.portalToast && window.portalToast({ type:'danger', title:'Error', message:'No se pudo cargar clientes' });
+    }
+  }
+
+  // Clipboard
+  document.addEventListener('click', async (e) => {
+    const copyBtn = e.target && e.target.closest ? e.target.closest('[data-copy]') : null;
+    if (copyBtn) {
+      const value = copyBtn.getAttribute('data-copy') || '';
+      try{
+        await navigator.clipboard.writeText(value);
+        window.portalToast && window.portalToast({ type:'success', title:'Copiado', message:'RFC copiado al portapapeles' });
+      }catch(_){
+        window.portalToast && window.portalToast({ type:'danger', title:'No se pudo copiar', message:'Tu navegador bloqueó el portapapeles' });
+      }
+      return;
+    }
+
+    // Eliminar cliente
+    const deleteBtn = e.target && e.target.closest ? e.target.closest('[data-delete-rfc]') : null;
+    if (deleteBtn) {
+      const rfc = deleteBtn.getAttribute('data-delete-rfc') || '';
+      const name = deleteBtn.getAttribute('data-delete-name') || rfc;
+      if (!rfc) return;
+      if (!confirm('¿Eliminar el cliente "' + name.replace(/"/g, '\\"') + '" (RFC ' + rfc + ')? Esta acción no se puede deshacer.')) return;
+      deleteBtn.disabled = true;
+      try {
+        const res = await fetch('/api/customers/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token, rfc }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.detail || 'Error al eliminar');
+        window.portalToast && window.portalToast({ type:'success', title:'Eliminado', message:'Cliente eliminado correctamente' });
+        await load();
+      } catch (err) {
+        window.portalToast && window.portalToast({ type:'danger', title:'Error', message: String(err.message || err) });
+      } finally {
+        deleteBtn.disabled = false;
+      }
+      return;
+    }
+  });
+
+  // Search
+  searchEl.addEventListener('input', () => filter());
+
+  // Modal
+  const openModal = () => {
+    modal.hidden = false;
+    modal.setAttribute('aria-hidden','false');
+    document.body.style.overflow = 'hidden';
+    setTimeout(() => rfcEl && rfcEl.focus(), 30);
+  };
+
+  const closeModal = () => {
+    modal.hidden = true;
+    modal.setAttribute('aria-hidden','true');
+    document.body.style.overflow = '';
+    // reset
+    [rfcEl, aliasEl, nameEl, zipEl, taxEl, emailEl].forEach(x => x && (x.value = ''));
+    rfcHelp.hidden = true;
+    nameHelp.hidden = true;
+    rfcEl.classList.remove('input--error');
+    nameEl.classList.remove('input--error');
+  };
+
+  [openBtn, emptyBtn].forEach(b => b && b.addEventListener('click', () => openModal()));
+
+  modal.addEventListener('click', (e) => {
+    const t = e.target;
+    const direct = t && t.getAttribute && t.getAttribute('data-close') === 'true';
+    const nested = t && t.closest && t.closest('[data-close="true"]');
+    const backdrop = t && t.classList && t.classList.contains('modal__backdrop');
+    if (direct || nested || backdrop) closeModal();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !modal.hidden) closeModal();
+  });
+
+  function validate(){
+    const rfc = (rfcEl.value || '').trim();
+    const name = (nameEl.value || '').trim();
+
+    let ok = true;
+    if (!rfc){
+      ok = false;
+      rfcHelp.hidden = false;
+      rfcEl.classList.add('input--error');
+    } else {
+      rfcHelp.hidden = true;
+      rfcEl.classList.remove('input--error');
+    }
+
+    if (!name){
+      ok = false;
+      nameHelp.hidden = false;
+      nameEl.classList.add('input--error');
+    } else {
+      nameHelp.hidden = true;
+      nameEl.classList.remove('input--error');
+    }
+
+    return ok;
+  }
+
+  async function save(){
+    if (!validate()) {
+      window.portalToast && window.portalToast({ type:'danger', title:'Faltan datos', message:'RFC y Razón social son obligatorios' });
+      return;
+    }
+
+    const payload = {
+      token,
+      rfc: (rfcEl.value || '').trim(),
+      legal_name: (nameEl.value || '').trim(),
+      alias: (aliasEl.value || '').trim() || null,
+      zip: (zipEl.value || '').trim() || null,
+      tax_system: (taxEl.value || '').trim() || null,
+      email: (emailEl.value || '').trim() || null,
+    };
+
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Guardando…';
+
+    try{
+      const res = await fetch('/api/customers/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
+
+      window.portalToast && window.portalToast({ type:'success', title:'Guardado', message:'Cliente guardado correctamente' });
+      closeModal();
+      await load();
+    }catch(e){
+      window.portalToast && window.portalToast({ type:'danger', title:'Error', message: String(e.message || e) });
+    }finally{
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Guardar';
+    }
+  }
+
+  saveBtn.addEventListener('click', () => save());
+
+  load();
+})();
+</script>
+
+<style>
+/* Page local layout helpers (keep minimal) */
+.page-section{ display:flex; flex-direction:column; gap: 14px; }
+.page-section--clients{ margin-top: 8px; }
+.page-section--clients .card-list-sep{ margin-top: 20px; }
+.page-head{ display:flex; justify-content:space-between; align-items:flex-end; gap: 14px; margin-bottom: 2px; }
+.page-title{ margin:0; font-size: 20px; font-weight: 850; letter-spacing: -.02em; }
+.page-subtitle{ margin: 6px 0 0; color: var(--muted); font-size: 13px; }
+.table-tools{ display:flex; align-items:center; gap: 10px; }
+.table-tools__search{ position:relative; display:flex; align-items:center; gap: 8px; }
+.table-tools__search .icon{ position:absolute; left: 12px; width:18px; height:18px; opacity:.75; }
+.table-tools__search input{ padding-left: 40px; width: 320px; }
+/* Clientes: misma estructura que facturas emitidas/recibidas (min-width en tabla y th, sin table-layout fixed) */
+#custTable td { vertical-align: middle; }
+#custTable .btn { margin-right: 6px; }
+#custTable .btn:last-child { margin-right: 0; }
+
+.empty-state{ padding: 24px; text-align:center; display:flex; flex-direction:column; align-items:center; gap: 10px; }
+.empty-state[hidden]{ display: none !important; }
+.empty-state__icon{ width: 44px; height: 44px; display:grid; place-items:center; border-radius: 14px; background: rgba(0,0,0,.04); border: 1px solid rgba(0,0,0,.06); }
+.empty-state__icon .icon{ width: 22px; height: 22px; opacity:.85; }
+.empty-state__title{ font-weight: 850; }
+.empty-state__desc{ color: var(--muted); font-size: 13px; max-width: 520px; }
+
+/* Modal */
+.modal[hidden]{ display:none !important; }
+.modal__backdrop{ position:absolute; inset:0; background: rgba(0,0,0,.35); cursor:pointer; }
+.modal__panel{ position:relative; width: min(660px, calc(100vw - 28px)); min-width: 320px; background: rgba(255,255,255,.94); backdrop-filter: blur(12px);
+  border: 1px solid rgba(0,0,0,.10); border-radius: 18px; box-shadow: var(--shadow-md); overflow:hidden; }
+.modal__head{ display:flex; justify-content:space-between; align-items:flex-start; padding: 14px 14px 10px; border-bottom: 1px solid var(--border); }
+.modal__title{ font-weight: 900; }
+.modal__subtitle{ color: var(--muted); font-size: 12px; margin-top: 2px; }
+.modal__body{ padding: 14px; display:flex; flex-direction:column; gap: 12px; }
+.modal__foot{ padding: 12px 14px 14px; border-top: 1px solid var(--border); display:flex; justify-content:flex-end; gap: 10px; }
+.icon-btn{ width: 36px; height: 36px; display:grid; place-items:center; border-radius: 12px; border: 1px solid var(--border); background: rgba(255,255,255,.8); }
+.icon-btn:hover{ background: rgba(0,0,0,.03); }
+.grid-2{ display:grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.grid-3{ display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+.field{ display:flex; flex-direction:column; gap: 8px; }
+.label{ font-size: 12px; color: var(--muted); font-weight: 700; }
+.help{ font-size: 12px; color: #b42318; }
+.hint{ font-size: 12px; color: var(--muted); padding: 10px 12px; border-radius: 14px; background: rgba(0,0,0,.03); border: 1px solid rgba(0,0,0,.06); }
+.input--error{ border-color: rgba(240,68,56,.55) !important; box-shadow: 0 0 0 3px rgba(240,68,56,.15) !important; }
+
+@media (max-width: 860px){
+  .page-head{ flex-direction:column; align-items:stretch; }
+  .table-tools{ justify-content:space-between; }
+  .table-tools__search input{ width: 100%; }
+  .grid-2{ grid-template-columns: 1fr; }
+  .grid-3{ grid-template-columns: 1fr; }
+}
+</style>
+{% endblock %}

@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Gracias — {{ quotation.issuer_name or 'Cotización' }}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root { --bg: #f7f7f8; --surface: #fff; --text: #111; --muted: #6b6f76; --accent: #21c16b; --radius: 14px; --shadow: 0 6px 18px rgba(17,17,17,.06); }
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 24px; font-family: Inter, system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+    .wrap { max-width: 480px; margin: 0 auto; }
+    .card { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 32px; text-align: center; }
+    .icon-ok { width: 56px; height: 56px; margin: 0 auto 20px; background: #eefbf4; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+    .icon-ok svg { width: 28px; height: 28px; stroke: var(--accent); }
+    h1 { font-size: 20px; font-weight: 700; margin: 0 0 8px; }
+    p { color: var(--muted); margin: 0; font-size: 15px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <div class="icon-ok">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20 6L9 17l-5-5"/>
+        </svg>
+      </div>
+      <h1>Gracias</h1>
+      <p>
+        {% if action == 'accepted' %}
+        Tu aceptación fue registrada. El proveedor ha sido notificado.
+        {% else %}
+        Tu rechazo fue registrado. El proveedor ha sido notificado.
+        {% endif %}
+      </p>
+    </div>
+  </div>
+</body>
+</html>

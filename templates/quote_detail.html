@@ -1,0 +1,145 @@
+{% extends "base_portal.html" %}
+{% set title = 'Cotización' %}
+{% set page_icon = '<svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M8 4h8v2H8z" stroke="currentColor" stroke-width="1.8"/><path d="M8 10h8v2H8z" stroke="currentColor" stroke-width="1.8"/><path d="M8 16h5" stroke="currentColor" stroke-width="1.8"/><path d="M6 2a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6H6z" stroke="currentColor" stroke-width="1.8"/><path d="M14 2v6h6" stroke="currentColor" stroke-width="1.8"/></svg>' %}
+
+{% macro status_badge(s) %}
+  {% set st = (s|default('')|string)|lower %}
+  {% if st == 'draft' %}
+    <span class="quote-status quote-status--draft">Borrador</span>
+  {% elif st == 'sent' %}
+    <span class="quote-status quote-status--sent">Enviada</span>
+  {% elif st == 'accepted' %}
+    <span class="quote-status quote-status--accepted">Aceptada</span>
+  {% elif st == 'rejected' %}
+    <span class="quote-status quote-status--rejected">Rechazada</span>
+  {% elif st == 'expired' %}
+    <span class="quote-status quote-status--expired">Expirada</span>
+  {% else %}
+    <span class="quote-status">{{ s or '-' }}</span>
+  {% endif %}
+{% endmacro %}
+
+{% block content %}
+<section class="page-section page-section--quote-detail">
+  <header class="app-header" style="margin-bottom:16px;">
+    <div class="app-header__left">
+      <a href="/portal/cotizaciones" class="btn btn-ghost btn-small" style="text-decoration:none;">← Cotizaciones</a>
+      <div class="app-title" style="margin-top:8px;"></div>
+      <div class="app-subtitle muted">Cotización {{ quote.folio or quote.id }}</div>
+    </div>
+    <div class="app-header__right">
+      {{ status_badge(quote.status) }}
+    </div>
+  </header>
+
+  <div class="card p-20">
+    <div class="quote-detail-meta">
+      <p class="muted" style="margin:0 0 8px;"><strong>Cliente:</strong> {{ quote.customer_legal_name }}</p>
+      {% if quote.customer_rfc %}<p class="muted" style="margin:0 0 8px;">RFC {{ quote.customer_rfc }}</p>{% endif %}
+      {% if quote.customer_email %}<p class="muted" style="margin:0 0 8px;">Email {{ quote.customer_email }}</p>{% endif %}
+      <p class="muted" style="margin:0;">Fecha: {{ quote.created_at[:10] if quote.created_at else '-' }}</p>
+    </div>
+
+    <div style="overflow-x:auto; margin-top:16px;">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Descripción</th>
+            <th style="text-align:right;">Cant.</th>
+            <th style="text-align:right;">P. unit.</th>
+            <th style="text-align:right;">Importe</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for it in quote.items %}
+          <tr>
+            <td>{{ it.description }}</td>
+            <td style="text-align:right;">{{ '{:,.2f}'.format(it.quantity) }}</td>
+            <td style="text-align:right;">${{ '{:,.2f}'.format(it.unit_price) }}</td>
+            <td style="text-align:right;">${{ '{:,.2f}'.format(it.total_line) }}</td>
+          </tr>
+          {% endfor %}
+          <tr style="border-top:2px solid var(--border); font-weight:700;">
+            <td colspan="3" style="text-align:right;">Subtotal</td>
+            <td style="text-align:right;">${{ '{:,.2f}'.format(quote.subtotal) }}</td>
+          </tr>
+          <tr>
+            <td colspan="3" style="text-align:right;">IVA</td>
+            <td style="text-align:right;">${{ '{:,.2f}'.format(quote.iva_total) }}</td>
+          </tr>
+          <tr>
+            <td colspan="3" style="text-align:right;">Total (MXN)</td>
+            <td style="text-align:right;">${{ '{:,.2f}'.format(quote.total) }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    {% if quote.notes %}
+    <div class="quote-detail-notes muted" style="margin-top:16px; padding-top:16px; border-top:1px solid var(--border); font-size:13px; white-space:pre-wrap;">{{ quote.notes }}</div>
+    {% endif %}
+
+    {% if quote.status == 'rejected' and quote.rejection_reason %}
+    <div class="quote-detail-rejected" style="margin-top:16px; padding:12px; background:rgba(185,28,28,.08); border-radius:12px; border:1px solid rgba(185,28,28,.2);">
+      <strong>Motivo de rechazo:</strong> {{ quote.rejection_reason }}
+    </div>
+    {% endif %}
+
+    {% if quote.status == 'accepted' %}
+    <div class="quote-detail-accepted" style="margin-top:20px; padding:14px; background:rgba(33,193,107,.1); border-radius:12px; border:1px solid rgba(33,193,107,.3);">
+      <p style="margin:0 0 12px; font-weight:600;">Aceptada por el cliente</p>
+      <a href="/portal/create?quote_id={{ quote.id }}" class="btn btn-primary" style="text-decoration:none;">Facturar desde esta cotización</a>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="card p-20" style="margin-top:16px;">
+    <h3 class="section-title" style="margin:0 0 12px;">Vista previa PDF</h3>
+    <p class="muted" style="margin:0 0 12px; font-size:13px;">La cotización en formato PDF se muestra abajo. Puedes abrirlo en otra pestaña o descargarlo.</p>
+    <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:12px;">
+      <a href="/portal/quotations/{{ quote.id }}/pdf" class="btn btn-ghost" target="_blank" rel="noopener" style="text-decoration:none;">Abrir PDF en nueva pestaña</a>
+      <a href="/portal/quotations/{{ quote.id }}/pdf?download=1" class="btn btn-ghost" download style="text-decoration:none;">Descargar PDF</a>
+      {% if quote.status == 'sent' or quote.status == 'draft' %}
+      <div style="display:flex; align-items:center; gap:8px;">
+        <input type="text" id="quoteLinkInput" class="input" readonly value="" style="width:280px;" />
+        <button type="button" class="btn btn-ghost" id="quoteCopyLink">Copiar link</button>
+      </div>
+      {% endif %}
+    </div>
+    <div class="quote-pdf-preview" style="border:1px solid var(--border); border-radius:12px; overflow:hidden; background:#f9f9f9;">
+      <iframe
+        title="PDF Cotización {{ quote.folio or quote.id }}"
+        src="/portal/quotations/{{ quote.id }}/pdf"
+        style="width:100%; height:min(80vh, 720px); border:none; display:block;"
+      ></iframe>
+    </div>
+  </div>
+</section>
+
+<script>
+(function(){
+  const token = "{{ token }}";
+  const baseUrl = window.location.origin;
+  const publicToken = "{{ quote.public_token or '' }}";
+  const linkInput = document.getElementById('quoteLinkInput');
+  if (linkInput && publicToken) linkInput.value = baseUrl + '/q/' + publicToken;
+  const copyBtn = document.getElementById('quoteCopyLink');
+  if (copyBtn && linkInput) copyBtn.addEventListener('click', function(){
+    linkInput.select();
+    navigator.clipboard.writeText(linkInput.value).then(function(){
+      window.portalToast && window.portalToast({ type: 'success', title: 'Copiado', message: 'Link copiado al portapapeles' });
+    });
+  });
+})();
+</script>
+
+<style>
+.quote-status { display: inline-block; padding: 6px 12px; border-radius: 10px; font-size: 12px; font-weight: 700; }
+.quote-status--draft { background: #f5f5f5; border: 1px solid #e0e0e0; }
+.quote-status--sent { background: #eef4fc; border: 1px solid #c9daf8; }
+.quote-status--accepted { background: #f3fcf6; border: 1px solid #cfead9; }
+.quote-status--rejected { background: #fff4f4; border: 1px solid #f2c9c9; }
+.quote-status--expired { background: #f5f5f5; border: 1px solid #ccc; color: #666; }
+.page-section--quote-detail .table td, .page-section--quote-detail .table th { padding: 10px 12px; }
+</style>
+{% endblock %}

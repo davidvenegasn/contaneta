@@ -1,0 +1,22 @@
+-- 003_ensure_columns_crash.sql
+-- Asegura columnas críticas que causan "no such column" si faltan en DBs antiguas.
+-- 
+-- NOTA: Esta migración es ejecutada por el runner usando lógica Python segura
+-- (_apply_003_safe_add_columns) que verifica existencia antes de agregar columnas.
+-- El archivo SQL existe para documentación; el runner ejecuta la lógica Python directamente.
+--
+-- Columnas que se aseguran:
+--
+-- sat_cfdi (12 columnas críticas):
+--   - serie, folio, forma_pago, metodo_pago, uso_cfdi (TEXT)
+--   - subtotal, descuento, impuestos, retenciones (REAL)
+--   - concepto, tipo_comprobante, xml_status (TEXT)
+--
+-- invoices (1 columna crítica):
+--   - issue_date (TEXT) - usada en SELECT y ORDER BY en api_pending_invoices
+--
+-- Todas las columnas se agregan como nullable para no romper datos existentes.
+-- La migración es idempotente: si una columna ya existe, se omite sin error.
+
+-- Este archivo SQL no se ejecuta directamente; el runner usa _apply_003_safe_add_columns()
+-- que verifica existencia con PRAGMA table_info antes de ejecutar ALTER TABLE ADD COLUMN.
