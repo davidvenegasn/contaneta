@@ -2,7 +2,11 @@
 __pycache__/
 *.pyc
 .DS_Store
+
+# data local
 invoicing.db
 invoicing.db-*
 storage/
+
+# secrets
 .env
