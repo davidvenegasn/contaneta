@@ -49,10 +49,15 @@ Documento de decisiones tomadas para lanzamiento público y operación autónoma
 
 ---
 
-## Seguridad adicional
+## Seguridad (agent/security)
 
-- **Rate limit login:** Hasta 5 intentos de login por IP en una ventana de 60 segundos; tras superar el límite se aplica un retraso y se devuelve error genérico.
-- **Path traversal:** Las rutas que sirven XML/PDF resuelven rutas bajo `BASE_DIR` y rechazan paths que salgan de ese árbol (`_safe_abs_path`).
+- **Rate limiting:** Login: 5 intentos por IP en 60 s. Registro: 3 intentos por IP en 60 s. Retraso y mensaje genérico al superar el límite.
+- **CSRF:** Token firmado (HMAC, validez 1 h) en login, registro, choose-issuer y submit de factura. Verificación en cada POST sensible.
+- **Cookies:** HttpOnly, SameSite=Lax, Secure en prod (COOKIE_SECURE=1 o X-Forwarded-Proto: https), max_age=SESSION_TTL_DAYS. Ver services/session.session_cookie_params.
+- **issuer_id:** Siempre obtenido de get_portal_issuer (sesión/token). Todas las consultas que filtran datos de cliente incluyen WHERE issuer_id = ?. choose-issuer valida membresía antes de cambiar issuer.
+- **Sanitización:** services/sanitize: email (lower, longitud), RFC (alfanumérico, mayúsculas), CP (sólo dígitos, 5), montos (float no negativo). Aplicado en registro y reutilizable en otros formularios.
+- **Path traversal:** Rutas XML/PDF con _safe_abs_path bajo BASE_DIR.
+- **Checklist antes de prod:** Ver SECURITY.md.
 
 ---
 

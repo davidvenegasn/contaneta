@@ -11,14 +11,20 @@ import httpx
 
 from config import _env_path
 from database import db
-from services import issuers, session, users, audit
+from services import issuers, session, users, audit, csrf as csrf_service
+from services import sanitize as sanitize_service
 
 logger = logging.getLogger(__name__)
 
-# Rate-limit login: por IP, máx 5 intentos por ventana de 60 s (mensaje genérico, sin filtrar si email existe/no existe)
+# Rate-limit login: por IP, máx 5 intentos por ventana de 60 s
 _LOGIN_ATTEMPTS: dict[str, list[float]] = defaultdict(list)
 _LOGIN_WINDOW = 60.0
 _LOGIN_MAX_ATTEMPTS = 5
+
+# Rate-limit registro: por IP, máx 3 intentos por ventana de 60 s
+_REGISTER_ATTEMPTS: dict[str, list[float]] = defaultdict(list)
+_REGISTER_WINDOW = 60.0
+_REGISTER_MAX_ATTEMPTS = 3
 
 
 def _client_ip(request: Request) -> str:
@@ -29,11 +35,21 @@ def _login_rate_limit(request: Request) -> bool:
     """True si se debe bloquear (rate limit excedido). Si no, registra intento y devuelve False."""
     ip = _client_ip(request)
     now = time.time()
-    # Prune old
     _LOGIN_ATTEMPTS[ip] = [t for t in _LOGIN_ATTEMPTS[ip] if now - t < _LOGIN_WINDOW]
     if len(_LOGIN_ATTEMPTS[ip]) >= _LOGIN_MAX_ATTEMPTS:
         return True
     _LOGIN_ATTEMPTS[ip].append(now)
+    return False
+
+
+def _register_rate_limit(request: Request) -> bool:
+    """True si se debe bloquear registro por IP (rate limit excedido)."""
+    ip = _client_ip(request)
+    now = time.time()
+    _REGISTER_ATTEMPTS[ip] = [t for t in _REGISTER_ATTEMPTS[ip] if now - t < _REGISTER_WINDOW]
+    if len(_REGISTER_ATTEMPTS[ip]) >= _REGISTER_MAX_ATTEMPTS:
+        return True
+    _REGISTER_ATTEMPTS[ip].append(now)
     return False
 
 
@@ -108,6 +124,7 @@ def get_auth_router(templates):
             {
                 "request": request,
                 "error": error,
+                "csrf_token": csrf_service.generate_csrf_token(),
                 "google_login_url": _google_login_url(request) or "#",
                 "facebook_login_url": _facebook_login_url(request) or "#",
                 "google_oauth_configured": bool(os.getenv("GOOGLE_CLIENT_ID", "").strip()),
@@ -139,8 +156,10 @@ def get_auth_router(templates):
         email: str | None = Form(None),
         phone: str | None = Form(None),
         password: str = Form(...),
+        csrf_token: str | None = Form(None),
     ):
-        # Rate-limit básico por IP
+        if not csrf_service.verify_csrf_token(csrf_token):
+            return RedirectResponse(url="/login?error=invalid", status_code=302)
         if _login_rate_limit(request):
             time.sleep(2)
             return RedirectResponse(url="/login?error=invalid", status_code=302)
@@ -193,7 +212,7 @@ def get_auth_router(templates):
     def register_page(request: Request, error: str | None = Query(None)):
         return templates.TemplateResponse(
             "register.html",
-            {"request": request, "error": _register_error_message(error)},
+            {"request": request, "error": _register_error_message(error), "csrf_token": csrf_service.generate_csrf_token()},
         )
 
     @router.post("/auth/register", response_class=RedirectResponse)
@@ -205,16 +224,25 @@ def get_auth_router(templates):
         razon_social: str = Form(...),
         regimen_fiscal: str = Form("616"),
         cp: str | None = Form(None),
+        csrf_token: str | None = Form(None),
     ):
-        email = (email or "").strip().lower()
-        if not email or "@" not in email:
+        if not csrf_service.verify_csrf_token(csrf_token):
+            return RedirectResponse(url="/register?error=error", status_code=302)
+        if _register_rate_limit(request):
+            time.sleep(2)
+            return RedirectResponse(url="/register?error=error", status_code=302)
+        email = sanitize_service.sanitize_email(email)
+        if not email:
             return RedirectResponse(url="/register?error=required", status_code=302)
         if not password or len(password) < 8:
             return RedirectResponse(url="/register?error=password", status_code=302)
-        rfc = (rfc or "").strip().upper()
-        razon_social = (razon_social or "").strip()
+        rfc = sanitize_service.sanitize_rfc(rfc)
+        razon_social = (razon_social or "").strip()[:200]
         if not rfc or not razon_social:
             return RedirectResponse(url="/register?error=required", status_code=302)
+        cp = sanitize_service.sanitize_cp(cp)
+        if cp is not None and len(cp) != 5:
+            cp = None
         if users.get_user_by_email(email):
             return RedirectResponse(url="/register?error=error", status_code=302)
         try:
@@ -270,15 +298,17 @@ def get_auth_router(templates):
             return resp
         return templates.TemplateResponse(
             "choose_issuer.html",
-            {"request": request, "memberships": memberships},
+            {"request": request, "memberships": memberships, "csrf_token": csrf_service.generate_csrf_token()},
         )
 
     @router.post("/choose-issuer", response_class=RedirectResponse)
-    def choose_issuer_submit(request: Request, issuer_id: int = Form(...)):
+    def choose_issuer_submit(request: Request, issuer_id: int = Form(...), csrf_token: str | None = Form(None)):
         cookie_val = request.cookies.get(cookie_name)
         session_data = session.verify_session(cookie_val)
         if not session_data or session_data[0] == 0:
             return RedirectResponse(url="/login", status_code=302)
+        if not csrf_service.verify_csrf_token(csrf_token):
+            return RedirectResponse(url="/choose-issuer", status_code=302)
         user_id = session_data[0]
         mem = users.get_membership(user_id, issuer_id)
         if not mem:

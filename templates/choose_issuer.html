@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Elige empresa · ContaNeta</title>
+  <link rel="stylesheet" href="/static/css/form.css">
+  <style>
+    body { max-width: 420px; margin: 2rem auto; padding: 0 1rem; }
+    .auth-card { padding: 1.5rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card-bg); }
+    .auth-card h1 { margin: 0 0 1rem; font-size: 1.25rem; }
+    .issuer-list { list-style: none; padding: 0; margin: 0; }
+    .issuer-list li { margin-bottom: 0.5rem; }
+    .issuer-list button { width: 100%; padding: 0.75rem; text-align: left; border: 1px solid var(--border-strong); border-radius: 12px; background: #fff; cursor: pointer; font-size: 14px; }
+    .issuer-list button:hover { border-color: var(--primary); background: var(--bg); }
+    .issuer-list .rfc { font-size: 12px; color: var(--muted); }
+  </style>
+</head>
+<body>
+  <div class="auth-card">
+    <h1>Elige la empresa</h1>
+    <p class="muted">Tienes acceso a más de un RFC. Selecciona con cuál quieres entrar.</p>
+    <form method="post" action="/choose-issuer" id="f">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token or '' }}" />
+      <input type="hidden" name="issuer_id" id="issuer_id" value="" />
+      <ul class="issuer-list">
+        {% for m in memberships %}
+        <li>
+          <button type="submit" value="{{ m.issuer_id }}" onclick="document.getElementById('issuer_id').value=this.value">
+            <strong>{{ m.razon_social or m.rfc or 'Emisor' }}</strong>
+            <br><span class="rfc">{{ m.rfc }}</span>
+          </button>
+        </li>
+        {% endfor %}
+      </ul>
+    </form>
+    <p style="margin-top:1rem; font-size:13px;"><a href="/logout">Cerrar sesión</a></p>
+  </div>
+</body>
+</html>

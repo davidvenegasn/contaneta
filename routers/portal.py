@@ -9,7 +9,7 @@ from fastapi.responses import HTMLResponse, Response, RedirectResponse
 from config import BASE_DIR, REGIMEN_LABEL_TO_CODE, COOKIE_DEMO_VIEW
 from database import db, db_rows, has_column
 from routers.deps import get_portal_issuer
-from services import quotations as quotations_service, session as session_service, audit, subscription as subscription_service
+from services import quotations as quotations_service, session as session_service, audit, subscription as subscription_service, csrf as csrf_service
 
 # ----------------------------
 # Helpers
@@ -440,6 +440,7 @@ def get_portal_router(templates):
                     "customer_prefill": customer_prefill,
                     "concept_prefill": concept_prefill,
                     "quote_items": quote_items,
+                    "csrf_token": csrf_service.generate_csrf_token(),
                 },
             )
         except Exception as e:
@@ -449,7 +450,7 @@ def get_portal_router(templates):
     def portal_create_quick(request: Request, issuer: dict = Depends(get_portal_issuer)):
         try:
             return _render_portal(
-                request, issuer=issuer, template_name="form.html", active_page="create_quick", title="Factura rápida", extra={"create_mode": "quick"}
+                request, issuer=issuer, template_name="form.html", active_page="create_quick", title="Factura rápida", extra={"create_mode": "quick", "csrf_token": csrf_service.generate_csrf_token()}
             )
         except Exception as e:
             return HTMLResponse(f"<h3>Error</h3><p>{str(e)}</p>", status_code=400)
@@ -458,7 +459,7 @@ def get_portal_router(templates):
     def portal_create_multi(request: Request, issuer: dict = Depends(get_portal_issuer)):
         try:
             return _render_portal(
-                request, issuer=issuer, template_name="form.html", active_page="create_multi", title="Factura múltiple", extra={"create_mode": "multi"}
+                request, issuer=issuer, template_name="form.html", active_page="create_multi", title="Factura múltiple", extra={"create_mode": "multi", "csrf_token": csrf_service.generate_csrf_token()}
             )
         except Exception as e:
             return HTMLResponse(f"<h3>Error</h3><p>{str(e)}</p>", status_code=400)

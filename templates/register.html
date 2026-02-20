@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Crear cuenta · ContaNeta</title>
+  <link rel="stylesheet" href="/static/css/form.css">
+  <style>
+    body { max-width: 440px; margin: 2rem auto; padding: 0 1rem; }
+    .auth-card { padding: 1.5rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card-bg); box-shadow: var(--shadow); }
+    .auth-card h1 { margin: 0 0 0.5rem; font-size: 1.25rem; }
+    .auth-card .muted { margin-bottom: 1rem; font-size: 14px; }
+    .auth-card .danger { color: #c00; margin-bottom: 1rem; font-size: 14px; }
+    .auth-card label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 0.25rem; }
+    .auth-card input, .auth-card select { width: 100%; padding: 0.5rem 0.75rem; margin-bottom: 1rem; border-radius: 12px; border: 1px solid var(--border-strong); box-sizing: border-box; }
+    .auth-card button[type="submit"] { width: 100%; padding: 0.6rem; margin-top: 0.25rem; }
+    .auth-footer { margin-top: 1.25rem; text-align: center; font-size: 14px; }
+    .auth-footer a { color: var(--primary); }
+  </style>
+</head>
+<body>
+  <div class="auth-card">
+    <h1>Crear cuenta</h1>
+    <p class="muted">Registro con correo y datos fiscales. Entras directo al portal.</p>
+    {% if error %}
+      <p class="danger">{{ error }}</p>
+    {% endif %}
+    <form method="post" action="/auth/register" id="register-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token or '' }}" />
+      <label for="email">Correo electrónico *</label>
+      <input type="email" name="email" id="email" placeholder="tu@correo.com" autocomplete="email" required />
+      <label for="password">Contraseña *</label>
+      <input type="password" name="password" id="password" placeholder="Mínimo 8 caracteres" autocomplete="new-password" required minlength="8" />
+      <label for="rfc">RFC *</label>
+      <input type="text" name="rfc" id="rfc" placeholder="RFC persona moral o física" autocomplete="off" required maxlength="13" />
+      <label for="razon_social">Razón social / Nombre fiscal *</label>
+      <input type="text" name="razon_social" id="razon_social" placeholder="Nombre o razón social" autocomplete="organization" required />
+      <label for="regimen_fiscal">Régimen fiscal *</label>
+      <select name="regimen_fiscal" id="regimen_fiscal">
+        <option value="616">616 - Sin obligaciones fiscales</option>
+        <option value="612">612 - Personas físicas con actividades empresariales</option>
+        <option value="626">626 - Régimen simplificado de confianza (RESICO)</option>
+        <option value="601">601 - General de ley personas morales</option>
+        <option value="603">603 - Personas morales con fines no lucrativos</option>
+      </select>
+      <label for="cp">Código postal (opcional)</label>
+      <input type="text" name="cp" id="cp" placeholder="5 dígitos" autocomplete="postal-code" maxlength="10" />
+      <button type="submit" class="btn btn-primary">Crear cuenta y entrar</button>
+    </form>
+    <div class="auth-footer">
+      ¿Ya tienes cuenta? <a href="/login">Entrar con email</a>
+    </div>
+  </div>
+</body>
+</html>

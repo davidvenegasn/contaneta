@@ -7,24 +7,91 @@
   <link rel="stylesheet" href="/static/css/form.css">
   <style>
     body { max-width: 420px; margin: 2rem auto; padding: 0 1rem; }
-    .login-card { padding: 1.5rem; border: 1px solid #e0e0e0; border-radius: 8px; }
-    .login-card h1 { margin: 0 0 1rem; font-size: 1.25rem; }
-    .login-card .danger { color: #c00; margin-bottom: 1rem; }
-    .login-card input { width: 100%; padding: 0.5rem; margin-bottom: 1rem; }
-    .login-card button { width: 100%; padding: 0.6rem; }
+    .auth-card { padding: 1.5rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card-bg); box-shadow: var(--shadow); }
+    .auth-card h1 { margin: 0 0 1rem; font-size: 1.25rem; }
+    .auth-card .danger { color: #c00; margin-bottom: 1rem; font-size: 14px; }
+    .auth-card input { width: 100%; padding: 0.5rem 0.75rem; margin-bottom: 1rem; border-radius: 12px; border: 1px solid var(--border-strong); }
+    .auth-card button[type="submit"] { width: 100%; padding: 0.6rem; }
+    .auth-tabs { display: flex; margin-bottom: 1rem; }
+    .auth-tabs label { flex: 1; text-align: center; padding: 0.5rem; cursor: pointer; border: 1px solid var(--border-strong); font-size: 14px; }
+    .auth-tabs label:first-of-type { border-radius: 12px 0 0 12px; }
+    .auth-tabs label:last-of-type { border-radius: 0 12px 12px 0; }
+    .auth-tabs input { display: none; }
+    .auth-tabs input:checked + label { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .oauth-buttons { margin: 1rem 0; display: flex; justify-content: center; gap: 1rem; flex-wrap: wrap; }
+    .btn-oauth { display: flex; align-items: center; justify-content: center; width: 48px; height: 48px; padding: 0; border: 1px solid var(--border-strong); border-radius: 12px; background: #fff; cursor: pointer; text-decoration: none; transition: background .15s, border-color .15s; }
+    .btn-oauth:hover { background: var(--bg); border-color: var(--primary); }
+    .btn-oauth svg { width: 24px; height: 24px; display: block; }
+    .divider { text-align: center; margin: 1rem 0; color: var(--muted); font-size: 12px; }
+    .auth-footer { margin-top: 1rem; text-align: center; font-size: 14px; }
+    .auth-footer a { color: var(--primary); }
+    .token-link { font-size: 13px; margin-top: 0.75rem; }
   </style>
 </head>
 <body>
-  <div class="login-card">
+  <div class="auth-card">
     <h1>Entrar al portal</h1>
-    <p class="muted">Ingresa tu token de acceso (solo una vez; después navegarás con sesión).</p>
+    <p class="muted">Entra con tu correo (o teléfono) y contraseña, o usa Google/Facebook.</p>
     {% if error %}
       <p class="danger">{{ error }}</p>
     {% endif %}
-    <form method="GET" action="/login">
-      <input type="text" name="token" placeholder="Token de acceso" autocomplete="off" required />
+    <form method="post" action="/login" id="login-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token or '' }}" />
+      <input type="hidden" name="login_type" value="credentials" />
+      <div class="auth-tabs">
+        <input type="radio" name="cred_type" id="cred_email" value="email" checked />
+        <label for="cred_email">Correo</label>
+        <input type="radio" name="cred_type" id="cred_phone" value="phone" />
+        <label for="cred_phone">Teléfono</label>
+      </div>
+      <div id="field-email">
+        <input type="email" name="email" id="email" placeholder="tu@correo.com" autocomplete="email" />
+      </div>
+      <div id="field-phone" style="display:none;">
+        <input type="tel" name="phone" id="phone" placeholder="55 1234 5678" autocomplete="tel" />
+      </div>
+      <input type="password" name="password" id="password" placeholder="Contraseña" autocomplete="current-password" required />
       <button type="submit" class="btn btn-primary">Entrar</button>
     </form>
+    {% if google_oauth_configured or facebook_oauth_configured %}
+    <div class="divider">— o continúa con —</div>
+    <div class="oauth-buttons">
+      {% if google_oauth_configured %}
+      <a href="{{ google_login_url }}" class="btn-oauth" title="Entrar con Google" aria-label="Entrar con Google">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+      </a>
+      {% endif %}
+      {% if facebook_oauth_configured %}
+      <a href="{{ facebook_login_url }}" class="btn-oauth" title="Entrar con Facebook" aria-label="Entrar con Facebook">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path fill="#1877F2" d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+      </a>
+      {% endif %}
+    </div>
+    {% endif %}
+    <p class="token-link"><a href="/login?token=">Entrar con token de acceso</a> (si te dieron un enlace)</p>
+    <div class="auth-footer">
+      ¿No tienes cuenta? <a href="/register">Crear cuenta</a>
+    </div>
   </div>
+  <script>
+    document.querySelectorAll('input[name="cred_type"]').forEach(function(r) {
+      r.addEventListener('change', function() {
+        var isEmail = document.getElementById('cred_email').checked;
+        document.getElementById('field-email').style.display = isEmail ? 'block' : 'none';
+        document.getElementById('field-phone').style.display = isEmail ? 'none' : 'block';
+      });
+    });
+    // Si la URL tiene ?token= vacío, mostrar mensaje para pegar token
+    if (window.location.search.indexOf('token=') >= 0 && !window.location.search.replace('token=', '').trim()) {
+      document.getElementById('login-form').style.display = 'none';
+      var ob = document.querySelector('.oauth-buttons');
+      if (ob) ob.style.display = 'none';
+      var div = document.querySelector('.divider');
+      if (div) div.style.display = 'none';
+      var p = document.createElement('p');
+      p.innerHTML = 'Pega tu token en la URL: <code>/login?token=TU_TOKEN</code> o <a href="/login">volver a correo/teléfono</a>.';
+      document.querySelector('.auth-card').insertBefore(p, document.querySelector('.auth-footer'));
+    }
+  </script>
 </body>
 </html>
