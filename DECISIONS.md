@@ -16,20 +16,21 @@ Documento de decisiones tomadas para lanzamiento público y operación autónoma
 ## Roles y acceso
 
 - **Roles en `memberships`:** `viewer`, `accountant`, `owner`, `admin`. El registro crea solo `owner`. Admin se asigna manualmente (p. ej. `UPDATE memberships SET role = 'admin' WHERE user_id = X AND issuer_id = Y`) para impersonación y operaciones sensibles.
-- **Impersonación:** Solo usuarios con rol `admin` en alguna membership pueden usar `/admin/impersonate` y `/admin/stop-impersonate`. Cada acción se registra en `audit_log`.
+- **Impersonación:** Solo usuarios con rol `admin` u `owner` en alguna membership pueden usar el panel admin y `/admin/impersonate` / `/admin/stop-impersonate`. Cada acción se registra en `audit_log` (incluyendo IP y user-agent en `details` para impersonate).
 
 ---
 
 ## Auditoría
 
-- **Tabla `audit_log`:** Acciones registradas: `login`, `logout`, `impersonate`, `stop_impersonate`, `download_xml`, `download_pdf`, `quotation_pdf`. Incluyen `user_id`, `issuer_id`, `target_issuer_id` (si aplica) y `details`.
+- **Tabla `audit_log`:** Acciones registradas: `register`, `login`, `logout`, `impersonate`, `stop_impersonate`, `download_xml`, `download_pdf`, `quotation_pdf`, `cfdi_view`, `admin_ops`. Incluyen `user_id`, `issuer_id`, `target_issuer_id` (si aplica) y `details`. Para impersonate se guardan IP y user-agent en `details`.
+- **Sync SAT:** El sincronizado con SAT se dispara por scripts externos (sat_sync/*); si en el futuro la app expone un endpoint de sync, se registrará en audit_log.
 - **Separación por issuer:** Todas las rutas del portal y APIs que devuelven datos usan `issuer_id` de la sesión (o token); las queries filtran por `issuer_id` para no mezclar datos entre clientes.
 
 ---
 
 ## Operación y backups
 
-- **Health:** `GET /health` devuelve `{"status": "ok"|"degraded", "db": "ok"|"error"}`. No requiere autenticación. Uso: balanceadores y monitoreo.
+- **Health:** `GET /health` devuelve JSON con `ok`, `db_readable`, `migrations_applied`, `storage_writable`. No requiere autenticación. `GET /status` ofrece la misma información en HTML legible.
 - **Backups:** Scripts no destructivos:
   - `scripts/backup_db.sh`: copia `invoicing.db` a `backup/invoicing_YYYYMMDD_HHMMSS.db`.
   - `scripts/backup_storage_xml.sh`: copia el directorio `storage` a `backup/storage_YYYYMMDD_HHMMSS`.
@@ -45,4 +46,14 @@ Documento de decisiones tomadas para lanzamiento público y operación autónoma
 
 ---
 
-*Última actualización: lanzamiento público / hardening autónomo.*
+---
+
+## Panel admin (CONTRATO 3)
+
+- **Acceso:** Rutas bajo `/admin` (dashboard, users, issuers, memberships, ops) exigen sesión y rol `admin` u `owner` vía `user_has_admin_or_owner_role(user_id)`.
+- **Dashboard:** Tarjetas con conteos (users, issuers, memberships), sat_cfdi por dirección y mes actual, sat_requests por status, últimos 20 audit_log.
+- **Impersonación:** Botón “Entrar como este issuer” en `/admin/issuers` (POST a `/admin/impersonate-form`). Se registra en audit_log con IP y user-agent en `details`. En el portal se muestra banner “Modo soporte: estás viendo como X” y botón “Salir de soporte” (POST `/admin/stop-impersonate`).
+- **Status/Health admin:** `GET /admin/status` y `GET /admin/health` muestran conteos: #usuarios, #issuers, #CFDI por estado, #jobs pendientes. Requieren rol admin u owner.
+- **Ops:** `/admin/ops` permite “Correr migraciones” (apply_migrations), “Verificar DB” (listado de tablas y schema_migrations), “Crear backup ahora” (scripts backup_db.sh y backup_storage_xml.sh). Cada acción se registra en audit_log.
+
+*Última actualización: audit register/cfdi_view, /admin/status con conteos, Salir de soporte (agent/admin-ops).*
