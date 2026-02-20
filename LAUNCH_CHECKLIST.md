@@ -4,7 +4,7 @@
 
 **Fecha objetivo:** _______________
 
-**Documentos relacionados:** `QA_STEPS.md` (pasos de verificación), `DECISIONS.md` (decisiones de diseño y operación).
+**Documentos relacionados:** `QA_STEPS.md` (pasos de verificación), `DECISIONS.md` (decisiones de diseño y operación), `SECURITY_NOTES.md` (aislamiento issuer_id, cookies, rate limit), `env.example` (variables de entorno y defaults seguros).
 
 ---
 
@@ -26,7 +26,7 @@ Ver pasos detallados en **QA_STEPS.md**.
 ### 1.1 Variables de entorno críticas
 - [ ] **DEV_MODE=0** en `.env` de producción (por defecto es "1", debe estar OFF)
 - [ ] **SESSION_SECRET** configurado con valor aleatorio fuerte (32+ caracteres hex)
-- [ ] **COOKIE_SECURE=1** si se usa HTTPS (si no, dejar en 0 pero documentar riesgo)
+- [ ] **COOKIE_SECURE=1** si se usa HTTPS (obligatorio en producción con HTTPS; con 0 la cookie se envía por HTTP y puede ser interceptada). Ver **SECURITY_NOTES.md** (sección Cookies).
 - [ ] **APP_DB_PATH** apunta a ruta absoluta de `invoicing.db` (no relativa)
 - [ ] **FACTURAPI_SECRET_KEY** configurado y válido para timbrado real
 
@@ -38,6 +38,8 @@ grep SESSION_SECRET .env  # Debe existir y tener valor largo
 ```
 
 **Riesgo si falla:** Acceso sin autenticación (DEV_MODE), sesiones predecibles, timbrado fallido.
+
+- [ ] **Rate limiting login:** Máx. 5 intentos por IP en 60 s (ya implementado en `POST /login`). Ver **SECURITY_NOTES.md**.
 
 ---
 
@@ -66,6 +68,8 @@ GROUP BY i.id;
 - [ ] **Auditoría rápida:** Todas las queries SELECT/UPDATE/DELETE incluyen `WHERE issuer_id = ?`
 - [ ] Endpoints públicos (cotizaciones `/q/{public_token}`) no exponen datos de otros issuers
 - [ ] Path traversal protegido en `/portal/sat/xml/{uuid}` y `/portal/sat/pdf/{uuid}` (ya implementado con `_safe_abs_path`)
+
+Detalle de dónde se valida `issuer_id` (descargas, detalle, APIs): **SECURITY_NOTES.md**.
 
 **Verificación código:**
 ```bash
@@ -434,7 +438,39 @@ php sat_sync/verify_requests.php --limit=5
 
 ---
 
+---
+
+## Verificación final y cómo revertir
+
+### Verificación final antes de lanzar
+1. Copiar `env.example` a `.env` y rellenar valores de producción (DEV_MODE=0, SESSION_SECRET, COOKIE_SECURE=1 si HTTPS, APP_DB_PATH, FACTURAPI_SECRET_KEY si aplica).
+2. Ejecutar pasos de **QA_STEPS.md** (registro, login, logout, portal, detalle, XML/PDF, cotizaciones, health, backups).
+3. Revisar **SECURITY_NOTES.md** (rate limit login, cookies, issuer_id).
+
+### Cómo revertir usando git
+Si tras desplegar esta rama necesitas volver al estado anterior (ej. rama `main`):
+
+```bash
+# Opción A: volver a la rama main y descartar cambios de esta rama
+git checkout main
+
+# Opción B: deshacer el último commit de la rama actual (mantener cambios en working tree)
+git reset --soft HEAD~1
+
+# Opción C: revertir un commit concreto (crea un nuevo commit que deshace el indicado)
+git revert <commit-hash> --no-edit
+```
+
+Para desplegar de nuevo desde `agent/autonomous-hardening` después de haber vuelto a `main`:
+```bash
+git checkout agent/autonomous-hardening
+```
+
+**Importante:** Revertir no borra la base de datos ni los archivos de `storage/` ni `backup/`. Solo afecta al código del repositorio.
+
+---
+
 **Notas finales:**
 - Este checklist está diseñado para **beta cerrada** (pocos usuarios controlados).
-- Para producción abierta, añadir: rate limiting, monitoreo avanzado, alertas, tests automatizados.
+- Rate limiting de login ya está implementado (ver SECURITY_NOTES.md); para producción con varios workers valorar límite por IP en Redis.
 - Priorizar seguridad (riesgos #1 y #2) sobre features adicionales.
