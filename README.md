@@ -10,6 +10,7 @@ El schema de la base de datos se gestiona **solo por migraciones**. Al arrancar 
 
 - **Crear/actualizar schema:** No hace falta ejecutar ningún script manual; las migraciones se aplican al iniciar la app.
 - **Documentación completa:** [MIGRATIONS.md](MIGRATIONS.md) — cómo funciona el runner, cómo crear una migración nueva, cómo probar con DB desde cero o DB vieja, y qué hacer si aparecen errores WAL/SHM (`invoicing.db-wal`, `invoicing.db-shm`).
+- **Operación:** [OPS_RUNBOOK.md](OPS_RUNBOOK.md) — deploy, backups, restore, health check, cron del worker SAT y logging.
 
 ---
 

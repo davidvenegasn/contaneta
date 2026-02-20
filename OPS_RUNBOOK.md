@@ -1,0 +1,190 @@
+# Runbook de operación — Conta Invoicing MVP
+
+Pasos para desplegar, respaldar, restaurar y operar el sistema de forma autónoma (backups, health, worker SAT).
+
+---
+
+## 1. Deploy
+
+### 1.1 Requisitos
+
+- Python 3.10+ con dependencias: `pip install -r requirements.txt`
+- SQLite (incluido con Python)
+- Para sync SAT: PHP 8+ y Composer en `sat_sync/` (ver sat_sync/README si existe)
+- Variables de entorno: ver README (SESSION_SECRET, APP_DB_PATH, etc.)
+
+### 1.2 Primera puesta en marcha
+
+```bash
+# Opcional: DB en ruta distinta
+export APP_DB_PATH=/var/lib/conta/invoicing.db
+
+# Migraciones se aplican solas al arrancar la app
+uvicorn app:app --host 0.0.0.0 --port 8000
+
+# O con gunicorn (producción)
+gunicorn app:app -w 4 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000
+```
+
+### 1.3 Comprobar que todo está bien
+
+- `curl -s http://localhost:8000/health` → `{"status":"ok", "db":"ok", "migrations_applied": true, "storage_exists": true, ...}`
+- Abrir `/login` o `/register` y verificar que la app responde.
+
+---
+
+## 2. Backups
+
+### 2.1 Backup de la base de datos
+
+Script: **`scripts/backup_db.sh`**
+
+- Copia `invoicing.db` (o `APP_DB_PATH`) a `backup/invoicing_YYYYMMDD_HHMMSS.db`.
+- **Retención:** se eliminan copias más antiguas de `BACKUP_RETAIN_DAYS` días (por defecto 30).
+
+```bash
+# Desde la raíz del proyecto
+./scripts/backup_db.sh
+
+# Con DB y directorio de backup custom
+APP_DB_PATH=/var/lib/conta/invoicing.db BACKUP_DIR=/backups BACKUP_RETAIN_DAYS=14 ./scripts/backup_db.sh
+```
+
+### 2.2 Backup del storage (XMLs)
+
+Script: **`scripts/backup_storage_xml.sh`**
+
+- Copia el directorio `storage/` a `backup/storage_YYYYMMDD_HHMMSS` (o `.tar.gz` si `BACKUP_STORAGE_ZIP=1`).
+- **Retención:** se eliminan backups de storage más antiguos de `BACKUP_RETAIN_DAYS` días (por defecto 30).
+
+```bash
+./scripts/backup_storage_xml.sh
+
+# Comprimir a .tar.gz
+BACKUP_STORAGE_ZIP=1 ./scripts/backup_storage_xml.sh
+```
+
+### 2.3 Cron recomendado para backups
+
+Ejemplo en crontab (ejecutar como usuario que corre la app):
+
+```cron
+# Backup DB todos los días a las 02:00
+0 2 * * * cd /ruta/al/proyecto && ./scripts/backup_db.sh >> /var/log/conta_backup_db.log 2>&1
+
+# Backup storage (XMLs) cada 3 días a las 03:00
+0 3 */3 * * cd /ruta/al/proyecto && ./scripts/backup_storage_xml.sh >> /var/log/conta_backup_storage.log 2>&1
+```
+
+---
+
+## 3. Restore
+
+### 3.1 Restaurar la base de datos
+
+1. Detener la aplicación.
+2. Opcional: copia de seguridad del archivo actual por si acaso:  
+   `cp invoicing.db invoicing.db.before_restore`
+3. Sustituir la DB por la copia del backup:  
+   `cp backup/invoicing_YYYYMMDD_HHMMSS.db invoicing.db`  
+   (o a la ruta que uses en `APP_DB_PATH`).
+4. Si usas WAL: opcional limpiar auxiliares antes de arrancar (ver MIGRATIONS.md):  
+   `mv invoicing.db-wal invoicing.db-wal.off 2>/dev/null; mv invoicing.db-shm invoicing.db-shm.off 2>/dev/null`
+5. Arrancar la aplicación de nuevo y comprobar `/health`.
+
+### 3.2 Restaurar el storage (XMLs)
+
+1. Detener la aplicación (recomendado si la app escribe en `storage/` mientras tanto).
+2. Restaurar desde backup:  
+   `cp -a backup/storage_YYYYMMDD_HHMMSS storage`  
+   o, si fue comprimido:  
+   `tar xzf backup/storage_YYYYMMDD_HHMMSS.tar.gz -C /ruta/al/proyecto`
+3. Arrancar la aplicación y comprobar `/health` y que el portal muestre XMLs.
+
+---
+
+## 4. Health check
+
+Endpoint: **`GET /health`** (público, sin auth).
+
+Respuesta esperada cuando todo está bien:
+
+```json
+{
+  "status": "ok",
+  "db": "ok",
+  "db_readable": true,
+  "migrations_applied": true,
+  "migration_version": "011",
+  "storage_exists": true,
+  "storage_writable": true
+}
+```
+
+- **status:** `ok` si DB legible y migraciones aplicadas; `degraded` en caso contrario.
+- **storage_exists:** el directorio `storage/` existe.
+- **storage_writable:** el directorio `backup/` existe y es escribible (para backups).
+
+Uso típico: balanceadores, monitoreo (ping cada X minutos) y alertas si `status != "ok"`.
+
+---
+
+## 5. Worker SAT (sync CFDI)
+
+Comando único recomendado: **`scripts/run_sat_sync.sh`**
+
+- Sin argumentos: sincroniza **todos** los issuers activos (issued + received).
+- Con un argumento (issuer_id): solo ese issuer.
+- Con dos argumentos (issuer_id, dirección): solo ese issuer y esa dirección (`issued` o `received`).
+
+Requisitos: `php` en PATH, `sat_sync/sync.php` y sus dependencias Composer. La DB debe tener la tabla `issuers`.
+
+```bash
+# Todos los issuers activos
+./scripts/run_sat_sync.sh
+
+# Solo issuer_id 1
+./scripts/run_sat_sync.sh 1
+
+# Solo issuer 1, dirección issued
+./scripts/run_sat_sync.sh 1 issued
+```
+
+### 5.1 Cron del worker SAT
+
+Ejemplo: ejecutar sync cada 6 horas.
+
+```cron
+0 */6 * * * cd /ruta/al/proyecto && ./scripts/run_sat_sync.sh >> /var/log/sat_sync.log 2>&1
+```
+
+Ajustar `/ruta/al/proyecto` y, si usas otra DB, `APP_DB_PATH` en el entorno del cron.
+
+---
+
+## 6. Logging
+
+- **Request ID:** cada request tiene un `request_id` (generado o tomado de `X-Request-ID`). Si `LOG_REQUEST_ID=1` (por defecto), los logs incluyen `[request_id]` y la respuesta lleva cabecera `X-Request-ID`.
+- **Log a archivo:** si defines `LOG_FILE=/ruta/al/app.log`, los logs se escriben también en ese archivo (encoding UTF-8).
+- **Desactivar request_id en logs:** `LOG_REQUEST_ID=0`.
+
+Ejemplo:
+
+```bash
+LOG_FILE=/var/log/conta/app.log uvicorn app:app --host 0.0.0.0 --port 8000
+```
+
+---
+
+## 7. Resumen rápido
+
+| Tarea           | Comando o endpoint |
+|----------------|--------------------|
+| Health         | `GET /health`      |
+| Backup DB      | `./scripts/backup_db.sh` |
+| Backup storage | `./scripts/backup_storage_xml.sh` |
+| Sync SAT       | `./scripts/run_sat_sync.sh` |
+| Restore DB     | Copiar backup sobre `invoicing.db` y reiniciar app |
+| Restore storage| Copiar/extraer backup en `storage/` |
+
+Ver **MIGRATIONS.md** para problemas con WAL/SHM y **README** para variables de entorno y seguridad.

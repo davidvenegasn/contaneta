@@ -1,5 +1,10 @@
 import logging
+import os
+import uuid
+from contextvars import ContextVar
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
+
+request_id_ctx: ContextVar[str] = ContextVar("request_id", default="-")
 
 from migrations_runner import apply_migrations
 from fastapi import FastAPI, Request, Query, Depends
@@ -30,14 +35,49 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
 
+def _configure_logging() -> None:
+    log_format = os.getenv("LOG_FORMAT", "%(message)s")
+    if os.getenv("LOG_REQUEST_ID", "1") == "1":
+        log_format = "[%(request_id)s] " + log_format
+    logging.basicConfig(level=logging.INFO, format=log_format)
+    # Añadir request_id al log record desde context var (por defecto '-' si no hay request)
+    old_factory = logging.getLogRecordFactory()
+    def record_factory(*args, **kwargs):
+        record = old_factory(*args, **kwargs)
+        record.request_id = request_id_ctx.get()
+        return record
+    logging.setLogRecordFactory(record_factory)
+    log_file = os.getenv("LOG_FILE", "").strip()
+    if log_file:
+        root = logging.getLogger()
+        fh = logging.FileHandler(log_file, encoding="utf-8")
+        fh.setLevel(logging.INFO)
+        fh.setFormatter(logging.Formatter(log_format))
+        root.addHandler(fh)
+
+
 @app.on_event("startup")
 def _startup() -> None:
-    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    _configure_logging()
     try:
         apply_migrations(DB_PATH)
     except Exception as e:
         logging.exception("Migrations failed: %s", e)
         raise
+
+
+@app.middleware("http")
+async def request_id_middleware(request: Request, call_next):
+    request_id = request.headers.get("x-request-id") or str(uuid.uuid4())[:12]
+    request.state.request_id = request_id
+    token = request_id_ctx.set(request_id)
+    try:
+        response = await call_next(request)
+        if os.getenv("LOG_REQUEST_ID", "1") == "1":
+            response.headers["x-request-id"] = request_id
+        return response
+    finally:
+        request_id_ctx.reset(token)
 
 
 @app.middleware("http")
@@ -86,10 +126,17 @@ def root():
 
 
 def _health_checks():
-    """Devuelve dict con ok, db_readable, migrations_applied, storage_writable."""
+    """Devuelve dict con ok, db_readable, migrations_applied, storage_exists, storage_writable."""
     import os
+    from config import BASE_DIR
     from database import db, db_rows
-    out = {"ok": True, "db_readable": False, "migrations_applied": False, "storage_writable": False}
+    out = {
+        "ok": True,
+        "db_readable": False,
+        "migrations_applied": False,
+        "storage_exists": False,
+        "storage_writable": False,
+    }
     try:
         if os.path.isfile(DB_PATH):
             conn = db()
@@ -104,8 +151,9 @@ def _health_checks():
                 pass
     except Exception:
         pass
+    storage_dir = os.path.join(BASE_DIR, "storage")
+    out["storage_exists"] = os.path.isdir(storage_dir)
     try:
-        from config import BASE_DIR
         backup_dir = os.path.join(BASE_DIR, "backup")
         os.makedirs(backup_dir, exist_ok=True)
         test_file = os.path.join(backup_dir, ".health_write_test")
@@ -121,7 +169,7 @@ def _health_checks():
 
 @app.get("/health")
 def health():
-    """Health check para monitoreo y balanceadores. No requiere auth. Revisa DB accesible y versión de migración aplicada."""
+    """Health check para monitoreo y balanceadores. No requiere auth. Revisa DB, migraciones y storage."""
     checks = _health_checks()
     status = "ok" if checks["ok"] else "degraded"
     versions = checks.get("migrations_versions") or []
@@ -132,6 +180,7 @@ def health():
         "db_readable": checks["db_readable"],
         "migrations_applied": checks["migrations_applied"],
         "migration_version": migration_version,
+        "storage_exists": checks["storage_exists"],
         "storage_writable": checks["storage_writable"],
     }
 
@@ -142,6 +191,7 @@ def status_page():
     checks = _health_checks()
     db_ok = checks["db_readable"]
     mig_ok = checks["migrations_applied"]
+    storage_exists = checks["storage_exists"]
     storage_ok = checks["storage_writable"]
     status = "ok" if checks["ok"] else "degraded"
     versions = checks.get("migrations_versions") or []
@@ -163,7 +213,8 @@ def status_page():
     <div class="row"><span>Estado</span><span class="{'ok' if status == 'ok' else 'error'}">{status}</span></div>
     <div class="row"><span>DB legible</span><span class="{'ok' if db_ok else 'error'}">{'Sí' if db_ok else 'No'}</span></div>
     <div class="row"><span>Migraciones aplicadas</span><span class="{'ok' if mig_ok else 'error'}">{'Sí' if mig_ok else 'No'}</span></div>
-    <div class="row"><span>Storage escribible</span><span class="{'ok' if storage_ok else 'error'}">{'Sí' if storage_ok else 'No'}</span></div>
+    <div class="row"><span>Storage existe</span><span class="{'ok' if storage_exists else 'error'}">{'Sí' if storage_exists else 'No'}</span></div>
+    <div class="row"><span>Storage escribible (backup)</span><span class="{'ok' if storage_ok else 'error'}">{'Sí' if storage_ok else 'No'}</span></div>
     <div class="versions">Versiones: {', '.join(versions) or '—'}</div>
   </div>
 </body>
