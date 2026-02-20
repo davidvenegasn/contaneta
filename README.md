@@ -37,11 +37,12 @@ Configuración: ver sección **Variables de entorno** más abajo.
 | `SESSION_TTL_DAYS` | Días de validez de la cookie (por defecto 7). | Ajustar según política. |
 | `COOKIE_SECURE` | `1` = cookie solo por HTTPS. | `1` en producción con HTTPS. |
 | `FIRM_USER_EMAIL` | Email del usuario “firma” (admin interno). | Opcional. |
-| `SITE_URL` | URL base del sitio (para OAuth y enlaces). | En producción con dominio propio. |
+| `SITE_URL` | URL base del sitio (para OAuth, verificación de correo y reset password). | En producción con dominio propio. |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` | Envío de correos (verificación, recuperación de contraseña). | En producción para emails reales. Sin SMTP y con `DEV_MODE=1`, los enlaces se loguean en consola. |
 | `GOOGLE_CLIENT_ID` | OAuth Google (login con Google). | Opcional. |
 | `FACEBOOK_APP_ID` | OAuth Facebook (login con Facebook). | Opcional. |
 
-Registro y login usan **bcrypt** para el hash de contraseñas. El login tiene rate limit por IP (máx. 5 intentos por 60 s); el registro tiene límite de 3 intentos por 60 s por IP.
+Registro y login usan **bcrypt** para el hash de contraseñas. Rate limit por IP: login 5 intentos/60 s, registro/signup 3/60 s, forgot password 3/60 s. Los tokens de verificación y reset se guardan en DB como hash (nunca en claro).
 
 ---
 
@@ -58,13 +59,13 @@ El portal **no depende de `?token=` en la URL**. El token se usa solo para inici
 
 ### Registro público
 
-Cualquier persona puede crear cuenta en **`/register`**: correo, contraseña (mín. 8 caracteres), RFC, razón social, régimen fiscal y código postal (opcional). La app crea en la base:
+Cualquier persona puede crear cuenta en **`/signup`** (o `/register`, que redirige a `/signup`): correo, contraseña (mín. 8 caracteres), RFC, razón social, régimen fiscal y código postal (opcional). La app crea en la base:
 
 - **users:** email (único), password_hash (bcrypt), nombre, active=1.
 - **issuers:** RFC, razón social, régimen fiscal y un token legacy en `issuer_tokens` (para transición).
 - **memberships:** un registro con `role = 'owner'` vinculando al usuario con el nuevo emisor.
 
-Tras el registro se inicia sesión por cookie y se redirige a `/portal/home`; el portal opera sin token en la URL.
+Tras el registro se inicia sesión por cookie y se redirige a `/portal/home`; el portal opera sin token en la URL. Se envía un correo de **verificación** (enlace `/verify-email?token=...`); si no hay SMTP configurado y `DEV_MODE=1`, el enlace se imprime en logs. **Recuperación de contraseña:** `/forgot` (solicitar por email) y `/reset-password?token=...` (establecer nueva contraseña); tokens con hash en DB, expiración 2 h.
 
 **Roles (memberships):** `owner` (cliente dueño del emisor), `admin` (superadministrador), `staff` (equipo), `viewer` (solo lectura), `accountant` (contador, legado).
 

@@ -6,13 +6,23 @@ Pasos exactos para probar registro, login, logout, portal (emitidas/recibidas), 
 
 ---
 
-## 1. Registro
+## 1. Registro público (/signup)
 
 | Paso | Acción | Esperado |
 |------|--------|----------|
-| 1.1 | Abrir `http://127.0.0.1:8000/register` | Página "Crear cuenta" con campos: correo, contraseña, RFC, razón social, régimen fiscal, CP (opcional). |
-| 1.2 | Rellenar email (ej. `qa@ejemplo.com`), contraseña ≥8 caracteres, RFC (ej. `XAXX010101000`), razón social, régimen (ej. 616). Enviar. | Redirección a `http://127.0.0.1:8000/portal/home`; **sin** `?token=` en la URL. Portal visible (menú, inicio). |
+| 1.1 | Abrir `http://127.0.0.1:8000/signup` (o `/register`, que redirige a `/signup`) | Página "Crear cuenta" con campos: correo, contraseña, RFC, razón social, régimen fiscal, CP (opcional). |
+| 1.2 | Rellenar email (ej. `qa@ejemplo.com`), contraseña ≥8 caracteres, RFC (ej. `XAXX010101000`), razón social, régimen (ej. 616). Enviar. | Redirección a `http://127.0.0.1:8000/portal/home`; **sin** `?token=` en la URL. Sesión por cookie. Portal visible (menú, inicio). |
 | 1.3 | Comprobar URL en barra de direcciones | Debe ser `/portal/home` sin query string. |
+| 1.4 | Sin SMTP (DEV): revisar logs del servidor | Debe aparecer el enlace de verificación de correo (ej. `[DEV] Email no enviado...` con URL `/verify-email?token=...`). |
+
+---
+
+## 1b. Verificación por correo
+
+| Paso | Acción | Esperado |
+|------|--------|----------|
+| 1b.1 | Tras registrarse, en DEV copiar el enlace de verificación de los logs (o en producción abrir el correo). | Enlace tipo `.../verify-email?token=...`. |
+| 1b.2 | Abrir ese enlace en el navegador | Redirección a `/login?verified=1`. (Si el token expiró o ya se usó: `/login?verified=0`.) |
 
 ---
 
@@ -29,9 +39,21 @@ Pasos exactos para probar registro, login, logout, portal (emitidas/recibidas), 
 
 | Paso | Acción | Esperado |
 |------|--------|----------|
-| 3.1 | Abrir `http://127.0.0.1:8000/login` | Página "Entrar al portal" con opción correo/teléfono y contraseña. |
+| 3.1 | Abrir `http://127.0.0.1:8000/login` | Página "Entrar al portal" con opción correo/teléfono, contraseña y enlace "¿Olvidaste tu contraseña?". |
 | 3.2 | Introducir el mismo email y contraseña usados en registro. Enviar. | Redirección a `/portal/home`; sesión por cookie; **no** se requiere `?token=`. |
 | 3.3 | Navegar a "Facturas emitidas" o "Facturas recibidas" | Listado del mes (puede estar vacío); sin errores 500. |
+
+---
+
+## 3b. Recuperar contraseña
+
+| Paso | Acción | Esperado |
+|------|--------|----------|
+| 3b.1 | En login, clic en "¿Olvidaste tu contraseña?" o abrir `http://127.0.0.1:8000/forgot` | Página "Recuperar contraseña" con campo de correo. |
+| 3b.2 | Introducir un email registrado y enviar | Mensaje "Si ese correo está registrado, recibirás un enlace...". En DEV sin SMTP: el enlace aparece en logs. |
+| 3b.3 | Abrir el enlace de reset (logs en DEV o correo en producción) | Página "Nueva contraseña" con campos nueva contraseña y confirmar. |
+| 3b.4 | Introducir contraseña ≥8 caracteres (y confirmar). Enviar. | Redirección a `/login?reset=1`. |
+| 3b.5 | Entrar con el mismo email y la **nueva** contraseña | Redirección a `/portal/home`; login correcto. |
 
 ---
 
