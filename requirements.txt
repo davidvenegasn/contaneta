@@ -11,3 +11,4 @@ Pillow>=9.0.0
 bcrypt>=4.0.0
 httpx>=0.25.0
 gunicorn>=21.0.0
+stripe>=7.0.0

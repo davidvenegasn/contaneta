@@ -23,6 +23,7 @@ from routers.public import get_public_router
 from routers.portal import get_portal_router
 from routers.invoicing import get_invoicing_router
 from routers.admin import get_admin_router
+from routers.billing import router as billing_router
 
 app = FastAPI()
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
@@ -176,6 +177,7 @@ app.include_router(get_public_router(templates))
 app.include_router(get_portal_router(templates))
 app.include_router(get_invoicing_router(templates))
 app.include_router(get_admin_router(templates))
+app.include_router(billing_router)
 
 
 # Backwards compatible URL (legacy: ?token= sigue funcionando vía dependency en /portal/create)
