@@ -4,6 +4,21 @@
 
 **Fecha objetivo:** _______________
 
+**Documentos relacionados:** `QA_STEPS.md` (pasos de verificación), `DECISIONS.md` (decisiones de diseño y operación).
+
+---
+
+## 0. Verificación rápida (post-despliegue)
+
+- [ ] **Registro:** Ir a `/register`, crear cuenta (email, contraseña, RFC, razón social, régimen). Debe redirigir a `/portal/home` sin token en la URL.
+- [ ] **Login:** Cerrar sesión, entrar con email/contraseña en `/login`. Debe entrar al portal sin `?token=`.
+- [ ] **Descargas:** En facturas emitidas/recibidas, descargar XML y PDF de un CFDI; debe funcionar con sesión cookie.
+- [ ] **Detalle:** Abrir detalle de un CFDI (emitido o recibido); botones XML/PDF deben funcionar.
+- [ ] **Health:** `curl -s http://localhost:8000/health` devuelve `{"status":"ok","db":"ok"}`.
+- [ ] **Backups:** Ejecutar `./scripts/backup_db.sh` y (si existe) `./scripts/backup_storage_xml.sh`; se crean copias en `backup/` sin borrar nada.
+
+Ver pasos detallados en **QA_STEPS.md**.
+
 ---
 
 ## 1. Seguridad mínima
@@ -107,16 +122,17 @@ PRAGMA table_info(customer_profiles);
 - [ ] Backup se guarda en ubicación externa (otro servidor, S3, o disco separado)
 - [ ] Retención mínima: 7 días de backups diarios + 1 backup mensual
 
-**Script sugerido (`backup_db.sh`):**
+**Scripts incluidos (no destructivos):**
+- `scripts/backup_db.sh`: copia `invoicing.db` a `backup/invoicing_YYYYMMDD_HHMMSS.db`
+- `scripts/backup_storage_xml.sh`: copia directorio `storage` a `backup/storage_YYYYMMDD_HHMMSS`
+- `scripts/cron_backup_example.sh`: ejemplo de entradas cron
+
+**Uso:**
 ```bash
-#!/bin/bash
-BACKUP_DIR="/backups/conta_invoicing"
-DATE=$(date +%Y%m%d_%H%M%S)
-mkdir -p "$BACKUP_DIR"
-sqlite3 invoicing.db ".backup '$BACKUP_DIR/invoicing_${DATE}.db'"
-# Limpiar backups > 7 días
-find "$BACKUP_DIR" -name "invoicing_*.db" -mtime +7 -delete
+APP_DB_PATH=/ruta/invoicing.db ./scripts/backup_db.sh
+STORAGE_DIR=/ruta/storage BACKUP_DIR=/backups/conta ./scripts/backup_storage_xml.sh
 ```
+Ver ejemplo de cron en `scripts/cron_backup_example.sh`. Retención (borrar copias antiguas) se configura fuera del script.
 
 **Riesgo si falla:** Pérdida total de datos en caso de corrupción de DB o borrado accidental.
 
