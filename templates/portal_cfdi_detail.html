@@ -95,7 +95,6 @@
     <div class="btn-group" style="flex-wrap:wrap; gap:10px;">
       {% if cfdi.xml_path %}
         <a href="/portal/sat/xml/{{ cfdi.uuid }}" class="btn" target="_blank" rel="noopener" style="text-decoration:none;">Descargar XML</a>
-        <a href="/download/xml/{{ cfdi.uuid }}" class="btn" style="text-decoration:none;">Descargar XML (archivo)</a>
         <button type="button" class="btn" data-pdf-url="/portal/sat/pdf/{{ cfdi.uuid }}">Ver PDF</button>
         <a href="/portal/sat/pdf/{{ cfdi.uuid }}?dl=1" class="btn" style="text-decoration:none;">Descargar PDF</a>
       {% else %}

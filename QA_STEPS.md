@@ -51,7 +51,7 @@ Pasos exactos para probar registro, login, logout, portal (emitidas/recibidas), 
 |------|--------|----------|
 | 5.1 | Desde emitidas o recibidas, clic en un UUID (o enlace "Ver detalle") que lleve a detalle del CFDI. | URL tipo `/portal/cfdi/issued/{uuid}` o `/portal/cfdi/received/{uuid}`. |
 | 5.2 | Comprobar que la página muestra: fecha, receptor/emisor, concepto, total, IVA, estatus. | Datos coherentes con la fila del listado. |
-| 5.3 | Comprobar botones/enlaces "Descargar XML" y "Ver PDF" / "Descargar PDF". | Presentes cuando hay XML; no error 404/500 al usarlos. |
+| 5.3 | Comprobar botones/enlaces "Descargar XML" y "Ver PDF" / "Descargar PDF" (todos bajo `/portal/sat/...`). | Presentes cuando hay XML; no error 404/500 al usarlos; **no** debe haber textos en blanco ni token en la URL. |
 
 ---
 
@@ -114,6 +114,19 @@ Pasos exactos para probar registro, login, logout, portal (emitidas/recibidas), 
 | 11.1 | `curl -s http://127.0.0.1:8000/health` | `{"status":"ok","db":"ok"}` (o `"degraded"` si DB no accesible). |
 | 11.2 | Ejecutar `./scripts/backup_db.sh` | Se crea `backup/invoicing_YYYYMMDD_HHMMSS.db`. |
 | 11.3 | Si existe directorio `storage`, ejecutar `./scripts/backup_storage_xml.sh` | Se crea `backup/storage_YYYYMMDD_HHMMSS`. |
+
+---
+
+## Smoke script del portal
+
+Para verificación automatizada mínima (listados, detalle, XML, PDF):
+
+```bash
+# Con app corriendo en http://127.0.0.1:8000 y token válido (ej. DEV_TOKEN o de issuer_tokens)
+PORTAL_SMOKE_TOKEN=demo BASE_URL=http://127.0.0.1:8000 python scripts/smoke_portal.py
+```
+
+Requiere `requests`. Si no hay facturas en el listado, solo se comprueban listados y login; si hay al menos una, se prueba detalle y descargas XML/PDF.
 
 ---
 
