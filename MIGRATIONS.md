@@ -210,6 +210,9 @@ Recrea `memberships` añadiendo rol `staff` al CHECK: roles permitidos `viewer`,
 ### 011_audit_log_columns.sql
 Añade a `audit_log` las columnas `entity`, `entity_id`, `meta_json`, `ip`, `user_agent` (aplicada con lógica Python idempotente). Permite registrar entidad afectada, IP y user-agent en cada evento.
 
+### 012_email_verification_and_password_reset.sql
+Tablas `email_verifications` (user_id, token_hash, expires_at, used_at) y `password_resets` (user_id, token_hash, expires_at, used_at). Los tokens se guardan solo como hash; nunca en claro.
+
 ---
 
 ## Hardening SQLite (timeout, pragmas, WAL)
