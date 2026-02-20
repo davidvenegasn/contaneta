@@ -236,6 +236,12 @@ def get_auth_router(templates):
         except Exception as e:
             logger.exception("Register create_issuer/membership: %s", e)
             return RedirectResponse(url="/register?error=error", status_code=302)
+        audit.log(
+            action="register",
+            user_id=user["id"],
+            issuer_id=issuer_id,
+            details=f"email={email[:50]} rfc={rfc}",
+        )
         resp = RedirectResponse(url="/portal/home", status_code=302)
         resp.set_cookie(
             cookie_name,
