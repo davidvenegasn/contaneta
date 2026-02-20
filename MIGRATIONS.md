@@ -22,6 +22,7 @@ Desde cualquier carpeta: `source /ruta/al/proyecto/scripts/dev_aliases.sh`
   - Se inserta la versión en `schema_migrations` y se hace commit.
 - **Pragmas:** Todas las conexiones usan `PRAGMA foreign_keys = ON`, `PRAGMA busy_timeout = 5000`, `PRAGMA journal_mode = WAL`.
 - **Helpers:** `_column_exists()`, `_safe_add_column()` permiten ADD COLUMN idempotente para migraciones que lo necesiten.
+- **008_users_active:** Añade `users.active` (INTEGER NOT NULL DEFAULT 1) vía `_apply_008_users_active()`; solo usuarios activos pueden hacer login. Registro en `/register` + `POST /auth/register` crea user, issuer, membership owner y redirige al portal.
 
 ---
 
@@ -187,6 +188,24 @@ Asegura compatibilidad y calidad sin romper DBs viejas. **Ejecutada con lógica 
 - **D) Índices:** `CREATE INDEX IF NOT EXISTS` para `idx_invoices_issuer_uuid`, `idx_invoices_issuer_payment_method`, `idx_invoices_issuer_issue_date`.
 
 Idempotente y reintentable; compatible con DB nueva y vieja.
+
+### 005_users_and_memberships.sql
+Tablas `users` (email, phone, password_hash, oauth_*, created_at) y `memberships` (user_id, issuer_id, role). Roles iniciales: viewer, accountant, owner.
+
+### 006_add_users_name.sql
+Columna `name` en `users` (aplicada con lógica Python idempotente).
+
+### 007_audit_log_and_admin_role.sql
+Tabla `audit_log` y recreación de `memberships` añadiendo rol `admin` al CHECK.
+
+### 008_users_active.sql
+Columna `users.active` (INTEGER NOT NULL DEFAULT 1) vía lógica Python; solo usuarios activos pueden hacer login.
+
+### 009_subscriptions.sql
+Tablas/columnas para suscripciones y billing (Stripe).
+
+### 010_roles_staff.sql
+Recrea `memberships` añadiendo rol `staff` al CHECK: roles permitidos `viewer`, `accountant`, `owner`, `admin`, `staff`.
 
 ---
 
