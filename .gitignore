@@ -7,6 +7,7 @@ __pycache__/
 invoicing.db
 invoicing.db-*
 storage/
+backup/
 
 # secrets
 .env
