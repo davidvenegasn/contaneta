@@ -39,6 +39,16 @@ Documento de decisiones tomadas para lanzamiento público y operación autónoma
 
 ---
 
+## Billing (suscripciones Stripe)
+
+- **Modelo:** Tabla `subscriptions` (user_id, plan, status, stripe_customer_id, stripe_subscription_id, current_period_end). Un registro por usuario (UNIQUE user_id). Status: active, canceled, past_due, trialing, inactive, incomplete.
+- **Checkout:** `POST /billing/checkout` crea una sesión de Stripe Checkout (subscription) y devuelve `{ "url": "..." }`. Requiere sesión con user_id > 0. El frontend redirige a esa URL.
+- **Webhook:** `POST /webhooks/stripe` recibe checkout.session.completed (activar suscripción), customer.subscription.updated (actualizar estado/periodo) y customer.subscription.deleted (marcar canceled). Firma verificada con STRIPE_WEBHOOK_SECRET.
+- **Gating:** Usuarios con suscripción no activa (status distinto de active/trialing) reciben 402 en descarga XML y descarga PDF; el resto del portal sigue usable. Usuarios solo por token (user_id 0) no se comprueba suscripción para no romper enlaces legacy.
+- **Configuración:** STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_PRICE_ID, SITE_URL. Detalle en BILLING_GUIDE.md.
+
+---
+
 ## Seguridad adicional
 
 - **Rate limit login:** Hasta 5 intentos de login por IP en una ventana de 60 segundos; tras superar el límite se aplica un retraso y se devuelve error genérico.
