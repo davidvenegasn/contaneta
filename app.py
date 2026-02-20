@@ -22,7 +22,7 @@ from routers.api import router as api_router
 from routers.public import get_public_router
 from routers.portal import get_portal_router
 from routers.invoicing import get_invoicing_router
-from routers.admin import router as admin_router
+from routers.admin import get_admin_router
 
 app = FastAPI()
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
@@ -84,22 +84,90 @@ def root():
     return RedirectResponse(url="/portal/home")
 
 
-@app.get("/health")
-def health():
-    """Health check para monitoreo y balanceadores. No requiere auth."""
+def _health_checks():
+    """Devuelve dict con ok, db_readable, migrations_applied, storage_writable."""
     import os
-    from database import db
-    db_ok = False
+    from database import db, db_rows
+    out = {"ok": True, "db_readable": False, "migrations_applied": False, "storage_writable": False}
     try:
         if os.path.isfile(DB_PATH):
             conn = db()
             conn.execute("SELECT 1")
             conn.close()
-            db_ok = True
+            out["db_readable"] = True
+            try:
+                rows = db_rows("SELECT version FROM schema_migrations ORDER BY version")
+                out["migrations_applied"] = True
+                out["migrations_versions"] = [r["version"] for r in rows]
+            except Exception:
+                pass
     except Exception:
         pass
-    status = "ok" if db_ok else "degraded"
-    return {"status": status, "db": "ok" if db_ok else "error"}
+    try:
+        from config import BASE_DIR
+        backup_dir = os.path.join(BASE_DIR, "backup")
+        os.makedirs(backup_dir, exist_ok=True)
+        test_file = os.path.join(backup_dir, ".health_write_test")
+        with open(test_file, "w") as f:
+            f.write("1")
+        os.remove(test_file)
+        out["storage_writable"] = True
+    except Exception:
+        pass
+    out["ok"] = out["db_readable"] and out["migrations_applied"]
+    return out
+
+
+@app.get("/health")
+def health():
+    """Health check para monitoreo y balanceadores. No requiere auth. Revisa DB accesible y versión de migración aplicada."""
+    checks = _health_checks()
+    status = "ok" if checks["ok"] else "degraded"
+    versions = checks.get("migrations_versions") or []
+    migration_version = versions[-1] if versions else None
+    return {
+        "status": status,
+        "db": "ok" if checks["db_readable"] else "error",
+        "db_readable": checks["db_readable"],
+        "migrations_applied": checks["migrations_applied"],
+        "migration_version": migration_version,
+        "storage_writable": checks["storage_writable"],
+    }
+
+
+@app.get("/status", response_class=HTMLResponse)
+def status_page():
+    """Página HTML legible con el mismo contenido que /health."""
+    checks = _health_checks()
+    db_ok = checks["db_readable"]
+    mig_ok = checks["migrations_applied"]
+    storage_ok = checks["storage_writable"]
+    status = "ok" if checks["ok"] else "degraded"
+    versions = checks.get("migrations_versions") or []
+    html = f"""<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="utf-8"/><title>Status — ContaNeta</title>
+<style>
+  body {{ font-family: system-ui,sans-serif; margin: 24px; background: #f8fafc; }}
+  .card {{ max-width: 480px; background: #fff; padding: 20px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }}
+  h1 {{ margin: 0 0 16px; font-size: 1.25rem; }}
+  .row {{ display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e2e8f0; }}
+  .ok {{ color: #15803d; }} .error {{ color: #b91c1c; }}
+  .versions {{ font-size: 12px; color: #64748b; margin-top: 8px; }}
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>Estado del sistema</h1>
+    <div class="row"><span>Estado</span><span class="{'ok' if status == 'ok' else 'error'}">{status}</span></div>
+    <div class="row"><span>DB legible</span><span class="{'ok' if db_ok else 'error'}">{'Sí' if db_ok else 'No'}</span></div>
+    <div class="row"><span>Migraciones aplicadas</span><span class="{'ok' if mig_ok else 'error'}">{'Sí' if mig_ok else 'No'}</span></div>
+    <div class="row"><span>Storage escribible</span><span class="{'ok' if storage_ok else 'error'}">{'Sí' if storage_ok else 'No'}</span></div>
+    <div class="versions">Versiones: {', '.join(versions) or '—'}</div>
+  </div>
+</body>
+</html>"""
+    return HTMLResponse(html)
 
 
 app.include_router(get_auth_router(templates))
@@ -107,7 +175,7 @@ app.include_router(api_router)
 app.include_router(get_public_router(templates))
 app.include_router(get_portal_router(templates))
 app.include_router(get_invoicing_router(templates))
-app.include_router(admin_router)
+app.include_router(get_admin_router(templates))
 
 
 # Backwards compatible URL (legacy: ?token= sigue funcionando vía dependency en /portal/create)

@@ -30,12 +30,12 @@ Documento de decisiones tomadas para lanzamiento público y operación autónoma
 
 ## Operación y backups
 
-- **Health:** `GET /health` devuelve JSON con `ok`, `db_readable`, `migrations_applied`, `storage_writable`. No requiere autenticación. `GET /status` ofrece la misma información en HTML legible.
-- **Backups:** Scripts no destructivos:
-  - `scripts/backup_db.sh`: copia `invoicing.db` a `backup/invoicing_YYYYMMDD_HHMMSS.db`.
-  - `scripts/backup_storage_xml.sh`: copia el directorio `storage` a `backup/storage_YYYYMMDD_HHMMSS`.
-  - `scripts/cron_backup_example.sh`: ejemplo de entradas cron; no ejecuta backups por sí solo.
-- **Retención:** La limpieza de backups antiguos (p. ej. borrar copias de más de 30 días) se deja fuera de estos scripts para no hacer operaciones destructivas automáticas sin configuración explícita.
+- **Health:** `GET /health` devuelve JSON con `ok`, `db_readable`, `migrations_applied`, `migration_version` (última aplicada), `storage_writable`. No requiere autenticación. Pensado para balanceadores y monitoreo 24/7.
+- **Backups:** Scripts con rotación opcional:
+  - `scripts/backup_db.sh`: copia `invoicing.db` a `backup/` con timestamp; mantiene últimos `BACKUP_RETAIN_DAYS` días (default 30).
+  - `scripts/backup_storage.sh`: copia `storage/` a `backup/` con timestamp y misma rotación.
+  - Restaurar: ver `scripts/restore_notes.md`.
+- **Despliegue:** Guía paso a paso en DEPLOY_GUIDE.md (usuario, venv, .env, migraciones, systemd, Nginx/Caddy, HTTPS Let's Encrypt, cron backups). Servicio systemd con Restart=always para que reinicie solo.
 
 ---
 
