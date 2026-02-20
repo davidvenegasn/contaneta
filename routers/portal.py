@@ -158,6 +158,7 @@ def get_portal_router(templates):
             request.state, "is_demo_view", False
         )
         is_demo_view = getattr(request.state, "is_demo_view", False)
+        is_impersonating = getattr(request.state, "is_impersonating", False)
         payload = {
             "request": request,
             "token": "",
@@ -171,6 +172,7 @@ def get_portal_router(templates):
             "has_nomina": has_nomina,
             "show_welcome_popup": show_welcome_popup,
             "is_demo_view": is_demo_view,
+            "is_impersonating": is_impersonating,
         }
         if extra:
             payload.update(extra)
@@ -723,6 +725,8 @@ def get_portal_router(templates):
         cfdi = _get_cfdi_by_uuid(issuer["id"], uuid, "issued")
         if not cfdi:
             raise HTTPException(status_code=404, detail="CFDI no encontrado")
+        uid = getattr(request.state, "user_id", None) or 0
+        audit.log(action="cfdi_view", user_id=uid if uid else None, issuer_id=issuer["id"], details=f"direction=issued uuid={(uuid or '')[:36]}")
         return _render_portal(
             request,
             issuer=issuer,
@@ -737,6 +741,8 @@ def get_portal_router(templates):
         cfdi = _get_cfdi_by_uuid(issuer["id"], uuid, "received")
         if not cfdi:
             raise HTTPException(status_code=404, detail="CFDI no encontrado")
+        uid = getattr(request.state, "user_id", None) or 0
+        audit.log(action="cfdi_view", user_id=uid if uid else None, issuer_id=issuer["id"], details=f"direction=received uuid={(uuid or '')[:36]}")
         return _render_portal(
             request,
             issuer=issuer,
