@@ -1,0 +1,71 @@
+{% extends "base_portal.html" %}
+
+{% block content %}
+  <header class="app-header" style="margin-bottom:14px;">
+    <div class="app-header__left">
+      <div class="app-title">Mi plan</div>
+      <div class="app-subtitle muted">Estado de tu suscripción y opciones para actualizar a Pro.</div>
+    </div>
+  </header>
+
+  {% if success %}
+  <div class="card" style="margin-bottom:14px; background: #dcfce7; border-color: #22c55e;">
+    <p style="margin:0;">Pago completado. Tu plan Pro está activo.</p>
+  </div>
+  {% endif %}
+  {% if canceled %}
+  <div class="card" style="margin-bottom:14px; background: #fef3c7; border-color: #f59e0b;">
+    <p style="margin:0;">Pago cancelado. Puedes actualizar cuando quieras.</p>
+  </div>
+  {% endif %}
+
+  <div class="card" style="margin-bottom:14px;">
+    <h2 style="margin:0 0 12px; font-size:1rem;">Estado actual</h2>
+    {% if subscription %}
+      <p><strong>Plan:</strong> {{ subscription.plan or 'free' }}</p>
+      <p><strong>Estado:</strong> {{ subscription.status or 'inactive' }}</p>
+      {% if subscription.current_period_end %}
+      <p class="muted"><strong>Próximo vencimiento:</strong> {{ subscription.current_period_end[:10] }}</p>
+      {% endif %}
+    {% else %}
+      <p>Plan gratuito. Descargas y PDF limitados.</p>
+    {% endif %}
+  </div>
+
+  {% if not is_active %}
+  <div class="card">
+    <h2 style="margin:0 0 12px; font-size:1rem;">Actualizar a Pro</h2>
+    <p style="margin:0 0 14px;">Desbloquea descargas XML/PDF y más funciones.</p>
+    <button type="button" id="btnCheckout" class="btn btn-primary">Actualizar a Pro</button>
+    <p id="checkoutError" class="muted" style="margin-top:10px; display:none;"></p>
+  </div>
+  <script>
+    document.getElementById('btnCheckout').addEventListener('click', function() {
+      var btn = this;
+      btn.disabled = true;
+      var errEl = document.getElementById('checkoutError');
+      errEl.style.display = 'none';
+      fetch('/billing/checkout', { method: 'POST', headers: { 'Content-Type': 'application/json' } })
+        .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
+        .then(function(o) {
+          if (o.ok && o.data && o.data.url) {
+            window.location.href = o.data.url;
+          } else {
+            btn.disabled = false;
+            errEl.textContent = o.data && o.data.detail ? o.data.detail : 'No se pudo iniciar el pago.';
+            errEl.style.display = 'block';
+          }
+        })
+        .catch(function() {
+          btn.disabled = false;
+          errEl.textContent = 'Error de conexión. Intenta de nuevo.';
+          errEl.style.display = 'block';
+        });
+    });
+  </script>
+  {% else %}
+  <div class="card" style="background: #f0fdf4;">
+    <p style="margin:0;">Tienes plan Pro activo. Gracias por tu suscripción.</p>
+  </div>
+  {% endif %}
+{% endblock %}

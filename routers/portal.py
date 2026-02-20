@@ -9,7 +9,7 @@ from fastapi.responses import HTMLResponse, Response, RedirectResponse
 from config import BASE_DIR, REGIMEN_LABEL_TO_CODE, COOKIE_DEMO_VIEW
 from database import db, db_rows, has_column
 from routers.deps import get_portal_issuer
-from services import quotations as quotations_service, session as session_service, audit
+from services import quotations as quotations_service, session as session_service, audit, subscription as subscription_service
 
 # ----------------------------
 # Helpers
@@ -663,6 +663,8 @@ def get_portal_router(templates):
         if not os.path.exists(abs_path):
             raise HTTPException(status_code=404, detail="Archivo XML no existe en disco")
         uid, iid = _audit_user_issuer(request)
+        if uid and uid > 0 and not subscription_service.is_subscription_active(uid):
+            raise HTTPException(status_code=402, detail="Actualiza a Pro para descargar XML. Ve a Mi plan.")
         audit.log(action="download_xml", user_id=uid, issuer_id=issuer["id"], details=u[:36])
         with open(abs_path, "rb") as f:
             xml_bytes = f.read()
@@ -692,6 +694,8 @@ def get_portal_router(templates):
         if not os.path.exists(abs_path):
             raise HTTPException(status_code=404, detail="Archivo XML no existe en disco")
         uid, _ = _audit_user_issuer(request)
+        if uid and uid > 0 and not subscription_service.is_subscription_active(uid):
+            raise HTTPException(status_code=402, detail="Actualiza a Pro para descargar PDF. Ve a Mi plan.")
         audit.log(action="download_pdf", user_id=uid, issuer_id=issuer["id"], details=uuid_clean[:36])
         try:
             from cfdi_pdf import parse_cfdi_xml, build_pdf
@@ -837,5 +841,24 @@ def get_portal_router(templates):
             )
         except Exception as e:
             return HTMLResponse(f"<h3>Error</h3><p>{str(e)}</p>", status_code=400)
+
+    @router.get("/plan", response_class=HTMLResponse)
+    def portal_plan(request: Request, issuer: dict = Depends(get_portal_issuer), success: str = Query(""), canceled: str = Query("")):
+        user_id = getattr(request.state, "user_id", None) or 0
+        subscription = subscription_service.get_subscription_by_user_id(user_id) if user_id else None
+        is_active = subscription_service.is_subscription_active(user_id)
+        return _render_portal(
+            request,
+            issuer=issuer,
+            template_name="portal_plan.html",
+            active_page="plan",
+            title="Mi plan",
+            extra={
+                "subscription": subscription,
+                "is_active": is_active,
+                "success": success == "1",
+                "canceled": canceled == "1",
+            },
+        )
 
     return router
