@@ -51,6 +51,7 @@
         <input type="tel" name="phone" id="phone" placeholder="55 1234 5678" autocomplete="tel" />
       </div>
       <input type="password" name="password" id="password" placeholder="Contraseña" autocomplete="current-password" required />
+      <p style="margin: -0.5rem 0 1rem; font-size: 13px;"><a href="/forgot">¿Olvidaste tu contraseña?</a></p>
       <button type="submit" class="btn btn-primary">Entrar</button>
     </form>
     {% if google_oauth_configured or facebook_oauth_configured %}
@@ -70,7 +71,7 @@
     {% endif %}
     <p class="token-link"><a href="/login?token=">Entrar con token de acceso</a> (si te dieron un enlace)</p>
     <div class="auth-footer">
-      ¿No tienes cuenta? <a href="/register">Crear cuenta</a>
+      ¿No tienes cuenta? <a href="/signup">Crear cuenta</a>
     </div>
   </div>
   <script>

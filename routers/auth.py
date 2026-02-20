@@ -13,6 +13,8 @@ from config import _env_path
 from database import db
 from services import issuers, session, users, audit, csrf as csrf_service
 from services import sanitize as sanitize_service
+from services import verification as verification_service
+from services import email_sender
 
 logger = logging.getLogger(__name__)
 
@@ -21,10 +23,15 @@ _LOGIN_ATTEMPTS: dict[str, list[float]] = defaultdict(list)
 _LOGIN_WINDOW = 60.0
 _LOGIN_MAX_ATTEMPTS = 5
 
-# Rate-limit registro: por IP, máx 3 intentos por ventana de 60 s
+# Rate-limit registro/signup: por IP, máx 3 intentos por ventana de 60 s
 _REGISTER_ATTEMPTS: dict[str, list[float]] = defaultdict(list)
 _REGISTER_WINDOW = 60.0
 _REGISTER_MAX_ATTEMPTS = 3
+
+# Rate-limit forgot password: por IP, máx 3 por 60 s
+_FORGOT_ATTEMPTS: dict[str, list[float]] = defaultdict(list)
+_FORGOT_WINDOW = 60.0
+_FORGOT_MAX_ATTEMPTS = 3
 
 
 def _client_ip(request: Request) -> str:
@@ -50,6 +57,17 @@ def _register_rate_limit(request: Request) -> bool:
     if len(_REGISTER_ATTEMPTS[ip]) >= _REGISTER_MAX_ATTEMPTS:
         return True
     _REGISTER_ATTEMPTS[ip].append(now)
+    return False
+
+
+def _forgot_rate_limit(request: Request) -> bool:
+    """True si se debe bloquear forgot por IP."""
+    ip = _client_ip(request)
+    now = time.time()
+    _FORGOT_ATTEMPTS[ip] = [t for t in _FORGOT_ATTEMPTS[ip] if now - t < _FORGOT_WINDOW]
+    if len(_FORGOT_ATTEMPTS[ip]) >= _FORGOT_MAX_ATTEMPTS:
+        return True
+    _FORGOT_ATTEMPTS[ip].append(now)
     return False
 
 
@@ -86,6 +104,30 @@ def _register_error_message(code: str | None) -> str | None:
         "required": "Completa todos los campos obligatorios.",
     }
     return msgs.get(code or "", None)
+
+
+def _forgot_error_message(code: str | None) -> str | None:
+    msgs = {
+        "error": "No se pudo enviar el correo. Intenta más tarde.",
+        "email": "Indica tu correo electrónico.",
+    }
+    return msgs.get(code or "", None)
+
+
+def _reset_error_message(code: str | None) -> str | None:
+    msgs = {
+        "error": "El enlace no es válido o ha expirado. Solicita uno nuevo.",
+        "password": "La contraseña debe tener al menos 8 caracteres.",
+        "mismatch": "Las contraseñas no coinciden.",
+    }
+    return msgs.get(code or "", None)
+
+
+def _base_url(request: Request) -> str:
+    base = os.getenv("SITE_URL", "").strip()
+    if base:
+        return base.rstrip("/")
+    return str(request.base_url).rstrip("/")
 
 
 def _oauth_redirect_base(request: Request) -> str:
@@ -208,12 +250,87 @@ def get_auth_router(templates):
         )
         return resp
 
-    @router.get("/register", response_class=HTMLResponse)
-    def register_page(request: Request, error: str | None = Query(None)):
+    @router.get("/register", response_class=RedirectResponse)
+    def register_redirect(request: Request):
+        return RedirectResponse(url="/signup", status_code=302)
+
+    @router.get("/signup", response_class=HTMLResponse)
+    def signup_page_public(request: Request, error: str | None = Query(None)):
         return templates.TemplateResponse(
             "register.html",
-            {"request": request, "error": _register_error_message(error), "csrf_token": csrf_service.generate_csrf_token()},
+            {"request": request, "error": _register_error_message(error), "csrf_token": csrf_service.generate_csrf_token(), "form_action": "/auth/signup"},
         )
+
+    @router.post("/auth/signup", response_class=RedirectResponse)
+    def auth_signup_submit(
+        request: Request,
+        email: str = Form(...),
+        password: str = Form(...),
+        rfc: str = Form(...),
+        razon_social: str = Form(...),
+        regimen_fiscal: str = Form("616"),
+        cp: str | None = Form(None),
+        csrf_token: str | None = Form(None),
+    ):
+        if not csrf_service.verify_csrf_token(csrf_token):
+            return RedirectResponse(url="/signup?error=error", status_code=302)
+        if _register_rate_limit(request):
+            time.sleep(2)
+            return RedirectResponse(url="/signup?error=error", status_code=302)
+        email = sanitize_service.sanitize_email(email)
+        if not email:
+            return RedirectResponse(url="/signup?error=required", status_code=302)
+        if not password or len(password) < 8:
+            return RedirectResponse(url="/signup?error=password", status_code=302)
+        rfc = sanitize_service.sanitize_rfc(rfc)
+        razon_social = (razon_social or "").strip()[:200]
+        if not rfc or not razon_social:
+            return RedirectResponse(url="/signup?error=required", status_code=302)
+        cp = sanitize_service.sanitize_cp(cp)
+        if cp is not None and len(cp) != 5:
+            cp = None
+        if users.get_user_by_email(email):
+            return RedirectResponse(url="/signup?error=error", status_code=302)
+        try:
+            user = users.create_user(
+                email=email,
+                password_hash=users.hash_password(password),
+                name=razon_social,
+            )
+        except Exception as e:
+            logger.exception("Signup create_user: %s", e)
+            return RedirectResponse(url="/signup?error=error", status_code=302)
+        try:
+            issuer_id, _ = issuers.create_issuer_with_token(
+                rfc=rfc,
+                razon_social=razon_social,
+                regimen_fiscal=(regimen_fiscal or "").strip() or None,
+            )
+            users.add_membership(user["id"], issuer_id, "owner")
+        except Exception as e:
+            logger.exception("Signup create_issuer/membership: %s", e)
+            return RedirectResponse(url="/signup?error=error", status_code=302)
+        audit.log(
+            action="register",
+            user_id=user["id"],
+            issuer_id=issuer_id,
+            details=f"email={email[:50]} rfc={rfc}",
+            request=request,
+        )
+        try:
+            token = verification_service.create_email_verification(user["id"], expires_hours=24)
+            verify_url = f"{_base_url(request)}/verify-email?token={token}"
+            body = f"Hola,\n\nVerifica tu correo abriendo este enlace (válido 24 h):\n{verify_url}\n\nSi no creaste esta cuenta, ignora este mensaje."
+            email_sender.send_email(to=email, subject="Verifica tu correo — ContaNeta", body_plain=body)
+        except Exception as e:
+            logger.exception("Signup send verification email: %s", e)
+        resp = RedirectResponse(url="/portal/home", status_code=302)
+        resp.set_cookie(
+            cookie_name,
+            session.sign_session(user["id"], issuer_id),
+            **session.session_cookie_params(request),
+        )
+        return resp
 
     @router.post("/auth/register", response_class=RedirectResponse)
     def auth_register_submit(
@@ -227,24 +344,24 @@ def get_auth_router(templates):
         csrf_token: str | None = Form(None),
     ):
         if not csrf_service.verify_csrf_token(csrf_token):
-            return RedirectResponse(url="/register?error=error", status_code=302)
+            return RedirectResponse(url="/signup?error=error", status_code=302)
         if _register_rate_limit(request):
             time.sleep(2)
-            return RedirectResponse(url="/register?error=error", status_code=302)
+            return RedirectResponse(url="/signup?error=error", status_code=302)
         email = sanitize_service.sanitize_email(email)
         if not email:
-            return RedirectResponse(url="/register?error=required", status_code=302)
+            return RedirectResponse(url="/signup?error=required", status_code=302)
         if not password or len(password) < 8:
-            return RedirectResponse(url="/register?error=password", status_code=302)
+            return RedirectResponse(url="/signup?error=password", status_code=302)
         rfc = sanitize_service.sanitize_rfc(rfc)
         razon_social = (razon_social or "").strip()[:200]
         if not rfc or not razon_social:
-            return RedirectResponse(url="/register?error=required", status_code=302)
+            return RedirectResponse(url="/signup?error=required", status_code=302)
         cp = sanitize_service.sanitize_cp(cp)
         if cp is not None and len(cp) != 5:
             cp = None
         if users.get_user_by_email(email):
-            return RedirectResponse(url="/register?error=error", status_code=302)
+            return RedirectResponse(url="/signup?error=error", status_code=302)
         try:
             user = users.create_user(
                 email=email,
@@ -253,7 +370,7 @@ def get_auth_router(templates):
             )
         except Exception as e:
             logger.exception("Register create_user: %s", e)
-            return RedirectResponse(url="/register?error=error", status_code=302)
+            return RedirectResponse(url="/signup?error=error", status_code=302)
         try:
             issuer_id, _ = issuers.create_issuer_with_token(
                 rfc=rfc,
@@ -263,7 +380,7 @@ def get_auth_router(templates):
             users.add_membership(user["id"], issuer_id, "owner")
         except Exception as e:
             logger.exception("Register create_issuer/membership: %s", e)
-            return RedirectResponse(url="/register?error=error", status_code=302)
+            return RedirectResponse(url="/signup?error=error", status_code=302)
         audit.log(
             action="register",
             user_id=user["id"],
@@ -271,6 +388,13 @@ def get_auth_router(templates):
             details=f"email={email[:50]} rfc={rfc}",
             request=request,
         )
+        try:
+            token = verification_service.create_email_verification(user["id"], expires_hours=24)
+            verify_url = f"{_base_url(request)}/verify-email?token={token}"
+            body = f"Hola,\n\nVerifica tu correo: {verify_url}\n\nVálido 24 h."
+            email_sender.send_email(to=email, subject="Verifica tu correo — ContaNeta", body_plain=body)
+        except Exception as e:
+            logger.exception("Register send verification: %s", e)
         resp = RedirectResponse(url="/portal/home", status_code=302)
         resp.set_cookie(
             cookie_name,
@@ -278,6 +402,70 @@ def get_auth_router(templates):
             **session.session_cookie_params(request),
         )
         return resp
+
+    @router.get("/verify-email", response_class=RedirectResponse)
+    def verify_email_page(request: Request, token: str = Query("")):
+        user_id = verification_service.verify_email_token(token)
+        if user_id:
+            return RedirectResponse(url="/login?verified=1", status_code=302)
+        return RedirectResponse(url="/login?verified=0", status_code=302)
+
+    @router.get("/forgot", response_class=HTMLResponse)
+    def forgot_page(request: Request, error: str | None = Query(None), sent: str | None = Query(None)):
+        return templates.TemplateResponse(
+            "forgot_password.html",
+            {"request": request, "error": _forgot_error_message(error), "sent": sent == "1", "csrf_token": csrf_service.generate_csrf_token()},
+        )
+
+    @router.post("/forgot", response_class=RedirectResponse)
+    def forgot_submit(request: Request, email: str = Form(""), csrf_token: str | None = Form(None)):
+        if not csrf_service.verify_csrf_token(csrf_token):
+            return RedirectResponse(url="/forgot?error=error", status_code=302)
+        if _forgot_rate_limit(request):
+            time.sleep(2)
+            return RedirectResponse(url="/forgot?error=error", status_code=302)
+        email = sanitize_service.sanitize_email(email)
+        if not email:
+            return RedirectResponse(url="/forgot?error=email", status_code=302)
+        user = users.get_user_by_email(email)
+        if user:
+            try:
+                token = verification_service.create_password_reset(user["id"], expires_hours=2)
+                reset_url = f"{_base_url(request)}/reset-password?token={token}"
+                body = f"Hola,\n\nPara restablecer tu contraseña abre este enlace (válido 2 h):\n{reset_url}\n\nSi no solicitaste esto, ignora el correo."
+                email_sender.send_email(to=email, subject="Restablecer contraseña — ContaNeta", body_plain=body)
+            except Exception as e:
+                logger.exception("Forgot send reset email: %s", e)
+        return RedirectResponse(url="/forgot?sent=1", status_code=302)
+
+    @router.get("/reset-password", response_class=HTMLResponse)
+    def reset_password_page(request: Request, token: str = Query(""), error: str | None = Query(None)):
+        return templates.TemplateResponse(
+            "reset_password.html",
+            {"request": request, "token": token, "error": _reset_error_message(error), "csrf_token": csrf_service.generate_csrf_token()},
+        )
+
+    @router.post("/reset-password", response_class=RedirectResponse)
+    def reset_password_submit(
+        request: Request,
+        token: str = Form(""),
+        password: str = Form(""),
+        password_confirm: str = Form(""),
+        csrf_token: str | None = Form(None),
+    ):
+        if not csrf_service.verify_csrf_token(csrf_token):
+            return RedirectResponse(url="/reset-password?error=error", status_code=302)
+        if not token:
+            return RedirectResponse(url="/login?error=invalid", status_code=302)
+        user_id = verification_service.consume_password_reset_token(token)
+        if not user_id:
+            return RedirectResponse(url="/login?error=reset_expired", status_code=302)
+        if not password or len(password) < 8:
+            return RedirectResponse(url=f"/reset-password?token={token}&error=password", status_code=302)
+        if password != password_confirm:
+            return RedirectResponse(url=f"/reset-password?token={token}&error=mismatch", status_code=302)
+        users.update_user_password(user_id, users.hash_password(password))
+        return RedirectResponse(url="/login?reset=1", status_code=302)
 
     @router.get("/choose-issuer", response_class=HTMLResponse)
     def choose_issuer_page(request: Request):
