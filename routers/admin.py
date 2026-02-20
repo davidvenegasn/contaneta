@@ -68,7 +68,8 @@ def get_admin_router(templates):
             "SELECT status, COUNT(*) AS n FROM sat_requests GROUP BY status"
         )
         audit_events = db_rows(
-            "SELECT id, created_at, action, user_id, issuer_id, target_issuer_id, details FROM audit_log ORDER BY id DESC LIMIT 20"
+            """SELECT id, created_at, action, user_id, issuer_id, target_issuer_id, details,
+                      entity, entity_id, meta_json, ip, user_agent FROM audit_log ORDER BY id DESC LIMIT 20"""
         )
         return templates.TemplateResponse(
             "admin_dashboard.html",
@@ -105,19 +106,44 @@ def get_admin_router(templates):
             {"request": request, "active_page": "users", "users": rows},
         )
 
-    # ---------- GET: Issuers ----------
+    # ---------- GET: Issuers (con búsqueda RFC/email) ----------
     @router.get("/issuers", response_class=HTMLResponse)
     def admin_issuers(
         request: Request,
+        q: str | None = None,
         _admin: tuple[int, int, int | None] = Depends(require_admin_or_owner),
     ):
-        rows = db_rows(
-            """SELECT id, rfc, razon_social, regimen_fiscal, active, facturapi_org_id
-               FROM issuers ORDER BY id"""
-        )
+        user_id, _, _ = _admin
+        can_impersonate = users.user_has_admin_role(user_id)
+        search = (q or "").strip()
+        if search:
+            like = f"%{search}%"
+            rows = db_rows(
+                """SELECT i.id, i.rfc, i.razon_social, i.regimen_fiscal, i.active, i.facturapi_org_id
+                   FROM issuers i
+                   WHERE i.rfc LIKE ? OR i.razon_social LIKE ?
+                      OR i.id IN (
+                        SELECT m.issuer_id FROM memberships m
+                        JOIN users u ON u.id = m.user_id
+                        WHERE u.email LIKE ?
+                      )
+                   ORDER BY i.id""",
+                (like, like, like),
+            )
+        else:
+            rows = db_rows(
+                """SELECT id, rfc, razon_social, regimen_fiscal, active, facturapi_org_id
+                   FROM issuers ORDER BY id"""
+            )
         return templates.TemplateResponse(
             "admin_issuers.html",
-            {"request": request, "active_page": "issuers", "issuers": rows},
+            {
+                "request": request,
+                "active_page": "issuers",
+                "issuers": rows,
+                "search_q": search,
+                "can_impersonate": can_impersonate,
+            },
         )
 
     # ---------- GET: Memberships ----------
@@ -362,15 +388,13 @@ def get_admin_router(templates):
             target_issuer = issuers.get_issuer_by_rfc((rfc or "").strip())
         if not target_issuer:
             raise HTTPException(status_code=400, detail="Issuer no encontrado (issuer_id o rfc válido)")
-        ip = (request.client.host if request.client else None) or ""
-        ua = request.headers.get("user-agent") or ""
-        details = f"admin user_id={user_id} impersonating issuer_id={target_issuer['id']} ip={ip} user_agent={ua[:200]}"
         audit.log(
             action="impersonate",
             user_id=user_id,
             issuer_id=current_issuer_id,
             target_issuer_id=target_issuer["id"],
-            details=details,
+            details=f"impersonate issuer_id={target_issuer['id']}",
+            request=request,
         )
         cookie_val = session.sign_session(
             user_id,
@@ -389,17 +413,35 @@ def get_admin_router(templates):
     def admin_impersonate(
         request: Request,
         body: ImpersonateBody,
-        _admin: tuple[int, int, int | None] = Depends(require_admin_or_owner),
+        _admin: tuple[int, int, int | None] = Depends(require_admin),
     ):
         user_id, current_issuer_id, _ = _admin
         return _do_impersonate(request, user_id, current_issuer_id, body.issuer_id, body.rfc)
+
+    @router.get("/impersonate/{issuer_id:int}", response_class=RedirectResponse)
+    def admin_impersonate_get(
+        request: Request,
+        issuer_id: int,
+        _admin: tuple[int, int, int | None] = Depends(require_admin),
+    ):
+        user_id, current_issuer_id, _ = _admin
+        return _do_impersonate(request, user_id, current_issuer_id, issuer_id, None)
+
+    @router.post("/impersonate/{issuer_id:int}", response_class=RedirectResponse)
+    def admin_impersonate_post(
+        request: Request,
+        issuer_id: int,
+        _admin: tuple[int, int, int | None] = Depends(require_admin),
+    ):
+        user_id, current_issuer_id, _ = _admin
+        return _do_impersonate(request, user_id, current_issuer_id, issuer_id, None)
 
     @router.post("/impersonate-form", response_class=RedirectResponse)
     def admin_impersonate_form(
         request: Request,
         issuer_id: int | None = Form(None),
         rfc: str | None = Form(None),
-        _admin: tuple[int, int, int | None] = Depends(require_admin_or_owner),
+        _admin: tuple[int, int, int | None] = Depends(require_admin),
     ):
         user_id, current_issuer_id, _ = _admin
         return _do_impersonate(request, user_id, current_issuer_id, issuer_id, rfc)
@@ -414,7 +456,8 @@ def get_admin_router(templates):
             user_id=user_id,
             issuer_id=_current_issuer_id,
             target_issuer_id=restore_issuer_id,
-            details=f"user_id={user_id} stopped impersonating, restored to issuer_id={restore_issuer_id}",
+            details="stop_impersonate",
+            request=request,
         )
         cookie_val = session.sign_session(user_id, restore_issuer_id, restore_issuer_id=None)
         response = RedirectResponse(url="/portal/home", status_code=302)

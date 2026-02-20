@@ -125,6 +125,20 @@ Salida esperada si todo va bien: `OK. Smoke onboarding: registro → confirmar p
 
 Los usuarios con **rol `admin`** en alguna membership pueden “entrar como” otro emisor (por `issuer_id` o `rfc`). Toda acción queda registrada en `audit_log`.
 
+### Permisos
+
+- **Solo rol `admin`** puede impersonar. Los usuarios con rol `owner`, `staff` o `viewer` no pueden (403).
+- En Panel Admin → Issuers solo los admin ven el botón "Entrar como"; la búsqueda por RFC/razón social/email está disponible para admin y owner.
+
+### Cómo desactivar la impersonación
+
+- En la base: quitar el rol admin de memberships, por ejemplo `UPDATE memberships SET role = 'owner' WHERE role = 'admin';`
+- No asignar `role = 'admin'` a nadie si no quieres que nadie pueda impersonar.
+
+### Auditoría
+
+En `audit_log` se registran: `login`, `logout`, `impersonate`, `stop_impersonate`, `download_xml`, `download_pdf`, `cfdi_view`, `register`, `admin_ops`, etc. La tabla incluye columnas `entity`, `entity_id`, `meta_json`, `ip`, `user_agent` (migración 011). Cualquier trigger de sync SAT debería llamar a `audit.log(action="sync_sat_trigger", ...)`.
+
 ### Seguridad
 
 - Solo usuarios con al menos una membership con `role = 'admin'` pueden usar la impersonación.
@@ -143,7 +157,8 @@ Los usuarios con **rol `admin`** en alguna membership pueden “entrar como” o
 2. **Iniciar sesión como ese usuario**  
    Login normal (email/teléfono + contraseña o token) y que la sesión sea para un issuer donde ese usuario tenga rol `admin`.
 
-3. **Impersonar por issuer_id o rfc**  
+3. **Impersonar**  
+   Desde el panel Admin → Issuers: clic en **"Entrar como"** (enlace a `GET /admin/impersonate/{issuer_id}`). O por API:  
    - Por **issuer_id**:
      ```bash
      curl -X POST http://127.0.0.1:8000/admin/impersonate \

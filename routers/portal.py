@@ -666,7 +666,15 @@ def get_portal_router(templates):
         uid, iid = _audit_user_issuer(request)
         if uid and uid > 0 and not subscription_service.is_subscription_active(uid):
             raise HTTPException(status_code=402, detail="Actualiza a Pro para descargar XML. Ve a Mi plan.")
-        audit.log(action="download_xml", user_id=uid, issuer_id=issuer["id"], details=u[:36])
+        audit.log(
+            action="download_xml",
+            user_id=uid,
+            issuer_id=issuer["id"],
+            details=u[:36],
+            request=request,
+            entity="cfdi",
+            entity_id=u,
+        )
         with open(abs_path, "rb") as f:
             xml_bytes = f.read()
         return Response(
@@ -697,7 +705,15 @@ def get_portal_router(templates):
         uid, _ = _audit_user_issuer(request)
         if uid and uid > 0 and not subscription_service.is_subscription_active(uid):
             raise HTTPException(status_code=402, detail="Actualiza a Pro para descargar PDF. Ve a Mi plan.")
-        audit.log(action="download_pdf", user_id=uid, issuer_id=issuer["id"], details=uuid_clean[:36])
+        audit.log(
+            action="download_pdf",
+            user_id=uid,
+            issuer_id=issuer["id"],
+            details=uuid_clean[:36],
+            request=request,
+            entity="cfdi",
+            entity_id=uuid_clean,
+        )
         try:
             from cfdi_pdf import parse_cfdi_xml, build_pdf
             data = parse_cfdi_xml(abs_path)
@@ -731,7 +747,15 @@ def get_portal_router(templates):
         if not cfdi:
             raise HTTPException(status_code=404, detail="CFDI no encontrado")
         uid = getattr(request.state, "user_id", None) or 0
-        audit.log(action="cfdi_view", user_id=uid if uid else None, issuer_id=issuer["id"], details=f"direction=issued uuid={(uuid or '')[:36]}")
+        audit.log(
+            action="cfdi_view",
+            user_id=uid if uid else None,
+            issuer_id=issuer["id"],
+            details=f"direction=issued uuid={(uuid or '')[:36]}",
+            request=request,
+            entity="cfdi",
+            entity_id=(uuid or "").strip()[:36],
+        )
         return _render_portal(
             request,
             issuer=issuer,
@@ -747,7 +771,15 @@ def get_portal_router(templates):
         if not cfdi:
             raise HTTPException(status_code=404, detail="CFDI no encontrado")
         uid = getattr(request.state, "user_id", None) or 0
-        audit.log(action="cfdi_view", user_id=uid if uid else None, issuer_id=issuer["id"], details=f"direction=received uuid={(uuid or '')[:36]}")
+        audit.log(
+            action="cfdi_view",
+            user_id=uid if uid else None,
+            issuer_id=issuer["id"],
+            details=f"direction=received uuid={(uuid or '')[:36]}",
+            request=request,
+            entity="cfdi",
+            entity_id=(uuid or "").strip()[:36],
+        )
         return _render_portal(
             request,
             issuer=issuer,

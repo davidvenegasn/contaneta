@@ -37,9 +37,9 @@
   <body class="portal">
 {% if is_impersonating %}
     <div class="impersonation-banner" role="alert">
-      <span class="impersonation-banner__text">Modo soporte: estás viendo como <strong>{{ issuer_alias or issuer_rfc or 'Issuer' }}</strong></span>
+      <span class="impersonation-banner__text">Estás en modo admin/impersonation: viendo como <strong>{{ issuer_alias or issuer_rfc or 'Issuer' }}</strong></span>
       <form method="post" action="/admin/stop-impersonate" style="display:inline;">
-        <button type="submit" class="btn">Salir de soporte</button>
+        <button type="submit" class="btn">Salir de impersonation</button>
       </form>
     </div>
 {% endif %}

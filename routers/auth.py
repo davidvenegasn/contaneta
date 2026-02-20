@@ -181,7 +181,7 @@ def get_auth_router(templates):
             return RedirectResponse(url="/login?error=bad_credentials", status_code=302)
         memberships = users.get_memberships_for_user(user["id"])
         if not memberships:
-            audit.log(action="login", user_id=user["id"], issuer_id=0, details="credentials")
+            audit.log(action="login", user_id=user["id"], issuer_id=0, details="credentials", request=request)
             resp = RedirectResponse(url="/confirmar-perfil", status_code=302)
             resp.set_cookie(
                 cookie_name,
@@ -191,7 +191,7 @@ def get_auth_router(templates):
             return resp
         if len(memberships) == 1:
             issuer_id = memberships[0]["issuer_id"]
-            audit.log(action="login", user_id=user["id"], issuer_id=issuer_id, details="credentials")
+            audit.log(action="login", user_id=user["id"], issuer_id=issuer_id, details="credentials", request=request)
             resp = RedirectResponse(url="/portal/home", status_code=302)
             resp.set_cookie(
                 cookie_name,
@@ -199,7 +199,7 @@ def get_auth_router(templates):
                 **session.session_cookie_params(request),
             )
             return resp
-        audit.log(action="login", user_id=user["id"], issuer_id=0, details="credentials")
+        audit.log(action="login", user_id=user["id"], issuer_id=0, details="credentials", request=request)
         resp = RedirectResponse(url="/choose-issuer", status_code=302)
         resp.set_cookie(
             cookie_name,
@@ -269,6 +269,7 @@ def get_auth_router(templates):
             user_id=user["id"],
             issuer_id=issuer_id,
             details=f"email={email[:50]} rfc={rfc}",
+            request=request,
         )
         resp = RedirectResponse(url="/portal/home", status_code=302)
         resp.set_cookie(
@@ -332,6 +333,7 @@ def get_auth_router(templates):
                 user_id=session_data[0] if session_data[0] else None,
                 issuer_id=session_data[1] if session_data[1] else None,
                 details="",
+                request=request,
             )
         resp = RedirectResponse(url="/", status_code=302)
         resp.delete_cookie(cookie_name, path="/")

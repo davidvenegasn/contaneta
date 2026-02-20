@@ -207,6 +207,9 @@ Tablas/columnas para suscripciones y billing (Stripe).
 ### 010_roles_staff.sql
 Recrea `memberships` añadiendo rol `staff` al CHECK: roles permitidos `viewer`, `accountant`, `owner`, `admin`, `staff`.
 
+### 011_audit_log_columns.sql
+Añade a `audit_log` las columnas `entity`, `entity_id`, `meta_json`, `ip`, `user_agent` (aplicada con lógica Python idempotente). Permite registrar entidad afectada, IP y user-agent en cada evento.
+
 ---
 
 ## Hardening SQLite (timeout, pragmas, WAL)

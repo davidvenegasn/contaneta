@@ -200,6 +200,26 @@ def _apply_004_optional_columns_and_constraints(conn: sqlite3.Connection) -> Non
                     raise
 
 
+def _apply_008_users_active(conn: sqlite3.Connection) -> None:
+    """Aplica 008: columna users.active (default 1) para login solo usuarios activos."""
+    if _table_exists(conn, "users"):
+        _safe_add_column(conn, "users", "active", "INTEGER NOT NULL DEFAULT 1")
+
+
+def _apply_011_audit_log_columns(conn: sqlite3.Connection) -> None:
+    """Aplica 011: columnas entity, entity_id, meta_json, ip, user_agent en audit_log."""
+    if not _table_exists(conn, "audit_log"):
+        return
+    for col, typ in [
+        ("entity", "TEXT"),
+        ("entity_id", "TEXT"),
+        ("meta_json", "TEXT"),
+        ("ip", "TEXT"),
+        ("user_agent", "TEXT"),
+    ]:
+        _safe_add_column(conn, "audit_log", col, typ)
+
+
 def _list_migration_files(migrations_dir: str) -> list[tuple[str, str]]:
     """
     Lista archivos *.sql en migrations_dir ordenados por prefijo numérico.
@@ -263,6 +283,12 @@ def apply_migrations(
                     _apply_003_safe_add_columns(conn)
                 elif version == "004":
                     _apply_004_optional_columns_and_constraints(conn)
+                elif version == "006":
+                    _safe_add_column(conn, "users", "name", "TEXT")
+                elif version == "008":
+                    _apply_008_users_active(conn)
+                elif version == "011":
+                    _apply_011_audit_log_columns(conn)
                 else:
                     # Migraciones normales: ejecutar SQL directamente
                     conn.executescript(sql)
