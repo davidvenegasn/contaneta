@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{% block title %}Admin{% endblock %} — ContaNeta</title>
+  <link rel="stylesheet" href="/static/css/form.css" />
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; margin: 0; padding: 16px; background: #f5f5f5; }
+    .admin-wrap { max-width: 1200px; margin: 0 auto; }
+    .admin-nav { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; padding: 12px; background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+    .admin-nav a { color: #0369a1; text-decoration: none; font-weight: 500; }
+    .admin-nav a:hover { text-decoration: underline; }
+    .admin-nav .active { color: #0c4a6e; font-weight: 600; }
+    .admin-nav .sep { color: #94a3b8; }
+    h1 { margin: 0 0 16px; font-size: 1.5rem; color: #1e293b; }
+    .card { background: #fff; border-radius: 8px; padding: 16px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+    .card h2 { margin: 0 0 12px; font-size: 1rem; color: #64748b; font-weight: 600; }
+    .stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
+    .stat { background: #f1f5f9; padding: 12px; border-radius: 8px; text-align: center; }
+    .stat .n { font-size: 1.5rem; font-weight: 700; color: #0f172a; }
+    .stat .label { font-size: 12px; color: #64748b; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #e2e8f0; }
+    th { background: #f8fafc; font-weight: 600; font-size: 12px; color: #64748b; text-transform: uppercase; }
+    .btn { display: inline-block; padding: 8px 14px; border-radius: 8px; font-size: 14px; text-decoration: none; border: none; cursor: pointer; font-weight: 500; }
+    .btn-primary { background: #0ea5e9; color: #fff; }
+    .btn-primary:hover { background: #0284c7; }
+    .btn-secondary { background: #e2e8f0; color: #334155; }
+    .btn-secondary:hover { background: #cbd5e1; }
+    .btn-sm { padding: 6px 10px; font-size: 12px; }
+    .ops-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+    .ops-result { white-space: pre-wrap; font-family: monospace; font-size: 12px; background: #1e293b; color: #e2e8f0; padding: 12px; border-radius: 8px; max-height: 400px; overflow: auto; }
+    .alert { padding: 12px; border-radius: 8px; margin-bottom: 12px; }
+    .alert-success { background: #dcfce7; color: #166534; }
+    .alert-error { background: #fee2e2; color: #991b1b; }
+    .impersonate-form { display: inline; }
+    .impersonate-form button { margin-left: 4px; }
+  </style>
+</head>
+<body>
+  <div class="admin-wrap">
+    <nav class="admin-nav">
+      <a href="/admin" class="{% if active_page == 'dashboard' %}active{% endif %}">Dashboard</a>
+      <span class="sep">|</span>
+      <a href="/admin/users" class="{% if active_page == 'users' %}active{% endif %}">Usuarios</a>
+      <a href="/admin/issuers" class="{% if active_page == 'issuers' %}active{% endif %}">Issuers</a>
+      <a href="/admin/memberships" class="{% if active_page == 'memberships' %}active{% endif %}">Memberships</a>
+      <span class="sep">|</span>
+      <a href="/admin/ops" class="{% if active_page == 'ops' %}active{% endif %}">Operaciones</a>
+      <span class="sep">|</span>
+      <a href="/admin/status">Status</a>
+      <a href="/portal/home">Ir al portal</a>
+    </nav>
+    {% block content %}{% endblock %}
+  </div>
+</body>
+</html>

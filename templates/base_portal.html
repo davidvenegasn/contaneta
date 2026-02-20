@@ -14,9 +14,35 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+      .demo-banner { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 16px; margin-bottom: 12px; background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%); border: 1px solid #7dd3fc; border-radius: 12px; font-size: 14px; }
+      .demo-banner__text { color: #0c4a6e; }
+      .demo-banner__link { color: #0369a1; font-weight: 600; text-decoration: none; }
+      .demo-banner__link:hover { text-decoration: underline; }
+      .welcome-popup { position: fixed; inset: 0; z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 16px; }
+      .welcome-popup[hidden] { display: none !important; }
+      .welcome-popup__backdrop { position: absolute; inset: 0; background: rgba(0,0,0,.45); }
+      .welcome-popup__card { position: relative; max-width: 400px; width: 100%; padding: 24px; background: var(--card-bg); border-radius: var(--radius); box-shadow: 0 20px 50px rgba(0,0,0,.2); }
+      .welcome-popup__title { margin: 0 0 12px; font-size: 1.25rem; }
+      .welcome-popup__text { margin: 0 0 20px; font-size: 14px; color: var(--muted); line-height: 1.5; }
+      .welcome-popup__actions { display: flex; flex-direction: column; gap: 10px; }
+      .welcome-popup__btn { text-align: center; text-decoration: none; }
+      .impersonation-banner { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 16px; margin-bottom: 12px; background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border: 1px solid #f59e0b; border-radius: 12px; font-size: 14px; }
+      .impersonation-banner__text { color: #92400e; }
+      .impersonation-banner .btn { padding: 6px 12px; border-radius: 8px; font-size: 13px; font-weight: 600; background: #f59e0b; color: #fff; border: none; cursor: pointer; text-decoration: none; }
+      .impersonation-banner .btn:hover { background: #d97706; }
+    </style>
   </head>
 
   <body class="portal">
+{% if is_impersonating %}
+    <div class="impersonation-banner" role="alert">
+      <span class="impersonation-banner__text">Modo soporte: estás viendo como <strong>{{ issuer_alias or issuer_rfc or 'Issuer' }}</strong></span>
+      <form method="post" action="/admin/stop-impersonate" style="display:inline;">
+        <button type="submit" class="btn">Salir de soporte</button>
+      </form>
+    </div>
+{% endif %}
 {% macro icon_home() %}
 <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
   <path d="M3 10.5 12 3l9 7.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
@@ -263,6 +289,12 @@
             </button>
 
             <div class="user-menu" id="userMenu" role="menu" hidden>
+              {% if getattr(request.state, 'is_impersonating', False) %}
+              <form method="post" action="/admin/stop-impersonate" class="user-menu__impersonate-form">
+                <button type="submit" class="user-menu__item user-menu__item--action" role="menuitem">Volver a mi cuenta</button>
+              </form>
+              <div class="user-menu__sep" aria-hidden="true"></div>
+              {% endif %}
               <a class="user-menu__item" role="menuitem" href="/portal/summary">Resumen</a>
               <a class="user-menu__item" role="menuitem" href="/portal/home">Inicio</a>
               <div class="user-menu__sep" aria-hidden="true"></div>
@@ -287,11 +319,40 @@
 
       <main class="main">
         <div class="main-inner page">
+          {% if getattr(request.state, 'is_impersonating', False) %}
+          <div class="demo-banner" role="status">
+            <span class="demo-banner__text">Estás viendo el portal como <strong>{{ issuer_alias }}</strong>.</span>
+            <form method="post" action="/admin/stop-impersonate" style="display:inline;">
+              <button type="submit" class="demo-banner__link" style="background:none;border:none;cursor:pointer;padding:0;font:inherit;color:inherit;text-decoration:underline;">Volver a mi cuenta</button>
+            </form>
+          </div>
+          {% endif %}
+          {% if is_demo_view %}
+          <div class="demo-banner" role="status">
+            <span class="demo-banner__text">Estás viendo el portal con datos de ejemplo.</span>
+            <a href="/portal/exit-demo-view" class="demo-banner__link">Volver a mi portal</a>
+          </div>
+          {% endif %}
           <div id="toastStack" class="toast-stack" aria-live="polite" aria-relevant="additions"></div>
 
           {% block content %}{% endblock %}
         </div>
       </main>
+
+      {% if show_welcome_popup %}
+      <div id="welcomePopup" class="welcome-popup" role="dialog" aria-labelledby="welcomePopupTitle" aria-modal="true" hidden>
+        <div class="welcome-popup__backdrop"></div>
+        <div class="welcome-popup__card">
+          <h2 id="welcomePopupTitle" class="welcome-popup__title">Aún no tienes datos registrados</h2>
+          <p class="welcome-popup__text">Registra tus datos fiscales y prueba el portal por <strong>30 días gratis</strong>. O explora el portal con datos de ejemplo.</p>
+          <div class="welcome-popup__actions">
+            <a href="/onboarding" class="btn btn-primary welcome-popup__btn">Registrar mis datos</a>
+            <a href="/portal/set-demo-view" class="btn btn--secondary welcome-popup__btn">Ver portal con info demo</a>
+            <button type="button" class="btn btn--ghost welcome-popup__btn" id="welcomePopupClose">Cerrar y continuar</button>
+          </div>
+        </div>
+      </div>
+      {% endif %}
 
       <div id="pdfModal" class="pdf-modal" aria-hidden="true" role="dialog" aria-labelledby="pdfModalTitle">
         <div class="pdf-modal__backdrop" id="pdfModalBackdrop"></div>
@@ -313,6 +374,19 @@
 
     {% block action_bar %}{% endblock %}
 
+    <script>
+(function () {
+  var popup = document.getElementById('welcomePopup');
+  if (!popup) return;
+  var key = 'welcome_popup_dismissed';
+  if (sessionStorage.getItem(key) === '1') { popup.setAttribute('hidden', ''); return; }
+  popup.removeAttribute('hidden');
+  function dismiss() { sessionStorage.setItem(key, '1'); popup.setAttribute('hidden', ''); }
+  popup.querySelector('.welcome-popup__backdrop').addEventListener('click', dismiss);
+  var closeBtn = document.getElementById('welcomePopupClose');
+  if (closeBtn) closeBtn.addEventListener('click', dismiss);
+})();
+    </script>
     <script>
 // Mover modales al final de body para que position:fixed use el viewport y no se escondan (evita ancestros con transform/overflow)
 (function () {
