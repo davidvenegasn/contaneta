@@ -1,0 +1,6 @@
+# Caddy: proxy a ContaNeta y HTTPS automático (Let's Encrypt)
+# Copiar a /etc/caddy/Caddyfile o incluir en tu config. Sustituir TU_DOMINIO.
+
+TU_DOMINIO {
+    reverse_proxy 127.0.0.1:8000
+}

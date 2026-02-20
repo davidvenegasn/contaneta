@@ -1,0 +1,21 @@
+# systemd unit para ContaNeta (producción 24/7)
+# Copiar a /etc/systemd/system/conta-invoicing.service y ajustar rutas/usuario.
+# Después: sudo systemctl daemon-reload && sudo systemctl enable conta-invoicing && sudo systemctl start conta-invoicing
+
+[Unit]
+Description=ContaNeta Invoicing (FastAPI)
+After=network.target
+
+[Service]
+Type=simple
+User=conta
+Group=conta
+WorkingDirectory=/var/www/conta-invoicing
+Environment=PATH=/var/www/conta-invoicing/venv/bin
+EnvironmentFile=-/var/www/conta-invoicing/.env
+ExecStart=/var/www/conta-invoicing/venv/bin/gunicorn app:app -k uvicorn.workers.UvicornWorker -w 2 -b 127.0.0.1:8000
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,13 @@
+# Ejemplo logrotate por si la app escribe a un archivo de log.
+# Copiar a /etc/logrotate.d/conta-invoicing y ajustar rutas.
+# Si solo usas journald (systemd), no necesitas este archivo.
+
+/var/www/conta-invoicing/logs/*.log {
+    daily
+    rotate 14
+    compress
+    delaycompress
+    missingok
+    notifempty
+    copytruncate
+}
