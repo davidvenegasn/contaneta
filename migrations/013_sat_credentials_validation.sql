@@ -1,0 +1,7 @@
+-- 013_sat_credentials_validation.sql
+-- Columnas opcionales para mostrar última validación FIEL en el portal.
+-- La app las crea al vuelo con _ensure_sat_credentials_validation_columns() si no existen.
+-- Este archivo es referencia; para aplicar a mano (solo una vez):
+--   sqlite3 invoicing.db "ALTER TABLE sat_credentials ADD COLUMN validation_at TEXT;"
+--   sqlite3 invoicing.db "ALTER TABLE sat_credentials ADD COLUMN validation_ok INTEGER;"
+--   sqlite3 invoicing.db "ALTER TABLE sat_credentials ADD COLUMN validation_message TEXT;"

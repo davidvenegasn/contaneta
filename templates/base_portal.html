@@ -3,17 +3,19 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#f7f7f8" />
+    <meta name="theme-color" content="#f0fdf9" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <title>{{ title or "ContaNeta" }}</title>
     <script>if(localStorage.getItem('portal_nightmode')==='1')document.documentElement.classList.add('nightmode');</script>
     <link rel="stylesheet" href="/static/css/form.css">
+    <link rel="stylesheet" href="/static/css/portal_tokens.css">
+    <link rel="stylesheet" href="/static/css/components.css">
     <link rel="stylesheet" href="/static/css/portal.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
     <style>
       .demo-banner { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 16px; margin-bottom: 12px; background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%); border: 1px solid #7dd3fc; border-radius: 12px; font-size: 14px; }
       .demo-banner__text { color: #0c4a6e; }
@@ -31,11 +33,32 @@
       .impersonation-banner__text { color: #92400e; }
       .impersonation-banner .btn { padding: 6px 12px; border-radius: 8px; font-size: 13px; font-weight: 600; background: #f59e0b; color: #fff; border: none; cursor: pointer; text-decoration: none; }
       .impersonation-banner .btn:hover { background: #d97706; }
+      .demo-ui-hooks { position: fixed; bottom: 16px; right: 16px; z-index: 70; display: flex; flex-wrap: wrap; gap: 8px; padding: 10px; background: rgba(255,255,255,.95); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,.1); }
+      .demo-ui-hooks[hidden] { display: none !important; }
+      .user-menu__session-info { padding: 8px 12px; font-size: 12px; color: var(--muted, #64748b); display: flex; flex-direction: column; gap: 2px; }
+      .user-menu__session-label { font-weight: 600; color: var(--text, #1e293b); }
+      .user-menu__session-meta { font-size: 11px; }
+      .user-menu__logout-form--prominent { border-top: 1px solid var(--border, #e2e8f0); margin-top: 2px !important; padding-top: 6px !important; }
+      .user-menu__logout-form .user-menu__item--logout,
+      .user-menu__item--logout { width: 100%; text-align: left; background: none; border: none; cursor: pointer; font: inherit; padding: 8px 12px; color: #b91c1c !important; font-weight: 600; }
+      .user-menu__item--logout:hover { background: rgba(185, 28, 28, 0.08) !important; color: #991b1b !important; }
+      .portal-footer { margin-top: 24px; padding: 12px 0; border-top: 1px solid var(--border, #e2e8f0); font-size: 12px; color: var(--muted, #64748b); }
+      .portal-footer a { color: var(--link, #0ea5e9); text-decoration: none; }
+      .portal-footer a:hover { text-decoration: underline; }
+      .confirm-modal { position: fixed; inset: 0; z-index: 9000; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(0,0,0,.4); }
+      .confirm-modal[hidden] { display: none !important; }
+      .confirm-modal__card { max-width: 400px; width: 100%; padding: 20px; background: var(--card-bg); border-radius: var(--radius); box-shadow: 0 20px 50px rgba(0,0,0,.2); }
+      .confirm-modal__title { margin: 0 0 10px; font-size: 1.1rem; }
+      .confirm-modal__text { margin: 0 0 18px; font-size: 14px; color: var(--muted); line-height: 1.5; }
+      .confirm-modal__actions { display: flex; gap: 10px; justify-content: flex-end; }
+      .confirm-modal__btn--cancel { background: var(--muted); color: #fff; }
+      .confirm-modal__btn--danger { background: #b91c1c; color: #fff; }
+      .confirm-modal__btn--danger:hover { background: #991b1b; }
     </style>
   </head>
 
   <body class="portal">
-{% if is_impersonating %}
+{% if is_impersonating|default(false) %}
     <div class="impersonation-banner" role="alert">
       <span class="impersonation-banner__text">Estás en modo admin/impersonation: viendo como <strong>{{ issuer_alias or issuer_rfc or 'Issuer' }}</strong></span>
       <form method="post" action="/admin/stop-impersonate" style="display:inline;">
@@ -126,6 +149,23 @@
 </svg>
 {% endmacro %}
 
+{% macro icon_sync() %}
+<svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+  <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M21 3v5h-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M3 21v-5h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
+{% endmacro %}
+
+{% macro icon_download() %}
+<svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M7 10l5 5 5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M12 15V3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+</svg>
+{% endmacro %}
+
 {% macro month_picker(base_url, token, ym, ym_label) %}
 <div class="month-picker" data-base-url="{{ base_url }}" data-ym="{{ ym }}" data-ym-label="{{ ym_label }}">
   <div class="month-picker__trigger-wrap">
@@ -145,6 +185,7 @@
   </div>
 </div>
 {% endmacro %}
+    <div id="pageLoadingBar" class="page-loading-bar" aria-hidden="true"></div>
     <div class="portal-shell">
       <aside id="sidebar" class="sidebar sidebar-drawer" aria-hidden="true">
         <div class="sidebar-top">
@@ -161,83 +202,80 @@
         </div>
 
         <nav class="nav">
-  <a class="nav-item {{ 'active' if active_page=='home' else '' }}" href="/portal/home" data-tip="Inicio">
-    <span class="nav-icon" aria-hidden="true">
-      {{ icon_home() }}
-    </span>
-    <span class="nav-label">Inicio</span>
-  </a>
+          <!-- Sección: Principal -->
+          <div class="nav-section">
+            <div class="nav-section__header">Principal</div>
+            <div class="nav-section__items">
+              <a class="nav-item {{ 'active' if active_page=='home' else '' }}" href="/portal/home" data-tip="Inicio">
+                <span class="nav-icon" aria-hidden="true">{{ icon_home() }}</span>
+                <span class="nav-label">Inicio</span>
+              </a>
+              <a class="nav-item {{ 'active' if active_page=='create' else '' }}" href="/portal/create" data-tip="Genera tu factura">
+                <span class="nav-icon" aria-hidden="true">{{ icon_create() }}</span>
+                <span class="nav-label">Genera tu factura</span>
+              </a>
+            </div>
+          </div>
 
-  <a class="nav-item {{ 'active' if active_page=='create' else '' }}" href="/portal/create" data-tip="Genera tu factura">
-    <span class="nav-icon" aria-hidden="true">
-      {{ icon_create() }}
-    </span>
-    <span class="nav-label">Genera tu factura</span>
-  </a>
+          <!-- Sección: Facturas -->
+          <div class="nav-section">
+            <div class="nav-section__header">Facturas</div>
+            <div class="nav-section__items">
+              <a class="nav-item {{ 'active' if active_page=='issued' else '' }}" href="/portal/invoices/issued" data-tip="Facts. emitidas">
+                <span class="nav-icon" aria-hidden="true">{{ icon_issued() }}</span>
+                <span class="nav-label">Emitidas</span>
+              </a>
+              <a class="nav-item {{ 'active' if active_page=='received' else '' }}" href="/portal/invoices/received" data-tip="Facts. recibidas">
+                <span class="nav-icon" aria-hidden="true">{{ icon_received() }}</span>
+                <span class="nav-label">Recibidas</span>
+              </a>
+              {% if has_nomina %}
+              <a class="nav-item {{ 'active' if active_page=='nomina' else '' }}" href="/portal/invoices/nomina" data-tip="Nómina recibida">
+                <span class="nav-icon" aria-hidden="true">{{ icon_received() }}</span>
+                <span class="nav-label">Nómina</span>
+              </a>
+              {% endif %}
+            </div>
+          </div>
 
-  <a class="nav-item {{ 'active' if active_page=='issued' else '' }}" href="/portal/invoices/issued" data-tip="Facts. emitidas">
-    <span class="nav-icon" aria-hidden="true">
-      {{ icon_issued() }}
-    </span>
-    <span class="nav-label">Facts. emitidas</span>
-  </a>
+          <!-- Sección: Catálogos -->
+          <div class="nav-section">
+            <div class="nav-section__header">Catálogos</div>
+            <div class="nav-section__items">
+              <a class="nav-item {{ 'active' if active_page=='clients' else '' }}" href="/portal/clients" data-tip="Clientes">
+                <span class="nav-icon" aria-hidden="true">{{ icon_clients() }}</span>
+                <span class="nav-label">Clientes</span>
+              </a>
+              <a class="nav-item {{ 'active' if active_page=='providers' else '' }}" href="/portal/providers" data-tip="Proveedores">
+                <span class="nav-icon" aria-hidden="true">{{ icon_providers() }}</span>
+                <span class="nav-label">Proveedores</span>
+              </a>
+              <a class="nav-item {{ 'active' if active_page=='products' else '' }}" href="/portal/products" data-tip="Productos">
+                <span class="nav-icon" aria-hidden="true">{{ icon_products() }}</span>
+                <span class="nav-label">Productos</span>
+              </a>
+            </div>
+          </div>
 
-  <a class="nav-item {{ 'active' if active_page=='received' else '' }}" href="/portal/invoices/received" data-tip="Facts. recibidas">
-    <span class="nav-icon" aria-hidden="true">
-      {{ icon_received() }}
-    </span>
-    <span class="nav-label">Facts. recibidas</span>
-  </a>
-
-  {% if has_nomina %}
-  <a class="nav-item {{ 'active' if active_page=='nomina' else '' }}" href="/portal/invoices/nomina" data-tip="Nómina recibida">
-    <span class="nav-icon" aria-hidden="true">
-      {{ icon_received() }}
-    </span>
-    <span class="nav-label">Nómina recibida</span>
-  </a>
-  {% endif %}
-
-  <a class="nav-item {{ 'active' if active_page=='clients' else '' }}" href="/portal/clients" data-tip="Clientes">
-    <span class="nav-icon" aria-hidden="true">
-      {{ icon_clients() }}
-    </span>
-    <span class="nav-label">Clientes</span>
-  </a>
-
-  <a class="nav-item {{ 'active' if active_page=='providers' else '' }}" href="/portal/providers" data-tip="Proveedores">
-    <span class="nav-icon" aria-hidden="true">
-      {{ icon_providers() }}
-    </span>
-    <span class="nav-label">Proveedores</span>
-  </a>
-
-  <a class="nav-item {{ 'active' if active_page=='products' else '' }}" href="/portal/products" data-tip="Productos">
-    <span class="nav-icon" aria-hidden="true">
-      {{ icon_products() }}
-    </span>
-    <span class="nav-label">Productos</span>
-  </a>
-
-  <a class="nav-item {{ 'active' if active_page=='quotations' else '' }}" href="/portal/cotizaciones" data-tip="Cotizaciones">
-    <span class="nav-icon" aria-hidden="true">
-      {{ icon_quotations() }}
-    </span>
-    <span class="nav-label">Cotizaciones</span>
-  </a>
-
-  <a class="nav-item {{ 'active' if active_page=='summary' else '' }}" href="/portal/summary" data-tip="Resumen">
-    <span class="nav-icon" aria-hidden="true">
-      {{ icon_summary() }}
-    </span>
-    <span class="nav-label">Resumen</span>
-  </a>
-
-  <a class="nav-item {{ 'active' if active_page=='plan' else '' }}" href="/portal/plan" data-tip="Mi plan">
-    <span class="nav-icon" aria-hidden="true">{{ icon_summary() }}</span>
-    <span class="nav-label">Mi plan</span>
-  </a>
-</nav>
+          <!-- Sección: Otros -->
+          <div class="nav-section">
+            <div class="nav-section__header">Otros</div>
+            <div class="nav-section__items">
+              <a class="nav-item {{ 'active' if active_page=='quotations' else '' }}" href="/portal/cotizaciones" data-tip="Cotizaciones">
+                <span class="nav-icon" aria-hidden="true">{{ icon_quotations() }}</span>
+                <span class="nav-label">Cotizaciones</span>
+              </a>
+              <a class="nav-item {{ 'active' if active_page=='summary' else '' }}" href="/portal/summary" data-tip="Resumen">
+                <span class="nav-icon" aria-hidden="true">{{ icon_summary() }}</span>
+                <span class="nav-label">Resumen</span>
+              </a>
+              <a class="nav-item {{ 'active' if active_page=='plan' else '' }}" href="/portal/plan" data-tip="Mi plan">
+                <span class="nav-icon" aria-hidden="true">{{ icon_summary() }}</span>
+                <span class="nav-label">Mi plan</span>
+              </a>
+            </div>
+          </div>
+        </nav>
 
         <div class="sidebar-bottom muted">
           MVP • sin WhatsApp todavía
@@ -260,7 +298,58 @@
               <path d="M4 19h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
             </svg>
           </button>
-          <div class="portal-topbar__title">
+
+          <!-- Issuer info -->
+          <div class="portal-topbar__issuer">
+            <div class="portal-topbar__issuer-name">{{ issuer_alias or 'ContaNeta' }}</div>
+            {% if issuer_rfc %}
+            <div class="portal-topbar__issuer-rfc">{{ issuer_rfc }}</div>
+            {% endif %}
+          </div>
+
+          <!-- Breadcrumb -->
+          <nav class="portal-topbar__breadcrumb" aria-label="Breadcrumb">
+            <a href="/portal/home" class="portal-topbar__breadcrumb-item">Inicio</a>
+            {% if active_page == 'issued' %}
+              <span class="portal-topbar__breadcrumb-sep" aria-hidden="true">›</span>
+              <span class="portal-topbar__breadcrumb-item portal-topbar__breadcrumb-item--current">Emitidas</span>
+            {% elif active_page == 'received' %}
+              <span class="portal-topbar__breadcrumb-sep" aria-hidden="true">›</span>
+              <span class="portal-topbar__breadcrumb-item portal-topbar__breadcrumb-item--current">Recibidas</span>
+            {% elif active_page == 'nomina' %}
+              <span class="portal-topbar__breadcrumb-sep" aria-hidden="true">›</span>
+              <span class="portal-topbar__breadcrumb-item portal-topbar__breadcrumb-item--current">Nómina</span>
+            {% elif active_page == 'quotations' %}
+              <span class="portal-topbar__breadcrumb-sep" aria-hidden="true">›</span>
+              <span class="portal-topbar__breadcrumb-item portal-topbar__breadcrumb-item--current">Cotizaciones</span>
+            {% elif active_page == 'create' %}
+              <span class="portal-topbar__breadcrumb-sep" aria-hidden="true">›</span>
+              <span class="portal-topbar__breadcrumb-item portal-topbar__breadcrumb-item--current">Generar factura</span>
+            {% elif active_page == 'clients' %}
+              <span class="portal-topbar__breadcrumb-sep" aria-hidden="true">›</span>
+              <span class="portal-topbar__breadcrumb-item portal-topbar__breadcrumb-item--current">Clientes</span>
+            {% elif active_page == 'providers' %}
+              <span class="portal-topbar__breadcrumb-sep" aria-hidden="true">›</span>
+              <span class="portal-topbar__breadcrumb-item portal-topbar__breadcrumb-item--current">Proveedores</span>
+            {% elif active_page == 'products' %}
+              <span class="portal-topbar__breadcrumb-sep" aria-hidden="true">›</span>
+              <span class="portal-topbar__breadcrumb-item portal-topbar__breadcrumb-item--current">Productos</span>
+            {% elif active_page == 'summary' %}
+              <span class="portal-topbar__breadcrumb-sep" aria-hidden="true">›</span>
+              <span class="portal-topbar__breadcrumb-item portal-topbar__breadcrumb-item--current">Resumen</span>
+            {% elif active_page == 'plan' %}
+              <span class="portal-topbar__breadcrumb-sep" aria-hidden="true">›</span>
+              <span class="portal-topbar__breadcrumb-item portal-topbar__breadcrumb-item--current">Mi plan</span>
+            {% elif active_page == 'config_sat' %}
+              <span class="portal-topbar__breadcrumb-sep" aria-hidden="true">›</span>
+              <span class="portal-topbar__breadcrumb-item portal-topbar__breadcrumb-item--current">FIEL SAT</span>
+            {% endif %}
+          </nav>
+        </div>
+
+        <div class="portal-topbar__center">
+          <!-- Título de página (oculto en desktop, visible en móvil) -->
+          <div class="portal-topbar__title portal-topbar__title--mobile">
             {% set _auto_icon = none %}
             {% if not page_icon %}
               {% if active_page=='home' %}{% set _auto_icon = icon_home() %}
@@ -273,9 +362,9 @@
               {% elif active_page=='products' %}{% set _auto_icon = icon_products() %}
               {% elif active_page=='quotations' %}{% set _auto_icon = icon_quotations() %}
               {% elif active_page=='summary' %}{% set _auto_icon = icon_summary() %}
+              {% elif active_page=='config_sat' %}{% set _auto_icon = icon_summary() %}
               {% endif %}
             {% endif %}
-
             {% if page_icon or _auto_icon %}
               <span class="portal-topbar__icon" aria-hidden="true">{{ (page_icon if page_icon else _auto_icon)|safe }}</span>
             {% endif %}
@@ -284,6 +373,18 @@
         </div>
 
         <div class="portal-topbar__right">
+          <!-- Acciones rápidas (contextuales) -->
+          <div class="portal-topbar__actions">
+            {% if active_page in ['issued', 'received', 'nomina'] %}
+              <button type="button" class="btn btn--sm btn--ghost portal-topbar__action" id="topbarSyncBtn" title="Sincronizar con SAT" aria-label="Sincronizar con SAT">
+                <span class="icon" aria-hidden="true">{{ icon_sync() }}</span>
+                <span class="portal-topbar__action-label">Sync SAT</span>
+              </button>
+            {% endif %}
+            {% block topbar_actions %}{% endblock %}
+          </div>
+
+          <!-- Menú usuario -->
           <div class="user-menu-wrap">
             <button type="button" class="topbar-user" id="userMenuBtn" aria-haspopup="menu" aria-expanded="false" title="{{ issuer_alias }}">
               <span class="topbar-user__dot" aria-hidden="true"></span>
@@ -294,12 +395,19 @@
             </button>
 
             <div class="user-menu" id="userMenu" role="menu" hidden>
-              {% if getattr(request.state, 'is_impersonating', False) %}
+              {% if is_impersonating|default(false) %}
               <form method="post" action="/admin/stop-impersonate" class="user-menu__impersonate-form">
                 <button type="submit" class="user-menu__item user-menu__item--action" role="menuitem">Volver a mi cuenta</button>
               </form>
               <div class="user-menu__sep" aria-hidden="true"></div>
               {% endif %}
+              <div class="user-menu__session-info" role="status">
+                <span class="user-menu__session-label">Sesión activa</span>
+                {% if last_access %}
+                <span class="user-menu__session-meta">Último acceso: {{ last_access }}</span>
+                {% endif %}
+              </div>
+              <div class="user-menu__sep" aria-hidden="true"></div>
               <a class="user-menu__item" role="menuitem" href="/portal/summary">Resumen</a>
               <a class="user-menu__item" role="menuitem" href="/portal/home">Inicio</a>
               <div class="user-menu__sep" aria-hidden="true"></div>
@@ -316,7 +424,9 @@
                 </button>
               </div>
               <div class="user-menu__sep" aria-hidden="true"></div>
-              <a class="user-menu__item" role="menuitem" href="/logout">Cerrar sesión</a>
+              <form method="get" action="/logout" class="user-menu__logout-form user-menu__logout-form--prominent" style="margin:0; padding:0;">
+                <button type="submit" class="user-menu__item user-menu__item--logout" role="menuitem">Cerrar sesión</button>
+              </form>
             </div>
           </div>
         </div>
@@ -324,7 +434,7 @@
 
       <main class="main">
         <div class="main-inner page">
-          {% if getattr(request.state, 'is_impersonating', False) %}
+          {% if is_impersonating|default(false) %}
           <div class="demo-banner" role="status">
             <span class="demo-banner__text">Estás viendo el portal como <strong>{{ issuer_alias }}</strong>.</span>
             <form method="post" action="/admin/stop-impersonate" style="display:inline;">
@@ -340,9 +450,33 @@
           {% endif %}
           <div id="toastStack" class="toast-stack" aria-live="polite" aria-relevant="additions"></div>
 
+          <!-- Demo UI hooks: ?demo=1 para mostrar botones de simulación -->
+          <div id="demoUiHooks" class="demo-ui-hooks" hidden aria-hidden="true">
+            <button type="button" class="btn btn--sm btn--secondary" data-demo-toast="success">Simular éxito</button>
+            <button type="button" class="btn btn--sm btn--secondary" data-demo-toast="error">Simular error</button>
+            <button type="button" class="btn btn--sm btn--secondary" data-demo-toast="info">Simular info</button>
+            <button type="button" class="btn btn--sm btn--secondary" data-demo-overlay">Simular overlay</button>
+          </div>
+
           {% block content %}{% endblock %}
+          <footer class="portal-footer" role="contentinfo">
+            Protegemos tu sesión con cookies seguras. No compartas tu acceso.
+            <a href="/portal/info">Seguridad e información</a>
+          </footer>
         </div>
       </main>
+
+      <!-- Modal de confirmación para acciones irreversibles (movido a body por script de modales) -->
+      <div id="portalConfirmModal" class="modal confirm-modal" role="dialog" aria-modal="true" aria-labelledby="portalConfirmTitle" hidden>
+        <div class="confirm-modal__card">
+          <h2 id="portalConfirmTitle" class="confirm-modal__title"></h2>
+          <p id="portalConfirmText" class="confirm-modal__text"></p>
+          <div class="confirm-modal__actions">
+            <button type="button" id="portalConfirmCancel" class="btn confirm-modal__btn--cancel">Cancelar</button>
+            <button type="button" id="portalConfirmOk" class="btn confirm-modal__btn--danger"></button>
+          </div>
+        </div>
+      </div>
 
       {% if show_welcome_popup %}
       <div id="welcomePopup" class="welcome-popup" role="dialog" aria-labelledby="welcomePopupTitle" aria-modal="true" hidden>
@@ -366,6 +500,7 @@
             <h2 id="pdfModalTitle" class="pdf-modal__title">Vista previa CFDI</h2>
             <div class="pdf-modal__actions">
               <a id="pdfModalDownload" class="btn btn--secondary" href="#" download target="_blank" rel="noopener">Descargar</a>
+              <a id="pdfModalNewTab" class="btn btn--secondary" href="#" target="_blank" rel="noopener" style="display:none;">Ver en otra pestaña</a>
               <button type="button" class="btn btn--primary" id="pdfModalClose">Cerrar</button>
             </div>
           </div>
@@ -396,10 +531,49 @@
 // Mover modales al final de body para que position:fixed use el viewport y no se escondan (evita ancestros con transform/overflow)
 (function () {
   document.addEventListener('DOMContentLoaded', function () {
-    document.querySelectorAll('.modal').forEach(function (el) {
+    document.querySelectorAll('.modal, .form-modal').forEach(function (el) {
       if (el.parentNode && el.parentNode !== document.body) document.body.appendChild(el);
     });
   });
+})();
+    </script>
+    <script>
+// Modal de confirmación para acciones irreversibles. Uso: window.portalConfirm({ title, message, confirmLabel, cancelLabel, onConfirm })
+(function () {
+  const modal = document.getElementById('portalConfirmModal');
+  const titleEl = document.getElementById('portalConfirmTitle');
+  const textEl = document.getElementById('portalConfirmText');
+  const cancelBtn = document.getElementById('portalConfirmCancel');
+  const okBtn = document.getElementById('portalConfirmOk');
+  if (!modal || !titleEl || !textEl || !cancelBtn || !okBtn) return;
+  var resolvePromise, onConfirmCb;
+  function close(ok) {
+    modal.hidden = true;
+    modal.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+    if (resolvePromise) resolvePromise(ok);
+    if (ok && onConfirmCb) onConfirmCb();
+    resolvePromise = null;
+    onConfirmCb = null;
+  }
+  cancelBtn.addEventListener('click', function () { close(false); });
+  okBtn.addEventListener('click', function () { close(true); });
+  modal.addEventListener('click', function (e) { if (e.target === modal) close(false); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !modal.hidden) close(false); });
+  window.portalConfirm = function (opts) {
+    var o = opts || {};
+    titleEl.textContent = o.title || 'Confirmar';
+    textEl.textContent = o.message || '¿Continuar?';
+    okBtn.textContent = o.confirmLabel || 'Confirmar';
+    cancelBtn.textContent = o.cancelLabel || 'Cancelar';
+    modal.hidden = false;
+    modal.removeAttribute('aria-hidden');
+    document.body.style.overflow = 'hidden';
+    onConfirmCb = typeof o.onConfirm === 'function' ? o.onConfirm : null;
+    return new Promise(function (resolve) {
+      resolvePromise = resolve;
+    });
+  };
 })();
     </script>
     <script>
@@ -419,6 +593,50 @@
     // Prevent body scroll when drawer is open
     document.body.classList.toggle('no-scroll', open);
   };
+
+  // Sync SAT button handler
+  const syncBtn = document.getElementById('topbarSyncBtn');
+  if (syncBtn) {
+    syncBtn.addEventListener('click', async function() {
+      if (syncBtn.disabled) return;
+      syncBtn.disabled = true;
+      const originalHTML = syncBtn.innerHTML;
+      syncBtn.innerHTML = '<span class="icon" aria-hidden="true">' + 
+        '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>' +
+        '</span><span class="portal-topbar__action-label">Sincronizando...</span>';
+      
+      try {
+        const res = await fetch('/api/sync-sat', { method: 'POST' });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok) {
+          window.portalToast && window.portalToast({
+            type: 'success',
+            title: 'Sincronización iniciada',
+            message: 'Las facturas se están sincronizando con el SAT. Esto puede tardar unos minutos.'
+          });
+        } else {
+          var rawMsg = (data && (data.error && data.error.message || data.detail || data.message)) || '';
+          var syncMsg = (typeof rawMsg === 'string' && /sin\s*informaci[oó]n|no\s*hay\s*datos|vac[ií]o|sin\s*cfdi|no\s*encontrad/i.test(rawMsg))
+            ? 'No se encontraron CFDI en este rango. Prueba otro periodo o sincroniza más tarde.'
+            : (window.portalApiErrorMessage ? window.portalApiErrorMessage(data) : (data.detail || data.message || 'No se pudo sincronizar. Revisa tu conexión e intenta de nuevo.'));
+          throw new Error(syncMsg);
+        }
+      } catch (err) {
+        window.portalToastError && window.portalToastError(err, 'No se pudo sincronizar', 'Revisa tu conexión o intenta en otro momento.');
+      } finally {
+        syncBtn.disabled = false;
+        syncBtn.innerHTML = originalHTML;
+      }
+    });
+  }
+
+  // Botón "Sincronizar con SAT" en empty states: mismo comportamiento que el de la topbar
+  document.addEventListener('click', function(e) {
+    const trigger = e.target && e.target.closest ? e.target.closest('[data-action="sync-sat"]') : null;
+    if (!trigger) return;
+    const btn = document.getElementById('topbarSyncBtn');
+    if (btn && !btn.disabled) btn.click();
+  });
 
   btn.addEventListener('click', () => {
     const open = !document.body.classList.contains('sidebar-open');
@@ -464,6 +682,74 @@
     document.body.classList.add('page-enter');
   });
 
+  // ============ Errores amigables: Título + detalle + acción recomendada ============
+  /** Extrae mensaje de error de respuestas API (solo el detalle, para usar en message del toast). */
+  window.portalApiErrorMessage = function(data) {
+    if (!data) return 'No se pudo completar la acción. Revisa e intenta de nuevo.';
+    var msg = (data.error && typeof data.error.message === 'string') ? data.error.message
+      : (typeof data.detail === 'string') ? data.detail
+      : (Array.isArray(data.detail)) ? (data.detail.join('; ') || 'Error de validación')
+      : String(data.detail || data.message || 'Error');
+    return msg.trim() || 'No se pudo completar la acción. Revisa e intenta de nuevo.';
+  };
+
+  /**
+   * Formato normalizado para toast de error: título corto + detalle (y opcional acción).
+   * Uso: portalToastApiError(data, { title: 'No pudimos guardar', action: 'Revisa RFC y CP e intenta de nuevo.' })
+   */
+  window.portalToastApiError = function(data, opts) {
+    var o = opts || {};
+    var title = o.title || 'No pudimos completar la acción';
+    var detail = window.portalApiErrorMessage ? window.portalApiErrorMessage(data) : (data && data.detail) || 'Revisa los datos e intenta de nuevo.';
+    var action = o.action || '';
+    var message = action ? (detail + ' ' + action) : detail;
+    if (window.portalToast) window.portalToast({ type: 'danger', title: title, message: message, timeout: 5000 });
+  };
+
+  /**
+   * Mensaje contextual cuando falla la carga de un listado (clientes, proveedores, etc.).
+   * Evita el genérico "No se pudo cargar" y da mensajes claros: sin sesión, perfil incompleto, o error de red.
+   * @param {Response} res - fetch response
+   * @param {object} data - body parseado (puede ser {} si falló el parse)
+   * @param {string} context - 'clientes' | 'proveedores' | 'productos' | 'cotizaciones' | 'emitidas' | 'recibidas'
+   */
+  window.portalListLoadErrorMessage = function(res, data, context) {
+    var status = res && res.status;
+    var detail = (data && (data.error && data.error.message || data.detail)) || '';
+    if (status === 401) {
+      return context === 'emitidas' || context === 'recibidas'
+        ? 'Inicia sesión o enlaza tus claves del SAT para ver tus facturas.'
+        : 'Inicia sesión o usa tu enlace de acceso para ver ' + (context === 'clientes' ? 'tus clientes.' : context === 'proveedores' ? 'tus proveedores.' : context === 'productos' ? 'tus productos.' : context === 'cotizaciones' ? 'tus cotizaciones.' : 'este contenido.');
+    }
+    if (status === 403) {
+      if (typeof detail === 'string' && detail.length > 0) return detail;
+      return 'Completa tu perfil fiscal para ver ' + (context === 'clientes' ? 'tus clientes.' : context === 'proveedores' ? 'tus proveedores.' : context === 'productos' ? 'tus productos.' : context === 'cotizaciones' ? 'tus cotizaciones.' : 'tus facturas.');
+    }
+    if (status === 404) return 'No encontrado.';
+    if (status >= 500) return 'El servidor no respondió. Intenta de nuevo en unos minutos.';
+    if (typeof detail === 'string' && detail.length > 0) return detail;
+    return 'Revisa tu conexión e intenta de nuevo.';
+  };
+
+  function sanitizeErrorMessage(msg) {
+    if (msg == null || typeof msg !== 'string') return 'Algo salió mal. Intenta de nuevo.';
+    const s = String(msg).trim();
+    if (s.length > 120) return 'Algo salió mal. Intenta de nuevo.';
+    if (/^\s*at\s+/m.test(s) || /\n\s+at\s+/m.test(s) || /Error:\s*.{100,}/.test(s)) return 'Algo salió mal. Intenta de nuevo.';
+    return s;
+  }
+  window.portalToastError = function(err, fallbackTitle, fallbackMessage) {
+    const title = fallbackTitle || 'No pudimos completar la acción';
+    const msg = err && (err.message || err.detail || (typeof err === 'string' ? err : null));
+    const detail = sanitizeErrorMessage(msg || fallbackMessage || 'Revisa los datos e intenta de nuevo.');
+    window.portalToast && window.portalToast({
+      type: 'danger',
+      title: title,
+      message: detail,
+      timeout: 5000
+    });
+  };
+
   // ============ Toast helper (window.portalToast) ============
   const toastStack = document.getElementById('toastStack');
   window.portalToast = (opts) => {
@@ -471,7 +757,8 @@
     const o = opts || {};
     const type = o.type || 'success'; // success | danger | warning
     const title = o.title || 'Listo';
-    const msg = o.message || '';
+    let msg = o.message || '';
+    if (type === 'danger' && msg) msg = sanitizeErrorMessage(msg);
     const defaultTtl = type === 'danger' ? 5000 : 3200;
     const ttl = Number.isFinite(o.ttl) ? o.ttl : defaultTtl;
 
@@ -479,10 +766,11 @@
     el.className = `toast toast--${type}`;
     el.setAttribute('role', 'status');
 
+    const escape = (s) => { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; };
     el.innerHTML = `
       <div>
-        <p class="toast__title">${title}</p>
-        ${msg ? `<p class="toast__msg">${msg}</p>` : ''}
+        <p class="toast__title">${escape(title)}</p>
+        ${msg ? `<p class="toast__msg">${escape(msg)}</p>` : ''}
       </div>
     `;
 
@@ -664,22 +952,56 @@
     if (pdfModalFrame) pdfModalFrame.classList.remove('pdf-modal__frame--hidden');
   }
 
+  var currentPdfUrl = '';
+  var currentPdfBlobUrl = null;
+
+  function setPdfModalError(msg) {
+    if (pdfModalError) {
+      pdfModalError.textContent = msg || 'No se pudo cargar el PDF.';
+      pdfModalError.hidden = false;
+      pdfModalError.classList.add('pdf-modal__error--visible');
+    }
+    if (pdfModalFrame) pdfModalFrame.classList.add('pdf-modal__frame--hidden');
+  }
+
   window.openPdfModal = (url) => {
     if (!pdfModal || !pdfModalFrame) return;
     clearPdfModalError();
-    var baseUrl = url.split('?')[0];
-    var params = url.includes('?') ? '?' + url.split('?').slice(1).join('?') : '';
-    // Evitar UUID con texto extra (ej. ".../pdf/6eb12xxx received" -> ".../pdf/6eb12xxx")
-    var parts = baseUrl.split('/');
-    var last = (parts[parts.length - 1] || '').trim().split(/\s+/)[0];
-    if (last) parts[parts.length - 1] = last;
-    baseUrl = parts.join('/');
-    var sep = params ? '&' : '?';
-    pdfModalFrame.src = baseUrl + params;
-    pdfModalDownload.href = baseUrl + (params ? params + sep : '?') + 'dl=1';
+    if (currentPdfBlobUrl) { URL.revokeObjectURL(currentPdfBlobUrl); currentPdfBlobUrl = null; }
+    var path = (url || '').split('?')[0];
+    var params = (url || '').includes('?') ? '?' + url.split('?').slice(1).join('?') : '';
+    var parts = path.replace(/^https?:\/\/[^/]+/, '').split('/').filter(Boolean);
+    if (parts.length) {
+      var last = (parts[parts.length - 1] || '').trim().split(/\s+/)[0];
+      if (last) parts[parts.length - 1] = last;
+    }
+    path = '/' + parts.join('/');
+    var fullUrl = path.startsWith('http') ? path : (window.location.origin + path + params);
+    currentPdfUrl = fullUrl;
+    pdfModalDownload.href = fullUrl + (fullUrl.indexOf('?') >= 0 ? '&' : '?') + 'dl=1';
+    var newTabBtn = document.getElementById('pdfModalNewTab');
+    if (newTabBtn) { newTabBtn.href = fullUrl; newTabBtn.style.display = ''; }
     pdfModal.setAttribute('aria-hidden', 'false');
     pdfModal.classList.add('pdf-modal--open');
     document.body.classList.add('no-scroll');
+
+    fetch(fullUrl, { credentials: 'same-origin' })
+      .then(function(res) {
+        if (!res.ok) throw new Error(res.status === 403 ? 'Sin permiso' : res.status === 404 ? 'No encontrado' : 'Error ' + res.status);
+        return res.blob();
+      })
+      .then(function(blob) {
+        if (currentPdfBlobUrl) URL.revokeObjectURL(currentPdfBlobUrl);
+        currentPdfBlobUrl = URL.createObjectURL(blob);
+        pdfModalFrame.src = currentPdfBlobUrl;
+      })
+      .catch(function(err) {
+        var msg = (err && err.message) ? err.message : '';
+        if (/rechazó la conexión|failed to fetch|NetworkError|Load failed/i.test(msg)) {
+          msg = 'No se pudo cargar el PDF. Usa «Ver en otra pestaña» o «Descargar» si el problema continúa.';
+        }
+        setPdfModalError(msg || 'No se pudo cargar el PDF.');
+      });
   };
 
   if (pdfModalFrame) {
@@ -708,6 +1030,9 @@
     pdfModal.setAttribute('aria-hidden', 'true');
     document.body.classList.remove('no-scroll');
     clearPdfModalError();
+    var newTabBtn = document.getElementById('pdfModalNewTab');
+    if (newTabBtn) newTabBtn.style.display = 'none';
+    if (currentPdfBlobUrl) { URL.revokeObjectURL(currentPdfBlobUrl); currentPdfBlobUrl = null; }
     setTimeout(() => { pdfModalFrame.src = 'about:blank'; }, 300);
   };
 
@@ -729,6 +1054,52 @@
     }
   });
 })();
+</script>
+<script src="/static/js/ui.js"></script>
+<script>
+  // Alias: uiToast usa timeout; portalToast acepta ttl y type 'info'
+  (function () {
+    if (window.portalToast && !window.portalToast._wrapped) {
+      var orig = window.portalToast;
+      window.portalToast = function (opts) {
+        if (opts && Number.isFinite(opts.timeout)) opts.ttl = opts.timeout;
+        if (opts && opts.type === 'error') opts.type = 'danger';
+        return orig(opts);
+      };
+      window.portalToast._wrapped = true;
+    }
+  })();
+  // Demo hooks: mostrar con ?demo=1
+  (function () {
+    var params = new URLSearchParams(window.location.search);
+    if (params.get('demo') !== '1') return;
+    var wrap = document.getElementById('demoUiHooks');
+    if (!wrap) return;
+    wrap.hidden = false;
+    wrap.setAttribute('aria-hidden', 'false');
+    wrap.addEventListener('click', function (e) {
+      var t = e.target && e.target.closest ? e.target.closest('[data-demo-toast]') : null;
+      if (t) {
+        var kind = t.getAttribute('data-demo-toast');
+        if (kind === 'success') window.uiToast && window.uiToast({ type: 'success', title: 'Guardado', message: 'Cliente guardado correctamente.', timeout: 3000 });
+        else if (kind === 'error') window.uiToast && window.uiToast({ type: 'danger', title: 'Error', message: 'No se pudo guardar. Intenta de nuevo.', timeout: 4000 });
+        else if (kind === 'info') window.uiToast && window.uiToast({ type: 'info', title: 'Información', message: 'Sincronización en segundo plano.', timeout: 3000 });
+        return;
+      }
+      var o = e.target && e.target.closest ? e.target.closest('[data-demo-overlay]') : null;
+      if (o && window.uiSuccessOverlay) {
+        window.uiSuccessOverlay({
+          title: 'Cotización creada',
+          message: 'Comparte el link con tu cliente para que la acepte o rechace.',
+          copyLink: window.location.origin + '/portal/quotations/123',
+          copyLabel: 'Copiar link',
+          actions: [
+            { label: 'Ver cotización', href: '/portal/quotations' }
+          ]
+        });
+      }
+    });
+  })();
 </script>
 <script>
   // Keep layout CSS vars in sync (used by form.css for the fixed bottom action bar)

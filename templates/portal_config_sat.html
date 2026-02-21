@@ -1,0 +1,105 @@
+{% extends "base_portal.html" %}
+{% set title = 'FIEL / Credenciales SAT' %}
+{% block content %}
+<header class="app-header" style="margin-bottom:18px;">
+  <div class="app-header__left">
+    <div class="app-title">Credenciales FIEL (SAT)</div>
+    <div class="app-subtitle muted">Sube tu certificado (.cer) y clave privada (.key) para sincronizar con el SAT.</div>
+  </div>
+</header>
+
+<div class="card p-20" style="margin-bottom:18px;">
+  <p class="muted" style="margin:0 0 16px; font-size:14px;">
+    Tus archivos se guardan de forma segura y se usan para sincronizar con SAT (descarga de CFDI). No se comparten con terceros.
+  </p>
+
+  <div class="sat-config-status" style="margin-bottom:20px;">
+    <p style="margin:0 0 6px; font-size:15px; font-weight:600;">
+      Estado: {% if has_fiel %}<span style="color:var(--success, #22c55e);">Configurado</span>{% else %}<span style="color:var(--muted);">No configurado</span>{% endif %}
+    </p>
+    {% if validation_at %}
+    <p style="margin:0; font-size:13px; color:var(--muted);">
+      Última validación: {{ validation_at }} —
+      {% if validation_ok %} <span style="color:var(--success, #22c55e);">✓ Válido</span>{% else %} <span style="color:var(--danger, #ef4444);">✗ Error</span>{% endif %}
+      {% if validation_message %} {{ validation_message }}{% endif %}
+    </p>
+    {% else %}
+    <p style="margin:0; font-size:13px; color:var(--muted);">Aún no se ha ejecutado una validación.</p>
+    {% endif %}
+  </div>
+
+  <form id="satCredForm" action="/portal/config/sat" method="post" enctype="multipart/form-data" class="sat-config-form">
+    <div class="field" style="margin-bottom:14px;">
+      <label class="label" for="fiel_cer">Certificado (.cer) *</label>
+      <input type="file" id="fiel_cer" name="fiel_cer" accept=".cer" required class="input" />
+    </div>
+    <div class="field" style="margin-bottom:14px;">
+      <label class="label" for="fiel_key">Clave privada (.key) *</label>
+      <input type="file" id="fiel_key" name="fiel_key" accept=".key" required class="input" />
+    </div>
+    <div class="field" style="margin-bottom:18px;">
+      <label class="label" for="fiel_password">Contraseña de la clave FIEL *</label>
+      <input type="password" id="fiel_password" name="fiel_password" autocomplete="off" class="input" placeholder="Contraseña" required />
+    </div>
+    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+      <button type="submit" class="btn btn-primary" id="satSaveBtn">Guardar y validar</button>
+      {% if has_fiel %}
+      <button type="button" class="btn btn--secondary" id="satValidateBtn">Solo validar</button>
+      {% endif %}
+    </div>
+  </form>
+</div>
+
+<p style="font-size:13px; color:var(--muted);">
+  <a href="/portal/home">Volver al inicio</a>
+</p>
+
+<div id="satValidateResult" class="card p-20" hidden style="margin-top:14px;" role="alert"></div>
+
+<script>
+(function(){
+  var form = document.getElementById('satCredForm');
+  var saveBtn = document.getElementById('satSaveBtn');
+  var validateBtn = document.getElementById('satValidateBtn');
+  var resultEl = document.getElementById('satValidateResult');
+
+  function showResult(ok, message) {
+    if (!resultEl) return;
+    resultEl.hidden = false;
+    resultEl.textContent = message;
+    resultEl.style.background = ok ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)';
+    resultEl.style.borderLeft = '4px solid ' + (ok ? 'var(--success,#22c55e)' : 'var(--danger,#ef4444)');
+  }
+
+  if (form) {
+    form.addEventListener('submit', function(e){
+      if (saveBtn) saveBtn.disabled = true;
+    });
+  }
+
+  if (validateBtn) {
+    validateBtn.addEventListener('click', function(){
+      validateBtn.disabled = true;
+      fetch('/portal/config/sat/validate', { method: 'POST', credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+        .then(function(r){ return r.json(); })
+        .then(function(data){
+          showResult(data.ok, data.ok ? '✓ ' + (data.message || 'FIEL válida.') : '✗ ' + (data.message || 'Error.'));
+          if (data.ok) window.location.reload();
+        })
+        .catch(function(){ showResult(false, 'Error de conexión.'); })
+        .finally(function(){ if (validateBtn) validateBtn.disabled = false; });
+    });
+  }
+
+  if (window.location.search.indexOf('saved=1') >= 0 && resultEl) {
+    fetch('/portal/config/sat/validate', { method: 'POST', credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+      .then(function(r){ return r.json(); })
+      .then(function(data){
+        showResult(data.ok, data.ok ? '✓ Guardado y validado: ' + (data.message || 'FIEL válida.') : '✓ Guardado. Validación: ' + (data.message || 'Error.'));
+        if (data.ok) window.location.replace('/portal/config/sat?valid=1');
+      })
+      .catch(function(){ showResult(true, 'Guardado correctamente. Ejecuta «Solo validar» para comprobar la FIEL.'); });
+  }
+})();
+</script>
+{% endblock %}

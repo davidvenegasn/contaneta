@@ -1,15 +1,19 @@
 # Portal HTML routes and helpers
+import json
 import os
+import stat
+import subprocess
 from datetime import datetime, date
 from typing import Optional
 
-from fastapi import APIRouter, Request, Depends, Query, HTTPException
-from fastapi.responses import HTMLResponse, Response, RedirectResponse
+from fastapi import APIRouter, Request, Depends, Query, HTTPException, File, UploadFile, Form
+from fastapi.responses import HTMLResponse, Response, RedirectResponse, JSONResponse
 
-from config import BASE_DIR, REGIMEN_LABEL_TO_CODE, COOKIE_DEMO_VIEW
+from config import BASE_DIR, REGIMEN_LABEL_TO_CODE, COOKIE_DEMO_VIEW, DB_PATH
 from database import db, db_rows, has_column
 from routers.deps import get_portal_issuer
 from services import quotations as quotations_service, session as session_service, audit, subscription as subscription_service, csrf as csrf_service
+from services.action_log import log_action
 
 # ----------------------------
 # Helpers
@@ -23,6 +27,20 @@ MESES_ES = (
 
 def ym_now():
     return datetime.now().strftime("%Y-%m")
+
+
+def _ensure_sat_credentials_validation_columns(conn) -> None:
+    """Añade columnas validation_* a sat_credentials si no existen."""
+    for col, col_type in [("validation_at", "TEXT"), ("validation_ok", "INTEGER"), ("validation_message", "TEXT")]:
+        if not has_column(conn, "sat_credentials", col):
+            conn.execute(f"ALTER TABLE sat_credentials ADD COLUMN {col} {col_type};")
+
+
+def _credentials_dir(issuer_id: int) -> str:
+    """Ruta al directorio storage/credentials/{issuer_id}/ (creado si no existe)."""
+    path = os.path.join(BASE_DIR, "storage", "credentials", str(issuer_id))
+    os.makedirs(path, mode=0o700, exist_ok=True)
+    return path
 
 
 def ym_to_label(ym: str) -> str:
@@ -98,12 +116,12 @@ def _get_month_totals(issuer_id: int, ym: str, direction: str) -> dict:
 
 def _safe_abs_path(path_like: str) -> str:
     """Resolve a stored path to an absolute path under BASE_DIR (prevent path traversal)."""
-    if not path_like:
+    if not path_like or not (path_like or "").strip():
         raise ValueError("XML no disponible")
-    p = path_like
+    p = path_like.strip()
     if not os.path.isabs(p):
         p = os.path.join(BASE_DIR, p)
-    abs_p = os.path.abspath(p)
+    abs_p = os.path.normpath(os.path.abspath(p))
     base = os.path.abspath(BASE_DIR)
     if not abs_p.startswith(base + os.sep):
         raise ValueError("Ruta XML inválida")
@@ -144,6 +162,7 @@ def get_portal_router(templates):
         title: str,
         extra: Optional[dict] = None,
         error: Optional[str] = None,
+        status_code: int = 200,
     ):
         has_nomina = False
         if issuer.get("id", 0) > 0:
@@ -176,7 +195,7 @@ def get_portal_router(templates):
         }
         if extra:
             payload.update(extra)
-        return templates.TemplateResponse(template_name, payload)
+        return templates.TemplateResponse(template_name, payload, status_code=status_code)
 
     def _portal_quotations_impl(request: Request, issuer: dict):
         try:
@@ -198,6 +217,11 @@ def get_portal_router(templates):
     @router.get("")
     def portal_root():
         return RedirectResponse(url="/portal/home", status_code=302)
+
+    @router.get("/login", response_class=RedirectResponse)
+    def portal_login_redirect():
+        """La ruta de login es /login, no /portal/login. Redirigir para evitar 404."""
+        return RedirectResponse(url="/login", status_code=302)
 
     @router.get("/set-demo-view", response_class=RedirectResponse)
     def portal_set_demo_view(request: Request, _: dict = Depends(get_portal_issuer)):
@@ -243,6 +267,7 @@ def get_portal_router(templates):
         data = session_service.verify_session(cookie_val)
         uid = data[0] if data and len(data) >= 1 else None
         audit.log(action="quotation_pdf", user_id=uid, issuer_id=issuer["id"], details=f"qid={qid}")
+        log_action(request, "quotation_pdf", issuer_id=issuer["id"], quotation_id=qid)
         try:
             pdf_bytes = quotations_service.build_quotation_pdf(quote)
         except Exception as e:
@@ -329,6 +354,60 @@ def get_portal_router(templates):
                     a["time_ago"] = "Hoy" if d == 0 else "Ayer" if d == 1 else f"Hace {d} días"
                 except (ValueError, TypeError):
                     a["time_ago"] = a.get("fecha_emision", "")[:10] or "-"
+            # Onboarding: RFC completo, FIEL/CSD, clientes, productos (para ocultar banner cuando todo está listo)
+            rfc_val = (issuer.get("rfc") or "").strip().upper()
+            razon = (issuer.get("razon_social") or "").strip()
+            rfc_configured = bool(rfc_val and rfc_val != "PENDIENTE" and razon)
+            has_fiel = bool(
+                db_rows("SELECT 1 FROM sat_credentials WHERE issuer_id = ? LIMIT 1", (issuer_id,))
+            )
+            cust_count = db_rows("SELECT COUNT(*) AS n FROM customer_profiles WHERE issuer_id = ?", (issuer_id,))
+            prod_count = db_rows("SELECT COUNT(*) AS n FROM issuer_products WHERE issuer_id = ?", (issuer_id,))
+            any_issued = db_rows(
+                "SELECT 1 FROM sat_cfdi WHERE issuer_id = ? AND direction = 'issued' AND (total IS NULL OR total >= 0.01) LIMIT 1",
+                (issuer_id,),
+            )
+            onboarding = {
+                "rfc_configured": rfc_configured,
+                "has_fiel": has_fiel,
+                "count_customers": cust_count[0]["n"] if cust_count else 0,
+                "count_products": prod_count[0]["n"] if prod_count else 0,
+                "has_any_issued": bool(any_issued),
+            }
+            # Listas para Factura rápida (dropdowns y datos precargados)
+            quick_customers = db_rows(
+                """
+                SELECT id, rfc, legal_name, zip, tax_system, email, alias
+                FROM customer_profiles WHERE issuer_id = ? ORDER BY COALESCE(alias, ''), rfc
+                """,
+                (issuer_id,),
+            ) or []
+            quick_products = db_rows(
+                """
+                SELECT id, description, product_key, unit_key, unit_price, iva_rate, created_at
+                FROM issuer_products WHERE issuer_id = ? ORDER BY description
+                """,
+                (issuer_id,),
+            ) or []
+
+            def _serialize_row(r):
+                d = dict(r) if hasattr(r, "keys") else r
+                out = {}
+                for k, v in d.items():
+                    if hasattr(v, "isoformat"):
+                        out[k] = v.isoformat()
+                    elif hasattr(v, "__float__") and not isinstance(v, (int, bool)):
+                        try:
+                            out[k] = float(v)
+                        except (TypeError, ValueError):
+                            out[k] = v
+                    else:
+                        out[k] = v
+                return out
+
+            quick_customers_json = json.dumps([_serialize_row(r) for r in quick_customers])
+            quick_products_json = json.dumps([_serialize_row(r) for r in quick_products])
+
             return _render_portal(
                 request,
                 issuer=issuer,
@@ -336,6 +415,7 @@ def get_portal_router(templates):
                 active_page="home",
                 title="Inicio",
                 extra={
+                    "issuer_id": issuer_id,
                     "count_issued": count_issued[0]["n"] if count_issued else 0,
                     "count_received": count_received[0]["n"] if count_received else 0,
                     "activities": activities,
@@ -346,6 +426,9 @@ def get_portal_router(templates):
                     "iva_recibido_neto": iva_recibido_neto,
                     "iva_retenciones": iva_retenciones,
                     "iva_pagado": iva_pagado,
+                    "onboarding": onboarding,
+                    "quick_customers_json": quick_customers_json,
+                    "quick_products_json": quick_products_json,
                 },
             )
         except Exception as e:
@@ -480,10 +563,9 @@ def get_portal_router(templates):
             if not ym:
                 ym = ym_now()
             rows = db_rows("""
-                SELECT uuid, fecha_emision, rfc_receptor, nombre_receptor, total, moneda, status, xml_path,
-                       serie, folio, concepto, forma_pago, metodo_pago, uso_cfdi, subtotal, descuento, impuestos,
-                       COALESCE(retenciones, 0) AS retenciones,
-                       tipo_comprobante, xml_status
+                SELECT uuid, fecha_emision, rfc_receptor, nombre_receptor, concepto, total, moneda,
+                       COALESCE(impuestos, 0) AS impuestos, COALESCE(retenciones, 0) AS retenciones,
+                       metodo_pago, status, xml_path
                 FROM sat_cfdi
                 WHERE issuer_id = ? AND direction = 'issued' AND fecha_emision IS NOT NULL
                   AND substr(fecha_emision,1,7) = ? AND (total IS NULL OR total >= 0.01)
@@ -538,10 +620,9 @@ def get_portal_router(templates):
             if not ym:
                 ym = ym_now()
             rows = db_rows("""
-                SELECT uuid, fecha_emision, rfc_emisor, nombre_emisor, total, moneda, status, xml_path,
-                       serie, folio, concepto, forma_pago, metodo_pago, uso_cfdi, subtotal, descuento, impuestos,
-                       COALESCE(retenciones, 0) AS retenciones,
-                       tipo_comprobante, xml_status
+                SELECT uuid, fecha_emision, rfc_emisor, nombre_emisor, concepto, total, moneda,
+                       COALESCE(impuestos, 0) AS impuestos, COALESCE(retenciones, 0) AS retenciones,
+                       metodo_pago, status, xml_path
                 FROM sat_cfdi
                 WHERE issuer_id = ? AND direction = 'received' AND fecha_emision IS NOT NULL
                   AND substr(fecha_emision,1,7) = ? AND total IS NOT NULL AND total >= 0.01
@@ -675,6 +756,7 @@ def get_portal_router(templates):
             entity="cfdi",
             entity_id=u,
         )
+        log_action(request, "download_xml", issuer_id=issuer["id"], entity_id=u[:36])
         with open(abs_path, "rb") as f:
             xml_bytes = f.read()
         return Response(
@@ -714,6 +796,7 @@ def get_portal_router(templates):
             entity="cfdi",
             entity_id=uuid_clean,
         )
+        log_action(request, "download_pdf", issuer_id=issuer["id"], entity_id=uuid_clean[:36])
         try:
             from cfdi_pdf import parse_cfdi_xml, build_pdf
             data = parse_cfdi_xml(abs_path)
@@ -745,7 +828,15 @@ def get_portal_router(templates):
     def portal_cfdi_detail_issued(request: Request, uuid: str, issuer: dict = Depends(get_portal_issuer)):
         cfdi = _get_cfdi_by_uuid(issuer["id"], uuid, "issued")
         if not cfdi:
-            raise HTTPException(status_code=404, detail="CFDI no encontrado")
+            return _render_portal(
+                request,
+                issuer=issuer,
+                template_name="portal_cfdi_detail.html",
+                active_page="issued",
+                title="CFDI no encontrado",
+                extra={"cfdi": None, "direction": "issued", "error": "not_found", "requested_uuid": uuid},
+                status_code=404,
+            )
         uid = getattr(request.state, "user_id", None) or 0
         audit.log(
             action="cfdi_view",
@@ -769,7 +860,15 @@ def get_portal_router(templates):
     def portal_cfdi_detail_received(request: Request, uuid: str, issuer: dict = Depends(get_portal_issuer)):
         cfdi = _get_cfdi_by_uuid(issuer["id"], uuid, "received")
         if not cfdi:
-            raise HTTPException(status_code=404, detail="CFDI no encontrado")
+            return _render_portal(
+                request,
+                issuer=issuer,
+                template_name="portal_cfdi_detail.html",
+                active_page="received",
+                title="CFDI no encontrado",
+                extra={"cfdi": None, "direction": "received", "error": "not_found", "requested_uuid": uuid},
+                status_code=404,
+            )
         uid = getattr(request.state, "user_id", None) or 0
         audit.log(
             action="cfdi_view",
@@ -893,5 +992,151 @@ def get_portal_router(templates):
                 "canceled": canceled == "1",
             },
         )
+
+    @router.get("/info", response_class=HTMLResponse)
+    def portal_info(request: Request, issuer: dict = Depends(get_portal_issuer)):
+        return _render_portal(
+            request,
+            issuer=issuer,
+            template_name="portal_info.html",
+            active_page="info",
+            title="Seguridad e información",
+        )
+
+    # ---------- SAT credentials (FIEL) upload & validate ----------
+    MAX_FIEL_SIZE = 2 * 1024 * 1024  # 2 MB
+    ALLOWED_CER = (".cer",)
+    ALLOWED_KEY = (".key",)
+
+    @router.get("/config/sat", response_class=HTMLResponse)
+    def portal_config_sat(request: Request, issuer: dict = Depends(get_portal_issuer)):
+        issuer_id = issuer["id"]
+        conn = db()
+        try:
+            _ensure_sat_credentials_validation_columns(conn)
+            row = conn.execute(
+                "SELECT fiel_cer_path, fiel_key_path, validation_at, validation_ok, validation_message FROM sat_credentials WHERE issuer_id = ?",
+                (issuer_id,),
+            ).fetchone()
+        finally:
+            conn.close()
+        cred = dict(row) if row else None
+        return _render_portal(
+            request,
+            issuer=issuer,
+            template_name="portal_config_sat.html",
+            active_page="config_sat",
+            title="FIEL / Credenciales SAT",
+            extra={
+                "sat_cred": cred,
+                "has_fiel": cred is not None,
+                "validation_at": cred.get("validation_at") if cred else None,
+                "validation_ok": cred.get("validation_ok") if cred else None,
+                "validation_message": cred.get("validation_message") if cred else None,
+            },
+        )
+
+    @router.post("/config/sat")
+    async def portal_config_sat_save(
+        request: Request,
+        issuer: dict = Depends(get_portal_issuer),
+        fiel_cer: UploadFile = File(...),
+        fiel_key: UploadFile = File(...),
+        fiel_password: str = Form(""),
+    ):
+        issuer_id = issuer["id"]
+        # Validar extensiones
+        cer_name = (fiel_cer.filename or "").lower()
+        key_name = (fiel_key.filename or "").lower()
+        if not any(cer_name.endswith(e) for e in ALLOWED_CER):
+            raise HTTPException(status_code=400, detail="El archivo del certificado debe ser .cer")
+        if not any(key_name.endswith(e) for e in ALLOWED_KEY):
+            raise HTTPException(status_code=400, detail="El archivo de la clave debe ser .key")
+        if not (fiel_password and fiel_password.strip()):
+            raise HTTPException(status_code=400, detail="La contraseña FIEL es obligatoria")
+        cer_body = await fiel_cer.read()
+        key_body = await fiel_key.read()
+        if len(cer_body) > MAX_FIEL_SIZE or len(key_body) > MAX_FIEL_SIZE:
+            raise HTTPException(status_code=400, detail="Cada archivo debe medir como máximo 2 MB")
+        cred_dir = _credentials_dir(issuer_id)
+        cer_path = os.path.join(cred_dir, "fiel.cer")
+        key_path = os.path.join(cred_dir, "fiel.key")
+        rel_cer = f"storage/credentials/{issuer_id}/fiel.cer"
+        rel_key = f"storage/credentials/{issuer_id}/fiel.key"
+        with open(cer_path, "wb") as f:
+            f.write(cer_body)
+        with open(key_path, "wb") as f:
+            f.write(key_body)
+        os.chmod(cer_path, stat.S_IRUSR | stat.S_IWUSR)
+        os.chmod(key_path, stat.S_IRUSR | stat.S_IWUSR)
+        password = fiel_password.strip()
+        conn = db()
+        try:
+            _ensure_sat_credentials_validation_columns(conn)
+            conn.execute(
+                """
+                INSERT INTO sat_credentials (issuer_id, fiel_cer_path, fiel_key_path, fiel_key_password, updated_at)
+                VALUES (?, ?, ?, ?, datetime('now'))
+                ON CONFLICT(issuer_id) DO UPDATE SET
+                    fiel_cer_path = excluded.fiel_cer_path,
+                    fiel_key_path = excluded.fiel_key_path,
+                    fiel_key_password = excluded.fiel_key_password,
+                    updated_at = datetime('now')
+                """,
+                (issuer_id, rel_cer, rel_key, password),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+        if request.headers.get("accept", "").find("application/json") >= 0:
+            return JSONResponse({"ok": True, "message": "Credenciales guardadas."})
+        return RedirectResponse(url="/portal/config/sat?saved=1", status_code=302)
+
+    @router.post("/config/sat/validate", response_class=JSONResponse)
+    def portal_config_sat_validate(request: Request, issuer: dict = Depends(get_portal_issuer)):
+        issuer_id = issuer["id"]
+        php_script = os.path.join(BASE_DIR, "sat_sync", "check_fiel.php")
+        if not os.path.isfile(php_script):
+            return JSONResponse(
+                {"ok": False, "message": "No se encontró el script de validación (sat_sync/check_fiel.php)."},
+                status_code=500,
+            )
+        env = os.environ.copy()
+        env["APP_DB_PATH"] = DB_PATH
+        try:
+            proc = subprocess.run(
+                ["php", php_script, str(issuer_id)],
+                cwd=BASE_DIR,
+                capture_output=True,
+                text=True,
+                timeout=30,
+                env=env,
+            )
+        except subprocess.TimeoutExpired:
+            return JSONResponse({"ok": False, "message": "Validación tardó demasiado."}, status_code=500)
+        except FileNotFoundError:
+            return JSONResponse({"ok": False, "message": "PHP no está instalado o no está en el PATH."}, status_code=500)
+        stderr = (proc.stderr or "").strip()
+        stdout = (proc.stdout or "").strip()
+        ok = proc.returncode == 0
+        if ok:
+            message = stdout or "FIEL válida."
+        else:
+            message = stderr or "Error al validar la FIEL."
+        conn = db()
+        try:
+            _ensure_sat_credentials_validation_columns(conn)
+            if has_column(conn, "sat_credentials", "validation_at"):
+                conn.execute(
+                    """
+                    UPDATE sat_credentials SET validation_at = datetime('now'), validation_ok = ?, validation_message = ?
+                    WHERE issuer_id = ?
+                    """,
+                    (1 if ok else 0, message[:500], issuer_id),
+                )
+                conn.commit()
+        finally:
+            conn.close()
+        return JSONResponse({"ok": ok, "message": message})
 
     return router
