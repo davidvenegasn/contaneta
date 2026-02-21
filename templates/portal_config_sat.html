@@ -1,89 +1,205 @@
 {% extends "base_portal.html" %}
-{% set title = 'FIEL / Credenciales SAT' %}
+{% set title = 'Conectar SAT' %}
 {% block content %}
-<header class="app-header" style="margin-bottom:18px;">
+<header class="app-header app-header--with-back fiel-header">
   <div class="app-header__left">
-    <div class="app-title">Credenciales FIEL (SAT)</div>
-    <div class="app-subtitle muted">Sube tu certificado (.cer) y clave privada (.key) para sincronizar con el SAT.</div>
+    <a href="/portal/home" class="btn btn--ghost btn--sm app-header__back" style="text-decoration:none;">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="18" height="18"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+      Inicio
+    </a>
+    <div>
+      <h1 class="fiel-title">Conectar SAT</h1>
+      <p class="fiel-subtitle muted">Sube tu certificado (.cer) y tu clave privada (.key) para sincronizar CFDI.</p>
+    </div>
   </div>
 </header>
 
-<div class="card p-20" style="margin-bottom:18px;">
-  <p class="muted" style="margin:0 0 16px; font-size:14px;">
-    Tus archivos se guardan con almacenamiento seguro (permisos restringidos en servidor) y se usan solo para sincronizar con SAT (descarga de CFDI). No se comparten con terceros.
-  </p>
+<nav class="portal-breadcrumb" aria-label="Breadcrumb" style="margin-bottom:var(--space-4);">
+  <a href="/portal/home">Inicio</a>
+  <span aria-hidden="true">›</span>
+  <span>Conectar SAT</span>
+</nav>
 
-  <div class="sat-config-status" style="margin-bottom:20px;">
-    <p style="margin:0 0 6px; font-size:15px; font-weight:600;">
-      Estado: {% if has_fiel %}<span style="color:var(--success, #22c55e);">Configurado</span>{% else %}<span style="color:var(--muted);">No configurado</span>{% endif %}
-    </p>
-    {% if validation_at %}
-    <p style="margin:0; font-size:13px; color:var(--muted);">
-      Última validación: {{ validation_at }} —
-      {% if validation_ok %} <span style="color:var(--success, #22c55e);">✓ Válido</span>{% else %} <span style="color:var(--danger, #ef4444);">✗ Error</span>{% endif %}
-      {% if validation_message %} {{ validation_message }}{% endif %}
-    </p>
-    {% else %}
-    <p style="margin:0; font-size:13px; color:var(--muted);">Aún no se ha ejecutado una validación.</p>
-    {% endif %}
+<div class="fiel-layout">
+  <div class="fiel-main">
+    <div class="card fiel-card">
+      <div class="fiel-stepper">
+        <div class="fiel-stepper__step fiel-stepper__step--active">
+          <span class="fiel-stepper__num">1</span>
+          <span class="fiel-stepper__label">Subir archivos</span>
+        </div>
+        <div class="fiel-stepper__step">
+          <span class="fiel-stepper__num">2</span>
+          <span class="fiel-stepper__label">Contraseña</span>
+        </div>
+        <div class="fiel-stepper__step">
+          <span class="fiel-stepper__num">3</span>
+          <span class="fiel-stepper__label">Guardar y validar</span>
+        </div>
+      </div>
+
+      <form id="satCredForm" action="/portal/config/sat" method="post" enctype="multipart/form-data" class="fiel-form">
+        <div class="fiel-dropzone-wrap">
+          <label class="fiel-dropzone" id="dropzoneCer" for="fiel_cer">
+            <input type="file" id="fiel_cer" name="fiel_cer" accept=".cer" class="fiel-dropzone__input" required />
+            <span class="fiel-dropzone__icon" aria-hidden="true">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="32" height="32"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            </span>
+            <span class="fiel-dropzone__text" id="dropzoneCerText">Arrastra o selecciona tu certificado (.cer)</span>
+            <span class="fiel-dropzone__file" id="dropzoneCerFile" hidden></span>
+            <button type="button" class="btn btn--sm btn--ghost fiel-dropzone__change" id="dropzoneCerChange" hidden>Cambiar</button>
+          </label>
+          <label class="fiel-dropzone" id="dropzoneKey" for="fiel_key">
+            <input type="file" id="fiel_key" name="fiel_key" accept=".key" class="fiel-dropzone__input" required />
+            <span class="fiel-dropzone__icon" aria-hidden="true">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="32" height="32"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L15.5 13.5l-3-3 3-3z"/></svg>
+            </span>
+            <span class="fiel-dropzone__text" id="dropzoneKeyText">Arrastra o selecciona tu clave privada (.key)</span>
+            <span class="fiel-dropzone__file" id="dropzoneKeyFile" hidden></span>
+            <button type="button" class="btn btn--sm btn--ghost fiel-dropzone__change" id="dropzoneKeyChange" hidden>Cambiar</button>
+          </label>
+        </div>
+
+        <div class="fiel-field">
+          <label class="fiel-label" for="fiel_password">Contraseña de la clave FIEL *</label>
+          <div class="fiel-password-wrap">
+            <input type="password" id="fiel_password" name="fiel_password" autocomplete="off" class="input fiel-password-input" placeholder="Contraseña" required />
+            <button type="button" class="fiel-password-toggle" id="fielPasswordToggle" aria-label="Mostrar contraseña">
+              <svg class="icon fiel-password-toggle__show" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="20" height="20"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              <svg class="icon fiel-password-toggle__hide" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="20" height="20" hidden><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+            </button>
+          </div>
+          <p class="fiel-helper">La contraseña que te entregó el SAT al emitir tu FIEL.</p>
+        </div>
+
+        <div class="fiel-actions">
+          <button type="submit" class="btn btn-primary fiel-submit" id="satSaveBtn">
+            <span class="fiel-submit__text">Guardar y validar</span>
+            <span class="fiel-submit__spinner" id="satSaveSpinner" hidden aria-hidden="true"></span>
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <section class="fiel-privacy card p-20">
+      <h3 class="fiel-privacy__title">Privacidad y seguridad</h3>
+      <p class="fiel-privacy__text muted">Tus archivos se guardan con permisos restringidos en servidor y solo se usan para sincronizar con SAT.</p>
+    </section>
   </div>
 
-  <form id="satCredForm" action="/portal/config/sat" method="post" enctype="multipart/form-data" class="sat-config-form">
-    <div class="field" style="margin-bottom:14px;">
-      <label class="label" for="fiel_cer">Certificado (.cer) *</label>
-      <input type="file" id="fiel_cer" name="fiel_cer" accept=".cer" required class="input" />
-    </div>
-    <div class="field" style="margin-bottom:14px;">
-      <label class="label" for="fiel_key">Clave privada (.key) *</label>
-      <input type="file" id="fiel_key" name="fiel_key" accept=".key" required class="input" />
-    </div>
-    <div class="field" style="margin-bottom:18px;">
-      <label class="label" for="fiel_password">Contraseña de la clave FIEL *</label>
-      <input type="password" id="fiel_password" name="fiel_password" autocomplete="off" class="input" placeholder="Contraseña" required />
-    </div>
-    <div style="display:flex; gap:10px; flex-wrap:wrap;">
-      <button type="submit" class="btn btn-primary" id="satSaveBtn">Guardar y validar</button>
+  <aside class="fiel-sidebar">
+    <div class="card fiel-status-card">
+      <h3 class="fiel-status__title">Estado</h3>
+      <p class="fiel-status__value">
+        {% if has_fiel %}<span class="fiel-status-badge fiel-status-badge--ok">Configurado</span>{% else %}<span class="fiel-status-badge fiel-status-badge--muted">No configurado</span>{% endif %}
+      </p>
+      {% if validation_at %}
+      <p class="fiel-status__meta muted">Última validación: {{ validation_at }}</p>
+      <p class="fiel-status__result">{% if validation_ok %}<span style="color:var(--success); font-weight:600;">FIEL válida ✓</span>{% else %}<span style="color:var(--danger); font-weight:600;">Error</span>{% if validation_message %}<br/><span class="fiel-status__error-text">{{ validation_message }}</span>{% endif %}{% endif %}</p>
+      {% else %}
+      <p class="fiel-status__meta muted">Sube los archivos y guarda para validar.</p>
+      {% endif %}
       {% if has_fiel %}
-      <button type="button" class="btn btn--secondary" id="satValidateBtn">Solo validar</button>
+      <button type="button" class="btn btn--sm btn--ghost fiel-status__btn" id="satValidateBtn">Validar de nuevo</button>
+      <button type="button" class="btn btn--sm btn--ghost fiel-status__btn" id="satReplaceBtn">Reemplazar archivos</button>
       {% endif %}
     </div>
-  </form>
+  </aside>
 </div>
 
-<p style="font-size:13px; color:var(--muted);">
-  <a href="/portal/home">Volver al inicio</a>
-</p>
+<div id="satValidateResult" class="fiel-result card" hidden role="alert">
+  <div id="satValidateResultContent"></div>
+</div>
 
-<div id="satValidateResult" class="card p-20" hidden style="margin-top:14px;" role="alert"></div>
+<div id="fielReplaceModal" class="modal" hidden aria-hidden="true" role="dialog">
+  <div class="modal__backdrop" data-close="true"></div>
+  <div class="modal__panel">
+    <div class="modal__head">
+      <h2 class="modal__title">Reemplazar archivos FIEL</h2>
+      <button type="button" class="icon-btn" data-close="true" aria-label="Cerrar"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+    </div>
+    <div class="modal__body">
+      <p class="muted">Se subirán nuevos archivos .cer y .key. Deberás ingresar la contraseña de la nueva clave. ¿Continuar?</p>
+    </div>
+    <div class="modal__foot">
+      <button type="button" class="btn btn--ghost" data-close="true">Cancelar</button>
+      <button type="button" class="btn btn-primary" id="fielReplaceConfirm">Continuar</button>
+    </div>
+  </div>
+</div>
 
 <script>
 (function(){
   var form = document.getElementById('satCredForm');
   var saveBtn = document.getElementById('satSaveBtn');
+  var saveSpinner = document.getElementById('satSaveSpinner');
   var validateBtn = document.getElementById('satValidateBtn');
   var resultEl = document.getElementById('satValidateResult');
+  var resultContent = document.getElementById('satValidateResultContent');
+  var replaceBtn = document.getElementById('satReplaceBtn');
+  var replaceModal = document.getElementById('fielReplaceModal');
+  var fielCer = document.getElementById('fiel_cer');
+  var fielKey = document.getElementById('fiel_key');
 
   function showResult(ok, message) {
-    if (!resultEl) return;
+    if (!resultEl || !resultContent) return;
     resultEl.hidden = false;
-    resultEl.textContent = message;
-    resultEl.style.background = ok ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)';
-    resultEl.style.borderLeft = '4px solid ' + (ok ? 'var(--success,#22c55e)' : 'var(--danger,#ef4444)');
+    resultContent.innerHTML = '<p style="margin:0;">' + (ok ? '<span style="color:var(--success);">✓</span> ' : '<span style="color:var(--danger);">✗</span> ') + message + '</p>';
+    resultEl.style.background = ok ? 'var(--success-bg)' : 'var(--danger-bg)';
+    resultEl.style.borderLeft = '4px solid ' + (ok ? 'var(--success)' : 'var(--danger)');
+  }
+
+  function updateDropzone(inputId, textId, fileId, changeId) {
+    var input = document.getElementById(inputId);
+    var text = document.getElementById(textId);
+    var fileSpan = document.getElementById(fileId);
+    var changeBtn = document.getElementById(changeId);
+    if (!input || !text) return;
+    function update() {
+      var name = input.files && input.files[0] ? input.files[0].name : '';
+      if (name) {
+        text.hidden = true;
+        if (fileSpan) { fileSpan.textContent = name; fileSpan.hidden = false; }
+        if (changeBtn) changeBtn.hidden = false;
+      } else {
+        text.hidden = false;
+        if (fileSpan) fileSpan.hidden = true;
+        if (changeBtn) changeBtn.hidden = true;
+      }
+    }
+    input.addEventListener('change', update);
+    if (changeBtn) changeBtn.addEventListener('click', function(e){ e.preventDefault(); input.click(); });
+    update();
+  }
+  updateDropzone('fiel_cer', 'dropzoneCerText', 'dropzoneCerFile', 'dropzoneCerChange');
+  updateDropzone('fiel_key', 'dropzoneKeyText', 'dropzoneKeyFile', 'dropzoneKeyChange');
+
+  var passInput = document.getElementById('fiel_password');
+  var passToggle = document.getElementById('fielPasswordToggle');
+  if (passToggle && passInput) {
+    passToggle.addEventListener('click', function() {
+      var show = passInput.type === 'password';
+      passInput.type = show ? 'text' : 'password';
+      passToggle.setAttribute('aria-label', show ? 'Ocultar contraseña' : 'Mostrar contraseña');
+      passToggle.querySelector('.fiel-password-toggle__show').hidden = !show;
+      passToggle.querySelector('.fiel-password-toggle__hide').hidden = show;
+    });
   }
 
   if (form) {
-    form.addEventListener('submit', function(e){
-      if (saveBtn) saveBtn.disabled = true;
+    form.addEventListener('submit', function() {
+      if (saveBtn) { saveBtn.disabled = true; saveBtn.querySelector('.fiel-submit__text').textContent = 'Validando…'; }
+      if (saveSpinner) saveSpinner.hidden = false;
     });
   }
 
   if (validateBtn) {
-    validateBtn.addEventListener('click', function(){
+    validateBtn.addEventListener('click', function() {
       validateBtn.disabled = true;
       fetch('/portal/config/sat/validate', { method: 'POST', credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
         .then(function(r){ return r.json(); })
         .then(function(data){
-          showResult(data.ok, data.ok ? '✓ ' + (data.message || 'FIEL válida.') : '✗ ' + (data.message || 'Error.'));
+          showResult(data.ok, data.ok ? (data.message || 'FIEL válida.') : (data.message || 'Error.'));
           if (data.ok) window.location.reload();
         })
         .catch(function(){ showResult(false, 'Error de conexión.'); })
@@ -92,13 +208,30 @@
   }
 
   if (window.location.search.indexOf('saved=1') >= 0 && resultEl) {
-    fetch('/portal/config/sat/validate', { method: 'POST', credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
-      .then(function(r){ return r.json(); })
-      .then(function(data){
-        showResult(data.ok, data.ok ? '✓ Guardado y validado: ' + (data.message || 'FIEL válida.') : '✓ Guardado. Validación: ' + (data.message || 'Error.'));
-        if (data.ok) window.location.replace('/portal/config/sat?valid=1');
-      })
-      .catch(function(){ showResult(true, 'Guardado correctamente. Ejecuta «Solo validar» para comprobar la FIEL.'); });
+    resultEl.hidden = false;
+    resultContent.innerHTML = '<p style="margin:0;">Credenciales guardadas. El estado de validación se muestra en el panel Estado (FIEL válida ✓ o mensaje de error).</p>';
+    resultEl.style.background = 'var(--surface-hover)';
+    resultEl.style.borderLeft = '4px solid var(--primary)';
+  }
+
+  if (replaceBtn && replaceModal) {
+    replaceBtn.addEventListener('click', function() {
+      replaceModal.hidden = false;
+      replaceModal.setAttribute('aria-hidden', 'false');
+    });
+    replaceModal.querySelectorAll('[data-close="true"]').forEach(function(el) {
+      el.addEventListener('click', function() {
+        replaceModal.hidden = true;
+        replaceModal.setAttribute('aria-hidden', 'true');
+      });
+    });
+    var replaceConfirm = document.getElementById('fielReplaceConfirm');
+    if (replaceConfirm) {
+      replaceConfirm.addEventListener('click', function() {
+        replaceModal.hidden = true;
+        document.getElementById('dropzoneCer').scrollIntoView({ behavior: 'smooth' });
+      });
+    }
   }
 })();
 </script>

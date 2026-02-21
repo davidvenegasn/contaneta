@@ -45,6 +45,47 @@ def _credentials_dir(issuer_id: int) -> str:
     return path
 
 
+def _run_fiel_validation(issuer_id: int) -> tuple[bool, str]:
+    """Ejecuta check_fiel.php para issuer_id, actualiza sat_credentials y devuelve (ok, message)."""
+    php_script = os.path.join(BASE_DIR, "sat_sync", "check_fiel.php")
+    if not os.path.isfile(php_script):
+        return False, "No se encontró el script de validación."
+    env = os.environ.copy()
+    env["APP_DB_PATH"] = str(DB_PATH)
+    try:
+        proc = subprocess.run(
+            ["php", php_script, str(issuer_id)],
+            cwd=BASE_DIR,
+            capture_output=True,
+            text=True,
+            timeout=30,
+            env=env,
+        )
+    except subprocess.TimeoutExpired:
+        return False, "Validación tardó demasiado."
+    except FileNotFoundError:
+        return False, "PHP no está instalado o no está en el PATH."
+    stderr = (proc.stderr or "").strip()
+    stdout = (proc.stdout or "").strip()
+    ok = proc.returncode == 0
+    message = stdout if ok else (stderr or "Error al validar la FIEL.")
+    conn = db()
+    try:
+        _ensure_sat_credentials_validation_columns(conn)
+        if has_column(conn, "sat_credentials", "validation_at"):
+            conn.execute(
+                """
+                UPDATE sat_credentials SET validation_at = datetime('now'), validation_ok = ?, validation_message = ?
+                WHERE issuer_id = ?
+                """,
+                (1 if ok else 0, message[:500], issuer_id),
+            )
+            conn.commit()
+    finally:
+        conn.close()
+    return ok, message
+
+
 def ym_to_label(ym: str) -> str:
     """Convert 2026-01 to 'Enero 2026'."""
     try:
@@ -218,6 +259,16 @@ def get_portal_router(templates):
         )
         is_demo_view = getattr(request.state, "is_demo_view", False)
         is_impersonating = getattr(request.state, "is_impersonating", False)
+        issuer_id = issuer.get("id", 0)
+        menu_sat_configured = False
+        menu_catalog_ok = False
+        if issuer_id > 0:
+            menu_sat_configured = bool(
+                db_rows("SELECT 1 FROM sat_credentials WHERE issuer_id = ? AND validation_ok = 1 LIMIT 1", (issuer_id,))
+            )
+            cust = db_rows("SELECT COUNT(*) AS n FROM customer_profiles WHERE issuer_id = ?", (issuer_id,))
+            prod = db_rows("SELECT COUNT(*) AS n FROM issuer_products WHERE issuer_id = ?", (issuer_id,))
+            menu_catalog_ok = (cust[0]["n"] if cust else 0) > 0 and (prod[0]["n"] if prod else 0) > 0
         payload = {
             "request": request,
             "token": "",
@@ -232,6 +283,8 @@ def get_portal_router(templates):
             "show_welcome_popup": show_welcome_popup,
             "is_demo_view": is_demo_view,
             "is_impersonating": is_impersonating,
+            "menu_sat_configured": menu_sat_configured,
+            "menu_catalog_ok": menu_catalog_ok,
         }
         if extra:
             payload.update(extra)
@@ -655,6 +708,8 @@ def get_portal_router(templates):
                     "next_ym": shift_ym(ym, +1),
                     "months": months,
                     "month_totals": month_totals,
+                    "sat_sync_status": _get_sat_sync_status(issuer_id),
+                    "has_fiel_validated": bool(db_rows("SELECT 1 FROM sat_credentials WHERE issuer_id = ? AND validation_ok = 1 LIMIT 1", (issuer_id,))),
                 },
             )
         except Exception as e:
@@ -964,6 +1019,20 @@ def get_portal_router(templates):
         except Exception as e:
             return HTMLResponse(f"<h3>Error</h3><p>{str(e)}</p>", status_code=400)
 
+    @router.get("/datos-fiscales", response_class=HTMLResponse)
+    def portal_datos_fiscales(request: Request, issuer: dict = Depends(get_portal_issuer)):
+        """Vista read-only de datos fiscales del emisor (RFC, razón social, régimen)."""
+        return _render_portal(
+            request,
+            issuer=issuer,
+            template_name="portal_datos_fiscales.html",
+            active_page="datos_fiscales",
+            title="Datos fiscales",
+            extra={
+                "issuer_razon_social": issuer.get("alias") or issuer.get("rfc") or "—",
+            },
+        )
+
     @router.get("/summary", response_class=HTMLResponse)
     def portal_summary(request: Request, issuer: dict = Depends(get_portal_issuer), ym: str = None):
         try:
@@ -1222,8 +1291,12 @@ def get_portal_router(templates):
         uid = getattr(request.state, "user_id", None) or 0
         audit.log(action="credentials_uploaded", user_id=uid, issuer_id=issuer_id, request=request, entity="sat_credentials", entity_id=str(issuer_id))
         log_action(request, "credentials_uploaded", issuer_id=issuer_id)
+        # Validación post-upload: ejecutar check_fiel y persistir estado para mostrar en UI
+        valid_ok, valid_message = _run_fiel_validation(issuer_id)
+        audit.log(action="credentials_validated", user_id=uid, issuer_id=issuer_id, request=request, entity="sat_credentials", entity_id=str(issuer_id), details=f"ok={valid_ok}")
+        log_action(request, "credentials_validated", issuer_id=issuer_id)
         if request.headers.get("accept", "").find("application/json") >= 0:
-            return JSONResponse({"ok": True, "message": "Credenciales guardadas."})
+            return JSONResponse({"ok": True, "message": "Credenciales guardadas.", "validation_ok": valid_ok, "validation_message": valid_message})
         return RedirectResponse(url="/portal/config/sat?saved=1", status_code=302)
 
     @router.post("/config/sat/validate", response_class=JSONResponse)
@@ -1231,48 +1304,9 @@ def get_portal_router(templates):
         if _cred_rate_limit(request, "validate"):
             return JSONResponse({"ok": False, "message": "Demasiados intentos. Espera un minuto."}, status_code=429)
         issuer_id = issuer["id"]
-        php_script = os.path.join(BASE_DIR, "sat_sync", "check_fiel.php")
-        if not os.path.isfile(php_script):
-            return JSONResponse(
-                {"ok": False, "message": "No se encontró el script de validación (sat_sync/check_fiel.php)."},
-                status_code=500,
-            )
-        env = os.environ.copy()
-        env["APP_DB_PATH"] = DB_PATH
-        try:
-            proc = subprocess.run(
-                ["php", php_script, str(issuer_id)],
-                cwd=BASE_DIR,
-                capture_output=True,
-                text=True,
-                timeout=30,
-                env=env,
-            )
-        except subprocess.TimeoutExpired:
-            return JSONResponse({"ok": False, "message": "Validación tardó demasiado."}, status_code=500)
-        except FileNotFoundError:
-            return JSONResponse({"ok": False, "message": "PHP no está instalado o no está en el PATH."}, status_code=500)
-        stderr = (proc.stderr or "").strip()
-        stdout = (proc.stdout or "").strip()
-        ok = proc.returncode == 0
-        if ok:
-            message = stdout or "FIEL válida."
-        else:
-            message = stderr or "Error al validar la FIEL."
-        conn = db()
-        try:
-            _ensure_sat_credentials_validation_columns(conn)
-            if has_column(conn, "sat_credentials", "validation_at"):
-                conn.execute(
-                    """
-                    UPDATE sat_credentials SET validation_at = datetime('now'), validation_ok = ?, validation_message = ?
-                    WHERE issuer_id = ?
-                    """,
-                    (1 if ok else 0, message[:500], issuer_id),
-                )
-                conn.commit()
-        finally:
-            conn.close()
+        ok, message = _run_fiel_validation(issuer_id)
+        if not message:
+            message = "FIEL válida." if ok else "Error al validar la FIEL."
         uid = getattr(request.state, "user_id", None) or 0
         audit.log(action="credentials_validated", user_id=uid, issuer_id=issuer_id, request=request, entity="sat_credentials", entity_id=str(issuer_id), details=f"ok={ok}")
         log_action(request, "credentials_validated", issuer_id=issuer_id)
