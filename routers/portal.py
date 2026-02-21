@@ -3,6 +3,8 @@ import json
 import os
 import stat
 import subprocess
+import time
+from collections import defaultdict
 from datetime import datetime, date
 from typing import Optional
 
@@ -126,6 +128,44 @@ def _safe_abs_path(path_like: str) -> str:
     if not abs_p.startswith(base + os.sep):
         raise ValueError("Ruta XML inválida")
     return abs_p
+
+
+def _get_sat_sync_status(issuer_id: int) -> dict:
+    """Estado del sync SAT para un issuer: last_sync_at, status (running|ok|error), message."""
+    conn = db()
+    try:
+        running = conn.execute(
+            "SELECT 1 FROM sat_jobs WHERE issuer_id = ? AND status IN ('queued','running') LIMIT 1",
+            (issuer_id,),
+        ).fetchone()
+        last_ok = conn.execute(
+            "SELECT MAX(finished_at) AS t FROM sat_jobs WHERE issuer_id = ? AND status = 'ok'",
+            (issuer_id,),
+        ).fetchone()
+        last_error = conn.execute(
+            "SELECT finished_at, last_error FROM sat_jobs WHERE issuer_id = ? AND status = 'error' ORDER BY finished_at DESC LIMIT 1",
+            (issuer_id,),
+        ).fetchone()
+        sync_state = conn.execute(
+            "SELECT MAX(last_run_at) AS t FROM sat_sync_state WHERE issuer_id = ?",
+            (issuer_id,),
+        ).fetchone()
+    finally:
+        conn.close()
+    last_sync_at = (sync_state and sync_state["t"]) or (last_ok and last_ok["t"]) or None
+    if running:
+        status = "running"
+        message = "Sincronización en proceso"
+    elif last_error and last_ok and last_error["t"] and last_ok["t"] and last_error["t"] > last_ok["t"]:
+        status = "error"
+        message = (last_error["last_error"] or "Error en la última sincronización")[:200]
+    elif last_error and not last_ok:
+        status = "error"
+        message = (last_error["last_error"] or "Error en la última sincronización")[:200]
+    else:
+        status = "ok"
+        message = None
+    return {"last_sync_at": last_sync_at, "status": status, "message": message}
 
 
 def _get_cfdi_by_uuid(issuer_id: int, uuid: str, direction: str):
@@ -429,6 +469,13 @@ def get_portal_router(templates):
                     "onboarding": onboarding,
                     "quick_customers_json": quick_customers_json,
                     "quick_products_json": quick_products_json,
+                    "sat_sync_status": _get_sat_sync_status(issuer_id),
+                    "has_fiel_validated": has_fiel and bool(
+                        db_rows(
+                            "SELECT 1 FROM sat_credentials WHERE issuer_id = ? AND validation_ok = 1 LIMIT 1",
+                            (issuer_id,),
+                        )
+                    ),
                 },
             )
         except Exception as e:
@@ -667,6 +714,8 @@ def get_portal_router(templates):
                     "next_ym": shift_ym(ym, +1),
                     "months": months,
                     "month_totals": month_totals,
+                    "sat_sync_status": _get_sat_sync_status(issuer_id),
+                    "has_fiel_validated": bool(db_rows("SELECT 1 FROM sat_credentials WHERE issuer_id = ? AND validation_ok = 1 LIMIT 1", (issuer_id,))),
                 },
             )
         except Exception as e:
@@ -1003,6 +1052,86 @@ def get_portal_router(templates):
             title="Seguridad e información",
         )
 
+    # ---------- SAT sync (encolar desde UI; el worker procesa) ----------
+    @router.post("/sat/sync", response_class=JSONResponse)
+    def portal_sat_sync(request: Request, issuer: dict = Depends(get_portal_issuer)):
+        """Encola sincronización SAT (issued + received). Requiere FIEL configurada y validada."""
+        issuer_id = issuer["id"]
+        conn = db()
+        try:
+            _ensure_sat_credentials_validation_columns(conn)
+            cred = conn.execute(
+                "SELECT validation_ok FROM sat_credentials WHERE issuer_id = ?",
+                (issuer_id,),
+            ).fetchone()
+            if not cred:
+                return JSONResponse({"ok": False, "message": "Configura y valida tu FIEL en Ajustes primero."}, status_code=400)
+            if cred["validation_ok"] != 1:
+                return JSONResponse({"ok": False, "message": "Valida tu FIEL en Ajustes antes de sincronizar."}, status_code=400)
+            # No encolar si ya hay jobs en cola o en ejecución para este issuer
+            pending = conn.execute(
+                "SELECT 1 FROM sat_jobs WHERE issuer_id = ? AND status IN ('queued','running') LIMIT 1",
+                (issuer_id,),
+            ).fetchone()
+            if pending:
+                return JSONResponse({"ok": False, "message": "Ya hay una sincronización en curso. Espera a que termine."}, status_code=409)
+            conn.execute(
+                """
+                INSERT INTO sat_jobs (issuer_id, job_type, direction, status, created_at, updated_at)
+                VALUES (?, 'xml', 'issued', 'queued', datetime('now'), datetime('now')),
+                       (?, 'xml', 'received', 'queued', datetime('now'), datetime('now'))
+                """,
+                (issuer_id, issuer_id),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+        return JSONResponse({"ok": True, "message": "Sincronización iniciada."})
+
+    @router.get("/sat/status", response_class=JSONResponse)
+    def portal_sat_status(request: Request, issuer: dict = Depends(get_portal_issuer)):
+        """Estado del sync SAT para este issuer: último sync, en proceso / ok / error."""
+        issuer_id = issuer["id"]
+        conn = db()
+        try:
+            running = conn.execute(
+                "SELECT 1 FROM sat_jobs WHERE issuer_id = ? AND status IN ('queued','running') LIMIT 1",
+                (issuer_id,),
+            ).fetchone()
+            last_ok = conn.execute(
+                "SELECT MAX(finished_at) AS t FROM sat_jobs WHERE issuer_id = ? AND status = 'ok'",
+                (issuer_id,),
+            ).fetchone()
+            last_error = conn.execute(
+                "SELECT finished_at, last_error FROM sat_jobs WHERE issuer_id = ? AND status = 'error' ORDER BY finished_at DESC LIMIT 1",
+                (issuer_id,),
+            ).fetchone()
+            sync_state = conn.execute(
+                "SELECT MAX(last_run_at) AS t FROM sat_sync_state WHERE issuer_id = ?",
+                (issuer_id,),
+            ).fetchone()
+        finally:
+            conn.close()
+        last_sync_at = (sync_state and sync_state["t"]) or (last_ok and last_ok["t"]) or None
+        if running:
+            status = "running"
+            message = "Sincronización en proceso"
+        elif last_error and last_ok and last_error["t"] and last_ok["t"] and last_error["t"] > last_ok["t"]:
+            status = "error"
+            message = (last_error["last_error"] or "Error en la última sincronización")[:200]
+        elif last_error and not last_ok:
+            status = "error"
+            message = (last_error["last_error"] or "Error en la última sincronización")[:200]
+        else:
+            status = "ok"
+            message = None
+        return JSONResponse({
+            "ok": True,
+            "last_sync_at": last_sync_at,
+            "status": status,
+            "message": message,
+        })
+
     # ---------- SAT credentials (FIEL) upload & validate ----------
     MAX_FIEL_SIZE = 2 * 1024 * 1024  # 2 MB
     ALLOWED_CER = (".cer",)
@@ -1044,6 +1173,8 @@ def get_portal_router(templates):
         fiel_key: UploadFile = File(...),
         fiel_password: str = Form(""),
     ):
+        if _cred_rate_limit(request, "upload"):
+            raise HTTPException(status_code=429, detail="Demasiados intentos. Espera un minuto.")
         issuer_id = issuer["id"]
         # Validar extensiones
         cer_name = (fiel_cer.filename or "").lower()
@@ -1088,12 +1219,17 @@ def get_portal_router(templates):
             conn.commit()
         finally:
             conn.close()
+        uid = getattr(request.state, "user_id", None) or 0
+        audit.log(action="credentials_uploaded", user_id=uid, issuer_id=issuer_id, request=request, entity="sat_credentials", entity_id=str(issuer_id))
+        log_action(request, "credentials_uploaded", issuer_id=issuer_id)
         if request.headers.get("accept", "").find("application/json") >= 0:
             return JSONResponse({"ok": True, "message": "Credenciales guardadas."})
         return RedirectResponse(url="/portal/config/sat?saved=1", status_code=302)
 
     @router.post("/config/sat/validate", response_class=JSONResponse)
     def portal_config_sat_validate(request: Request, issuer: dict = Depends(get_portal_issuer)):
+        if _cred_rate_limit(request, "validate"):
+            return JSONResponse({"ok": False, "message": "Demasiados intentos. Espera un minuto."}, status_code=429)
         issuer_id = issuer["id"]
         php_script = os.path.join(BASE_DIR, "sat_sync", "check_fiel.php")
         if not os.path.isfile(php_script):
@@ -1137,6 +1273,9 @@ def get_portal_router(templates):
                 conn.commit()
         finally:
             conn.close()
+        uid = getattr(request.state, "user_id", None) or 0
+        audit.log(action="credentials_validated", user_id=uid, issuer_id=issuer_id, request=request, entity="sat_credentials", entity_id=str(issuer_id), details=f"ok={ok}")
+        log_action(request, "credentials_validated", issuer_id=issuer_id)
         return JSONResponse({"ok": ok, "message": message})
 
     return router
