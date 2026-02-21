@@ -32,8 +32,9 @@ Configuración: ver sección **Variables de entorno** más abajo.
 |----------|-----|----------------|
 | `ENV` | `dev` (default) o `prod`. Define defaults de `DEV_MODE` y `COOKIE_SECURE`. | En producción: `ENV=prod`. |
 | `APP_DB_PATH` | Ruta al archivo SQLite (por defecto `invoicing.db` en la raíz). | Opcional en desarrollo. |
-| `DEV_MODE` | `1` = permite acceso demo con `DEV_TOKEN` sin login. Default: **0** si `ENV=prod`, **1** si `ENV=dev`. | En producción debe ser `0` (o no definir). |
-| `DEV_TOKEN` | Token legacy para desarrollo (ej. `demo`). Debe existir en `issuer_tokens`. | Solo desarrollo; no exponer en producción. |
+| `DEV_MODE` | Modo desarrollo (ej. log de emails en consola). Default según ENV. | En producción `0`. |
+| `ALLOW_DEMO_PORTAL` | `1` = sin cookie válida, rutas HTML pueden usar issuer demo. Default `0`: sin cookie → redirect `/login`. | Solo desarrollo local; en prod no definir (0). |
+| `DEV_TOKEN` | Token del issuer demo cuando `ALLOW_DEMO_PORTAL=1`. Debe existir en `issuer_tokens`. | Solo desarrollo; no exponer en producción. |
 | `SESSION_SECRET` | Clave para firmar la cookie de sesión (valor fijo). | **Obligatorio en producción**; generar con `secrets.token_hex(32)`. |
 | `SESSION_TTL_DAYS` | Días de validez de la cookie (por defecto 7). | Ajustar según política. |
 | `COOKIE_SECURE` | `1` = cookie solo por HTTPS. Default: 0 en local, 1 en prod. | En local con HTTP: `0`. En prod con HTTPS: `1`. |
@@ -87,7 +88,7 @@ El script crea un emisor "Usuario Demo (desarrollo)" con token `demo` (o el que 
 - **Enlace directo al portal (ese usuario):** `http://127.0.0.1:8000/portal/home?token=demo`
 - Con sesión: `http://127.0.0.1:8000/login?token=demo` → te redirige al portal y ya no necesitas el token en la URL.
 
-Con `DEV_MODE=1`, si existe el usuario con token `demo`, también puedes ir directo a `http://127.0.0.1:8000/portal/home` (sin token) y entrarás como demo.
+Con `ALLOW_DEMO_PORTAL=1` y `DEV_MODE=1`, si existe el usuario con token `demo`, puedes ir directo a `http://127.0.0.1:8000/portal/home` (sin token) y entrarás como demo. Por defecto `ALLOW_DEMO_PORTAL=0`: sin cookie se redirige a `/login`.
 
 ### Cómo probar en local
 
@@ -98,7 +99,7 @@ Con `DEV_MODE=1`, si existe el usuario con token `demo`, también puedes ir dire
 5. Tras el login serás redirigido a `/portal/home`. Navega por el portal: las URLs ya no llevan `?token=`.
 6. Probar logout: en el menú de usuario (avatar/chevron) → "Cerrar sesión", o ir a `http://127.0.0.1:8000/logout`. Vuelve a `/`; si intentas entrar a `/portal/home` sin cookie, serás redirigido a `/login`.
 
-**Nota:** Con `DEV_MODE=1`, si no hay cookie ni token, el portal permite entrar con un emisor demo (token `DEV_TOKEN`, por defecto `demo`) para facilitar desarrollo local — pero ese emisor debe existir en la base (creado con `ensure_demo_user.py`).
+**Nota:** Con `ALLOW_DEMO_PORTAL=1` y `DEV_MODE=1`, si no hay cookie ni token, el portal permite entrar con el emisor demo (token `DEV_TOKEN`). Por defecto `ALLOW_DEMO_PORTAL=0`: sin cookie válida siempre se redirige a `/login` (no hay “brinco” al demo). El emisor demo debe existir en la base (creado con `ensure_demo_user.py`).
 
 ### Smoke test (registro, login y portal)
 

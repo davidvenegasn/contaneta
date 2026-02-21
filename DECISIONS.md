@@ -52,7 +52,7 @@ Documento de decisiones tomadas para lanzamiento público y operación autónoma
 ## Configuración (DEV_MODE por entorno)
 
 - **DEV_MODE por default:** En cualquier entorno que no sea explícitamente desarrollo (`ENV=dev`), el default de `DEV_MODE` es **0**. Solo con `ENV=dev` el default es `1`. Así se evita caer al acceso demo por defecto en producción o en entornos no configurados. Lógica en `config.py`: `DEV_MODE = os.getenv("DEV_MODE", "0" si no dev else "1") == "1"`.
-- **Demo solo con DEV_MODE=1 explícito:** El acceso con `DEV_TOKEN` (sin cookie/login) solo está activo cuando `DEV_MODE=1`. En prod, si no se define `DEV_MODE`, queda 0.
+- **Demo solo con ALLOW_DEMO_PORTAL=1:** Sin cookie válida, las rutas HTML del portal redirigen a `/login` y las API devuelven 401. El fallback al issuer demo (sin login) solo ocurre si `DEV_MODE=1` **y** `ALLOW_DEMO_PORTAL=1` (default `0`). Así se evitan "brincos" al demo al navegar. Ver `routers/deps.py` (`get_portal_issuer`).
 
 ---
 

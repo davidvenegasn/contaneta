@@ -22,6 +22,9 @@ IS_PROD = ENV == "prod"
 # Evita caer al demo por defecto en entornos no explícitamente de desarrollo.
 _DEV_MODE_DEFAULT = "1" if ENV == "dev" else "0"
 DEV_MODE = os.getenv("DEV_MODE", _DEV_MODE_DEFAULT) == "1"
+# Solo con ALLOW_DEMO_PORTAL=1 (y DEV_MODE=1) se permite fallback a demo en rutas HTML del portal.
+# Sin esto, sin cookie válida siempre se redirige a /login (HTML) o 401 (API).
+ALLOW_DEMO_PORTAL = os.getenv("ALLOW_DEMO_PORTAL", "0") == "1"
 DEV_TOKEN = os.getenv("DEV_TOKEN", "demo")
 
 FIRM_USER_EMAIL = (os.getenv("FIRM_USER_EMAIL") or "").strip() or None
