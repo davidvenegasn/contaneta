@@ -1,0 +1,28 @@
+{% if has_fiel_validated and sat_sync_status is defined %}
+<div class="card p-16 mb-16 sat-sync-block" id="satSyncBlock" data-poll-interval="8000">
+  <div class="sat-sync-block__row">
+    <div class="sat-sync-block__info">
+      <span class="sat-sync-block__label">SAT</span>
+      <span class="sat-sync-block__meta muted" id="satSyncMeta">
+        {% if sat_sync_status.last_sync_at %}
+          Último sync: {{ sat_sync_status.last_sync_at[:19] if sat_sync_status.last_sync_at else '—' }}
+        {% else %}
+          Aún no se ha sincronizado
+        {% endif %}
+      </span>
+      <span class="sat-sync-block__status" id="satSyncStatus" data-status="{{ sat_sync_status.status|default('ok') }}" aria-live="polite">
+        {% if sat_sync_status.status == 'running' %}<span class="spinner spinner--sm" aria-hidden="true"></span> Sincronizando…{% elif sat_sync_status.status == 'error' %}Error{% if sat_sync_status.message %}: <span id="satSyncError" class="sat-sync-block__error-inline">{{ (sat_sync_status.message or '')[:120] }}{% if (sat_sync_status.message or '')|length > 120 %}…{% endif %}</span>{% endif %}{% else %}OK{% endif %}
+      </span>
+    </div>
+    <button type="button" class="btn btn--sm btn--secondary" id="satSyncBtn" data-loading-text="Encolando…">
+      Sync SAT
+    </button>
+  </div>
+  {% if sat_sync_status.status == 'error' and sat_sync_status.message %}
+  <div class="sat-sync-block__error-block mt-12" id="satSyncErrorBlock">
+    <p class="sat-sync-block__error-text muted">{{ sat_sync_status.message }}</p>
+    <a href="/portal/config/sat" class="btn btn--sm btn--ghost">Ver detalle / Revalidar FIEL</a>
+  </div>
+  {% endif %}
+</div>
+{% endif %}

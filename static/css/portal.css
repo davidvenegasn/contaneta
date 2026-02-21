@@ -3766,6 +3766,30 @@ body.no-scroll {
   text-decoration: none;
 }
 
+/* B4/B5: Drawer a pantalla completa en móvil 390px, botones tocables (min 44px) */
+@media (max-width: 390px) {
+  .provider-drawer-overlay.ui-overlay.is-open {
+    display: flex !important;
+    align-items: stretch;
+    justify-content: flex-end;
+  }
+  .provider-drawer-overlay .ui-drawer.provider-drawer {
+    width: 100%;
+    max-width: 100vw;
+    height: 100%;
+    max-height: 100vh;
+    max-height: 100dvh;
+  }
+  .provider-drawer__close,
+  .provider-drawer__actions .btn,
+  .provider-drawer__page-btns .btn,
+  .provider-drawer__link {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  .provider-drawer__link { min-width: 0; }
+}
+
 /* Legacy row (por si se usa en otro template) */
 .provider-invoice-row {
   padding: 12px 14px;
@@ -3790,6 +3814,9 @@ body.no-scroll {
 .sat-sync-block__status[data-status="running"] { color: var(--primary, #0ea5e9); }
 .sat-sync-block__status[data-status="error"] { color: var(--danger, #dc2626); }
 .sat-sync-block__error { display: block; margin-top: 4px; font-size: 12px; color: var(--muted, #64748b); max-width: 360px; }
+.sat-sync-block__error-inline { font-size: 12px; color: var(--muted, #64748b); }
+.sat-sync-block__error-block { padding-top: 12px; border-top: 1px solid var(--border, #e2e8f0); }
+.sat-sync-block__error-text { margin: 0 0 8px; font-size: 13px; line-height: 1.4; word-break: break-word; }
 
 /* List sync bar (Emitidas/Recibidas: chip sutil arriba de la tabla) */
 .card__header-actions--wrap {
@@ -3902,6 +3929,7 @@ body.no-scroll {
 @media (max-width: 390px) {
   .main { padding-left: calc(12px + var(--safe-left)); padding-right: calc(12px + var(--safe-right)); }
   .main-inner { padding-left: 12px; padding-right: 12px; }
+  .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%; }
 }
 
 /* Home: dos cuadros por fila, menos espacio entre secciones en móvil */

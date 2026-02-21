@@ -206,6 +206,18 @@ def _apply_008_users_active(conn: sqlite3.Connection) -> None:
         _safe_add_column(conn, "users", "active", "INTEGER NOT NULL DEFAULT 1")
 
 
+def _apply_014_sat_credentials_validation(conn: sqlite3.Connection) -> None:
+    """Aplica 014: columnas validation_at, validation_ok, validation_message en sat_credentials (self-serve FIEL)."""
+    if not _table_exists(conn, "sat_credentials"):
+        return
+    for col, col_type in [
+        ("validation_at", "TEXT"),
+        ("validation_ok", "INTEGER"),
+        ("validation_message", "TEXT"),
+    ]:
+        _safe_add_column(conn, "sat_credentials", col, col_type)
+
+
 def _apply_011_audit_log_columns(conn: sqlite3.Connection) -> None:
     """Aplica 011: columnas entity, entity_id, meta_json, ip, user_agent en audit_log."""
     if not _table_exists(conn, "audit_log"):
@@ -289,6 +301,8 @@ def apply_migrations(
                     _apply_008_users_active(conn)
                 elif version == "011":
                     _apply_011_audit_log_columns(conn)
+                elif version == "014":
+                    _apply_014_sat_credentials_validation(conn)
                 else:
                     # Migraciones normales: ejecutar SQL directamente
                     conn.executescript(sql)

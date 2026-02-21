@@ -2,28 +2,6 @@
 {% set title = 'Inicio' %}
 {% set page_icon = '<svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M5.5 10.5V21h13V10.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 21v-6h4v6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>' %}
 {% block content %}
-{% set ob = onboarding|default({}) %}
-{% set rfc_ok = ob.get('rfc_configured', false) %}
-{% set has_fiel = ob.get('has_fiel', false) %}
-{% set has_customers = (ob.get('count_customers', 0)|int) > 0 %}
-{% set has_products = (ob.get('count_products', 0)|int) > 0 %}
-{% set has_issued = ob.get('has_any_issued', false) %}
-{% set all_onboarding_done = rfc_ok and has_fiel and has_customers and has_products %}
-{% set steps_done = (1 if rfc_ok else 0) + (1 if has_fiel else 0) + (1 if has_customers else 0) + (1 if has_products else 0) + (1 if has_issued else 0) %}
-
-{% if not all_onboarding_done %}
-<!-- Banner: siguiente paso recomendado (solo pasos faltantes; dismissible por issuer) -->
-<div class="tip-banner" id="tipBanner" role="region" aria-label="Siguiente paso" data-issuer-id="{{ issuer_id|default('') }}">
-  <div class="tip-banner__content">
-    <span class="tip-banner__label">Siguiente paso recomendado</span>
-    <p class="tip-banner__text" id="tipBannerText">
-      {% if not rfc_ok %}Configura tu RFC y razón social en ajustes para poder facturar.{% elif not has_fiel %}Sube tu FIEL/CSD en ajustes para firmar tus facturas.{% elif not has_customers %}Crea tu primer cliente para facturar más rápido.{% elif not has_products %}Agrega un producto o servicio para usarlo en tus facturas.{% else %}Revisa tu resumen del mes o genera una factura cuando lo necesites.{% endif %}
-    </p>
-  </div>
-  <button type="button" class="tip-banner__dismiss" id="tipBannerDismiss" aria-label="Cerrar">×</button>
-</div>
-{% endif %}
-
 <div class="app-header fade-in fade-in--1 mb-22">
   <div class="app-header__left">
     <div class="app-title"></div>
@@ -31,39 +9,11 @@
   </div>
 </div>
 
-{% if steps_done < 5 %}
-<section class="onboarding-card card p-20 fade-in fade-in--2 mb-20" aria-label="Empezar">
-  <h2 class="onboarding-card__title">
-    <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 2L2 7l10 5 10-5-10-5z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 17l10 5 10-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    Empezar
-  </h2>
-  <p class="onboarding-card__progress muted">{{ steps_done }} de 5 pasos</p>
-  <ul class="onboarding-checklist">
-    <li class="onboarding-checklist__item {% if rfc_ok %}onboarding-checklist__item--done{% endif %}">
-      {% if rfc_ok %}<span class="onboarding-checklist__check" aria-hidden="true">✓</span>{% else %}<span class="onboarding-checklist__dot" aria-hidden="true"></span>{% endif %}
-      {% if rfc_ok %}<span>Configura tu RFC</span>{% else %}<a href="/portal/settings">Configura tu RFC</a>{% endif %}
-    </li>
-    <li class="onboarding-checklist__item {% if has_fiel %}onboarding-checklist__item--done{% endif %}">
-      {% if has_fiel %}<span class="onboarding-checklist__check" aria-hidden="true">✓</span>{% else %}<span class="onboarding-checklist__dot" aria-hidden="true"></span>{% endif %}
-      {% if has_fiel %}<span>FIEL/CSD en ajustes</span>{% else %}<a href="/portal/config/sat">Sube FIEL/CSD</a>{% endif %}
-    </li>
-    <li class="onboarding-checklist__item {% if has_customers %}onboarding-checklist__item--done{% endif %}">
-      {% if has_customers %}<span class="onboarding-checklist__check" aria-hidden="true">✓</span>{% else %}<span class="onboarding-checklist__dot" aria-hidden="true"></span>{% endif %}
-      {% if has_customers %}<span>Crea un cliente</span>{% else %}<a href="/portal/clients">Crea un cliente</a>{% endif %}
-    </li>
-    <li class="onboarding-checklist__item {% if has_products %}onboarding-checklist__item--done{% endif %}">
-      {% if has_products %}<span class="onboarding-checklist__check" aria-hidden="true">✓</span>{% else %}<span class="onboarding-checklist__dot" aria-hidden="true"></span>{% endif %}
-      {% if has_products %}<span>Crea un producto</span>{% else %}<a href="/portal/products">Crea un producto</a>{% endif %}
-    </li>
-    <li class="onboarding-checklist__item {% if has_issued %}onboarding-checklist__item--done{% endif %}">
-      {% if has_issued %}<span class="onboarding-checklist__check" aria-hidden="true">✓</span>{% else %}<span class="onboarding-checklist__dot" aria-hidden="true"></span>{% endif %}
-      {% if has_issued %}<span>Genera tu primera factura</span>{% else %}<a href="/portal/create">Genera tu primera factura</a>{% endif %}
-    </li>
-  </ul>
-</section>
-{% endif %}
-
 <p class="muted" style="margin:0 0 12px; font-size:13px;">Resumen del mes en curso ({{ ym_label }})</p>
+
+{% if has_fiel_validated is defined and sat_sync_status is defined %}
+  {% include "portal_sat_sync_block.html" %}
+{% endif %}
 
 <div class="dashboard-metrics fade-in fade-in--3 mb-20">
   <div class="card metric-card">
@@ -431,7 +381,7 @@ window.__QUICK_INITIAL_PRODUCTS__ = {{ quick_products_json | default('[]') | saf
     quickCustSaveBtn.disabled = true;
     quickCustSaveBtn.textContent = 'Guardando…';
     try {
-      var res = await fetch('/api/customers/create', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      var res = await fetch('/api/customers/create', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       var data = await res.json().catch(function(){ return {}; });
       if (!res.ok) throw new Error(window.portalApiErrorMessage ? window.portalApiErrorMessage(data) : (data.detail || 'Error'));
       window.portalToast && window.portalToast({ type: 'success', title: 'Cliente guardado', message: 'Ya puedes usarlo en la factura rápida.' });
@@ -526,7 +476,7 @@ window.__QUICK_INITIAL_PRODUCTS__ = {{ quick_products_json | default('[]') | saf
     quickProdSaveBtn.disabled = true;
     quickProdSaveBtn.textContent = 'Guardando…';
     try {
-      var res = await fetch('/api/products/create', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      var res = await fetch('/api/products/create', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       var data = await res.json().catch(function(){ return {}; });
       if (!res.ok) throw new Error(window.portalApiErrorMessage ? window.portalApiErrorMessage(data) : (data.detail || 'Error'));
       window.portalToast && window.portalToast({ type: 'success', title: 'Producto guardado', message: 'Ya puedes usarlo en la factura rápida.' });
@@ -709,15 +659,6 @@ window.__QUICK_INITIAL_PRODUCTS__ = {{ quick_products_json | default('[]') | saf
   })();
 })();
 
-(function(){
-  var banner = document.getElementById('tipBanner');
-  var dismiss = document.getElementById('tipBannerDismiss');
-  if (!banner) return;
-  var issuerId = (banner.getAttribute && banner.getAttribute('data-issuer-id')) || '';
-  var key = 'portal_tip_dismiss_issuer_' + (issuerId || 'default');
-  if (localStorage.getItem(key) === '1') banner.hidden = true;
-  if (dismiss) dismiss.addEventListener('click', function(){ localStorage.setItem(key, '1'); banner.hidden = true; });
-})();
 </script>
 
 <style>

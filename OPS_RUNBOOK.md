@@ -131,34 +131,38 @@ Uso típico: balanceadores, monitoreo (ping cada X minutos) y alertas si `status
 
 ## 5. Worker SAT (sync CFDI)
 
-Comando único recomendado: **`scripts/run_sat_sync.sh`**
+### 5.1 Self-serve: worker que procesa la cola (recomendado)
 
-- Sin argumentos: sincroniza **todos** los issuers activos (issued + received).
-- Con un argumento (issuer_id): solo ese issuer.
-- Con dos argumentos (issuer_id, dirección): solo ese issuer y esa dirección (`issued` o `received`).
+Cuando los usuarios pulsan **"Sync SAT"** en el portal, se encolan jobs en la tabla `sat_jobs`. El worker **`scripts/sat_worker.py`** procesa esos jobs (ejecuta `php sat_sync/sync.php <issuer_id> <issued|received>`) y actualiza estado (ok/error, last_error, finished_at).
 
-Requisitos: `php` en PATH, `sat_sync/sync.php` y sus dependencias Composer. La DB debe tener la tabla `issuers`.
+**Cron recomendado:** ejecutar el worker cada **10–15 minutos** para que la sincronización encolada desde el portal se ejecute sin intervención manual.
 
 ```bash
-# Todos los issuers activos
-./scripts/run_sat_sync.sh
-
-# Solo issuer_id 1
-./scripts/run_sat_sync.sh 1
-
-# Solo issuer 1, dirección issued
-./scripts/run_sat_sync.sh 1 issued
+# Ejecutar worker (procesa hasta 20 jobs en cola)
+APP_DB_PATH=/ruta/al/invoicing.db python3 scripts/sat_worker.py
 ```
 
-### 5.1 Cron del worker SAT
-
-Ejemplo: ejecutar sync cada 6 horas.
+**Crontab ejemplo (cada 10 min):**
 
 ```cron
-0 */6 * * * cd /ruta/al/proyecto && ./scripts/run_sat_sync.sh >> /var/log/sat_sync.log 2>&1
+*/10 * * * * cd /ruta/al/proyecto && APP_DB_PATH=/ruta/al/invoicing.db python3 scripts/sat_worker.py >> /var/log/sat_worker.log 2>&1
 ```
 
-Ajustar `/ruta/al/proyecto` y, si usas otra DB, `APP_DB_PATH` en el entorno del cron.
+Requisitos: Python 3, PHP en PATH (o `PHP_BIN`), Composer en `sat_sync/`. Opcional: `SAT_SYNC_BACKFILL_DAYS`, `SAT_SYNC_WINDOW_HOURS` (por defecto 7 y 6).
+
+### 5.2 Sync manual / legacy (todos los issuers)
+
+Comando: **`scripts/run_sat_sync.sh`** (o el script que invoque `sat_sync/sync.php` por issuer).
+
+- Sin argumentos: sincroniza todos los issuers con `sat_credentials`.
+- Con argumentos: issuer_id y opcionalmente dirección (`issued`|`received`).
+
+Alternativa: **`sat_sync/cron_sat_sync.sh`** (pipeline completo: metadata, XML, verify, parse, cancelaciones). Úsalo si prefieres un cron que no dependa de la cola del portal.
+
+```cron
+# Opcional: cron legacy cada 6 h (sync directo por issuer, sin cola)
+0 */6 * * * cd /ruta/al/proyecto && ./scripts/run_sat_sync.sh >> /var/log/sat_sync.log 2>&1
+```
 
 ---
 

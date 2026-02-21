@@ -3,47 +3,12 @@
 {% set title = 'Facturas recibidas' %}
 {% set page_icon = '<svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 2v5a1 1 0 0 0 1 1h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 18v-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="m9 15 3 3 3-3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>' %}
 
-{% macro short_uuid(u) %}
-  {% if u %}{{ u[:8] }}…{{ u[-4:] }}{% else %}-{% endif %}
-{% endmacro %}
-
-{% macro date_dd_mm_yyyy(dt) %}
-  {% if dt and dt|length >= 10 %}{{ dt[8:10] }}/{{ dt[5:7] }}/{{ dt[:4] }}{% else %}-{% endif %}
-{% endmacro %}
-
-{% macro money(x, m) %}
-  {% if x is not none %}{{ '{:,.2f}'.format(x|float) }} {{ m or '' }}{% else %}-{% endif %}
-{% endmacro %}
-
-{% macro concepto_trunc(txt, maxlen=60) %}
-  {% if txt %}{{ (txt[:maxlen] + '…') if txt|length > maxlen else txt }}{% else %}—{% endif %}
-{% endmacro %}
-
-{% macro status_pill(s) %}
-  {% set st = (s|default('')|string)|upper %}
-  {% if st in ['V','VIGENTE','1'] %}
-    <span class="pill" style="border-color:#cfead9; background:#f3fcf6;">Vigente</span>
-  {% elif st in ['C','CANCELADO','CANCELADA','0'] %}
-    <span class="pill" style="border-color:#f2c9c9; background:#fff4f4;">Cancelada</span>
-  {% elif 'CANCELACION' in st or 'CANCELACIÓN' in st or st == 'EN CANCELACION' or st == 'EN CANCELACIÓN' %}
-    <span class="pill" style="border-color:#f0d9a8; background:#fef9e8;">En cancelación</span>
-  {% elif st in ['NO ENCONTRADO','NO ENCONTRADA',''] or not s %}
-    <span class="pill" style="border-color:#e0e0e0; background:#f5f5f5;">{{ s or 'Sin estatus' }}</span>
-  {% else %}
-    <span class="pill">{{ s }}</span>
-  {% endif %}
-{% endmacro %}
-
 {% block content %}
-  <header class="app-header" style="margin-bottom:14px;">
-    <div class="app-header__left">
-      <div class="app-title"></div>
-      <div class="app-subtitle">Historial de CFDI recibidos (SAT) para este emisor.</div>
-    </div>
-  </header>
-
-  <div class="card ym-card" style="margin-bottom:14px;">
-    <div class="ym-selector" style="margin-bottom:14px;">
+  {% if has_fiel_validated is defined and sat_sync_status is defined %}
+    {% include "portal_list_sync_bar.html" %}
+  {% endif %}
+  <div class="card ym-card" style="margin-bottom: var(--space-4);">
+    <div class="ym-selector" style="margin-bottom: var(--space-3);">
       {{ month_picker('/portal/invoices/received', token, ym, ym_label) }}
     </div>
     {% set mt = month_totals|default({}) %}
@@ -68,85 +33,568 @@
     </div>
   </div>
 
-  <div class="card">
-    <div class="card-title-row">
-      <h3 class="section-title">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v16H4z"></path><path d="M8 8h8"></path><path d="M8 12h8"></path><path d="M8 16h5"></path></svg>
-        Listado
-      </h3>
+  <div class="card card--invoice-list ui-card">
+    <div class="card__header card__header--row ui-card__header">
+      <h3 class="card__title section-title">Facturas recibidas</h3>
+      <div class="card__header-actions card__header-actions--wrap">
+        <button type="button" class="btn btn--sm btn--ghost filters-toggle" id="filtersToggleBtn" aria-expanded="false" aria-controls="filtersPanel">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true" width="18" height="18"><path d="M4 6h16M4 12h10M4 18h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          <span>Filtros</span>
+          <span class="filters-toggle__badge" id="filtersBadge" aria-hidden="true"></span>
+        </button>
+      </div>
     </div>
 
-    {% if rows and rows|length > 0 %}
-    <div style="overflow:auto;">
-      <table class="table" style="min-width:1200px;">
-        <thead>
-          <tr>
-            <th style="min-width:100px;">Fecha</th>
-            <th>Emisor</th>
-            <th style="min-width:220px;">Concepto</th>
-            <th style="min-width:140px;">UUID</th>
-            <th style="min-width:110px;">Total</th>
-            <th style="min-width:100px;">IVA pagado</th>
-            <th style="min-width:80px;">Pago</th>
-            <th style="min-width:100px;">Estatus</th>
-            <th style="min-width:200px;">Acciones</th>
-          </tr>
-        </thead>
-        <tbody>
-            {% for r in rows %}
-              <tr>
-                <td class="muted">{{ date_dd_mm_yyyy(r.fecha_emision) }}</td>
-                <td>
-                  <div style="font-weight:650;">{{ r.nombre_emisor or '—' }}</div>
-                  <div class="muted" style="font-size:12px;">{{ r.rfc_emisor or '' }}</div>
-                </td>
-                <td class="concepto-cell">{{ concepto_trunc(r.concepto) }}</td>
-                <td>
-                  <div style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; font-size:12px;">
-                    {{ short_uuid(r.uuid) }}
-                  </div>
-                </td>
-                <td style="font-weight:650;">{{ money(r.total, r.moneda) }}</td>
-                <td class="muted">{{ money(r.impuestos|default(0), r.moneda) }}</td>
-                <td>
-                  {% if r.metodo_pago %}
-                    <span class="pill" style="font-size:11px; padding:2px 6px;">
-                      {{ r.metodo_pago }}
-                    </span>
-                  {% else %}
-                    <span class="muted">—</span>
-                  {% endif %}
-                </td>
-                <td>{{ status_pill(r.status) }}</td>
-                <td style="text-align:right;">
-                  <span class="btn-group">
-                    <a class="btn btn-ghost" href="/portal/cfdi/received/{{ r.uuid }}" style="text-decoration:none;">Ver detalle</a>
-                    {% if r.xml_path %}
-                      <a class="btn" href="/portal/sat/xml/{{ r.uuid }}" target="_blank" rel="noopener" style="text-decoration:none;">XML</a>
-                      <button type="button" class="btn" data-pdf-url="/portal/sat/pdf/{{ r.uuid }}">PDF</button>
-                    {% elif r.xml_status == 'pending' %}
-                      <span class="muted" style="font-size:11px;">Descargando...</span>
-                    {% elif r.xml_status == 'error' %}
-                      <span class="muted" style="font-size:11px; color:#d32f2f;">Error XML</span>
-                    {% else %}
-                      <span class="muted">(sin XML)</span>
-                    {% endif %}
-                  </span>
-                </td>
-              </tr>
-            {% endfor %}
-        </tbody>
-      </table>
-    </div>
-    {% else %}
-    <div class="empty-state" style="padding:32px 20px;">
-      <div class="empty-state__icon" aria-hidden="true">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/><path d="M14 2v5a1 1 0 0 0 1 1h5"/><path d="M12 18v-6"/><path d="m9 15 3 3 3-3"/></svg>
+    <!-- Panel de filtros (oculto por defecto, compacto) -->
+    <div class="filters-panel" id="filtersPanel" hidden aria-hidden="true">
+      <div class="filters-panel__inner">
+        <div class="filters-panel__search">
+          <svg class="icon filters-panel__search-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" stroke="currentColor" stroke-width="1.8"/><path d="M16.2 16.2 21 21" stroke="currentColor" stroke-width="1.8"/></svg>
+          <input type="search" id="searchInput" class="input input--compact" placeholder="Buscar UUID, RFC, concepto..." />
+        </div>
+        <div class="filters-panel__row">
+          <select id="statusFilter" class="select select--compact" aria-label="Estatus">
+            <option value="">Estatus</option>
+            <option value="vigente">Vigentes</option>
+            <option value="cancelada">Canceladas</option>
+          </select>
+          <select id="metodoPagoFilter" class="select select--compact" aria-label="Método de pago">
+            <option value="">Pago</option>
+            <option value="PUE">PUE</option>
+            <option value="PPD">PPD</option>
+          </select>
+          <input type="number" id="minAmount" class="input input--compact" placeholder="Mín" step="0.01" aria-label="Monto mínimo" />
+          <input type="number" id="maxAmount" class="input input--compact" placeholder="Máx" step="0.01" aria-label="Monto máximo" />
+        </div>
+        <div class="filters-panel__actions">
+          <button type="button" class="btn btn--sm btn--ghost" id="clearFiltersBtn">Limpiar</button>
+        </div>
       </div>
-      <div class="empty-state__title">No hay facturas recibidas en {{ ym_label }}</div>
-      <div class="empty-state__desc muted">Las facturas que recibas (SAT) aparecerán aquí. Cambia de mes con el selector arriba.</div>
-      <a href="/portal/invoices/issued" class="btn btn-ghost" style="text-decoration:none; margin-top:12px;">Ver facturas emitidas</a>
     </div>
-    {% endif %}
+
+    <div class="card__body ui-card__body" style="padding-top: 0;">
+      <!-- Tabla -->
+      <div class="table-wrap ui-table-wrap" id="tableWrap">
+        <table class="table table--zebra ui-table ui-table--zebra" id="invoicesTable" style="min-width: 1200px;">
+          <thead>
+            <tr>
+              <th style="min-width: 100px;">Fecha</th>
+              <th style="min-width: 200px;">Emisor</th>
+              <th style="min-width: 220px;">Concepto</th>
+              <th style="min-width: 140px;">UUID</th>
+              <th style="min-width: 110px;">Total</th>
+              <th style="min-width: 100px;">IVA pagado</th>
+              <th style="min-width: 80px;">Pago</th>
+              <th style="min-width: 100px;">Estatus</th>
+              <th style="min-width: 200px; text-align: right;">Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody">
+            <tr>
+              <td colspan="9">
+                <div class="skeleton" style="height: 46px; border-radius: 14px;"></div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Lista en cards para móvil -->
+      <div class="invoice-list-mobile" id="invoiceListMobile" aria-label="Lista de facturas recibidas"></div>
+
+      <!-- Paginación -->
+      <div class="pagination" id="pagination" style="display: none; margin-top: var(--space-4); padding-top: var(--space-3); border-top: 1px solid var(--border); justify-content: space-between; align-items: center;">
+        <div class="pagination__info" style="font-size: var(--text-sm); color: var(--text-muted);"></div>
+        <div class="pagination__controls" style="display: flex; gap: var(--space-2); align-items: center;">
+          <button type="button" class="btn btn--sm btn--ghost" id="prevPageBtn" disabled>Anterior</button>
+          <span class="pagination__page" style="font-size: var(--text-sm); font-weight: var(--fw-semibold);"></span>
+          <button type="button" class="btn btn--sm btn--ghost" id="nextPageBtn" disabled>Siguiente</button>
+        </div>
+      </div>
+
+      <!-- Error de carga -->
+      <div class="empty-state" id="loadErrorState" hidden aria-live="polite">
+        <div class="empty-state__title">No se pudo cargar el listado</div>
+        <p class="empty-state__desc" id="loadErrorStateMsg">Revisa tu conexión e intenta de nuevo.</p>
+        <button type="button" class="btn btn--secondary" id="loadErrorStateRetry">Reintentar</button>
+      </div>
+      <!-- Empty state (0 facturas este mes) -->
+      <div class="empty-state" id="emptyState" hidden>
+        <div class="empty-state__icon" aria-hidden="true">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/>
+            <path d="M14 2v5a1 1 0 0 0 1 1h5"/>
+            <path d="M12 18v-6"/>
+            <path d="m9 15 3 3 3-3"/>
+          </svg>
+        </div>
+        <div class="empty-state__title">No hay facturas recibidas este mes</div>
+        <div class="empty-state__desc">Aún no hay facturas recibidas este mes.</div>
+        <div class="empty-state__actions">
+          <a href="/portal/invoices/issued" class="btn btn--primary" style="text-decoration: none;">Ver facturas emitidas</a>
+        </div>
+      </div>
+    </div>
   </div>
+
+<script>
+(function() {
+  const API_BASE = '/api/invoices/received';
+  const currentYM = '{{ ym }}';
+  let currentPage = 1;
+  const perPage = 50;
+  let filters = {};
+  let debounceTimer = null;
+  let currentPagination = null;
+
+  // Parse URL params
+  function parseURLParams() {
+    const params = new URLSearchParams(window.location.search);
+    filters = {
+      ym: params.get('ym') || currentYM,
+      search: params.get('search') || '',
+      status: params.get('status') || '',
+      min_amount: params.get('min_amount') ? parseFloat(params.get('min_amount')) : null,
+      max_amount: params.get('max_amount') ? parseFloat(params.get('max_amount')) : null,
+      metodo_pago: params.get('metodo_pago') || '',
+      page: parseInt(params.get('page') || '1', 10),
+    };
+    currentPage = filters.page;
+  }
+
+  // Update URL without reload
+  function updateURL() {
+    const params = new URLSearchParams();
+    if (filters.ym && filters.ym !== currentYM) params.set('ym', filters.ym);
+    if (filters.search) params.set('search', filters.search);
+    if (filters.status) params.set('status', filters.status);
+    if (filters.min_amount) params.set('min_amount', filters.min_amount.toString());
+    if (filters.max_amount) params.set('max_amount', filters.max_amount.toString());
+    if (filters.metodo_pago) params.set('metodo_pago', filters.metodo_pago);
+    if (currentPage > 1) params.set('page', currentPage.toString());
+    const newURL = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
+    window.history.replaceState({}, '', newURL);
+  }
+
+  // Sync form inputs with filters
+  function syncFormInputs() {
+    document.getElementById('searchInput').value = filters.search || '';
+    document.getElementById('statusFilter').value = filters.status || '';
+    document.getElementById('minAmount').value = filters.min_amount || '';
+    document.getElementById('maxAmount').value = filters.max_amount || '';
+    document.getElementById('metodoPagoFilter').value = filters.metodo_pago || '';
+    updateFiltersBadge();
+  }
+
+  function countActiveFilters() {
+    let n = 0;
+    if (filters.search && filters.search.trim()) n++;
+    if (filters.status) n++;
+    if (filters.metodo_pago) n++;
+    if (filters.min_amount != null && filters.min_amount !== '') n++;
+    if (filters.max_amount != null && filters.max_amount !== '') n++;
+    return n;
+  }
+
+  function updateFiltersBadge() {
+    const badge = document.getElementById('filtersBadge');
+    if (!badge) return;
+    const n = countActiveFilters();
+    if (n > 0) {
+      badge.textContent = n;
+      badge.hidden = false;
+    } else {
+      badge.hidden = true;
+    }
+  }
+
+  // Toggle filters panel
+  const filtersToggleBtn = document.getElementById('filtersToggleBtn');
+  const filtersPanel = document.getElementById('filtersPanel');
+  if (filtersToggleBtn && filtersPanel) {
+    filtersToggleBtn.addEventListener('click', function() {
+      const isOpen = !filtersPanel.hidden;
+      filtersPanel.hidden = !isOpen;
+      filtersPanel.setAttribute('aria-hidden', isOpen ? 'true' : 'false');
+      filtersToggleBtn.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
+    });
+  }
+
+  // Load data from API
+  async function loadData() {
+    const tableBody = document.getElementById('tableBody');
+    const tableWrap = document.getElementById('tableWrap');
+    const emptyState = document.getElementById('emptyState');
+    const pagination = document.getElementById('pagination');
+    
+    tableBody.innerHTML = (window.uiSkeletonTableRows && window.uiSkeletonTableRows(9, 5)) || '<tr><td colspan="9"><div class="skeleton" style="height: 46px; border-radius: 14px;"></div></td></tr>';
+    tableWrap.style.display = '';
+    var mobileList = document.getElementById('invoiceListMobile');
+    if (mobileList) mobileList.innerHTML = '<div class="invoice-card-mobile"><div class="skeleton" style="height:72px;border-radius:12px;"></div></div><div class="invoice-card-mobile"><div class="skeleton" style="height:72px;border-radius:12px;"></div></div><div class="invoice-card-mobile"><div class="skeleton" style="height:72px;border-radius:12px;"></div></div>';
+    emptyState.hidden = true;
+    var loadErr0 = document.getElementById('loadErrorState');
+    if (loadErr0) loadErr0.hidden = true;
+    pagination.style.display = 'none';
+
+    const params = new URLSearchParams();
+    params.set('ym', filters.ym || currentYM);
+    if (filters.search) params.set('search', filters.search);
+    if (filters.status) params.set('status', filters.status);
+    if (filters.min_amount) params.set('min_amount', filters.min_amount.toString());
+    if (filters.max_amount) params.set('max_amount', filters.max_amount.toString());
+    if (filters.metodo_pago) params.set('metodo_pago', filters.metodo_pago);
+    params.set('page', currentPage.toString());
+    params.set('per_page', perPage.toString());
+
+    try {
+      const res = await fetch(`${API_BASE}?${params.toString()}`);
+      if (!res.ok) {
+        const data = await res.json().catch(function() { return {}; });
+        const msg = window.portalListLoadErrorMessage ? window.portalListLoadErrorMessage(res, data, 'recibidas') : (window.portalApiErrorMessage && window.portalApiErrorMessage(data)) || 'Revisa tu conexión e intenta de nuevo.';
+        tableWrap.style.display = 'none';
+        var mobileListErr = document.getElementById('invoiceListMobile');
+        if (mobileListErr) mobileListErr.innerHTML = '';
+        emptyState.hidden = true;
+        var loadErr = document.getElementById('loadErrorState');
+        var loadErrMsg = document.getElementById('loadErrorStateMsg');
+        if (loadErrMsg) loadErrMsg.textContent = msg;
+        if (loadErr) loadErr.hidden = false;
+        pagination.style.display = 'none';
+        return;
+      }
+      const data = await res.json();
+
+      if (!data.data || data.data.length === 0) {
+        tableWrap.style.display = 'none';
+        var mobileList = document.getElementById('invoiceListMobile');
+        if (mobileList) mobileList.innerHTML = '';
+        emptyState.hidden = false;
+        var loadErrHide = document.getElementById('loadErrorState');
+        if (loadErrHide) loadErrHide.hidden = true;
+        pagination.style.display = 'none';
+        return;
+      }
+
+      renderTable(data.data);
+      currentPagination = data.pagination;
+      renderPagination(data.pagination);
+      updateURL();
+    } catch (err) {
+      const fallbackMsg = 'Revisa tu conexión e intenta de nuevo.';
+      tableWrap.style.display = 'none';
+      var mobileListCatch = document.getElementById('invoiceListMobile');
+      if (mobileListCatch) mobileListCatch.innerHTML = '';
+      emptyState.hidden = true;
+      var loadErr = document.getElementById('loadErrorState');
+      var loadErrMsg = document.getElementById('loadErrorStateMsg');
+      if (loadErrMsg) loadErrMsg.textContent = fallbackMsg;
+      if (loadErr) loadErr.hidden = false;
+      pagination.style.display = 'none';
+    }
+  }
+
+  var loadErrorRetryBtn = document.getElementById('loadErrorStateRetry');
+  if (loadErrorRetryBtn) loadErrorRetryBtn.addEventListener('click', loadData);
+
+  // Render table rows y lista móvil (cards)
+  function renderTable(rows) {
+    const tbody = document.getElementById('tableBody');
+    const mobileEl = document.getElementById('invoiceListMobile');
+    const fragment = document.createDocumentFragment();
+    const temp = document.createElement('tbody');
+    const mobileCards = [];
+    for (const row of rows) {
+      const fecha = row.fecha_emision ? formatDate(row.fecha_emision) : '—';
+      const emisor = escapeHtml(row.nombre_emisor || '—');
+      const rfc = escapeHtml(row.rfc_emisor || '');
+      const concepto = truncate(escapeHtml(row.concepto || '—'), 60);
+      const uuid = row.uuid ? `${row.uuid.substring(0, 8)}…${row.uuid.substring(row.uuid.length - 4)}` : '—';
+      const total = formatMoney(row.total, row.moneda);
+      const iva = formatMoney(row.impuestos || 0, row.moneda);
+      const metodoPago = row.metodo_pago ? `<span class="badge badge--neutral" style="font-size: 11px;">${escapeHtml(row.metodo_pago)}</span>` : '<span class="muted">—</span>';
+      const status = renderStatus(row.status);
+      const hasXML = row.xml_path && row.xml_path.trim();
+      const detailUrl = `/portal/cfdi/received/${row.uuid}`;
+      const xmlUrl = hasXML ? `/portal/sat/xml/${row.uuid}` : null;
+      const pdfUrl = hasXML ? `/portal/sat/pdf/${row.uuid}` : null;
+      temp.innerHTML = `<tr>
+        <td class="muted">${fecha}</td>
+        <td><div style="font-weight: var(--fw-semibold);">${emisor}</div><div class="muted" style="font-size: var(--text-xs); font-family: ui-monospace, monospace;">${rfc}</div></td>
+        <td class="concepto-cell">${concepto}</td>
+        <td><div style="font-family: ui-monospace, monospace; font-size: var(--text-xs);">${uuid}</div></td>
+        <td style="font-weight: var(--fw-semibold);">${total}</td>
+        <td class="muted">${iva}</td>
+        <td>${metodoPago}</td>
+        <td>${status}</td>
+        <td style="text-align: right;"><div style="display: flex; gap: var(--space-1); justify-content: flex-end; flex-wrap: wrap;">
+          <a href="${detailUrl}" class="btn btn--sm btn--ghost" style="text-decoration: none;">Detalle</a>
+          ${xmlUrl ? `<a href="${xmlUrl}" target="_blank" rel="noopener" class="btn btn--sm" style="text-decoration: none;">XML</a>` : ''}
+          ${pdfUrl ? `<button type="button" class="btn btn--sm" data-pdf-url="${pdfUrl}">PDF</button>` : ''}
+        </div></td>
+      </tr>`;
+      fragment.appendChild(temp.firstElementChild);
+
+      if (mobileEl) {
+        const actions = [
+          '<a href="' + detailUrl + '" class="btn btn--sm btn--ghost" style="text-decoration:none;">Detalle</a>',
+          xmlUrl ? '<a href="' + xmlUrl + '" target="_blank" rel="noopener" class="btn btn--sm btn--secondary" style="text-decoration:none;">XML</a>' : '',
+          pdfUrl ? '<button type="button" class="btn btn--sm btn--secondary" data-pdf-url="' + escapeHtml(pdfUrl) + '">PDF</button>' : ''
+        ].filter(Boolean).join('');
+        mobileCards.push('<div class="invoice-card-mobile">' +
+          '<div class="invoice-card-mobile__row">' +
+            '<div class="invoice-card-mobile__main">' +
+              '<div class="invoice-card-mobile__title">' + emisor + '</div>' +
+              '<div class="invoice-card-mobile__meta muted">' + fecha + (rfc ? ' · ' + rfc : '') + '</div>' +
+              '<div class="invoice-card-mobile__concept" title="' + escapeHtml(row.concepto || '') + '">' + concepto + '</div>' +
+            '</div>' +
+            '<div class="invoice-card-mobile__total">' + total + '</div>' +
+          '</div>' +
+          '<div class="invoice-card-mobile__row">' + status + '</div>' +
+          '<div class="invoice-card-mobile__actions">' + actions + '</div>' +
+        '</div>');
+      }
+    }
+    tbody.replaceChildren(fragment);
+    if (mobileEl) mobileEl.innerHTML = mobileCards.join('');
+  }
+
+  // Render pagination
+  function renderPagination(pag) {
+    const pagination = document.getElementById('pagination');
+    if (pag.pages <= 1) {
+      pagination.style.display = 'none';
+      return;
+    }
+    pagination.style.display = 'flex';
+    document.getElementById('prevPageBtn').disabled = pag.page <= 1;
+    document.getElementById('nextPageBtn').disabled = pag.page >= pag.pages;
+    document.querySelector('.pagination__info').textContent = 
+      `Mostrando ${(pag.page - 1) * pag.per_page + 1}-${Math.min(pag.page * pag.per_page, pag.total)} de ${pag.total}`;
+    document.querySelector('.pagination__page').textContent = `Página ${pag.page} de ${pag.pages}`;
+  }
+
+  // Helper functions
+  function formatDate(dt) {
+    if (!dt || dt.length < 10) return '—';
+    const part = dt.substring(0, 10);
+    const [y, m, d] = part.split('-');
+    return d && m && y ? `${d}/${m}/${y}` : part;
+  }
+
+  function formatMoney(x, m) {
+    if (x == null) return '—';
+    const n = parseFloat(x);
+    return Number.isFinite(n) ? `$${n.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${m || ''}`.trim() : '—';
+  }
+
+  function truncate(txt, maxlen) {
+    return txt && txt.length > maxlen ? txt.substring(0, maxlen) + '…' : (txt || '—');
+  }
+
+  function escapeHtml(s) {
+    return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  function renderStatus(s) {
+    const st = String(s || '').toUpperCase();
+    if (st === 'V' || st === 'VIGENTE' || st === '1') {
+      return '<span class="badge badge--success">Vigente</span>';
+    } else if (st === 'C' || st === 'CANCELADO' || st === 'CANCELADA' || st === '0') {
+      return '<span class="badge badge--danger">Cancelada</span>';
+    } else if (st.includes('CANCELACION') || st.includes('CANCELACIÓN')) {
+      return '<span class="badge badge--warn">En cancelación</span>';
+    }
+    return '<span class="badge badge--neutral">' + escapeHtml(s || 'Sin estatus') + '</span>';
+  }
+
+  // Event handlers
+  function applyFilters() {
+    filters.search = document.getElementById('searchInput').value.trim();
+    filters.status = document.getElementById('statusFilter').value;
+    const minVal = document.getElementById('minAmount').value.trim();
+    filters.min_amount = minVal ? parseFloat(minVal) : null;
+    const maxVal = document.getElementById('maxAmount').value.trim();
+    filters.max_amount = maxVal ? parseFloat(maxVal) : null;
+    filters.metodo_pago = document.getElementById('metodoPagoFilter').value;
+    currentPage = 1;
+    filters.page = 1;
+    updateFiltersBadge();
+    loadData();
+  }
+
+  document.getElementById('searchInput').addEventListener('input', function() {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(applyFilters, 400);
+  });
+
+  document.getElementById('statusFilter').addEventListener('change', applyFilters);
+  document.getElementById('minAmount').addEventListener('change', applyFilters);
+  document.getElementById('maxAmount').addEventListener('change', applyFilters);
+  document.getElementById('metodoPagoFilter').addEventListener('change', applyFilters);
+
+  document.getElementById('clearFiltersBtn').addEventListener('click', function() {
+    filters = { ym: currentYM, search: '', status: '', min_amount: null, max_amount: null, metodo_pago: '', page: 1 };
+    currentPage = 1;
+    syncFormInputs();
+    loadData();
+    updateFiltersBadge();
+  });
+
+  document.getElementById('prevPageBtn').addEventListener('click', function() {
+    if (currentPage > 1) {
+      currentPage--;
+      filters.page = currentPage;
+      loadData();
+    }
+  });
+
+  document.getElementById('nextPageBtn').addEventListener('click', function() {
+    if (currentPagination && currentPage < currentPagination.pages) {
+      currentPage++;
+      filters.page = currentPage;
+      loadData();
+    }
+  });
+
+  // PDF modal handler (reuse existing)
+  document.addEventListener('click', function(e) {
+    const btn = e.target.closest('[data-pdf-url]');
+    if (btn) {
+      const url = btn.getAttribute('data-pdf-url');
+      if (window.openPdfModal) window.openPdfModal(url);
+    }
+  });
+
+  // Listen for month picker changes (if month changes, update filters and reload)
+  const monthPicker = document.querySelector('.month-picker');
+  if (monthPicker) {
+    const observer = new MutationObserver(function(mutations) {
+      const newYm = monthPicker.getAttribute('data-ym');
+      if (newYm && newYm !== filters.ym) {
+        filters.ym = newYm;
+        currentPage = 1;
+        filters.page = 1;
+        loadData();
+      }
+    });
+    observer.observe(monthPicker, { attributes: true, attributeFilter: ['data-ym'] });
+  }
+
+  // Initialize
+  parseURLParams();
+  syncFormInputs();
+  updateFiltersBadge();
+  loadData();
+})();
+</script>
+
+<style>
+.card__header--row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.card__header-actions { display: flex; align-items: center; gap: var(--space-2); }
+
+.filters-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 6px 12px;
+  font-size: 13px;
+}
+.filters-toggle .icon { flex-shrink: 0; }
+.filters-toggle__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--text-inverse, #fff);
+  background: var(--primary, #0d9488);
+  border-radius: 9px;
+}
+.filters-toggle__badge[hidden] { display: none !important; }
+
+.filters-panel {
+  border-top: 1px solid var(--border);
+  background: var(--surface-hover, rgba(0,0,0,.02));
+  overflow: hidden;
+}
+.filters-panel[hidden] { display: none !important; }
+.filters-panel__inner {
+  padding: var(--space-3);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.filters-panel__search {
+  position: relative;
+  flex: 1;
+  min-width: 140px;
+}
+.filters-panel__search-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  opacity: 0.6;
+  pointer-events: none;
+}
+.filters-panel__search .input { padding-left: 32px; }
+.filters-panel__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.filters-panel__actions { margin-left: auto; }
+
+.input--compact, .select--compact {
+  font-size: 13px;
+  padding: 6px 10px;
+  min-height: 34px;
+  border-radius: 8px;
+}
+.input--compact { width: 100%; min-width: 0; }
+.select--compact { min-width: 90px; }
+.filters-panel__row .input--compact { width: 80px; min-width: 80px; }
+
+.pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+@media (max-width: 640px) {
+  .card__header--row { flex-direction: column; align-items: stretch; }
+  .card__header-actions { justify-content: flex-end; }
+  .filters-toggle { align-self: flex-end; }
+  .filters-panel__inner {
+    flex-direction: column;
+    align-items: stretch;
+    padding: var(--space-2);
+  }
+  .filters-panel__search { min-width: 0; }
+  .filters-panel__row {
+    flex-direction: column;
+    width: 100%;
+  }
+  .filters-panel__row .select--compact,
+  .filters-panel__row .input--compact { width: 100%; min-width: 0; }
+  .filters-panel__actions { margin-left: 0; justify-content: flex-end; }
+}
+</style>
 {% endblock %}

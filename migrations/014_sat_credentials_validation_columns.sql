@@ -1,0 +1,4 @@
+-- 014_sat_credentials_validation_columns.sql
+-- Columnas para estado de validación FIEL (validation_at, validation_ok, validation_message).
+-- Aplicado por migrations_runner vía _apply_014_sat_credentials_validation (idempotente).
+-- No ejecutar SQL directo: el runner usa _safe_add_column.

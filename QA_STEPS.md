@@ -63,8 +63,21 @@ Verificación de empty states, feedback, móvil y flujos cerrados. Base: sesión
 | U13 | En **Generar factura** (o crear factura), añadir un concepto. | Concepto en card/fila; en móvil sin solapamientos; botón quitar concepto accesible. |
 | U14 | Tras **guardar** un cliente o producto desde el modal (Home o listado). | Toast de éxito; listado o select se actualiza con el nuevo ítem. |
 | U15 | Comprobar **focus** con teclado (Tab en formularios y botones). | Anillo de focus visible en inputs y botones; sin saltos raros de foco. |
+| U16 | Abrir **menú usuario** (topbar) con sesión iniciada. | Bloque "Mi cuenta" con **Activación: X/4**, barra de progreso y 4 pasos clicables (Datos fiscales, Conectar SAT, Primer cliente, Primer producto). Enlaces "Completar"/"Ver" con área táctil ≥44px. Si todo está completo: "✅ Configuración completa" y botón "Ocultar". |
 
-Si U1–U15 pasan, el pulido UX está verificado. Detalle en **UX_AUDIT_REPORT.md** y **MOBILE_CHECKLIST.md**.
+Si U1–U16 pasan, el pulido UX está verificado. Detalle en **UX_AUDIT_REPORT.md** y **MOBILE_CHECKLIST.md**.
+
+---
+
+## API: Estado de cuenta (checklist de activación)
+
+| Aspecto | Detalle |
+|--------|--------|
+| **Endpoint** | `GET /api/account/status` |
+| **Autenticación** | Requiere sesión o token (cookie o `?token=`). Dependencia `get_portal_issuer`; si no hay sesión válida responde **401**. |
+| **Respuesta** | JSON: `issuer_ok`, `sat_ok`, `has_customer`, `has_product` (boolean), `completed` (0–4), `total` (4). |
+| **Uso** | El dropdown "Mi cuenta" del portal hace `fetch` con `credentials: 'include'` al abrir y pinta el checklist de activación. |
+| **Criterios** | *issuer_ok:* RFC, razón social y régimen fiscal no vacíos en `issuers`. *sat_ok:* existe fila en `sat_credentials` con `validation_ok = 1`. *has_customer:* `customer_profiles` count ≥ 1. *has_product:* `issuer_products` count ≥ 1. |
 
 ---
 
@@ -215,6 +228,25 @@ Si U1–U15 pasan, el pulido UX está verificado. Detalle en **UX_AUDIT_REPORT.m
 | 12.8 | Ir a **FIEL / Credenciales SAT** (desde Inicio → "Sube FIEL/CSD" o `/portal/config/sat`). | Página con estado "No configurado" o "Configurado", formulario para subir .cer, .key y contraseña. |
 | 12.9 | Subir archivos **.cer** y **.key** (FIEL vigente) y contraseña; clic en **"Guardar y validar"**. | Mensaje de guardado; se ejecuta validación y se muestra resultado (✓ válido o ✗ error). Estado pasa a "Configurado" y "Última validación" con fecha y resultado. |
 | 12.10 | Si la FIEL es válida: ejecutar sync SAT (script o botón según entorno, ej. `php sat_sync/sync.php` o "Sync SAT" en portal). | Sync completa sin error; en Emitidas/Recibidas aparecen o se actualizan CFDI según el período configurado. |
+
+---
+
+## 12b. Conectar SAT self-serve — 10 min
+
+Flujo completo para probar que un usuario puede configurar FIEL y sincronizar sin ayuda. Requisito: PHP en PATH, `sat_sync/check_fiel.php` y dependencias Composer; opcional: cron o ejecución manual de `scripts/sat_worker.py` para procesar la cola.
+
+| Paso | Acción | Esperado |
+|------|--------|----------|
+| 12b.1 | Ir a **Conectar SAT** (`/portal/config/sat`). | Página "Conectar SAT" con dropzones .cer / .key, campo contraseña, botón "Guardar y validar". Panel Estado: "No configurado" o "Configurado" y última validación. |
+| 12b.2 | Subir un **.cer** y **.key** (FIEL e.firma vigente) y contraseña; clic **"Guardar y validar"**. | Archivos guardados; validación se ejecuta; Estado muestra "FIEL válida ✓" y fecha, o "Error" y mensaje legible (no stack trace). |
+| 12b.3 | Pulsar **"Validar de nuevo"** (si ya hay FIEL configurada). | Respuesta inmediata (toast o recarga); Estado se actualiza con la misma o nueva validación. |
+| 12b.4 | Ir a **Inicio** (`/portal/home`). | Bloque "SAT" con "Último sync: …" (o "Aún no se ha sincronizado") y botón **"Sync SAT"** (pequeño, no gigante). |
+| 12b.5 | Clic en **"Sync SAT"**. | Botón pasa a "Encolando…"; luego estado "Sincronizando…" (spinner). Si el worker está corriendo, al cabo de un tiempo "Último sync" se actualiza y estado pasa a OK (o Error con mensaje). |
+| 12b.6 | Ir a **Facturas emitidas** y **Facturas recibidas**. | Misma barra con "Último sync" y botón "Sync SAT"; comportamiento idéntico al de Inicio. |
+| 12b.7 | Si el estado muestra **Error** (p. ej. FIEL inválida o worker no configurado). | Un solo bloque de error con mensaje claro y enlace "Ver detalle / Revalidar FIEL" a `/portal/config/sat`; no doble mensaje (toast + bloque). |
+| 12b.8 | Comprobar que **worker** procesa la cola: ejecutar `APP_DB_PATH=invoicing.db python3 scripts/sat_worker.py` tras encolar desde el portal. | Jobs en `sat_jobs` con status `queued` pasan a `running` y luego `ok` o `error`; `last_error` y `finished_at` actualizados. |
+
+Ver **SELF_SERVE_SAT.md** (guía usuario) y **OPS_RUNBOOK.md** (cron worker).
 
 ---
 

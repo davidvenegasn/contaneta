@@ -93,15 +93,16 @@ for ($i = 3; $i < $argc; $i++) {
 }
 
 // === Paths ===
-$baseDir = realpath(__DIR__ . '/..'); // raíz del proyecto (donde está invoicing.db)
+$baseDir = realpath(__DIR__ . '/..'); // raíz del proyecto
 if (false === $baseDir) {
     fwrite(STDERR, "No se pudo resolver la ruta base del proyecto.\n");
     exit(1);
 }
 
-$dbPath = $baseDir . '/invoicing.db';
-if (! file_exists($dbPath)) {
-    fwrite(STDERR, "No existe invoicing.db en: {$dbPath}\n");
+$dbPath = getenv('APP_DB_PATH') ?: ($baseDir . '/invoicing.db');
+$dbPath = strpos($dbPath, '/') === 0 ? $dbPath : $baseDir . '/' . ltrim($dbPath, '/');
+if (!file_exists($dbPath)) {
+    fwrite(STDERR, "No existe la base de datos en: {$dbPath}\n");
     exit(1);
 }
 
@@ -327,10 +328,11 @@ $runOneWindow = function (DateTimeImmutable $from, DateTimeImmutable $to) use (
 
         $count = 0;
         foreach ($reader->metadata() as $uuid => $m) {
+            $uuidNorm = strtolower((string) $m->uuid);
             $upsert->execute([
                 ':issuer_id' => $issuerId,
                 ':direction' => $direction,
-                ':uuid' => (string)$m->uuid,
+                ':uuid' => $uuidNorm,
                 ':fecha_emision' => (string)($m->fechaEmision ?? ''),
                 ':rfc_emisor' => (string)($m->rfcEmisor ?? ''),
                 ':rfc_receptor' => (string)($m->rfcReceptor ?? ''),
