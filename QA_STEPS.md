@@ -42,6 +42,32 @@ Si todo lo anterior pasa, el lanzamiento mínimo está verificado. Para pruebas 
 
 ---
 
+## Pruebas UX (15 min) — pulido premium
+
+Verificación de empty states, feedback, móvil y flujos cerrados. Base: sesión iniciada en el portal.
+
+| # | Acción | Esperado |
+|---|--------|----------|
+| U1 | Ir a **Clientes** sin tener clientes. | Empty state "Aún no tienes clientes" con CTA "Crear primer cliente"; **no** alerta ni toast de error. |
+| U2 | Ir a **Productos** sin productos. | Empty state "Aún no tienes productos" con "Crear primer producto"; sin error. |
+| U3 | Ir a **Proveedores** sin proveedores. | Empty state "Aún no hay proveedores" con "Agregar primer proveedor" y "Ver facturas recibidas"; sin error. |
+| U4 | Ir a **Cotizaciones** sin cotizaciones. | Empty state "Aún no tienes cotizaciones" con "Nueva cotización"; sin error. |
+| U5 | Ir a **Facturas emitidas** (mes actual sin datos). | Empty state "No hay facturas emitidas este mes" con "Generar factura" y "Sincronizar con SAT"; **no** botón Sync en la topbar (solo en barra de la lista). |
+| U6 | Ir a **Facturas recibidas** (mes sin datos). | Empty state equivalente; Sync solo en la barra de la lista. |
+| U7 | En Emitidas/Recibidas, comprobar barra sobre la tabla. | Texto "Último sync: …" (o "Aún no se ha sincronizado") y botón pequeño "Sync SAT" (ghost); en móvil botón solo icono. |
+| U8 | Redimensionar a **390px** (DevTools). | Sin scroll horizontal; listas en cards en emitidas/recibidas; botones y enlaces con área táctil cómoda (≈44px). |
+| U9 | En **Proveedores**, si hay un proveedor, clic en "Ver facturas". | Drawer/panel se abre con scroll interno; cerrar con X o ESC; sin cortes de layout. |
+| U10 | En **Cotizaciones**, "Nueva cotización". | Modal con footer fijo en móvil; botones "Cancelar", "Guardar borrador", "Enviar y obtener link" grandes y accesibles. |
+| U11 | Simular fallo de carga: desconectar red y recargar **Clientes**. | Bloque "No se pudo cargar el listado" con "Reintentar"; **no** doble mensaje (toast + bloque). Al reconectar, "Reintentar" vuelve a cargar. |
+| U12 | Navegar por **Inicio, Emitidas, Clientes, Productos** con el menú. | El ítem activo del sidebar se resalta (fondo y barra lateral); topbar muestra título e icono de la sección. |
+| U13 | En **Generar factura** (o crear factura), añadir un concepto. | Concepto en card/fila; en móvil sin solapamientos; botón quitar concepto accesible. |
+| U14 | Tras **guardar** un cliente o producto desde el modal (Home o listado). | Toast de éxito; listado o select se actualiza con el nuevo ítem. |
+| U15 | Comprobar **focus** con teclado (Tab en formularios y botones). | Anillo de focus visible en inputs y botones; sin saltos raros de foco. |
+
+Si U1–U15 pasan, el pulido UX está verificado. Detalle en **UX_AUDIT_REPORT.md** y **MOBILE_CHECKLIST.md**.
+
+---
+
 ## 1. Registro público (/signup)
 
 | Paso | Acción | Esperado |
