@@ -64,9 +64,10 @@ nano .env
 Variables mínimas recomendadas para producción:
 
 ```env
-# Obligatorias en producción
+# Obligatorias en producción (si SESSION_SECRET falta con ENV=prod, la app emite log CRITICAL al arrancar)
+ENV=prod
 DEV_MODE=0
-SESSION_SECRET=<generar con: python3 -c "import secrets; print(secrets.token_hex(32))">
+SESSION_SECRET=<valor fijo; generar: python3 -c "import secrets; print(secrets.token_hex(32))">
 COOKIE_SECURE=1
 
 # Base de datos (por defecto: ./invoicing.db)

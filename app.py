@@ -8,9 +8,10 @@ request_id_ctx: ContextVar[str] = ContextVar("request_id", default="-")
 
 from migrations_runner import apply_migrations
 from fastapi import FastAPI, Request, Query, Depends
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from config import (
     STATIC_DIR,
@@ -19,6 +20,8 @@ from config import (
     SESSION_COOKIE_NAME,
     DEV_MODE,
     DEV_TOKEN,
+    IS_PROD,
+    SESSION_SECRET_FROM_ENV,
 )
 from services import issuers, session
 from routers.deps import get_portal_issuer
@@ -31,8 +34,133 @@ from routers.admin import get_admin_router
 from routers.billing import router as billing_router
 
 app = FastAPI()
-app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+if os.path.isdir(STATIC_DIR):
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
+# Jinja2 no expone getattr por defecto; lo añadimos para templates que lo usen
+templates.env.globals["getattr"] = getattr
+
+
+def _html_404() -> str:
+    return """<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>No encontrado — ContaNeta</title>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; margin: 0; padding: 2rem; background: #f1f5f9; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+    .card { max-width: 420px; width: 100%; background: #fff; padding: 28px; border-radius: 16px; box-shadow: 0 4px 6px -1px rgba(0,0,0,.08), 0 2px 4px -2px rgba(0,0,0,.06); }
+    h1 { margin: 0 0 8px; font-size: 1.35rem; font-weight: 600; color: #1e293b; }
+    .code { font-size: 13px; color: #94a3b8; margin-bottom: 16px; }
+    p { margin: 0 0 20px; color: #64748b; line-height: 1.5; }
+    a { display: inline-block; color: #0ea5e9; text-decoration: none; font-weight: 500; }
+    a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Página no encontrada</h1>
+    <p class="code">404</p>
+    <p>La ruta que buscas no existe o ha sido movida.</p>
+    <p><a href="/">Ir al inicio</a></p>
+  </div>
+</body>
+</html>"""
+
+
+def _html_error(status: int, detail: str) -> str:
+    return f"""<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Error — ContaNeta</title>
+  <style>
+    body {{ font-family: system-ui, -apple-system, sans-serif; margin: 0; padding: 2rem; background: #fef2f2; min-height: 100vh; display: flex; align-items: center; justify-content: center; }}
+    .card {{ max-width: 420px; width: 100%; background: #fff; padding: 28px; border-radius: 16px; box-shadow: 0 4px 6px -1px rgba(0,0,0,.08); border-left: 4px solid #dc2626; }}
+    h1 {{ margin: 0 0 8px; font-size: 1.35rem; font-weight: 600; color: #b91c1c; }}
+    .code {{ font-size: 13px; color: #94a3b8; margin-bottom: 16px; }}
+    p {{ margin: 0 0 20px; color: #64748b; line-height: 1.5; }}
+    a {{ display: inline-block; color: #0ea5e9; text-decoration: none; font-weight: 500; }}
+    a:hover {{ text-decoration: underline; }}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Error en el servidor</h1>
+    <p class="code">{status}</p>
+    <p>{detail}</p>
+    <p><a href="/">Ir al inicio</a></p>
+  </div>
+</body>
+</html>"""
+
+
+def _api_error_code(status_code: int) -> str:
+    """Mapeo de HTTP status a código de error uniforme para la API."""
+    if status_code == 400:
+        return "BAD_REQUEST"
+    if status_code in (401, 403):
+        return "UNAUTHORIZED" if status_code == 401 else "FORBIDDEN"
+    if status_code == 404:
+        return "NOT_FOUND"
+    if status_code >= 500:
+        return "INTERNAL_ERROR"
+    return "ERROR"
+
+
+def _api_error_body(status_code: int, detail) -> dict:
+    """Cuerpo de respuesta de error uniforme: {ok: false, error: {code, message}, detail}."""
+    msg = detail
+    if isinstance(detail, list):
+        msg = "; ".join(str(x) for x in detail) if detail else "Error de validación"
+    elif not isinstance(msg, str):
+        msg = str(msg) if msg is not None else "Error"
+    return {
+        "ok": False,
+        "error": {"code": _api_error_code(status_code), "message": msg},
+        "detail": msg,
+    }
+
+
+@app.exception_handler(404)
+async def not_found_handler(request: Request, _exc):
+    accept = (request.headers.get("accept") or "").lower()
+    if "text/html" in accept:
+        return HTMLResponse(_html_404(), status_code=404)
+    from fastapi.responses import JSONResponse
+    path = (request.url.path or "")
+    if path.startswith("/api/"):
+        return JSONResponse(_api_error_body(404, "Not Found"), status_code=404)
+    return JSONResponse({"detail": "Not Found"}, status_code=404)
+
+
+@app.exception_handler(500)
+async def server_error_handler(request: Request, exc: Exception):
+    logging.exception("Unhandled error: %s", exc)
+    accept = (request.headers.get("accept") or "").lower()
+    if "text/html" in accept:
+        return HTMLResponse(_html_error(500, "Ha ocurrido un error en el servidor. Intenta de nuevo o ve al inicio."), status_code=500)
+    from fastapi.responses import JSONResponse
+    path = (request.url.path or "")
+    if path.startswith("/api/"):
+        return JSONResponse(_api_error_body(500, "Error interno del servidor. Intenta de nuevo."), status_code=500)
+    return JSONResponse({"detail": "Internal Server Error"}, status_code=500)
+
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    """Para 401/403 en peticiones HTML del portal, redirigir al login. En /api/* respuestas de error uniformes."""
+    path = request.url.path or ""
+    is_api = path.startswith("/api/") or path.startswith("/download/")
+    accept = (request.headers.get("accept") or "").lower()
+    if exc.status_code in (401, 403) and "text/html" in accept and not is_api:
+        return RedirectResponse(url="/login", status_code=302)
+    from fastapi.responses import JSONResponse
+    if is_api:
+        return JSONResponse(_api_error_body(exc.status_code, exc.detail), status_code=exc.status_code)
+    return JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
 
 
 def _configure_logging() -> None:
@@ -81,6 +209,25 @@ async def request_id_middleware(request: Request, call_next):
 
 
 @app.middleware("http")
+async def security_headers_middleware(request: Request, call_next):
+    """Cabeceras de seguridad: CSP (default-src 'self'), frame-ancestors 'none', nosniff, referrer-policy, permissions-policy."""
+    response = await call_next(request)
+    if "X-Content-Type-Options" not in response.headers:
+        response.headers["X-Content-Type-Options"] = "nosniff"
+    if "X-Frame-Options" not in response.headers:
+        response.headers["X-Frame-Options"] = "DENY"
+    if "Referrer-Policy" not in response.headers:
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    if "Permissions-Policy" not in response.headers:
+        response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=(), payment=()"
+    if "Content-Security-Policy" not in response.headers:
+        # CSP básico: default-src 'self'; frame-ancestors 'none' (no embedding); Stripe/fuentes si aplican
+        csp = "default-src 'self'; frame-ancestors 'none'; script-src 'self' 'unsafe-inline' https://js.stripe.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; frame-src 'self' https://js.stripe.com https://hooks.stripe.com; img-src 'self' data:; connect-src 'self' https://api.stripe.com;"
+        response.headers["Content-Security-Policy"] = csp
+    return response
+
+
+@app.middleware("http")
 async def redirect_token_middleware(request: Request, call_next):
     token_query = request.query_params.get("token", "").strip()
     is_api = request.url.path.startswith("/api/") or request.url.path.startswith("/download/")
@@ -123,6 +270,12 @@ async def redirect_token_middleware(request: Request, call_next):
 @app.get("/")
 def root():
     return RedirectResponse(url="/portal/home")
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon():
+    """Evita 404 cuando el navegador pide favicon.ico."""
+    return Response(status_code=204)
 
 
 def _health_checks():
@@ -169,9 +322,9 @@ def _health_checks():
 
 @app.get("/health")
 def health():
-    """Health check para monitoreo y balanceadores. No requiere auth. Revisa DB, migraciones y storage."""
+    """Health check para monitoreo. No requiere auth. Incluye DB, versión de migraciones y storage."""
     checks = _health_checks()
-    status = "ok" if checks["ok"] else "degraded"
+    status = "ok" if checks["db_readable"] else "degraded"
     versions = checks.get("migrations_versions") or []
     migration_version = versions[-1] if versions else None
     return {
@@ -183,6 +336,20 @@ def health():
         "storage_exists": checks["storage_exists"],
         "storage_writable": checks["storage_writable"],
     }
+
+
+@app.get("/ready")
+def ready():
+    """Readiness: 200 solo si migraciones aplicadas (para balanceadores/K8s). 503 si no está listo."""
+    checks = _health_checks()
+    if checks["migrations_applied"] and checks["db_readable"]:
+        versions = checks.get("migrations_versions") or []
+        return {"ready": True, "migration_version": versions[-1] if versions else None}
+    from fastapi.responses import JSONResponse
+    return JSONResponse(
+        {"ready": False, "reason": "migrations_not_applied" if not checks["migrations_applied"] else "db_not_readable"},
+        status_code=503,
+    )
 
 
 @app.get("/status", response_class=HTMLResponse)
@@ -229,6 +396,18 @@ app.include_router(get_portal_router(templates))
 app.include_router(get_invoicing_router(templates))
 app.include_router(get_admin_router(templates))
 app.include_router(billing_router)
+
+logger = logging.getLogger(__name__)
+
+
+@app.on_event("startup")
+def _startup_session_secret_check():
+    """En producción exige SESSION_SECRET en .env; si falta, warning crítico."""
+    if IS_PROD and not SESSION_SECRET_FROM_ENV:
+        logger.critical(
+            "SESSION_SECRET no está definido en .env. En producción es OBLIGATORIO. "
+            "Genera uno con: python3 -c \"import secrets; print(secrets.token_hex(32))\" y añádelo a .env"
+        )
 
 
 # Backwards compatible URL (legacy: ?token= sigue funcionando vía dependency en /portal/create)

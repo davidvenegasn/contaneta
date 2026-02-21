@@ -33,8 +33,10 @@ _demo_issuer = os.getenv("DEMO_ISSUER_ID", "").strip()
 DEMO_ISSUER_ID = int(_demo_issuer) if _demo_issuer.isdigit() else None
 COOKIE_DEMO_VIEW = "portal_demo_view"
 
-# En prod debe definirse SESSION_SECRET (valor fijo, no aleatorio por proceso).
-SESSION_SECRET = os.getenv("SESSION_SECRET", secrets.token_hex(32))
+# En prod OBLIGATORIO: SESSION_SECRET definido en .env (valor fijo). Si falta, se usa aleatorio y se emite warning al arranque.
+_session_secret_env = (os.getenv("SESSION_SECRET") or "").strip()
+SESSION_SECRET = _session_secret_env if _session_secret_env else secrets.token_hex(32)
+SESSION_SECRET_FROM_ENV = bool(_session_secret_env)
 SESSION_COOKIE_NAME = "portal_session"
 SESSION_TTL_DAYS = int(os.getenv("SESSION_TTL_DAYS", "7"))
 # En prod: Secure=True por defecto. En local (ENV=dev): 0 para HTTP.

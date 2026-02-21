@@ -4,7 +4,68 @@
 
 **Fecha objetivo:** _______________
 
-**Documentos relacionados:** `QA_STEPS.md` (pasos de verificación), `DECISIONS.md` (decisiones de diseño y operación), `SECURITY_NOTES.md` (aislamiento issuer_id, cookies, rate limit), `env.example` (variables de entorno y defaults seguros).
+**Documentos relacionados:** `QA_STEPS.md` (pruebas rápidas 15 min), `ROLLBACK.md` (volver atrás con git tags), `SECURITY_NOTES.md`, `env.example` / `.env.example`.
+
+---
+
+## Pasos exactos (copy/paste) — Dueño / no programador
+
+Ejecutar en orden. Sustituir `http://TU_SERVIDOR:8000` por tu URL real (ej. `https://tudominio.com`).
+
+### 1. Crear tag antes de lanzar (para poder volver atrás)
+```bash
+cd /ruta/del/proyecto
+git tag -a v1.0-pre-$(date +%Y%m%d) -m "Pre-lanzamiento $(date +%Y-%m-%d)"
+git push origin --tags
+```
+Ver **ROLLBACK.md** para revertir a este tag si algo falla.
+
+### 2. Copiar y configurar variables de entorno
+```bash
+cp .env.example .env
+# Editar .env: ENV=prod, DEV_MODE=0, SESSION_SECRET (obligatorio en prod; si falta, la app emite log CRITICAL al arrancar), COOKIE_SECURE=1 si usas HTTPS
+python3 -c "import secrets; print('SESSION_SECRET=' + secrets.token_hex(32))"
+# Pegar la línea que imprime dentro de .env
+```
+
+### 3. Instalar dependencias y aplicar migraciones
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+.venv/bin/python -c "from migrations_runner import apply_migrations; from config import DB_PATH; apply_migrations(DB_PATH); print('Migraciones OK')"
+```
+
+### 4. Smoke test (comprobar que la app responde)
+```bash
+# Terminal 1: levantar la app
+./run_server.sh 8000
+
+# Terminal 2: esperar 3 segundos y ejecutar
+./scripts/smoke.sh
+# Debe terminar con "OK" y código 0
+```
+
+### 5. Verificación rápida en navegador (15 min)
+Seguir **QA_STEPS.md** sección "Pruebas rápidas (15 min)": registro, login, portal, health.
+
+### 6. Backup antes de abrir a usuarios
+```bash
+./scripts/backup_db.sh
+# Si tienes storage: ./scripts/backup_storage_xml.sh
+```
+
+### 7. Arrancar en producción (ejemplo con gunicorn)
+```bash
+.venv/bin/pip install gunicorn
+.venv/bin/gunicorn app:app -w 2 -k uvicorn.workers.UvicornWorker --bind 127.0.0.1:8000
+```
+(O usar systemd/supervisor con ese comando; ver DEPLOY_GUIDE.md.)
+
+### 8. Comprobar health desde fuera
+```bash
+curl -s http://TU_SERVIDOR:8000/health
+# Debe devolver {"status":"ok", ...}
+```
 
 ---
 
