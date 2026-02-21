@@ -30,12 +30,13 @@ Configuración: ver sección **Variables de entorno** más abajo.
 
 | Variable | Uso | Recomendación |
 |----------|-----|----------------|
+| `ENV` | `dev` (default) o `prod`. Define defaults de `DEV_MODE` y `COOKIE_SECURE`. | En producción: `ENV=prod`. |
 | `APP_DB_PATH` | Ruta al archivo SQLite (por defecto `invoicing.db` en la raíz). | Opcional en desarrollo. |
-| `DEV_MODE` | `1` = permite acceso demo sin cookie/token si existe emisor con `DEV_TOKEN`. | `0` en producción. |
+| `DEV_MODE` | `1` = permite acceso demo con `DEV_TOKEN` sin login. Default: **0** si `ENV=prod`, **1** si `ENV=dev`. | En producción debe ser `0` (o no definir). |
 | `DEV_TOKEN` | Token legacy para desarrollo (ej. `demo`). Debe existir en `issuer_tokens`. | Solo desarrollo; no exponer en producción. |
-| `SESSION_SECRET` | Clave para firmar la cookie de sesión. | **Obligatorio en producción**; valor fuerte y secreto. |
+| `SESSION_SECRET` | Clave para firmar la cookie de sesión (valor fijo). | **Obligatorio en producción**; generar con `secrets.token_hex(32)`. |
 | `SESSION_TTL_DAYS` | Días de validez de la cookie (por defecto 7). | Ajustar según política. |
-| `COOKIE_SECURE` | `1` = cookie solo por HTTPS. | `1` en producción con HTTPS. |
+| `COOKIE_SECURE` | `1` = cookie solo por HTTPS. Default: 0 en local, 1 en prod. | En local con HTTP: `0`. En prod con HTTPS: `1`. |
 | `FIRM_USER_EMAIL` | Email del usuario “firma” (admin interno). | Opcional. |
 | `SITE_URL` | URL base del sitio (para OAuth, verificación de correo y reset password). | En producción con dominio propio. |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` | Envío de correos (verificación, recuperación de contraseña). | En producción para emails reales. Sin SMTP y con `DEV_MODE=1`, los enlaces se loguean en consola. |

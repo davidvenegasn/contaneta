@@ -6,9 +6,9 @@ from email.mime.text import MIMEText
 from email.utils import formataddr
 from typing import Optional
 
-logger = logging.getLogger(__name__)
+from config import DEV_MODE
 
-DEV_MODE = os.getenv("DEV_MODE", "1") == "1"
+logger = logging.getLogger(__name__)
 SMTP_HOST = (os.getenv("SMTP_HOST") or "").strip()
 SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
 SMTP_USER = (os.getenv("SMTP_USER") or "").strip()

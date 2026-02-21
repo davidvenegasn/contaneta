@@ -49,6 +49,13 @@ Documento de decisiones tomadas para lanzamiento público y operación autónoma
 
 ---
 
+## Configuración (DEV_MODE por entorno)
+
+- **DEV_MODE por default:** En cualquier entorno que no sea explícitamente desarrollo (`ENV=dev`), el default de `DEV_MODE` es **0**. Solo con `ENV=dev` el default es `1`. Así se evita caer al acceso demo por defecto en producción o en entornos no configurados. Lógica en `config.py`: `DEV_MODE = os.getenv("DEV_MODE", "0" si no dev else "1") == "1"`.
+- **Demo solo con DEV_MODE=1 explícito:** El acceso con `DEV_TOKEN` (sin cookie/login) solo está activo cuando `DEV_MODE=1`. En prod, si no se define `DEV_MODE`, queda 0.
+
+---
+
 ## Seguridad (agent/security)
 
 - **Rate limiting:** Login: 5 intentos por IP en 60 s. Registro: 3 intentos por IP en 60 s. Retraso y mensaje genérico al superar el límite.
