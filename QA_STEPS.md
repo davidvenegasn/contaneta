@@ -2,7 +2,43 @@
 
 Pasos exactos para probar registro, login, logout, portal (emitidas/recibidas), detalle CFDI, descarga XML/PDF y cotizaciones.
 
-**Requisito:** App corriendo (ej. `uvicorn app:app --reload`) y base con migraciones aplicadas.
+**Requisito:** App corriendo (ej. `./run_server.sh 8000` o `uvicorn app:app --reload`) y base con migraciones aplicadas.
+
+---
+
+## Pruebas rápidas (15 min) — copy/paste
+
+Para el dueño: verificación mínima antes de dar por bueno el lanzamiento. Sustituir `http://127.0.0.1:8000` por tu URL si no es local.
+
+### A. Smoke script (terminal, ~30 s)
+```bash
+cd /ruta/del/proyecto
+./scripts/smoke.sh
+```
+Debe terminar con **"OK"** y código de salida 0. Si falla, no lanzar.
+
+### B. Health (terminal)
+```bash
+curl -s http://127.0.0.1:8000/health
+```
+Esperado: `{"status":"ok","db":"ok", ...}` (o al menos `"status":"ok"`).
+
+### C. Páginas clave (navegador)
+| Qué | URL | Esperado |
+|-----|-----|----------|
+| Raíz | http://127.0.0.1:8000/ | Redirige a portal o login |
+| Login | http://127.0.0.1:8000/login | Página "Entrar" con email/contraseña |
+| Registro | http://127.0.0.1:8000/signup | Página "Crear cuenta" |
+| Estado | http://127.0.0.1:8000/status | Página con status OK y DB ok |
+
+### D. Flujo mínimo (navegador, ~10 min)
+1. **Registro:** Ir a `/signup`, rellenar email, contraseña (≥8 caracteres), RFC (ej. XAXX010101000), razón social, régimen. Enviar. → Debe llevar a `/portal/home` sin `?token=` en la URL.
+2. **Logout:** Clic en "Cerrar sesión" (menú usuario). → Redirige a login o raíz.
+3. **Login:** Ir a `/login`, mismo email y contraseña. Enviar. → Debe llevar a `/portal/home`.
+4. **Portal:** Clic en "Facturas emitidas" o "Facturas recibidas". → Listado (puede estar vacío); sin error 500.
+5. **Info:** Ir a "Seguridad e información" (footer o `/portal/info`). → Página con texto de cookies y contraseña.
+
+Si todo lo anterior pasa, el lanzamiento mínimo está verificado. Para pruebas detalladas (XML, PDF, cotizaciones, aislamiento), seguir las secciones numeradas más abajo.
 
 ---
 
@@ -139,6 +175,23 @@ Pasos exactos para probar registro, login, logout, portal (emitidas/recibidas), 
 
 ---
 
+## 12. FIEL, validación, sync y Factura rápida (10 pasos humanos)
+
+| Paso | Acción | Esperado |
+|------|--------|----------|
+| 12.1 | Ir a **Inicio** y en el bloque "Factura rápida" comprobar que existen los desplegables **Cliente** y **Producto**. | Se muestran "— Seleccionar cliente —" y "— Seleccionar producto —"; si ya hay datos, aparecen opciones. |
+| 12.2 | Clic en **"+ Añadir cliente"**. | Se abre el modal "Nuevo cliente" con campos RFC, razón social, CP, régimen, email. |
+| 12.3 | Rellenar RFC (ej. `XAXX010101000`), razón social, guardar. | Toast "Cliente guardado"; el nuevo cliente aparece en el desplegable Cliente y queda seleccionado. |
+| 12.4 | Clic en **"+ Añadir producto"**. | Se abre el modal "Agregar producto" con descripción, Clave ProdServ, unidad, precio, IVA. |
+| 12.5 | Rellenar descripción, elegir Clave ProdServ (autocompletado) y unidad (ej. E48), precio, guardar. | Toast "Producto guardado"; el nuevo producto aparece en el desplegable Producto y queda seleccionado. |
+| 12.6 | Seleccionar un **Cliente** y un **Producto** en los desplegables. | El botón **"Generar factura"** se habilita. |
+| 12.7 | Clic en **"Generar factura"**. | Redirección a `/portal/create?...` con datos precargados (cliente y concepto en el formulario). |
+| 12.8 | Ir a **FIEL / Credenciales SAT** (desde Inicio → "Sube FIEL/CSD" o `/portal/config/sat`). | Página con estado "No configurado" o "Configurado", formulario para subir .cer, .key y contraseña. |
+| 12.9 | Subir archivos **.cer** y **.key** (FIEL vigente) y contraseña; clic en **"Guardar y validar"**. | Mensaje de guardado; se ejecuta validación y se muestra resultado (✓ válido o ✗ error). Estado pasa a "Configurado" y "Última validación" con fecha y resultado. |
+| 12.10 | Si la FIEL es válida: ejecutar sync SAT (script o botón según entorno, ej. `php sat_sync/sync.php` o "Sync SAT" en portal). | Sync completa sin error; en Emitidas/Recibidas aparecen o se actualizan CFDI según el período configurado. |
+
+---
+
 ## Smoke script del portal
 
 Para verificación automatizada mínima (listados, detalle, XML, PDF):
@@ -149,6 +202,16 @@ PORTAL_SMOKE_TOKEN=demo BASE_URL=http://127.0.0.1:8000 python scripts/smoke_port
 ```
 
 Requiere `requests`. Si no hay facturas en el listado, solo se comprueban listados y login; si hay al menos una, se prueba detalle y descargas XML/PDF.
+
+### Smoke self-serve (Factura rápida + API)
+
+Verifica portal home, API customers/products, creación de cliente y producto vía API, y que los listados devueltos por la API contienen los datos (los dropdowns de Factura rápida se llenan con esos datos):
+
+```bash
+BASE_URL=http://127.0.0.1:8000 PORTAL_SMOKE_TOKEN=demo python3 scripts/smoke_selfserve.py
+```
+
+Requiere `requests` y un token válido (ej. `DEV_TOKEN` o uno de `issuer_tokens`). La app debe estar corriendo.
 
 ---
 
