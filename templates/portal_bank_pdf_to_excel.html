@@ -1,0 +1,190 @@
+{% extends "base_portal.html" %}
+{% set title = 'Convertir Edo. de Cuenta' %}
+
+{% block content %}
+<div class="page-wrap">
+  <div class="card p-20">
+    <div class="card-title-row mb-14">
+      <h2 class="section-title">Convertir Edo. de Cuenta</h2>
+    </div>
+    <p class="muted" style="margin:0 0 14px;">
+      Arrastra y suelta tu PDF (estado de cuenta) para convertirlo a Excel (.xlsx).
+    </p>
+    <div class="empty-state empty-state--info" style="margin: 0 0 14px;">
+      <div class="empty-state__title">Tip</div>
+      <div class="empty-state__message">
+        Mejor resultado si el PDF trae texto seleccionable. Si es escaneado, puede fallar o salir incompleto.
+      </div>
+    </div>
+
+    <div class="dropzone" id="pdfDropzone" role="button" tabindex="0" aria-label="Arrastra tu PDF aquí o haz click para seleccionar">
+      <div class="dropzone__icon" aria-hidden="true">PDF</div>
+      <div class="dropzone__title">Arrastra tu PDF aquí</div>
+      <div class="dropzone__hint muted">o haz click para seleccionar</div>
+      <div class="dropzone__file muted" id="pdfFileMeta" hidden></div>
+      <input id="pdfFileInput" type="file" accept="application/pdf,.pdf" hidden />
+    </div>
+
+    <div class="bank-convert-status" aria-live="polite">
+      <div class="bank-convert-status__row" id="uploadRow" hidden>
+        <span class="bank-convert-status__label">Estatus</span>
+        <span class="bank-convert-status__value" id="uploadStatus">—</span>
+      </div>
+      <div class="bank-convert-status__error" id="uploadError" hidden role="alert"></div>
+      <div class="bank-convert-status__actions">
+        <a class="btn btn-primary" id="downloadBtn" href="#" hidden>Descargar Excel</a>
+        <button type="button" class="btn btn-ghost" id="resetBtn" hidden>Convertir otro PDF</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var dropzone = document.getElementById('pdfDropzone');
+  var input = document.getElementById('pdfFileInput');
+  var meta = document.getElementById('pdfFileMeta');
+  var uploadRow = document.getElementById('uploadRow');
+  var statusEl = document.getElementById('uploadStatus');
+  var errorEl = document.getElementById('uploadError');
+  var downloadBtn = document.getElementById('downloadBtn');
+  var resetBtn = document.getElementById('resetBtn');
+
+  var uploading = false;
+  var MAX_MB = 15;
+  var MAX_BYTES = MAX_MB * 1024 * 1024;
+
+  function setError(msg) {
+    if (errorEl) {
+      errorEl.textContent = msg || 'No se pudo procesar el archivo.';
+      errorEl.hidden = false;
+    }
+  }
+  function clearError() {
+    if (errorEl) { errorEl.hidden = true; errorEl.textContent = ''; }
+  }
+  function setStatus(msg) {
+    if (uploadRow) uploadRow.hidden = false;
+    if (statusEl) statusEl.textContent = msg || '—';
+  }
+  function resetUi() {
+    uploading = false;
+    clearError();
+    if (downloadBtn) { downloadBtn.hidden = true; downloadBtn.href = '#'; }
+    if (resetBtn) resetBtn.hidden = true;
+    if (uploadRow) uploadRow.hidden = true;
+    if (meta) { meta.hidden = true; meta.textContent = ''; }
+    if (input) input.value = '';
+  }
+
+  function fmtSize(n) {
+    if (!Number.isFinite(n)) return '';
+    var mb = n / (1024 * 1024);
+    return mb.toFixed(mb >= 10 ? 0 : 1) + ' MB';
+  }
+
+  async function uploadFile(file) {
+    if (!file) return;
+    if (uploading) return;
+    resetUi();
+    clearError();
+
+    var name = String(file.name || '').toLowerCase();
+    if (!name.endsWith('.pdf')) {
+      setError('El archivo debe ser .pdf');
+      return;
+    }
+    if (file.size > MAX_BYTES) {
+      setError('El PDF excede el máximo de ' + MAX_MB + 'MB.');
+      return;
+    }
+    if (meta) {
+      meta.hidden = false;
+      meta.textContent = (file.name || 'archivo.pdf') + ' • ' + fmtSize(file.size);
+    }
+
+    uploading = true;
+    setStatus('Subiendo…');
+
+    try {
+      var form = new FormData();
+      form.append('file', file, file.name || 'estado_cuenta.pdf');
+
+      var res = await (window.portalFetchWithTimeout
+        ? window.portalFetchWithTimeout('/portal/bank/pdf-to-excel/upload', {
+            method: 'POST',
+            credentials: 'same-origin',
+            body: form
+          }, 60000)
+        : fetch('/portal/bank/pdf-to-excel/upload', { method: 'POST', credentials: 'same-origin', body: form })
+      );
+
+      if (res && res.status === 401) {
+        if (typeof window.uiCloseAllOverlays === 'function') window.uiCloseAllOverlays();
+        if (typeof window.showSessionExpiredModal === 'function') window.showSessionExpiredModal();
+        uploading = false;
+        return;
+      }
+
+      var json = null;
+      try { json = await res.json(); } catch (_) {}
+      if (!res || !res.ok || !json || !json.ok) {
+        var detail = (json && (json.detail || json.error || json.message)) ? String(json.detail || json.error || json.message) : '';
+        setError(detail || ('No se pudo convertir el PDF (HTTP ' + (res ? res.status : '0') + ').'));
+        setStatus('Error');
+        uploading = false;
+        return;
+      }
+
+      setStatus('Listo');
+      if (downloadBtn && json.download_url) {
+        downloadBtn.href = json.download_url;
+        downloadBtn.hidden = false;
+      }
+      if (resetBtn) resetBtn.hidden = false;
+      if (window.uiToast) window.uiToast({ type: 'success', title: 'Convertido', message: 'Tu Excel está listo para descargar.' });
+      uploading = false;
+    } catch (err) {
+      uploading = false;
+      setStatus('Error');
+      var msg = (err && err.name === 'AbortError') ? 'La conversión tardó demasiado. Intenta de nuevo.' : ((err && err.message) || 'Error de conexión. Intenta de nuevo.');
+      setError(msg);
+    }
+  }
+
+  if (resetBtn) resetBtn.addEventListener('click', function () { resetUi(); });
+
+  if (dropzone && input) {
+    dropzone.addEventListener('click', function () { if (!uploading) input.click(); });
+    dropzone.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (!uploading) input.click(); }
+    });
+    input.addEventListener('change', function () {
+      var f = input.files && input.files[0];
+      if (f) uploadFile(f);
+    });
+
+    ['dragenter', 'dragover'].forEach(function (evt) {
+      dropzone.addEventListener(evt, function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!uploading) dropzone.classList.add('dropzone--active');
+      });
+    });
+    ['dragleave', 'drop'].forEach(function (evt) {
+      dropzone.addEventListener(evt, function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        dropzone.classList.remove('dropzone--active');
+      });
+    });
+    dropzone.addEventListener('drop', function (e) {
+      if (uploading) return;
+      var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+      if (f) uploadFile(f);
+    });
+  }
+})();
+</script>
+{% endblock %}
+
