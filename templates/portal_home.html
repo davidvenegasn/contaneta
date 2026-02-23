@@ -1,7 +1,35 @@
 {% extends "base_portal.html" %}
 {% set title = 'Inicio' %}
-{% set page_icon = '<svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M5.5 10.5V21h13V10.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 21v-6h4v6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>' %}
+{% set page_icon = '<svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/><path d="M5.5 10.5V21h13V10.5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 21v-6h4v6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>' %}
 {% block content %}
+<script>
+(function(){
+  /* P35: Prefetch customers/products al cargar Home (solo si logueado). Usa cache (portalCatalogGetJson) y AbortController al navegar. */
+  var prefetchAbort = new AbortController();
+  var signal = prefetchAbort.signal;
+  function normCustomers(data) {
+    if (Array.isArray(data)) return data;
+    if (data && data.customers) return data.customers;
+    if (data && data.data) return data.data;
+    return [];
+  }
+  function normProducts(data) {
+    if (Array.isArray(data)) return data;
+    if (data && data.products) return data.products;
+    if (data && data.data) return data.data;
+    return [];
+  }
+  var getJson = typeof window.portalCatalogGetJson === 'function' ? window.portalCatalogGetJson : null;
+  if (getJson) {
+    window.__prefetchCustomersPromise = getJson('/api/customers', { signal: signal }).then(normCustomers).catch(function() { return []; });
+    window.__prefetchProductsPromise = getJson('/api/products', { signal: signal }).then(normProducts).catch(function() { return []; });
+  } else {
+    window.__prefetchCustomersPromise = (window.portalFetchWithTimeout ? window.portalFetchWithTimeout('/api/customers', { credentials: 'same-origin', signal: signal }, 30000) : fetch('/api/customers', { credentials: 'same-origin', signal: signal })).then(function(r) { return r.ok ? r.json() : []; }).then(normCustomers).catch(function() { return []; });
+    window.__prefetchProductsPromise = (window.portalFetchWithTimeout ? window.portalFetchWithTimeout('/api/products', { credentials: 'same-origin', signal: signal }, 30000) : fetch('/api/products', { credentials: 'same-origin', signal: signal })).then(function(r) { return r.ok ? r.json() : []; }).then(normProducts).catch(function() { return []; });
+  }
+  window.addEventListener('pagehide', function() { try { prefetchAbort.abort(); } catch(e) {} });
+})();
+</script>
 <div class="app-header fade-in fade-in--1 mb-22">
   <div class="app-header__left">
     <div class="app-title"></div>
@@ -11,14 +39,10 @@
 
 <p class="muted" style="margin:0 0 12px; font-size:13px;">Resumen del mes en curso ({{ ym_label }})</p>
 
-{% if has_fiel_validated is defined and sat_sync_status is defined %}
-  {% include "portal_sat_sync_block.html" %}
-{% endif %}
-
 <div class="dashboard-metrics fade-in fade-in--3 mb-20">
   <div class="card metric-card">
     <div class="metric-label">
-      <svg class="icon" viewBox="0 0 24 24" fill="none"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <svg class="icon" viewBox="0 0 24 24" fill="none"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
       Ingresos (sin IVA)
     </div>
     <div class="metric-value">
@@ -31,7 +55,7 @@
 
   <div class="card metric-card">
     <div class="metric-label">
-      <svg class="icon" viewBox="0 0 24 24" fill="none"><path d="M12 22v-20M7 19h5a3.5 3.5 0 0 0 0-7H7M14 5H9.5a3.5 3.5 0 0 0 0 7H6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <svg class="icon" viewBox="0 0 24 24" fill="none"><path d="M12 22v-20M7 19h5a3.5 3.5 0 0 0 0-7H7M14 5H9.5a3.5 3.5 0 0 0 0 7H6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
       Gastos (sin IVA)
     </div>
     <div class="metric-value">
@@ -44,7 +68,7 @@
 
   <div class="card metric-card">
     <div class="metric-label">
-      <svg class="icon" viewBox="0 0 24 24" fill="none"><path d="M21 12a9 9 0 1 1-9-9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M21 3v6h-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <svg class="icon" viewBox="0 0 24 24" fill="none"><path d="M21 12a9 9 0 1 1-9-9" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/><path d="M21 3v6h-6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
       IVA recibido (neto)
     </div>
     <div class="metric-value">
@@ -62,7 +86,7 @@
 
   <div class="card metric-card">
     <div class="metric-label">
-      <svg class="icon" viewBox="0 0 24 24" fill="none"><path d="M22 12h-4l-3 9L9 3l-3 9H2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <svg class="icon" viewBox="0 0 24 24" fill="none"><path d="M22 12h-4l-3 9L9 3l-3 9H2" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
       IVA pagado
     </div>
     <div class="metric-value">
@@ -77,59 +101,347 @@
 <div class="dashboard-half-row fade-in fade-in--4 mb-20">
   <div class="card p-20 quick-invoice-card">
     <h3 class="section-title mb-14">
-      <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 2v5h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 12h8M8 16h8M8 8h3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7z" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 2v5h5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 12h8M8 16h8M8 8h3" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
       Factura rápida
     </h3>
-    <p class="muted quick-invoice-intro">Elige cliente y producto para abrir la factura con datos precargados.</p>
-    <div class="quick-invoice-form">
-      <div class="quick-invoice-row">
-        <div class="quick-invoice-label-row">
-          <label class="quick-invoice-label" for="quickCustomer">Cliente</label>
-          <button type="button" class="btn btn--secondary btn--sm quick-invoice-add-btn" id="quickAddCustomerBtn" title="Añadir cliente">+ Añadir cliente</button>
-        </div>
-        <select id="quickCustomer" class="quick-invoice-select" aria-label="Cliente">
+    <p class="muted" style="margin:0 0 16px; font-size:13px;">Elige cliente y producto, revisa el precálculo y timbra sin salir de Inicio.</p>
+    <div style="display:flex; flex-direction:column; gap:14px;">
+      <div>
+        <label class="label" for="quickCustomer" style="display:block; margin-bottom:6px; font-weight:600;">Cliente</label>
+        <select id="quickCustomer" class="input" style="width:100%; padding:10px 12px; border-radius:10px; font-size:14px; border:1px solid var(--border, #e2e8f0);" aria-label="Cliente">
           <option value="">— Seleccionar cliente —</option>
         </select>
-        <p id="quickCustomerHint" class="quick-invoice-hint muted" hidden>Aún no tienes clientes. Haz clic en <strong>+ Añadir cliente</strong> para crear uno.</p>
+        <p class="muted" style="margin:4px 0 0; font-size:12px;"><a href="/portal/clients">+ Añadir cliente</a></p>
       </div>
-      <div class="quick-invoice-row">
-        <div class="quick-invoice-label-row">
-          <label class="quick-invoice-label" for="quickProduct">Producto</label>
-          <button type="button" class="btn btn--secondary btn--sm quick-invoice-add-btn" id="quickAddProductBtn" title="Agregar producto">+ Añadir producto</button>
-        </div>
-        <select id="quickProduct" class="quick-invoice-select" aria-label="Producto">
+      <div>
+        <label class="label" for="quickProduct" style="display:block; margin-bottom:6px; font-weight:600;">Producto</label>
+        <select id="quickProduct" class="input" style="width:100%; padding:10px 12px; border-radius:10px; font-size:14px; border:1px solid var(--border, #e2e8f0);" aria-label="Producto">
           <option value="">— Seleccionar producto —</option>
         </select>
-        <p id="quickProductHint" class="quick-invoice-hint muted" hidden>Aún no tienes productos. Haz clic en <strong>+ Añadir producto</strong> para crear uno.</p>
+        <p class="muted" style="margin:4px 0 0; font-size:12px;"><a href="/portal/products">+ Añadir producto</a></p>
       </div>
-      <div class="quick-invoice-row quick-invoice-actions">
+      <div style="margin-top:6px;">
         <button type="button" id="quickInvoiceBtn" class="btn btn-primary" disabled>Generar factura</button>
+        <span id="quickInvoiceBtnHint" class="muted" style="margin-left:10px; font-size:12px;">Elige cliente y producto</span>
       </div>
     </div>
   </div>
 
+  <!-- Modal factura rápida: precálculo editable + Timbrar -->
+  <div id="quickInvoiceModal" class="quick-invoice-modal" role="dialog" aria-modal="true" aria-labelledby="quickInvoiceModalTitle" aria-describedby="quickInvoiceModalDesc" hidden>
+    <div class="quick-invoice-modal__backdrop" id="quickInvoiceModalBackdrop"></div>
+    <div class="quick-invoice-modal__panel" id="quickInvoiceModalPanel" tabindex="-1">
+      <div class="quick-invoice-modal__header">
+        <h2 id="quickInvoiceModalTitle" class="quick-invoice-modal__title">Factura rápida</h2>
+        <button type="button" class="quick-invoice-modal__close" id="quickInvoiceModalClose" aria-label="Cerrar">&times;</button>
+      </div>
+      <p id="quickInvoiceModalDesc" class="quick-invoice-modal__desc muted">Revisa los datos y edita cantidad o precio si lo necesitas.</p>
+      <div class="quick-invoice-modal__body">
+        <div class="quick-invoice-modal__row">
+          <span class="quick-invoice-modal__label">Cliente</span>
+          <span id="quickModalCustomerName" class="quick-invoice-modal__value"></span>
+          <span id="quickModalCustomerRfc" class="muted" style="font-size:12px;"></span>
+        </div>
+        <div class="quick-invoice-modal__row">
+          <span class="quick-invoice-modal__label">Concepto</span>
+          <span id="quickModalProductDesc" class="quick-invoice-modal__value"></span>
+        </div>
+        <div class="quick-invoice-modal__edits">
+          <div>
+            <label for="quickModalQty" class="label">Cantidad</label>
+            <input type="number" id="quickModalQty" class="input" min="0.01" step="0.01" value="1" aria-label="Cantidad" style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--border);" />
+          </div>
+          <div>
+            <label for="quickModalUnitPrice" class="label">P. unit. (sin IVA)</label>
+            <input type="number" id="quickModalUnitPrice" class="input" min="0" step="0.01" aria-label="Precio unitario" style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--border);" />
+          </div>
+        </div>
+        <div class="quick-invoice-modal__row">
+          <span class="quick-invoice-modal__label">IVA</span>
+          <span id="quickModalIvaPct" class="quick-invoice-modal__value"></span>
+        </div>
+        <div class="quick-invoice-modal__totals">
+          <div class="quick-invoice-modal__total-row"><span>Subtotal</span><span id="quickModalSubtotal">$0.00</span></div>
+          <div class="quick-invoice-modal__total-row"><span>IVA</span><span id="quickModalIva">$0.00</span></div>
+          <div class="quick-invoice-modal__total-row quick-invoice-modal__total-row--final"><span>Total</span><span id="quickModalTotal">$0.00</span></div>
+        </div>
+      </div>
+      <div id="quickInvoiceModalError" class="quick-invoice-modal__error" hidden role="alert"></div>
+      <div class="quick-invoice-modal__footer">
+        <button type="button" id="quickInvoiceModalCancel" class="btn btn-ghost">Cancelar</button>
+        <button type="button" id="quickInvoiceModalSubmit" class="btn btn-primary">Timbrar factura</button>
+      </div>
+    </div>
+  </div>
+  <style>
+    .quick-invoice-modal { position: fixed; inset: 0; z-index: 9000; display: flex; align-items: center; justify-content: center; padding: 16px; }
+    .quick-invoice-modal[hidden] { display: none !important; }
+    .quick-invoice-modal__backdrop { position: absolute; inset: 0; background: rgba(0,0,0,.4); }
+    .quick-invoice-modal__panel { position: relative; background: var(--surface, #fff); border-radius: 16px; box-shadow: 0 20px 50px rgba(0,0,0,.15); max-width: 420px; width: 100%; max-height: 90vh; overflow-y: auto; outline: none; }
+    body.quick-invoice-modal-open { overflow: hidden; }
+    .quick-invoice-modal__header { display: flex; align-items: center; justify-content: space-between; padding: 18px 20px; border-bottom: 1px solid var(--border, #e2e8f0); }
+    .quick-invoice-modal__title { margin: 0; font-size: 1.2rem; font-weight: 700; }
+    .quick-invoice-modal__close { background: none; border: none; font-size: 24px; line-height: 1; cursor: pointer; color: var(--text-muted, #64748b); padding: 4px; }
+    .quick-invoice-modal__close:hover { color: var(--text, #111); }
+    .quick-invoice-modal__desc { margin: 0 20px 14px; font-size: 13px; }
+    .quick-invoice-modal__body { padding: 0 20px 20px; }
+    .quick-invoice-modal__row { margin-bottom: 10px; }
+    .quick-invoice-modal__label { font-weight: 600; font-size: 12px; color: var(--text-muted); display: block; margin-bottom: 2px; }
+    .quick-invoice-modal__value { font-size: 14px; }
+    .quick-invoice-modal__edits { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 14px 0; }
+    .quick-invoice-modal__totals { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
+    .quick-invoice-modal__total-row { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 6px; }
+    .quick-invoice-modal__total-row--final { font-weight: 700; font-size: 16px; margin-top: 8px; }
+    .quick-invoice-modal__error { padding: 10px 14px; margin: 0 20px 12px; background: rgba(220,38,38,.1); border-radius: 10px; font-size: 13px; color: var(--danger, #b91c1c); border: 1px solid rgba(220,38,38,.25); }
+    .quick-invoice-modal__footer { display: flex; justify-content: flex-end; gap: 10px; padding: 16px 20px; border-top: 1px solid var(--border); }
+  </style>
+
+  <script>
+  (function(){
+    var customerSelect = document.getElementById('quickCustomer');
+    var productSelect = document.getElementById('quickProduct');
+    var btn = document.getElementById('quickInvoiceBtn');
+    var hint = document.getElementById('quickInvoiceBtnHint');
+    if (!customerSelect || !productSelect || !btn) return;
+
+    window.__quickCustomersData = [];
+    window.__quickProductsData = [];
+
+    function setBtn() {
+      var cId = customerSelect.value;
+      var pId = productSelect.value;
+      if (cId && pId) {
+        btn.disabled = false;
+        if (hint) hint.textContent = '';
+      } else {
+        btn.disabled = true;
+        if (hint) hint.textContent = 'Elige cliente y producto';
+      }
+    }
+
+    function loadCustomers() {
+      var p = window.__prefetchCustomersPromise;
+      var done = function(data) {
+        var list = Array.isArray(data) ? data : (data && data.customers) ? data.customers : (data && data.data) ? data.data : [];
+        window.__quickCustomersData = list;
+        customerSelect.innerHTML = '<option value="">— Seleccionar cliente —</option>';
+        list.forEach(function(c) {
+          var o = document.createElement('option');
+          o.value = String(c.id != null ? c.id : '');
+          o.textContent = (c.legal_name || c.rfc || 'Sin nombre').trim() || '—';
+          customerSelect.appendChild(o);
+        });
+        setBtn();
+      };
+      if (p) {
+        p.then(done).catch(function() { setBtn(); });
+        return;
+      }
+      if (window.portalCatalogGetJson) {
+        window.portalCatalogGetJson('/api/customers').then(function(r) { return Array.isArray(r) ? r : (r && r.customers) || (r && r.data) || []; }).then(done).catch(function() { setBtn(); });
+        return;
+      }
+      (window.portalFetchWithTimeout ? window.portalFetchWithTimeout('/api/customers', { credentials: 'same-origin' }, 30000) : fetch('/api/customers', { credentials: 'same-origin' })).then(function(r) { return r.ok ? r.json() : []; }).then(done).catch(function() { setBtn(); });
+    }
+    function loadProducts() {
+      var p = window.__prefetchProductsPromise;
+      var done = function(data) {
+        var list = Array.isArray(data) ? data : (data && data.products) ? data.products : (data && data.data) ? data.data : [];
+        window.__quickProductsData = list;
+        productSelect.innerHTML = '<option value="">— Seleccionar producto —</option>';
+        list.forEach(function(p) {
+          var o = document.createElement('option');
+          o.value = String(p.id != null ? p.id : '');
+          o.textContent = (p.description || p.product_key || 'Sin descripción').trim() || '—';
+          productSelect.appendChild(o);
+        });
+        setBtn();
+      };
+      if (p) {
+        p.then(done).catch(function() { setBtn(); });
+        return;
+      }
+      if (window.portalCatalogGetJson) {
+        window.portalCatalogGetJson('/api/products').then(function(r) { return Array.isArray(r) ? r : (r && r.products) || (r && r.data) || []; }).then(done).catch(function() { setBtn(); });
+        return;
+      }
+      (window.portalFetchWithTimeout ? window.portalFetchWithTimeout('/api/products', { credentials: 'same-origin' }, 30000) : fetch('/api/products', { credentials: 'same-origin' })).then(function(r) { return r.ok ? r.json() : []; }).then(done).catch(function() { setBtn(); });
+    }
+
+    var modal = document.getElementById('quickInvoiceModal');
+    var modalBackdrop = document.getElementById('quickInvoiceModalBackdrop');
+    var modalClose = document.getElementById('quickInvoiceModalClose');
+    var modalCancel = document.getElementById('quickInvoiceModalCancel');
+    var modalSubmit = document.getElementById('quickInvoiceModalSubmit');
+    var modalError = document.getElementById('quickInvoiceModalError');
+    var modalQty = document.getElementById('quickModalQty');
+    var modalUnitPrice = document.getElementById('quickModalUnitPrice');
+
+    function fmtMoney(n) { return '$' + (Number(n).toFixed(2)).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+    function updateModalTotals() {
+      var qty = parseFloat(modalQty.value) || 0;
+      var pu = parseFloat(modalUnitPrice.value) || 0;
+      var ivaRate = window.__quickCurrentIva !== undefined ? window.__quickCurrentIva : 0.16;
+      var subtotal = Math.round(qty * pu * 100) / 100;
+      var iva = Math.round(subtotal * ivaRate * 100) / 100;
+      var total = Math.round((subtotal + iva) * 100) / 100;
+      document.getElementById('quickModalSubtotal').textContent = fmtMoney(subtotal);
+      document.getElementById('quickModalIva').textContent = fmtMoney(iva);
+      document.getElementById('quickModalTotal').textContent = fmtMoney(total);
+    }
+
+    function openQuickModal() {
+      var cId = customerSelect.value;
+      var pId = productSelect.value;
+      if (!cId || !pId) return;
+      var cust = window.__quickCustomersData.find(function(c) { return String(c.id) === String(cId); });
+      var prod = window.__quickProductsData.find(function(p) { return String(p.id) === String(pId); });
+      if (!cust || !prod) {
+        if (window.portalToast) window.portalToast({ type: 'danger', title: 'Error', message: 'Cliente o producto no encontrado. Refresca la página.' });
+        return;
+      }
+      window.__quickCurrentCustomerId = cId;
+      window.__quickCurrentProductId = pId;
+      window.__quickCurrentIva = parseFloat(prod.iva_rate) || 0.16;
+      document.getElementById('quickModalCustomerName').textContent = (cust.legal_name || cust.rfc || '—').trim();
+      document.getElementById('quickModalCustomerRfc').textContent = cust.rfc ? 'RFC ' + cust.rfc : '';
+      document.getElementById('quickModalProductDesc').textContent = (prod.description || prod.product_key || '—').trim();
+      document.getElementById('quickModalIvaPct').textContent = (window.__quickCurrentIva * 100).toFixed(0) + '%';
+      modalQty.value = '1';
+      modalUnitPrice.value = String(prod.unit_price != null ? prod.unit_price : '');
+      modalError.hidden = true;
+      modalError.textContent = '';
+      updateModalTotals();
+      modal.hidden = false;
+      modal.removeAttribute('hidden');
+      document.body.classList.add('quick-invoice-modal-open');
+      setTimeout(function() { if (modalQty) modalQty.focus(); else document.getElementById('quickInvoiceModalPanel').focus(); }, 100);
+    }
+
+    function closeQuickModal() {
+      modal.hidden = true;
+      modal.setAttribute('hidden', '');
+      document.body.classList.remove('quick-invoice-modal-open');
+      if (btn) btn.focus();
+    }
+
+    if (modalQty) modalQty.addEventListener('input', updateModalTotals);
+    if (modalUnitPrice) modalUnitPrice.addEventListener('input', updateModalTotals);
+
+    if (modalBackdrop) modalBackdrop.addEventListener('click', closeQuickModal);
+    if (modalClose) modalClose.addEventListener('click', closeQuickModal);
+    if (modalCancel) modalCancel.addEventListener('click', closeQuickModal);
+
+    if (modalSubmit) modalSubmit.addEventListener('click', function() {
+      var customerId = window.__quickCurrentCustomerId;
+      var productId = window.__quickCurrentProductId;
+      if (!customerId || !productId) return;
+      var qty = parseFloat(modalQty.value);
+      var unitPrice = parseFloat(modalUnitPrice.value);
+      if (!qty || qty <= 0) {
+        modalError.textContent = 'Ingresa una cantidad válida.';
+        modalError.hidden = false;
+        return;
+      }
+      if (unitPrice === undefined || unitPrice === null || isNaN(unitPrice) || unitPrice < 0) {
+        modalError.textContent = 'Ingresa un precio unitario válido.';
+        modalError.hidden = false;
+        return;
+      }
+      modalError.hidden = true;
+      modalSubmit.disabled = true;
+      var csrf = document.querySelector('meta[name="csrf-token"]') && document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+      var headers = { 'Content-Type': 'application/json' };
+      if (csrf) headers['X-CSRF-Token'] = csrf;
+      (window.portalFetchWithTimeout ? window.portalFetchWithTimeout('/api/invoices/quick', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: headers,
+        body: JSON.stringify({ customer_id: parseInt(customerId, 10), product_id: parseInt(productId, 10), quantity: qty, unit_price: unitPrice })
+      }, 30000) : fetch('/api/invoices/quick', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: headers,
+        body: JSON.stringify({ customer_id: parseInt(customerId, 10), product_id: parseInt(productId, 10), quantity: qty, unit_price: unitPrice })
+      }))
+        .then(function(r) { return r.json().then(function(data) { return { ok: r.ok, status: r.status, data: data }; }); })
+        .then(function(res) {
+          modalSubmit.disabled = false;
+          if (res.ok && res.data && res.data.ok) {
+            closeQuickModal();
+            if (window.uiSuccessOverlay) {
+              window.uiSuccessOverlay({
+                title: 'Factura timbrada',
+                message: 'Total ' + fmtMoney(res.data.total || 0) + '. Ya puedes verla en Facturas emitidas.',
+                actions: [
+                  { label: 'Ver facturas emitidas', href: '/portal/issued' },
+                  { label: 'Entendido', onClick: function () { if (window.uiSuccessOverlayClose) window.uiSuccessOverlayClose(); } }
+                ]
+              });
+            } else if (window.portalToast) {
+              window.portalToast({ type: 'success', title: 'Factura timbrada', message: 'Total ' + fmtMoney(res.data.total || 0) });
+            }
+            window.__prefetchCustomersPromise = null;
+            window.__prefetchProductsPromise = null;
+            loadCustomers();
+            loadProducts();
+            return;
+          }
+          var detail = (res.data && res.data.detail) ? (typeof res.data.detail === 'string' ? res.data.detail : JSON.stringify(res.data.detail)) : '';
+          modalError.textContent = detail || (res.status === 402 ? 'Actualiza tu plan para emitir facturas.' : 'No se pudo timbrar. Revisa tu plan o datos.');
+          modalError.hidden = false;
+        })
+        .catch(function(err) {
+          modalSubmit.disabled = false;
+          modalError.textContent = err.message || 'Error de conexión. Intenta de nuevo.';
+          modalError.hidden = false;
+        });
+    });
+
+    modal.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') { closeQuickModal(); e.preventDefault(); }
+    });
+
+    btn.addEventListener('click', function(e) {
+      e.preventDefault();
+      openQuickModal();
+    });
+
+    customerSelect.addEventListener('change', setBtn);
+    productSelect.addEventListener('change', setBtn);
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', function() { loadCustomers(); loadProducts(); });
+    } else {
+      loadCustomers();
+      loadProducts();
+    }
+  })();
+  </script>
+
   <div class="card p-20">
     <div class="card-title-row mb-14">
       <h3 class="section-title">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"></circle><path d="M12 7v6l4 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path></svg>
+        <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.75"></circle><path d="M12 7v6l4 2" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"></path></svg>
         Actividad reciente
       </h3>
     </div>
-    <div class="activity-list">
-      {% for a in activities %}
-      <div class="activity-row">
-        <div>
-          <div class="activity-title">
-            {% if a.direction == 'issued' %}{{ icon_issued() }}{% else %}{{ icon_received() }}{% endif %}
-            Factura {{ 'emitida' if a.direction == 'issued' else 'recibida' }}
+    <div class="activity-list-wrap">
+      <div class="activity-list">
+        {% for a in activities %}
+        <div class="activity-row">
+          <div>
+            <div class="activity-title">
+              {% if a.direction == 'issued' %}{{ icon_issued() }}{% else %}{{ icon_received() }}{% endif %}
+              Factura {{ 'emitida' if a.direction == 'issued' else 'recibida' }}
+            </div>
+            <div class="activity-sub">{{ a.nombre or 'Sin nombre' }}</div>
           </div>
-          <div class="activity-sub">{{ a.nombre or 'Sin nombre' }}</div>
+          <div class="activity-sub">{{ a.time_ago }}</div>
         </div>
-        <div class="activity-sub">{{ a.time_ago }}</div>
+        {% else %}
+        <p class="muted">No hay actividad reciente.</p>
+        {% endfor %}
       </div>
-      {% else %}
-      <p class="muted">No hay actividad reciente.</p>
-      {% endfor %}
     </div>
   </div>
 </div>
@@ -149,551 +461,4 @@
   </div>
 
 </div>
-
-<!-- Modal: factura rápida (formulario con montos para completar y emitir) -->
-<div id="quickInvoiceModal" class="quick-invoice-modal" hidden aria-hidden="true" role="dialog" aria-labelledby="quickInvoiceModalTitle">
-  <div class="quick-invoice-modal__backdrop" id="quickInvoiceModalBackdrop"></div>
-  <div class="quick-invoice-modal__panel">
-    <div class="quick-invoice-modal__head">
-      <div>
-        <h2 id="quickInvoiceModalTitle" class="quick-invoice-modal__title">Precálculo de factura</h2>
-        <p class="quick-invoice-modal__subtitle">Revisa los datos precargados y edita si hace falta. Al guardar se emitirá la factura.</p>
-      </div>
-      <button type="button" class="quick-invoice-modal__close" id="quickInvoiceModalClose" aria-label="Cerrar">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-      </button>
-    </div>
-    <div class="quick-invoice-modal__body">
-      <iframe id="quickInvoiceFrame" class="quick-invoice-modal__frame" title="Formulario de factura"></iframe>
-    </div>
-  </div>
-</div>
-
-<!-- Modal: añadir cliente (mismo formulario que en Clientes) -->
-<div class="modal" id="quickCustModal" hidden aria-hidden="true" role="dialog" aria-labelledby="quickCustModalTitle">
-  <div class="modal__backdrop" data-close="true"></div>
-  <div class="modal__panel">
-    <div class="modal__head">
-      <div>
-        <div class="modal__title" id="quickCustModalTitle">Nuevo cliente</div>
-        <div class="modal__subtitle">Guarda datos para reutilizar al facturar.</div>
-      </div>
-      <button type="button" class="icon-btn" data-close="true" aria-label="Cerrar">
-        <svg class="icon" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12" stroke="currentColor" stroke-width="1.8"/><path d="M18 6 6 18" stroke="currentColor" stroke-width="1.8"/></svg>
-      </button>
-    </div>
-    <div class="modal__body">
-      <div class="grid-2">
-        <div class="field">
-          <label class="label">RFC *</label>
-          <input id="quickCustRfc" class="input" type="text" placeholder="XAXX010101000" autocomplete="off" maxlength="13" />
-          <div class="help" id="quickCustRfcHelp" hidden>Revisa el RFC: 12 o 13 caracteres, solo letras y números.</div>
-        </div>
-        <div class="field">
-          <label class="label">Alias (opcional)</label>
-          <input id="quickCustAlias" class="input" type="text" placeholder="Ej. Cliente frecuente" autocomplete="off" />
-        </div>
-      </div>
-      <div class="field">
-        <label class="label">Razón social *</label>
-        <input id="quickCustName" class="input" type="text" placeholder="Nombre / Razón social" autocomplete="off" />
-        <div class="help" id="quickCustNameHelp" hidden>Escribe la razón social o nombre del cliente.</div>
-      </div>
-      <div class="grid-3">
-        <div class="field">
-          <label class="label">C.P. (opcional)</label>
-          <input id="quickCustZip" class="input" type="text" placeholder="64000" autocomplete="off" maxlength="5" inputmode="numeric" pattern="[0-9]*" />
-          <div class="help" id="quickCustZipHelp" hidden>El código postal debe tener 5 dígitos.</div>
-        </div>
-        <div class="field">
-          <label class="label">Régimen receptor (opcional)</label>
-          <input id="quickCustTax" class="input" type="text" placeholder="601, 612, 626, etc." autocomplete="off" />
-        </div>
-        <div class="field">
-          <label class="label">Email (opcional)</label>
-          <input id="quickCustEmail" class="input" type="email" placeholder="correo@dominio.com" autocomplete="off" />
-          <div class="help" id="quickCustEmailHelp" hidden>Revisa el formato del correo (ej. nombre@dominio.com).</div>
-        </div>
-      </div>
-    </div>
-    <div class="modal__foot">
-      <button type="button" class="btn btn-ghost" data-close="true">Cancelar</button>
-      <button type="button" class="btn btn-primary" id="quickCustSaveBtn">Guardar</button>
-    </div>
-  </div>
-</div>
-
-<!-- Modal: agregar producto (mismo formulario que en Productos) -->
-<div class="modal" id="quickProdModal" hidden aria-hidden="true" role="dialog" aria-labelledby="quickProdModalTitle">
-  <div class="modal__backdrop" data-close="true"></div>
-  <div class="modal__panel">
-    <div class="modal__head">
-      <div>
-        <div class="modal__title" id="quickProdModalTitle">Agregar producto</div>
-        <div class="modal__subtitle">Descripción, Clave ProdServ (SAT), unidad, precio unitario e IVA.</div>
-      </div>
-      <button type="button" class="icon-btn" data-close="true" aria-label="Cerrar">
-        <svg class="icon" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12" stroke="currentColor" stroke-width="1.8"/><path d="M18 6 6 18" stroke="currentColor" stroke-width="1.8"/></svg>
-      </button>
-    </div>
-    <div class="modal__body">
-      <div class="field">
-        <label class="label">Descripción *</label>
-        <input id="quickProdDesc" class="input" type="text" placeholder="Ej. Asesoría contable mensual" autocomplete="off" />
-        <div class="help" id="quickProdDescHelp" hidden>La descripción es obligatoria.</div>
-      </div>
-      <div class="field">
-        <label class="label">Clave ProdServ (SAT) *</label>
-        <div style="position:relative;">
-          <input id="quickProdKey" class="input" type="text" placeholder="Buscar en catálogo SAT (ej. asesoría, 80141600)" autocomplete="off" />
-          <div id="quickProdKeyResults" class="prod-results" hidden></div>
-        </div>
-        <div class="help" id="quickProdKeyHelp" hidden>Selecciona una clave del catálogo SAT.</div>
-      </div>
-      <div class="field">
-        <label class="label">Unidad (SAT) *</label>
-        <div style="position:relative;">
-          <input id="quickProdUnit" class="input" type="text" placeholder="Buscar unidad (ej. servicio, pieza, hora)" autocomplete="off" value="E48 — Unidad de servicio" />
-          <div id="quickProdUnitResults" class="prod-results" hidden></div>
-        </div>
-        <div class="help" id="quickProdUnitHelp" hidden>Selecciona una unidad del catálogo SAT.</div>
-      </div>
-      <div class="grid-2">
-        <div class="field">
-          <label class="label">Precio unitario *</label>
-          <input id="quickProdPrice" class="input" type="number" step="0.01" min="0" placeholder="0.00" />
-          <div class="help" id="quickProdPriceHelp" hidden>Precio unitario inválido.</div>
-        </div>
-        <div class="field">
-          <label class="label">IVA *</label>
-          <select id="quickProdIva" class="input">
-            <option value="0.16" selected>16%</option>
-            <option value="0.08">8%</option>
-            <option value="0.00">0%</option>
-          </select>
-        </div>
-      </div>
-    </div>
-    <div class="modal__foot">
-      <button type="button" class="btn btn-ghost" data-close="true">Cancelar</button>
-      <button type="button" class="btn btn-primary" id="quickProdSaveBtn">Guardar</button>
-    </div>
-  </div>
-</div>
-
-<script>
-window.__QUICK_INITIAL_CUSTOMERS__ = {{ quick_customers_json | default('[]') | safe }};
-window.__QUICK_INITIAL_PRODUCTS__ = {{ quick_products_json | default('[]') | safe }};
-(function(){
-  const token = "{{ token }}";
-  const customerSelect = document.getElementById('quickCustomer');
-  const productSelect = document.getElementById('quickProduct');
-  const btn = document.getElementById('quickInvoiceBtn');
-  const modal = document.getElementById('quickInvoiceModal');
-  const modalBackdrop = document.getElementById('quickInvoiceModalBackdrop');
-  const modalClose = document.getElementById('quickInvoiceModalClose');
-  const frame = document.getElementById('quickInvoiceFrame');
-  let customers = [];
-  let products = [];
-
-  function applyInitialData() {
-    try {
-      var rawC = typeof window.__QUICK_INITIAL_CUSTOMERS__ !== 'undefined' ? window.__QUICK_INITIAL_CUSTOMERS__ : [];
-      var rawP = typeof window.__QUICK_INITIAL_PRODUCTS__ !== 'undefined' ? window.__QUICK_INITIAL_PRODUCTS__ : [];
-      customers = Array.isArray(rawC) ? rawC : [];
-      products = Array.isArray(rawP) ? rawP : [];
-    } catch (e) { customers = []; products = []; }
-    if (customerSelect) {
-      customerSelect.innerHTML = '<option value="">— Seleccionar cliente —</option>';
-      customers.forEach(function(c, i) {
-        var opt = document.createElement('option');
-        opt.value = String(i);
-        opt.textContent = (c.legal_name || c.rfc || 'Sin nombre').trim();
-        customerSelect.appendChild(opt);
-      });
-    }
-    if (productSelect) {
-      productSelect.innerHTML = '<option value="">— Seleccionar producto —</option>';
-      products.forEach(function(p, i) {
-        var opt = document.createElement('option');
-        opt.value = String(i);
-        opt.textContent = (p.description || p.product_key || 'Sin descripción').trim();
-        productSelect.appendChild(opt);
-      });
-    }
-    var ch = document.getElementById('quickCustomerHint');
-    var ph = document.getElementById('quickProductHint');
-    if (ch) ch.hidden = customers.length > 0;
-    if (ph) ph.hidden = products.length > 0;
-  }
-  applyInitialData();
-
-  // --- Modal Añadir cliente ---
-  const quickCustModal = document.getElementById('quickCustModal');
-  const quickCustRfc = document.getElementById('quickCustRfc');
-  const quickCustName = document.getElementById('quickCustName');
-  const quickCustAlias = document.getElementById('quickCustAlias');
-  const quickCustZip = document.getElementById('quickCustZip');
-  const quickCustTax = document.getElementById('quickCustTax');
-  const quickCustEmail = document.getElementById('quickCustEmail');
-  const quickCustRfcHelp = document.getElementById('quickCustRfcHelp');
-  const quickCustNameHelp = document.getElementById('quickCustNameHelp');
-  const quickCustZipHelp = document.getElementById('quickCustZipHelp');
-  const quickCustEmailHelp = document.getElementById('quickCustEmailHelp');
-  const quickCustSaveBtn = document.getElementById('quickCustSaveBtn');
-
-  function openQuickCustModal(){
-    if (!quickCustModal) return;
-    [quickCustRfc, quickCustAlias, quickCustName, quickCustZip, quickCustTax, quickCustEmail].forEach(function(el){ if (el) el.value = ''; });
-    [quickCustRfcHelp, quickCustNameHelp, quickCustZipHelp, quickCustEmailHelp].forEach(function(h){ if (h) h.hidden = true; });
-    [quickCustRfc, quickCustName, quickCustZip, quickCustEmail].forEach(function(el){ if (el) el.classList.remove('input--error'); });
-    quickCustModal.hidden = false;
-    quickCustModal.setAttribute('aria-hidden', 'false');
-    document.body.style.overflow = 'hidden';
-    setTimeout(function(){ if (quickCustRfc) quickCustRfc.focus(); }, 30);
-  }
-  function closeQuickCustModal(){
-    if (!quickCustModal) return;
-    quickCustModal.hidden = true;
-    quickCustModal.setAttribute('aria-hidden', 'true');
-    document.body.style.overflow = '';
-  }
-  function validateQuickCust(){
-    var rfcRaw = (quickCustRfc && quickCustRfc.value || '').trim();
-    var rfc = rfcRaw.toUpperCase();
-    if (rfcRaw !== rfc && quickCustRfc && quickCustRfc.value) quickCustRfc.value = rfc;
-    var name = (quickCustName && quickCustName.value || '').trim();
-    var zip = (quickCustZip && quickCustZip.value || '').trim();
-    var email = (quickCustEmail && quickCustEmail.value || '').trim();
-    var ok = true;
-    if (!rfc) { if (quickCustRfcHelp) { quickCustRfcHelp.textContent = 'El RFC es obligatorio.'; quickCustRfcHelp.hidden = false; } if (quickCustRfc) quickCustRfc.classList.add('input--error'); ok = false; }
-    else if (rfc.length !== 12 && rfc.length !== 13) { if (quickCustRfcHelp) { quickCustRfcHelp.textContent = 'El RFC debe tener 12 caracteres (moral) o 13 (física).'; quickCustRfcHelp.hidden = false; } if (quickCustRfc) quickCustRfc.classList.add('input--error'); ok = false; }
-    else if (!/^[A-Z&Ñ][0-9A-Z&Ñ]{11,12}$/.test(rfc)) { if (quickCustRfcHelp) { quickCustRfcHelp.textContent = 'Solo letras y números, sin espacios.'; quickCustRfcHelp.hidden = false; } if (quickCustRfc) quickCustRfc.classList.add('input--error'); ok = false; }
-    else { if (quickCustRfcHelp) quickCustRfcHelp.hidden = true; if (quickCustRfc) quickCustRfc.classList.remove('input--error'); }
-    if (!name) { if (quickCustNameHelp) quickCustNameHelp.hidden = false; if (quickCustName) quickCustName.classList.add('input--error'); ok = false; } else { if (quickCustNameHelp) quickCustNameHelp.hidden = true; if (quickCustName) quickCustName.classList.remove('input--error'); }
-    if (zip && !/^[0-9]{5}$/.test(zip)) { if (quickCustZipHelp) quickCustZipHelp.hidden = false; if (quickCustZip) quickCustZip.classList.add('input--error'); ok = false; } else { if (quickCustZipHelp) quickCustZipHelp.hidden = true; if (quickCustZip) quickCustZip.classList.remove('input--error'); }
-    if (email && !/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email)) { if (quickCustEmailHelp) quickCustEmailHelp.hidden = false; if (quickCustEmail) quickCustEmail.classList.add('input--error'); ok = false; } else { if (quickCustEmailHelp) quickCustEmailHelp.hidden = true; if (quickCustEmail) quickCustEmail.classList.remove('input--error'); }
-    return ok;
-  }
-  async function saveQuickCust(){
-    if (!validateQuickCust()) { window.portalToast && window.portalToast({ type: 'warning', title: 'Revisa los datos', message: 'Completa RFC y razón social. Si usas CP o email, revisa el formato.' }); return; }
-    var payload = { token: token, rfc: (quickCustRfc.value || '').trim().toUpperCase(), legal_name: (quickCustName.value || '').trim(), alias: (quickCustAlias.value || '').trim() || null, zip: (quickCustZip.value || '').trim() || null, tax_system: (quickCustTax.value || '').trim() || null, email: (quickCustEmail.value || '').trim() || null };
-    quickCustSaveBtn.disabled = true;
-    quickCustSaveBtn.textContent = 'Guardando…';
-    try {
-      var res = await fetch('/api/customers/create', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-      var data = await res.json().catch(function(){ return {}; });
-      if (!res.ok) throw new Error(window.portalApiErrorMessage ? window.portalApiErrorMessage(data) : (data.detail || 'Error'));
-      window.portalToast && window.portalToast({ type: 'success', title: 'Cliente guardado', message: 'Ya puedes usarlo en la factura rápida.' });
-      closeQuickCustModal();
-      await loadCustomers();
-      var savedRfc = (payload.rfc || '').toUpperCase();
-      var idx = customers.findIndex(function(c){ return (c.rfc || '').toUpperCase() === savedRfc; });
-      if (customerSelect && idx >= 0) customerSelect.value = String(idx);
-      updateBtn();
-    } catch (e) { window.portalToastError && window.portalToastError(e, 'No pudimos guardar', 'Revisa RFC y CP e intenta de nuevo.'); }
-    finally { quickCustSaveBtn.disabled = false; quickCustSaveBtn.textContent = 'Guardar'; }
-  }
-
-  // --- Modal Agregar producto ---
-  const quickProdModal = document.getElementById('quickProdModal');
-  const quickProdDesc = document.getElementById('quickProdDesc');
-  const quickProdKey = document.getElementById('quickProdKey');
-  const quickProdKeyResults = document.getElementById('quickProdKeyResults');
-  const quickProdUnit = document.getElementById('quickProdUnit');
-  const quickProdUnitResults = document.getElementById('quickProdUnitResults');
-  const quickProdPrice = document.getElementById('quickProdPrice');
-  const quickProdIva = document.getElementById('quickProdIva');
-  const quickProdSaveBtn = document.getElementById('quickProdSaveBtn');
-  var quickProdservDebounce = null;
-  var quickUnidadDebounce = null;
-  var quickUnidadAbort = null;
-
-  function openQuickProdModal(){
-    if (!quickProdModal) return;
-    if (quickProdDesc) quickProdDesc.value = '';
-    if (quickProdKey) quickProdKey.value = '';
-    if (quickProdKeyResults) { quickProdKeyResults.hidden = true; quickProdKeyResults.innerHTML = ''; }
-    if (quickProdUnit) { quickProdUnit.value = 'E48 — Unidad de servicio'; }
-    if (document.getElementById('quickProdUnitResults')) document.getElementById('quickProdUnitResults').hidden = true;
-    if (quickProdPrice) quickProdPrice.value = '';
-    if (quickProdIva) quickProdIva.value = '0.16';
-    ['quickProdDescHelp','quickProdKeyHelp','quickProdPriceHelp','quickProdUnitHelp'].forEach(function(id){ var h = document.getElementById(id); if (h) h.hidden = true; });
-    quickProdModal.hidden = false;
-    quickProdModal.setAttribute('aria-hidden', 'false');
-    document.body.style.overflow = 'hidden';
-    setTimeout(function(){ if (quickProdDesc) quickProdDesc.focus(); }, 30);
-  }
-  function closeQuickProdModal(){
-    if (!quickProdModal) return;
-    quickProdModal.hidden = true;
-    quickProdModal.setAttribute('aria-hidden', 'true');
-    document.body.style.overflow = '';
-  }
-  function validateQuickProd(){
-    var desc = (quickProdDesc && quickProdDesc.value || '').trim();
-    var keyRaw = (quickProdKey && quickProdKey.value || '').trim();
-    var key = keyRaw.indexOf(' — ') >= 0 ? keyRaw.split(' — ')[0].trim() : keyRaw;
-    var unitRaw = (quickProdUnit && quickProdUnit.value || '').trim();
-    var unit_key = unitRaw.indexOf(' — ') >= 0 ? unitRaw.split(' — ')[0].trim() : unitRaw;
-    var price = parseFloat(quickProdPrice && quickProdPrice.value || '');
-    var ok = true;
-    if (!desc) { document.getElementById('quickProdDescHelp').hidden = false; ok = false; } else document.getElementById('quickProdDescHelp').hidden = true;
-    if (!key) { document.getElementById('quickProdKeyHelp').hidden = false; ok = false; } else document.getElementById('quickProdKeyHelp').hidden = true;
-    if (!unit_key) { var h = document.getElementById('quickProdUnitHelp'); if (h) { h.hidden = false; ok = false; } } else { var h2 = document.getElementById('quickProdUnitHelp'); if (h2) h2.hidden = true; }
-    if (!Number.isFinite(price) || price < 0) { document.getElementById('quickProdPriceHelp').hidden = false; ok = false; } else document.getElementById('quickProdPriceHelp').hidden = true;
-    return ok;
-  }
-  var quickProdservAbort = null;
-  async function searchQuickProdserv(q){
-    var term = (q || '').trim();
-    if (term.length < 2) { quickProdKeyResults.hidden = true; quickProdKeyResults.innerHTML = ''; return; }
-    if (quickProdservAbort) quickProdservAbort.abort();
-    quickProdservAbort = new AbortController();
-    var signal = quickProdservAbort.signal;
-    try {
-      var res = await fetch('/api/catalogs/prodserv?q=' + encodeURIComponent(term) + '&limit=15', { signal: signal });
-      if (!res.ok) return;
-      var data = await res.json();
-      var items = Array.isArray(data) ? data : [];
-      var esc = function(s){ return String(s ?? '').replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }; };
-      quickProdKeyResults.innerHTML = items.map(function(it){ var k = (it.key || it.clave || it.code || '').toString(); var d = (it.label || it.descripcion || it.texto || '').toString(); var text = d ? k + ' — ' + d : k; return '<button type="button" class="prod-results-item" data-key="' + esc(k) + '" data-label="' + esc(text) + '">' + esc(text) + '</button>'; }).join('');
-      quickProdKeyResults.hidden = items.length === 0;
-    } catch (err) {
-      if (err.name === 'AbortError') return;
-      quickProdKeyResults.hidden = true; quickProdKeyResults.innerHTML = '';
-    } finally {
-      if (quickProdservAbort && quickProdservAbort.signal === signal) quickProdservAbort = null;
-    }
-  }
-  async function saveQuickProd(){
-    if (!validateQuickProd()) { window.portalToast && window.portalToast({ type: 'warning', title: 'Faltan datos', message: 'Completa descripción, Clave ProdServ, unidad y precio unitario.' }); return; }
-    var keyRaw = (quickProdKey.value || '').trim();
-    var product_key = keyRaw.indexOf(' — ') >= 0 ? keyRaw.split(' — ')[0].trim() : keyRaw;
-    var unitRaw = (quickProdUnit.value || '').trim();
-    var unit_key = unitRaw.indexOf(' — ') >= 0 ? unitRaw.split(' — ')[0].trim() : (unitRaw || 'E48');
-    var payload = { token: token, description: (quickProdDesc.value || '').trim(), product_key: product_key, unit_key: unit_key, unit_price: parseFloat(quickProdPrice.value), iva_rate: parseFloat(quickProdIva.value) || 0.16 };
-    quickProdSaveBtn.disabled = true;
-    quickProdSaveBtn.textContent = 'Guardando…';
-    try {
-      var res = await fetch('/api/products/create', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-      var data = await res.json().catch(function(){ return {}; });
-      if (!res.ok) throw new Error(window.portalApiErrorMessage ? window.portalApiErrorMessage(data) : (data.detail || 'Error'));
-      window.portalToast && window.portalToast({ type: 'success', title: 'Producto guardado', message: 'Ya puedes usarlo en la factura rápida.' });
-      closeQuickProdModal();
-      var newId = (data.data && data.data.id) ? data.data.id : null;
-      await loadProducts();
-      if (newId != null && productSelect && products.length > 0) {
-        var idx = products.findIndex(function(p){ return p.id === newId; });
-        if (idx >= 0) productSelect.value = String(idx);
-      }
-      updateBtn();
-    } catch (e) { window.portalToastError && window.portalToastError(e, 'Error', 'No se pudo guardar el producto.'); }
-    finally { quickProdSaveBtn.disabled = false; quickProdSaveBtn.textContent = 'Guardar'; }
-  }
-
-  function buildCreateUrl(){
-    const cIdx = customerSelect && customerSelect.value ? parseInt(customerSelect.value, 10) : -1;
-    const pIdx = productSelect && productSelect.value ? parseInt(productSelect.value, 10) : -1;
-    if (cIdx < 0 || pIdx < 0 || !customers[cIdx] || !products[pIdx]) return null;
-    const c = customers[cIdx];
-    const p = products[pIdx];
-    const params = new URLSearchParams({ token });
-    params.set('customer_rfc', c.rfc || '');
-    params.set('customer_legal_name', c.legal_name || '');
-    params.set('customer_zip', c.zip || '');
-    params.set('customer_tax_system', c.tax_system || '');
-    params.set('customer_email', c.email || '');
-    params.set('concept_desc', p.description || '');
-    params.set('concept_key', p.product_key || '');
-    params.set('concept_unit', p.unit_key || '');
-    params.set('concept_price', String(p.unit_price != null ? p.unit_price : ''));
-    params.set('concept_iva', String(p.iva_rate != null ? p.iva_rate : '0.16'));
-    return '/portal/create?' + params.toString();
-  }
-
-  function openQuickInvoice(){
-    const url = buildCreateUrl();
-    if (!url) return;
-    window.location.href = url;
-  }
-
-  function closeQuickInvoiceModal(){
-    if (!modal) return;
-    modal.hidden = true;
-    modal.setAttribute('aria-hidden', 'true');
-    modal.classList.remove('quick-invoice-modal--open');
-    document.body.classList.remove('no-scroll');
-    if (frame) frame.src = 'about:blank';
-  }
-
-  function updateBtn(){
-    if (!btn) return;
-    const url = buildCreateUrl();
-    btn.disabled = !url;
-  }
-
-  async function loadCustomers(){
-    try {
-      const res = await fetch('/api/customers', { credentials: 'same-origin' });
-      if (!res.ok) return;
-      const data = await res.json();
-      customers = Array.isArray(data) ? data : (data && data.data) ? data.data : (data && data.customers) ? data.customers : [];
-      if (!customerSelect) return;
-      customerSelect.innerHTML = '<option value="">— Seleccionar cliente —</option>';
-      customers.forEach((c, i) => {
-        const opt = document.createElement('option');
-        opt.value = String(i);
-        opt.textContent = (c.legal_name || c.rfc || 'Sin nombre').trim();
-        customerSelect.appendChild(opt);
-      });
-      var hint = document.getElementById('quickCustomerHint');
-      if (hint) hint.hidden = customers.length > 0;
-      updateBtn();
-    } catch (e) { console.warn('loadCustomers', e); }
-  }
-
-  async function loadProducts(){
-    try {
-      const res = await fetch('/api/products', { credentials: 'same-origin' });
-      if (!res.ok) return;
-      const data = await res.json();
-      products = Array.isArray(data) ? data : (data && data.data) ? data.data : [];
-      if (!productSelect) return;
-      productSelect.innerHTML = '<option value="">— Seleccionar producto —</option>';
-      products.forEach((p, i) => {
-        const opt = document.createElement('option');
-        opt.value = String(i);
-        opt.textContent = (p.description || p.product_key || 'Sin descripción').trim();
-        productSelect.appendChild(opt);
-      });
-      var hint = document.getElementById('quickProductHint');
-      if (hint) hint.hidden = products.length > 0;
-      updateBtn();
-    } catch (e) { console.warn('loadProducts', e); }
-  }
-
-  if (btn) btn.addEventListener('click', function(e){ e.preventDefault(); openQuickInvoice(); });
-  if (customerSelect) customerSelect.addEventListener('change', updateBtn);
-  if (productSelect) productSelect.addEventListener('change', updateBtn);
-  if (modalClose) modalClose.addEventListener('click', closeQuickInvoiceModal);
-  if (modalBackdrop) modalBackdrop.addEventListener('click', closeQuickInvoiceModal);
-  document.addEventListener('keydown', function(e){
-    if (e.key !== 'Escape') return;
-    if (quickCustModal && !quickCustModal.hidden) { closeQuickCustModal(); return; }
-    if (quickProdModal && !quickProdModal.hidden) { closeQuickProdModal(); return; }
-    if (modal && !modal.hidden) { closeQuickInvoiceModal(); }
-  });
-
-  document.body.addEventListener('click', function(e) {
-    if (e.target.closest && e.target.closest('#quickAddCustomerBtn')) { e.preventDefault(); openQuickCustModal(); }
-    if (e.target.closest && e.target.closest('#quickAddProductBtn')) { e.preventDefault(); openQuickProdModal(); }
-  });
-  if (quickCustSaveBtn) quickCustSaveBtn.addEventListener('click', saveQuickCust);
-  if (quickProdSaveBtn) quickProdSaveBtn.addEventListener('click', saveQuickProd);
-
-  quickCustModal && quickCustModal.addEventListener('click', function(e){
-    if (e.target.getAttribute('data-close') === 'true' || e.target.classList.contains('modal__backdrop')) closeQuickCustModal();
-  });
-  quickProdModal && quickProdModal.addEventListener('click', function(e){
-    if (e.target.getAttribute('data-close') === 'true' || e.target.classList.contains('modal__backdrop')) closeQuickProdModal();
-  });
-
-  if (quickProdKey) {
-    quickProdKey.addEventListener('input', function(){ clearTimeout(quickProdservDebounce); quickProdservDebounce = setTimeout(function(){ searchQuickProdserv(quickProdKey.value); }, 250); });
-    quickProdKey.addEventListener('focus', function(){ if ((quickProdKey.value || '').trim().length >= 2) searchQuickProdserv(quickProdKey.value); });
-  }
-  if (quickProdKeyResults) {
-    quickProdKeyResults.addEventListener('click', function(e){
-      var b = e.target.closest('.prod-results-item');
-      if (!b) return;
-      quickProdKey.value = b.getAttribute('data-label') || b.getAttribute('data-key') || '';
-      quickProdKeyResults.hidden = true;
-      quickProdKeyResults.innerHTML = '';
-    });
-  }
-  async function searchQuickUnidad(q){
-    var term = (q || '').trim();
-    if (term.length < 1) { if (quickProdUnitResults) { quickProdUnitResults.hidden = true; quickProdUnitResults.innerHTML = ''; } return; }
-    if (quickUnidadAbort) quickUnidadAbort.abort();
-    quickUnidadAbort = new AbortController();
-    try {
-      var res = await fetch('/api/catalogs/unidad?q=' + encodeURIComponent(term) + '&limit=15', { signal: quickUnidadAbort.signal });
-      if (!res.ok) return;
-      var data = await res.json();
-      var items = Array.isArray(data) ? data : [];
-      var esc = function(s){ return String(s ?? '').replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }; };
-      if (quickProdUnitResults) {
-        quickProdUnitResults.innerHTML = items.map(function(it){ var k = (it.key || '').toString(); var d = (it.label || '').toString(); var text = d ? k + ' — ' + d : k; return '<button type="button" class="prod-results-item" data-key="' + esc(k) + '" data-label="' + esc(text) + '">' + esc(text) + '</button>'; }).join('');
-        quickProdUnitResults.hidden = items.length === 0;
-      }
-    } catch (err) {
-      if (err.name === 'AbortError') return;
-      if (quickProdUnitResults) { quickProdUnitResults.hidden = true; quickProdUnitResults.innerHTML = ''; }
-    } finally { quickUnidadAbort = null; }
-  }
-  if (quickProdUnit) {
-    quickProdUnit.addEventListener('input', function(){ clearTimeout(quickUnidadDebounce); quickUnidadDebounce = setTimeout(function(){ searchQuickUnidad(quickProdUnit.value); }, 250); });
-    quickProdUnit.addEventListener('focus', function(){ if ((quickProdUnit.value || '').trim().length >= 1) searchQuickUnidad(quickProdUnit.value); });
-  }
-  if (quickProdUnitResults) {
-    quickProdUnitResults.addEventListener('click', function(e){
-      var b = e.target.closest('.prod-results-item');
-      if (!b) return;
-      quickProdUnit.value = b.getAttribute('data-label') || b.getAttribute('data-key') || '';
-      quickProdUnitResults.hidden = true;
-      quickProdUnitResults.innerHTML = '';
-    });
-  }
-  document.addEventListener('click', function(){
-    if (quickProdKeyResults) quickProdKeyResults.hidden = true;
-    if (quickProdUnitResults) quickProdUnitResults.hidden = true;
-  });
-  if (quickProdKey) quickProdKey.addEventListener('click', function(e){ e.stopPropagation(); });
-  if (quickProdUnit) quickProdUnit.addEventListener('click', function(e){ e.stopPropagation(); });
-
-  (async function init(){
-    await loadCustomers();
-    await loadProducts();
-    updateBtn();
-  })();
-})();
-
-</script>
-
-<style>
-.quick-invoice-intro { margin: 0 0 18px; font-size: 13px; }
-.quick-invoice-form { display: flex; flex-direction: column; gap: 22px; max-width: 100%; }
-.quick-invoice-row { display: flex; flex-direction: column; gap: 8px; }
-.quick-invoice-label-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-.quick-invoice-label { font-size: 16px; font-weight: 700; color: var(--text); letter-spacing: -0.02em; margin: 0; }
-.quick-invoice-add-btn { white-space: nowrap; }
-.quick-invoice-modal__subtitle { margin: 4px 0 0; font-size: 13px; color: var(--muted); line-height: 1.4; }
-.quick-invoice-hint { font-size: 13px; margin: 4px 0 0; line-height: 1.4; }
-.quick-invoice-select { width: 100%; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); font-size: 15px; color: var(--text); }
-.quick-invoice-actions { margin-top: 8px; }
-.btn--secondary { background: var(--surface-hover, rgba(0,0,0,.04)); border: 1px solid var(--border); color: var(--text); }
-.btn--secondary:hover { background: rgba(0,0,0,.08); border-color: var(--border); }
-.prod-results{ position:absolute; left:0; right:0; top:100%; margin-top:4px; background: var(--surface); border:1px solid var(--border); border-radius:12px; box-shadow: var(--shadow-md); max-height:220px; overflow:auto; z-index:10; }
-.prod-results-item{ display:block; width:100%; text-align:left; padding:10px 12px; border:none; background:0; font-size:13px; cursor:pointer; color: var(--text); }
-.prod-results-item:hover{ background: rgba(0,0,0,.05); }
-.grid-2{ display:grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.grid-3{ display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
-@media (max-width: 600px){ .grid-2, .grid-3{ grid-template-columns: 1fr; } }
-.input--error{ border-color: rgba(240,68,56,.55) !important; box-shadow: 0 0 0 3px rgba(240,68,56,.15) !important; }
-/* Modal factura rápida */
-.quick-invoice-modal{ position: fixed; inset: 0; z-index: 90; display: none; align-items: center; justify-content: center; padding: 16px; box-sizing: border-box; pointer-events: none; }
-.quick-invoice-modal:not([hidden]){ display: flex !important; pointer-events: auto; }
-.quick-invoice-modal__backdrop{ position: absolute; inset: 0; background: rgba(0,0,0,.45); opacity: 0; transition: opacity .2s ease; pointer-events: auto; }
-.quick-invoice-modal--open .quick-invoice-modal__backdrop{ opacity: 1; }
-.quick-invoice-modal__panel{ position: relative; width: 100%; max-width: 720px; max-height: 90vh; background: var(--surface); border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,.2); display: flex; flex-direction: column; overflow: hidden; pointer-events: auto; }
-.quick-invoice-modal__head{ display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
-.quick-invoice-modal__head > div{ min-width: 0; }
-.quick-invoice-modal__title{ margin: 0; font-size: 15px; font-weight: 700; }
-.quick-invoice-modal__close{ width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border: none; border-radius: 12px; background: transparent; color: var(--muted); cursor: pointer; }
-.quick-invoice-modal__close:hover{ background: rgba(0,0,0,.06); color: var(--text); }
-.quick-invoice-modal__body{ flex: 1; min-height: 0; display: flex; }
-.quick-invoice-modal__frame{ width: 100%; height: 75vh; min-height: 400px; border: none; display: block; }
-</style>
-
 {% endblock %}

@@ -3,21 +3,21 @@
 
 {% block content %}
 <section class="page-section page-section--clients">
-  <div class="card">
-    <div class="card-header card-header--with-tools">
+  <div class="card ui-card">
+    <div class="card-header card-header--with-tools ui-card__header">
       <div class="card-header__left">
         <div class="table-tools table-tools--inline">
           <div class="table-tools__search">
             <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path d="M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="M16.2 16.2 21 21" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+              <path d="M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M16.2 16.2 21 21" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
             </svg>
-            <input id="custSearch" class="input" type="search" placeholder="Buscar por RFC, razón social o alias" autocomplete="off" />
+            <input id="custSearch" class="input ui-input" type="search" placeholder="Buscar por RFC, razón social o alias" autocomplete="off" />
           </div>
-          <button id="custNewBtn" type="button" class="btn btn-primary">
+          <button id="custNewBtn" type="button" class="btn btn-primary ui-btn ui-btn--primary">
             <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path d="M12 5v14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-              <path d="M5 12h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+              <path d="M12 5v14" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+              <path d="M5 12h14" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
             </svg>
             Nuevo cliente
           </button>
@@ -30,8 +30,8 @@
     </div>
 
     <div class="card-list-sep">
-    <div style="overflow:auto;" id="custTableWrap">
-      <table class="table" id="custTable" style="min-width:1000px;">
+    <div class="table-wrap" id="custTableWrap" style="overflow:auto;">
+      <table class="table table--zebra ui-table ui-table--zebra" id="custTable" style="min-width:1000px;">
         <thead>
           <tr>
             <th style="min-width:140px;">RFC</th>
@@ -44,33 +44,35 @@
           </tr>
         </thead>
         <tbody id="custTbody">
-          <tr>
-            <td colspan="7"><div class="skeleton" style="height: 46px; border-radius: 14px;"></div></td>
-          </tr>
-          <tr>
-            <td colspan="7"><div class="skeleton" style="height: 46px; border-radius: 14px;"></div></td>
-          </tr>
-          <tr>
-            <td colspan="7"><div class="skeleton" style="height: 46px; border-radius: 14px;"></div></td>
-          </tr>
+          <tr><td colspan="7"><div class="skeleton" style="height: 46px; border-radius: 14px;"></div></td></tr>
+          <tr><td colspan="7"><div class="skeleton" style="height: 46px; border-radius: 14px;"></div></td></tr>
+          <tr><td colspan="7"><div class="skeleton" style="height: 46px; border-radius: 14px;"></div></td></tr>
+          <tr><td colspan="7"><div class="skeleton" style="height: 46px; border-radius: 14px;"></div></td></tr>
+          <tr><td colspan="7"><div class="skeleton" style="height: 46px; border-radius: 14px;"></div></td></tr>
         </tbody>
       </table>
     </div>
+    <div id="custTablePagination" class="table-pagination" hidden aria-label="Paginación del listado"></div>
 
-    <div class="empty-state" id="custEmpty" hidden>
+    <div class="empty-state empty-state--error" id="custLoadError" hidden aria-live="polite">
+      <div class="empty-state__title">No pudimos cargar esto ahora.</div>
+      <p class="empty-state__desc" id="custLoadErrorMsg">Puedes intentar de nuevo.</p>
+      <button type="button" class="btn btn--secondary" id="custLoadErrorRetry">Reintentar</button>
+    </div>
+    <div class="empty-state empty-state--empty" id="custEmpty" hidden>
       <div class="empty-state__icon" aria-hidden="true">
         <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <circle cx="9" cy="8" r="4" stroke="currentColor" stroke-width="1.8"/>
-          <path d="M3 20c0-3 3-5 6-5s6 2 6 5" stroke="currentColor" stroke-width="1.8"/>
-          <path d="M16 12l2 2 4-4" stroke="currentColor" stroke-width="1.8"/>
+          <circle cx="9" cy="8" r="4" stroke="currentColor" stroke-width="1.75"/>
+          <path d="M3 20c0-3 3-5 6-5s6 2 6 5" stroke="currentColor" stroke-width="1.75"/>
+          <path d="M16 12l2 2 4-4" stroke="currentColor" stroke-width="1.75"/>
         </svg>
       </div>
-      <div class="empty-state__title">Aún no tienes clientes guardados</div>
-      <div class="empty-state__desc">Agrega clientes y reutilízalos para facturar más rápido (RFC, razón social, CP y régimen).</div>
-      <button type="button" class="btn btn-primary" id="custEmptyBtn">
+      <div class="empty-state__title">Aún no tienes clientes</div>
+      <div class="empty-state__desc">Guarda los datos de quien te paga para reutilizarlos en cada factura y ahorrar tiempo.</div>
+      <button type="button" class="btn btn-primary ui-btn ui-btn--primary" id="custEmptyBtn">
         <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path d="M12 5v14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-          <path d="M5 12h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          <path d="M12 5v14" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+          <path d="M5 12h14" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
         </svg>
         Crear primer cliente
       </button>
@@ -89,8 +91,8 @@
         </div>
         <button type="button" class="icon-btn" data-close="true" aria-label="Cerrar">
           <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="M6 6l12 12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-            <path d="M18 6 6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M6 6l12 12" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+            <path d="M18 6 6 18" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
           </svg>
         </button>
       </div>
@@ -99,8 +101,8 @@
         <div class="grid-2">
           <div class="field">
             <label class="label">RFC *</label>
-            <input id="custRfc" class="input" type="text" placeholder="XAXX010101000" autocomplete="off" />
-            <div class="help" id="custRfcHelp" hidden>RFC requerido.</div>
+            <input id="custRfc" class="input" type="text" placeholder="XAXX010101000" autocomplete="off" maxlength="13" />
+            <div class="help" id="custRfcHelp" hidden>Revisa el RFC: 12 o 13 caracteres, solo letras y números.</div>
           </div>
           <div class="field">
             <label class="label">Alias (opcional)</label>
@@ -111,13 +113,14 @@
         <div class="field">
           <label class="label">Razón social *</label>
           <input id="custName" class="input" type="text" placeholder="Nombre / Razón social" autocomplete="off" />
-          <div class="help" id="custNameHelp" hidden>Razón social requerida.</div>
+          <div class="help" id="custNameHelp" hidden>Escribe la razón social o nombre del cliente.</div>
         </div>
 
         <div class="grid-3">
           <div class="field">
             <label class="label">C.P. (opcional)</label>
-            <input id="custZip" class="input" type="text" placeholder="64000" autocomplete="off" />
+            <input id="custZip" class="input" type="text" placeholder="64000" autocomplete="off" maxlength="5" inputmode="numeric" pattern="[0-9]*" />
+            <div class="help" id="custZipHelp" hidden>El código postal debe tener 5 dígitos.</div>
           </div>
           <div class="field">
             <label class="label">Régimen (opcional)</label>
@@ -126,6 +129,7 @@
           <div class="field">
             <label class="label">Email (opcional)</label>
             <input id="custEmail" class="input" type="email" placeholder="correo@dominio.com" autocomplete="off" />
+            <div class="help" id="custEmailHelp" hidden>Revisa el formato del correo (ej. nombre@dominio.com).</div>
           </div>
         </div>
 
@@ -169,19 +173,26 @@
   const emailEl = document.getElementById('custEmail');
   const rfcHelp = document.getElementById('custRfcHelp');
   const nameHelp = document.getElementById('custNameHelp');
+  const zipHelp = document.getElementById('custZipHelp');
+  const emailHelp = document.getElementById('custEmailHelp');
 
   let allRows = [];
 
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const hl = (text, q) => (window.uiHighlightSearch ? window.uiHighlightSearch(text, q) : esc(text));
 
-  function setCount(n){
-    countEl.textContent = (n === 1) ? 'Total: 1 cliente' : `Total: ${n} clientes`;
+  function setCount(n, from, to){
+    if (from != null && to != null && n > ROWS_PAGE_LIMIT)
+      countEl.textContent = 'Mostrando ' + from + '-' + to + ' de ' + n + ' clientes';
+    else
+      countEl.textContent = (n === 1) ? 'Total: 1 cliente' : 'Total: ' + n + ' clientes';
   }
 
-  function rowHTML(r){
-    const rfc = esc(r.rfc);
-    const name = esc(r.legal_name);
-    const alias = esc(r.alias || '');
+  function rowHTML(r, searchQ){
+    const q = (searchQ || '').trim();
+    const rfc = q ? hl(r.rfc, q) : esc(r.rfc);
+    const name = q ? hl(r.legal_name, q) : esc(r.legal_name);
+    const alias = q ? hl(r.alias || '', q) : esc(r.alias || '');
     const zip = esc(r.zip || '');
     const ts = esc(r.tax_system || '');
     const email = esc(r.email || '');
@@ -201,36 +212,75 @@
         <td class="muted">${ts}</td>
         <td style="font-size:12px;">${email}</td>
         <td>
-          <button type="button" class="btn btn-small btn-ghost" data-copy="${rfc}">Copiar RFC</button>
-          <a href="${createUrl}" class="btn btn-small" style="text-decoration:none;">Generar factura</a>
-          <button type="button" class="btn btn-small btn-ghost btn-danger-icon" data-delete-rfc="${rfc}" data-delete-name="${name}" title="Eliminar cliente" aria-label="Eliminar cliente">
-            <svg class="icon icon-trash" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path d="M4 7h16v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="M9 11v6M15 11v6M3 7l2-3h14l2 3M10 4v1M14 4v1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-            </svg>
-          </button>
+          <div class="cust-actions-cell">
+            <button type="button" class="btn btn-small btn-ghost" data-copy="${esc(r.rfc || '')}">Copiar RFC</button>
+            <div class="cust-actions-row">
+              <a href="${createUrl}" class="btn btn-small" style="text-decoration:none;">Generar factura</a>
+              <button type="button" class="btn btn-small btn-ghost cust-delete-btn" data-delete-rfc="${esc(r.rfc || '')}" data-delete-name="${esc(r.legal_name || r.rfc || '')}" title="Eliminar cliente" aria-label="Eliminar cliente">
+                <svg class="icon icon-trash" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M4 7h16v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7z" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+                  <path d="M9 11v6M15 11v6M3 7l2-3h14l2 3M10 4v1M14 4v1" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+                </svg>
+              </button>
+            </div>
+          </div>
         </td>
       </tr>
     `;
   }
 
-  function render(rows){
-    const n = rows.length;
-    setCount(n);
+  const ROWS_PAGE_LIMIT = 200;
+  let clientPage = 1;
+  let lastFilteredRows = [];
 
-    if (n === 0) {
+  function render(rows){
+    lastFilteredRows = rows;
+    const total = rows.length;
+    const totalPages = Math.max(1, Math.ceil(total / ROWS_PAGE_LIMIT));
+    if (clientPage > totalPages) clientPage = totalPages;
+    const start = (clientPage - 1) * ROWS_PAGE_LIMIT;
+    const displayRows = total <= ROWS_PAGE_LIMIT ? rows : rows.slice(start, start + ROWS_PAGE_LIMIT);
+    const n = displayRows.length;
+
+    setCount(total);
+    if (total > ROWS_PAGE_LIMIT) {
+      setCount(total, (clientPage - 1) * ROWS_PAGE_LIMIT + 1, (clientPage - 1) * ROWS_PAGE_LIMIT + n);
+    }
+
+    if (total === 0) {
       tbody.innerHTML = '';
       if (tableWrap) { tableWrap.hidden = true; tableWrap.style.display = 'none'; }
       if (emptyEl) { emptyEl.hidden = false; emptyEl.removeAttribute('hidden'); emptyEl.style.display = ''; }
+      document.getElementById('custTablePagination') && (document.getElementById('custTablePagination').hidden = true);
       return;
     }
 
     if (tableWrap) { tableWrap.hidden = false; tableWrap.style.display = ''; }
     if (emptyEl) { emptyEl.hidden = true; emptyEl.setAttribute('hidden', ''); emptyEl.style.display = 'none'; }
-    tbody.innerHTML = rows.map(rowHTML).join('');
+    const searchQ = (searchEl.value || '').trim();
+    tbody.innerHTML = displayRows.map(r => rowHTML(r, searchQ)).join('');
+
+    var pagEl = document.getElementById('custTablePagination');
+    if (pagEl) {
+      if (total <= ROWS_PAGE_LIMIT) {
+        pagEl.hidden = true;
+      } else {
+        pagEl.hidden = false;
+        var from = (clientPage - 1) * ROWS_PAGE_LIMIT + 1;
+        var to = (clientPage - 1) * ROWS_PAGE_LIMIT + n;
+        pagEl.innerHTML = '<span class="muted">Mostrando ' + from + '-' + to + ' de ' + total + '</span>' +
+          (clientPage > 1 ? ' <button type="button" class="btn btn--sm btn--ghost" id="custTablePrev">Anterior</button>' : '') +
+          (clientPage < totalPages ? ' <button type="button" class="btn btn--sm btn--ghost" id="custTableNext">Siguiente</button>' : '');
+        var prevBtn = document.getElementById('custTablePrev');
+        var nextBtn = document.getElementById('custTableNext');
+        if (prevBtn) prevBtn.onclick = function(){ clientPage--; render(lastFilteredRows); };
+        if (nextBtn) nextBtn.onclick = function(){ clientPage++; render(lastFilteredRows); };
+      }
+    }
   }
 
   function filter(){
+    clientPage = 1;
     const q = (searchEl.value || '').trim().toLowerCase();
     if (!q) return render(allRows);
     const filtered = allRows.filter(r => {
@@ -241,27 +291,59 @@
     render(filtered);
   }
 
+  const loadErrorEl = document.getElementById('custLoadError');
+  const loadErrorMsgEl = document.getElementById('custLoadErrorMsg');
+
   async function load(){
-    try{
-      const res = await fetch('/api/customers');
-      if(!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      if (Array.isArray(data)) {
-        allRows = data;
-      } else if (data && Array.isArray(data.data)) {
-        allRows = data.data;
-      } else if (data && Array.isArray(data.customers)) {
-        allRows = data.customers;
-      } else {
+    var skeletonShownAt = Date.now();
+    if (loadErrorEl) loadErrorEl.hidden = true;
+    if (emptyEl) { emptyEl.hidden = true; emptyEl.style.display = 'none'; }
+    if (tableWrap) { tableWrap.hidden = false; tableWrap.style.display = ''; }
+    tbody.innerHTML = (window.uiSkeletonTableRows && window.uiSkeletonTableRows(7, 5)) || '<tr><td colspan="7"><div class="skeleton" style="height: 46px; border-radius: 14px;"></div></td></tr>'.repeat(5);
+    try {
+      if (window.portalProgressBar) window.portalProgressBar.start();
+      const r = window.uiFetchJSON ? await window.uiFetchJSON('/api/customers') : { ok: false, status: 0, data: null, error: 'Helper no disponible' };
+      const list = window.uiGetListFromResponse ? window.uiGetListFromResponse(r.data) : (Array.isArray(r.data) ? r.data : []);
+      await (window.uiMinSkeletonDelay && window.uiMinSkeletonDelay(skeletonShownAt, 300));
+      if (r.ok && (!list || list.length === 0)) {
         allRows = [];
+        if (loadErrorEl) loadErrorEl.hidden = true;
+        if (tableWrap) tableWrap.hidden = true;
+        if (emptyEl) { emptyEl.hidden = false; emptyEl.style.display = ''; }
+        tbody.innerHTML = '';
+        return;
       }
+      if (r.status === 401) {
+        allRows = [];
+        if (loadErrorMsgEl) loadErrorMsgEl.innerHTML = window.uiSessionExpiredMessage ? window.uiSessionExpiredMessage() : 'Sesión expirada. <a href="/login">Inicia sesión</a>';
+        if (loadErrorEl) loadErrorEl.hidden = false;
+        if (tableWrap) tableWrap.hidden = true;
+        if (emptyEl) emptyEl.hidden = true;
+        tbody.innerHTML = '';
+        return;
+      }
+      if (!r.ok) {
+        allRows = [];
+        const msg = window.uiListLoadErrorText ? window.uiListLoadErrorText(r, 'clientes') : (r.error || 'Revisa tu conexión e intenta de nuevo.');
+        if (loadErrorMsgEl) loadErrorMsgEl.textContent = msg;
+        if (loadErrorEl) loadErrorEl.hidden = false;
+        if (tableWrap) tableWrap.hidden = true;
+        if (emptyEl) emptyEl.hidden = true;
+        tbody.innerHTML = '';
+        return;
+      }
+      allRows = list;
       render(allRows);
-    }catch(e){
+    } catch (e) {
       allRows = [];
       tbody.innerHTML = '';
+      const fallbackMsg = 'Revisa tu conexión e intenta de nuevo.';
+      if (loadErrorMsgEl) loadErrorMsgEl.textContent = fallbackMsg;
+      if (loadErrorEl) loadErrorEl.hidden = false;
       if (tableWrap) tableWrap.hidden = true;
-      emptyEl.hidden = false;
-      window.portalToast && window.portalToast({ type:'danger', title:'Error', message:'No se pudo cargar clientes' });
+      if (emptyEl) emptyEl.hidden = true;
+    } finally {
+      if (window.portalProgressBar) window.portalProgressBar.done();
     }
   }
 
@@ -272,33 +354,44 @@
       const value = copyBtn.getAttribute('data-copy') || '';
       try{
         await navigator.clipboard.writeText(value);
-        window.portalToast && window.portalToast({ type:'success', title:'Copiado', message:'RFC copiado al portapapeles' });
+        window.portalToast && window.portalToast({ type: 'success', title: 'Copiado', message: 'RFC copiado al portapapeles.' });
       }catch(_){
-        window.portalToast && window.portalToast({ type:'danger', title:'No se pudo copiar', message:'Tu navegador bloqueó el portapapeles' });
+        window.portalToast && window.portalToast({ type: 'danger', title: 'No se pudo copiar', message: 'Tu navegador bloqueó el portapapeles.' });
       }
       return;
     }
 
-    // Eliminar cliente
+    // Eliminar cliente (modal de confirmación para acción irreversible)
     const deleteBtn = e.target && e.target.closest ? e.target.closest('[data-delete-rfc]') : null;
     if (deleteBtn) {
       const rfc = deleteBtn.getAttribute('data-delete-rfc') || '';
       const name = deleteBtn.getAttribute('data-delete-name') || rfc;
       if (!rfc) return;
-      if (!confirm('¿Eliminar el cliente "' + name.replace(/"/g, '\\"') + '" (RFC ' + rfc + ')? Esta acción no se puede deshacer.')) return;
+      const confirmed = window.uiConfirm ? await window.uiConfirm({
+        title: 'Eliminar cliente',
+        message: '¿Eliminar el cliente "' + (name || rfc).replace(/"/g, '') + '" (RFC ' + rfc + ')? Esta acción no se puede deshacer.',
+        confirmText: 'Eliminar',
+        cancelText: 'Cancelar',
+      }) : false;
+      if (!confirmed) return;
       deleteBtn.disabled = true;
       try {
-        const res = await fetch('/api/customers/delete', {
+        const res = await (window.portalFetchWithTimeout ? window.portalFetchWithTimeout('/api/customers/delete', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ token, rfc }),
-        });
+        }, 30000) : fetch('/api/customers/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token, rfc }),
+        }));
         const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.detail || 'Error al eliminar');
-        window.portalToast && window.portalToast({ type:'success', title:'Eliminado', message:'Cliente eliminado correctamente' });
+        if (!res.ok) throw new Error(window.portalApiErrorMessage ? window.portalApiErrorMessage(data) : (data.detail || 'Error al eliminar'));
+        /* P38: borrado irreversible — no inventar Undo; mostrar "Eliminado" y sugerir recrear */
+        window.portalToast && window.portalToast({ type: 'success', title: 'Eliminado', message: 'Puedes agregar otro cliente cuando quieras.', ttl: 4500 });
         await load();
       } catch (err) {
-        window.portalToast && window.portalToast({ type:'danger', title:'Error', message: String(err.message || err) });
+        window.portalToastError && window.portalToastError(err, 'No se pudo eliminar', 'Revisa e intenta de nuevo o recarga la página.');
       } finally {
         deleteBtn.disabled = false;
       }
@@ -306,8 +399,26 @@
     }
   });
 
-  // Search
-  searchEl.addEventListener('input', () => filter());
+  // P39: Search debounce 250ms + teclado Enter/Esc
+  var filterDebounce;
+  searchEl.addEventListener('input', function(){
+    clearTimeout(filterDebounce);
+    filterDebounce = setTimeout(filter, 250);
+  });
+  searchEl.addEventListener('keydown', function(e){
+    if (e.key === 'Escape') {
+      searchEl.value = '';
+      filter();
+      searchEl.blur();
+      e.preventDefault();
+      return;
+    }
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      var firstLink = tbody && tbody.querySelector('a[href*="/portal/create"]');
+      if (firstLink) { firstLink.focus(); firstLink.click(); }
+    }
+  });
 
   // Modal
   const openModal = () => {
@@ -344,26 +455,56 @@
   });
 
   function validate(){
-    const rfc = (rfcEl.value || '').trim();
+    const rfcRaw = (rfcEl.value || '').trim();
+    const rfc = rfcRaw.toUpperCase();
+    if (rfcRaw !== rfc && rfcEl.value) rfcEl.value = rfc;
     const name = (nameEl.value || '').trim();
+    const zip = (zipEl.value || '').trim();
+    const email = (emailEl.value || '').trim();
 
     let ok = true;
-    if (!rfc){
+    if (!rfc) {
       ok = false;
-      rfcHelp.hidden = false;
-      rfcEl.classList.add('input--error');
+      if (rfcHelp) { rfcHelp.textContent = 'El RFC es obligatorio.'; rfcHelp.hidden = false; }
+      if (rfcEl) rfcEl.classList.add('input--error');
+    } else if (rfc.length !== 12 && rfc.length !== 13) {
+      ok = false;
+      if (rfcHelp) { rfcHelp.textContent = 'El RFC debe tener 12 caracteres (moral) o 13 (física).'; rfcHelp.hidden = false; }
+      if (rfcEl) rfcEl.classList.add('input--error');
+    } else if (!/^[A-Z&Ñ][0-9A-Z&Ñ]{11,12}$/.test(rfc)) {
+      ok = false;
+      if (rfcHelp) { rfcHelp.textContent = 'Solo letras y números, sin espacios ni caracteres especiales.'; rfcHelp.hidden = false; }
+      if (rfcEl) rfcEl.classList.add('input--error');
     } else {
-      rfcHelp.hidden = true;
-      rfcEl.classList.remove('input--error');
+      if (rfcHelp) rfcHelp.hidden = true;
+      if (rfcEl) rfcEl.classList.remove('input--error');
     }
 
-    if (!name){
+    if (!name) {
       ok = false;
-      nameHelp.hidden = false;
-      nameEl.classList.add('input--error');
+      if (nameHelp) { nameHelp.hidden = false; nameHelp.textContent = 'Escribe la razón social o nombre del cliente.'; }
+      if (nameEl) nameEl.classList.add('input--error');
     } else {
-      nameHelp.hidden = true;
-      nameEl.classList.remove('input--error');
+      if (nameHelp) nameHelp.hidden = true;
+      if (nameEl) nameEl.classList.remove('input--error');
+    }
+
+    if (zip && !/^[0-9]{5}$/.test(zip)) {
+      ok = false;
+      if (zipHelp) { zipHelp.hidden = false; }
+      if (zipEl) zipEl.classList.add('input--error');
+    } else {
+      if (zipHelp) zipHelp.hidden = true;
+      if (zipEl) zipEl.classList.remove('input--error');
+    }
+
+    if (email && !/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email)) {
+      ok = false;
+      if (emailHelp) { emailHelp.hidden = false; }
+      if (emailEl) emailEl.classList.add('input--error');
+    } else {
+      if (emailHelp) emailHelp.hidden = true;
+      if (emailEl) emailEl.classList.remove('input--error');
     }
 
     return ok;
@@ -371,13 +512,13 @@
 
   async function save(){
     if (!validate()) {
-      window.portalToast && window.portalToast({ type:'danger', title:'Faltan datos', message:'RFC y Razón social son obligatorios' });
+      window.portalToast && window.portalToast({ type: 'warning', title: 'Revisa los datos', message: 'Completa RFC y razón social. Si usas CP o email, revisa el formato.' });
       return;
     }
 
     const payload = {
       token,
-      rfc: (rfcEl.value || '').trim(),
+      rfc: (rfcEl.value || '').trim().toUpperCase(),
       legal_name: (nameEl.value || '').trim(),
       alias: (aliasEl.value || '').trim() || null,
       zip: (zipEl.value || '').trim() || null,
@@ -385,30 +526,37 @@
       email: (emailEl.value || '').trim() || null,
     };
 
-    saveBtn.disabled = true;
-    saveBtn.textContent = 'Guardando…';
+    if (window.uiSetButtonLoading) window.uiSetButtonLoading(saveBtn, true, 'Guardando…');
 
     try{
-      const res = await fetch('/api/customers/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
+      const res = await (window.portalFetchWithTimeout ? window.portalFetchWithTimeout('/api/customers/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        }, 30000) : fetch('/api/customers/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        }));
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
+      if (!res.ok) throw new Error(window.portalApiErrorMessage ? window.portalApiErrorMessage(data) : (data.detail || `HTTP ${res.status}`));
 
-      window.portalToast && window.portalToast({ type:'success', title:'Guardado', message:'Cliente guardado correctamente' });
       closeModal();
       await load();
+      if (window.uiSuccessOverlay) window.uiSuccessOverlay({ title: 'Cliente guardado', message: 'Los datos se guardaron correctamente.', actions: [{ label: 'Entendido', onClick: function () { if (window.uiSuccessOverlayClose) window.uiSuccessOverlayClose(); } }] });
+      else if (window.portalToast) window.portalToast({ type: 'success', title: 'Guardado', message: 'Cliente guardado correctamente.' });
     }catch(e){
-      window.portalToast && window.portalToast({ type:'danger', title:'Error', message: String(e.message || e) });
+      if (window.uiToastError) window.uiToastError(e, 'No pudimos guardar', 'Revisa RFC, razón social y CP e intenta de nuevo.');
+      else if (window.portalToastError) window.portalToastError(e, 'No pudimos guardar', 'Revisa RFC, razón social y CP e intenta de nuevo.');
     }finally{
-      saveBtn.disabled = false;
-      saveBtn.textContent = 'Guardar';
+      if (window.uiSetButtonLoading) window.uiSetButtonLoading(saveBtn, false);
+      else { saveBtn.disabled = false; saveBtn.textContent = 'Guardar'; }
     }
   }
 
   saveBtn.addEventListener('click', () => save());
+  const retryBtn = document.getElementById('custLoadErrorRetry');
+  if (retryBtn) retryBtn.addEventListener('click', load);
 
   load();
 })();
@@ -425,18 +573,28 @@
 .table-tools{ display:flex; align-items:center; gap: 10px; }
 .table-tools__search{ position:relative; display:flex; align-items:center; gap: 8px; }
 .table-tools__search .icon{ position:absolute; left: 12px; width:18px; height:18px; opacity:.75; }
-.table-tools__search input{ padding-left: 40px; width: 320px; }
+.table-tools__search input{ padding-left: 40px; }
 /* Clientes: misma estructura que facturas emitidas/recibidas (min-width en tabla y th, sin table-layout fixed) */
 #custTable td { vertical-align: middle; }
 #custTable .btn { margin-right: 6px; }
 #custTable .btn:last-child { margin-right: 0; }
 
-.empty-state{ padding: 24px; text-align:center; display:flex; flex-direction:column; align-items:center; gap: 10px; }
-.empty-state[hidden]{ display: none !important; }
-.empty-state__icon{ width: 44px; height: 44px; display:grid; place-items:center; border-radius: 14px; background: rgba(0,0,0,.04); border: 1px solid rgba(0,0,0,.06); }
-.empty-state__icon .icon{ width: 22px; height: 22px; opacity:.85; }
-.empty-state__title{ font-weight: 850; }
-.empty-state__desc{ color: var(--muted); font-size: 13px; max-width: 520px; }
+/* Acciones: Copiar RFC arriba; Generar factura y basurita en la misma fila */
+.cust-actions-cell { display: flex; flex-direction: column; gap: 8px; }
+.cust-actions-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.cust-delete-btn {
+  color: var(--muted);
+  border-color: var(--border);
+  background: rgba(0,0,0,.04);
+  padding: 6px 10px;
+  min-width: 36px;
+}
+.cust-delete-btn:hover {
+  color: var(--text);
+  background: rgba(0,0,0,.08);
+  border-color: var(--border-strong);
+}
+.cust-delete-btn .icon { width: 16px; height: 16px; }
 
 /* Modal */
 .modal[hidden]{ display:none !important; }

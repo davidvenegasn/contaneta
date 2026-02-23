@@ -8,15 +8,15 @@
         <div class="table-tools table-tools--inline">
           <div class="table-tools__search">
             <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path d="M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="M16.2 16.2 21 21" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+              <path d="M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M16.2 16.2 21 21" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
             </svg>
             <input id="provSearch" class="input" type="search" placeholder="Buscar por RFC o razón social" autocomplete="off" />
           </div>
           <button id="provNewBtn" type="button" class="btn btn-primary">
             <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path d="M12 5v14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-              <path d="M5 12h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+              <path d="M12 5v14" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+              <path d="M5 12h14" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
             </svg>
             Agregar proveedor
           </button>
@@ -28,8 +28,8 @@
       </div>
     </div>
 
-    <div style="overflow:auto;" id="provTableWrap">
-      <table class="table" id="provTable" style="min-width:900px;">
+    <div class="table-wrap" id="provTableWrap" style="overflow:auto;">
+      <table class="table table--zebra" id="provTable" style="min-width:900px;">
         <thead>
           <tr>
             <th style="min-width:140px;">RFC</th>
@@ -40,46 +40,42 @@
           </tr>
         </thead>
         <tbody id="provTbody">
-          <tr>
-            <td colspan="5">
-              <div class="skeleton" style="height: 46px; border-radius: 14px;"></div>
-            </td>
-          </tr>
-          <tr>
-            <td colspan="5">
-              <div class="skeleton" style="height: 46px; border-radius: 14px;"></div>
-            </td>
-          </tr>
-          <tr>
-            <td colspan="5">
-              <div class="skeleton" style="height: 46px; border-radius: 14px;"></div>
-            </td>
-          </tr>
+          <tr><td colspan="5"><div class="skeleton" style="height: 46px; border-radius: 14px;"></div></td></tr>
+          <tr><td colspan="5"><div class="skeleton" style="height: 46px; border-radius: 14px;"></div></td></tr>
+          <tr><td colspan="5"><div class="skeleton" style="height: 46px; border-radius: 14px;"></div></td></tr>
+          <tr><td colspan="5"><div class="skeleton" style="height: 46px; border-radius: 14px;"></div></td></tr>
+          <tr><td colspan="5"><div class="skeleton" style="height: 46px; border-radius: 14px;"></div></td></tr>
         </tbody>
       </table>
     </div>
+    <div id="provTablePagination" class="table-pagination" hidden aria-label="Paginación del listado"></div>
 
-    <div class="empty-state" id="provEmpty" hidden>
+    <div class="empty-state empty-state--error" id="provLoadError" hidden aria-live="polite">
+      <div class="empty-state__title">No pudimos cargar esto ahora.</div>
+      <p class="empty-state__desc" id="provLoadErrorMsg">Puedes intentar de nuevo.</p>
+      <button type="button" class="btn btn--secondary" id="provLoadErrorRetry">Reintentar</button>
+    </div>
+    <div class="empty-state empty-state--empty" id="provEmpty" hidden>
       <div class="empty-state__icon" aria-hidden="true">
         <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <circle cx="8" cy="9" r="3.5" stroke="currentColor" stroke-width="1.8"/>
-          <circle cx="16" cy="11" r="3" stroke="currentColor" stroke-width="1.8"/>
-          <path d="M2 20c0-3 3-5 6-5" stroke="currentColor" stroke-width="1.8"/>
-          <path d="M13 20c0-2.5 2-4 4.5-4S22 17.5 22 20" stroke="currentColor" stroke-width="1.8"/>
+          <circle cx="8" cy="9" r="3.5" stroke="currentColor" stroke-width="1.75"/>
+          <circle cx="16" cy="11" r="3" stroke="currentColor" stroke-width="1.75"/>
+          <path d="M2 20c0-3 3-5 6-5" stroke="currentColor" stroke-width="1.75"/>
+          <path d="M13 20c0-2.5 2-4 4.5-4S22 17.5 22 20" stroke="currentColor" stroke-width="1.75"/>
         </svg>
       </div>
       <div class="empty-state__title">Aún no hay proveedores</div>
       <div class="empty-state__desc">Agrega proveedores manualmente o sincroniza facturas recibidas desde el SAT para que aparezcan aquí.</div>
       <button type="button" class="btn btn-primary" id="provEmptyBtn">
         <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path d="M12 5v14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-          <path d="M5 12h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          <path d="M12 5v14" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+          <path d="M5 12h14" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
         </svg>
         Agregar primer proveedor
       </button>
       <a href="/portal/invoices/received" class="btn btn-ghost" style="text-decoration:none;">
         <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" stroke="currentColor" stroke-width="1.8"/>
+          <path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" stroke="currentColor" stroke-width="1.75"/>
           <path d="M14 2v5a1 1 0 0 0 1 1h5"/>
           <path d="M12 18v-6"/><path d="m9 15 3 3 3-3"/>
         </svg>
@@ -88,36 +84,64 @@
     </div>
   </div>
 
-  <!-- Panel lateral: facturas del proveedor -->
-  <div id="providerInvoicesPanel" class="provider-invoices-panel" aria-hidden="true" hidden>
-    <div class="provider-invoices-panel__backdrop" id="providerInvoicesBackdrop"></div>
-    <div class="provider-invoices-panel__drawer" role="dialog" aria-labelledby="providerInvoicesTitle">
-      <div class="provider-invoices-panel__head">
-        <h2 id="providerInvoicesTitle" class="provider-invoices-panel__title">Facturas del proveedor</h2>
-        <button type="button" class="provider-invoices-panel__close" id="providerInvoicesClose" aria-label="Cerrar">
-          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+  <!-- Drawer: Ver facturas del proveedor (overlay + drawer pro: sticky header/footer, scroll body) -->
+  <div id="providerInvoicesPanel" class="ui-overlay provider-drawer-overlay" aria-hidden="true" hidden>
+    <div class="ui-overlay__backdrop provider-drawer-overlay__backdrop" id="providerInvoicesBackdrop" aria-hidden="true"></div>
+    <aside id="providerInvoicesDrawer" class="ui-drawer provider-drawer" role="dialog" aria-modal="true" aria-labelledby="providerInvoicesTitle" aria-describedby="providerInvoicesBody">
+      <header class="ui-drawer__header provider-drawer__header">
+        <div class="provider-drawer__header-text">
+          <h2 id="providerInvoicesTitle" class="ui-drawer__title provider-drawer__title">Facturas del proveedor</h2>
+          <p id="providerInvoicesRfc" class="provider-drawer__rfc muted" aria-hidden="true"></p>
+        </div>
+        <button type="button" class="ui-drawer__close provider-drawer__close" id="providerInvoicesClose" aria-label="Cerrar panel">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
         </button>
-      </div>
-      <div class="provider-invoices-panel__body">
-        <div id="providerInvoicesLoading" class="provider-invoices-panel__loading" hidden>Cargando…</div>
+      </header>
+      <div id="providerInvoicesBody" class="ui-drawer__body provider-drawer__body">
+        <div id="providerInvoicesLoading" class="provider-drawer__loading" hidden>
+          <div class="provider-drawer-skeleton"></div>
+          <div class="provider-drawer-skeleton"></div>
+          <div class="provider-drawer-skeleton"></div>
+        </div>
+        <div id="providerInvoicesSummary" class="provider-drawer__summary" hidden>
+          <div class="provider-drawer__summary-grid">
+            <div class="provider-drawer__summary-card">
+              <span class="provider-drawer__summary-label">Facturas</span>
+              <span id="providerInvoicesSummaryCount" class="provider-drawer__summary-value">0</span>
+            </div>
+            <div class="provider-drawer__summary-card">
+              <span class="provider-drawer__summary-label">Total recibido</span>
+              <span id="providerInvoicesSummaryTotal" class="provider-drawer__summary-value">$0.00</span>
+            </div>
+            <div class="provider-drawer__summary-card">
+              <span class="provider-drawer__summary-label">Vigentes</span>
+              <span id="providerInvoicesSummaryVigentes" class="provider-drawer__summary-value">0</span>
+            </div>
+          </div>
+        </div>
         <div id="providerInvoicesList" class="provider-invoices-panel__list"></div>
-        <div id="providerInvoicesEmpty" class="provider-invoices-panel__empty muted" hidden>Sin facturas.</div>
-      </div>
-      <div id="providerInvoicesPagination" class="provider-invoices-panel__pagination" hidden>
-        <span class="provider-invoices-panel__page-info" id="providerInvoicesPageInfo"></span>
-        <div class="provider-invoices-panel__page-btns">
-          <button type="button" class="btn btn-small btn-ghost" id="providerInvoicesPrev" aria-label="Página anterior">Anterior</button>
-          <button type="button" class="btn btn-small btn-ghost" id="providerInvoicesNext" aria-label="Página siguiente">Siguiente</button>
+        <div id="providerInvoicesEmpty" class="provider-drawer__empty" hidden>
+          <p class="provider-drawer__empty-text muted">No hay facturas para este proveedor.</p>
+        </div>
+        <div id="providerInvoicesError" class="provider-drawer__error" hidden aria-live="polite">
+          <div id="providerInvoicesErrorBody"></div>
         </div>
       </div>
-      <div id="providerInvoicesDownloads" class="provider-invoices-panel__downloads" hidden>
-        <a id="providerInvoicesDownloadPdf" href="#" class="btn btn-small" target="_blank" rel="noopener" style="text-decoration:none;">Descargar PDF</a>
-        <a id="providerInvoicesDownloadExcel" href="#" class="btn btn-small btn-ghost" target="_blank" rel="noopener" style="text-decoration:none;">Descargar Excel</a>
-      </div>
-      <div class="provider-invoices-panel__foot">
-        <a id="providerInvoicesVerTodas" href="#" class="btn btn-ghost" style="text-decoration:none;">Ver todas en Facturas recibidas</a>
-      </div>
-    </div>
+      <footer class="ui-drawer__footer provider-drawer__footer">
+        <div id="providerInvoicesPagination" class="ui-drawer__pagination provider-drawer__pagination" hidden>
+          <span class="ui-drawer__page-info" id="providerInvoicesPageInfo"></span>
+          <div class="ui-drawer__page-btns">
+            <button type="button" class="btn btn--sm btn--ghost" id="providerInvoicesPrev" aria-label="Página anterior">Anterior</button>
+            <button type="button" class="btn btn--sm btn--ghost" id="providerInvoicesNext" aria-label="Página siguiente">Siguiente</button>
+          </div>
+        </div>
+        <div id="providerInvoicesDownloads" class="provider-drawer__actions" hidden>
+          <a id="providerInvoicesDownloadPdf" href="#" class="btn btn--sm" target="_blank" rel="noopener">Descargar PDF</a>
+          <a id="providerInvoicesDownloadExcel" href="#" class="btn btn--sm btn--ghost" target="_blank" rel="noopener">Descargar Excel</a>
+        </div>
+        <a id="providerInvoicesVerTodas" href="/portal/invoices/received" class="btn btn--ghost provider-drawer__link">Ver todas en Facturas recibidas</a>
+      </footer>
+    </aside>
   </div>
 
   <!-- Modal: agregar proveedor -->
@@ -131,8 +155,8 @@
         </div>
         <button type="button" class="icon-btn" data-close="true" aria-label="Cerrar">
           <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="M6 6l12 12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-            <path d="M18 6 6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M6 6l12 12" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+            <path d="M18 6 6 18" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
           </svg>
         </button>
       </div>
@@ -192,8 +216,14 @@
     return Number.isFinite(n) ? n.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00';
   }
 
-  function setCount(n){
-    countEl.textContent = (n === 1) ? 'Total: 1 proveedor' : `Total: ${n} proveedores`;
+  const ROWS_PAGE_LIMIT = 200;
+  var clientPage = 1;
+  var lastFilteredRows = [];
+  function setCount(n, from, to){
+    if (from != null && to != null && n > ROWS_PAGE_LIMIT)
+      countEl.textContent = 'Mostrando ' + from + '-' + to + ' de ' + n + ' proveedores';
+    else
+      countEl.textContent = (n === 1) ? 'Total: 1 proveedor' : 'Total: ' + n + ' proveedores';
   }
 
   const modal = document.getElementById('provModal');
@@ -232,12 +262,12 @@
     const rfc = (rfcEl.value || '').trim().toUpperCase();
     const legal_name = (nameEl.value || '').trim();
     if (!rfc || !legal_name) {
-      window.portalToast && window.portalToast({ type:'warning', title:'Datos requeridos', message:'RFC y razón social son obligatorios' });
+      window.portalToast && window.portalToast({ type: 'warning', title: 'Datos requeridos', message: 'RFC y razón social son obligatorios.' });
       return;
     }
     saveBtn.disabled = true;
     try {
-      const res = await fetch('/api/providers/create', {
+      const res = await (window.portalFetchWithTimeout ? window.portalFetchWithTimeout('/api/providers/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -248,22 +278,37 @@
           email: (emailEl.value || '').trim() || undefined,
           zip: (zipEl.value || '').trim() || undefined,
         }),
-      });
+      }, 30000) : fetch('/api/providers/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token,
+          rfc,
+          legal_name,
+          alias: (aliasEl.value || '').trim() || undefined,
+          email: (emailEl.value || '').trim() || undefined,
+          zip: (zipEl.value || '').trim() || undefined,
+        }),
+      }));
       const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || data.message || 'Error');
-      window.portalToast && window.portalToast({ type:'success', title:'Guardado', message:'Proveedor agregado correctamente' });
+      if (!res.ok) throw new Error(window.portalApiErrorMessage ? window.portalApiErrorMessage(data) : (data.detail || data.message || 'Error'));
+      if (window.uiSuccessOverlay) window.uiSuccessOverlay({ title: 'Proveedor guardado', message: 'Los datos se guardaron correctamente.', actions: [{ label: 'Entendido', onClick: function () { if (window.uiSuccessOverlayClose) window.uiSuccessOverlayClose(); } }] });
+      else window.portalToast && window.portalToast({ type: 'success', title: 'Guardado', message: 'Proveedor agregado correctamente.' });
       closeModal();
       load();
     } catch (e) {
-      window.portalToast && window.portalToast({ type:'danger', title:'Error', message: e.message || 'No se pudo guardar' });
+      window.portalToastError && window.portalToastError(e, 'No pudimos guardar', 'Revisa RFC y razón social e intenta de nuevo.');
     } finally {
       saveBtn.disabled = false;
     }
   });
 
-  function rowHTML(r){
-    const rfc = esc(r.rfc);
-    const name = esc(r.legal_name || '—');
+  const hl = (text, q) => (window.uiHighlightSearch ? window.uiHighlightSearch(text, q) : esc(text));
+
+  function rowHTML(r, searchQ){
+    const q = (searchQ || '').trim();
+    const rfc = q ? hl(r.rfc, q) : esc(r.rfc);
+    const name = q ? hl(r.legal_name || '—', q) : esc(r.legal_name || '—');
     const count = Number(r.facturas_count) || 0;
     const total = fmtMoney(r.total_recibido);
 
@@ -274,30 +319,53 @@
         <td>${count}</td>
         <td class="muted">$${total} MXN</td>
         <td>
-          <button type="button" class="btn btn-small btn-ghost" data-copy="${rfc}">Copiar RFC</button>
-          <button type="button" class="btn btn-small" data-provider-rfc="${rfc}" data-provider-name="${name}">Ver facturas</button>
+          <button type="button" class="btn btn-small btn-ghost" data-copy="${esc(r.rfc || '')}">Copiar RFC</button>
+          <button type="button" class="btn btn-small" data-provider-rfc="${esc(r.rfc || '')}" data-provider-name="${esc(r.legal_name || '')}">Ver facturas</button>
         </td>
       </tr>
     `;
   }
 
   function render(rows){
-    const n = rows.length;
-    setCount(n);
-
-    if (n === 0) {
+    lastFilteredRows = rows;
+    const total = rows.length;
+    const totalPages = Math.max(1, Math.ceil(total / ROWS_PAGE_LIMIT));
+    if (clientPage > totalPages) clientPage = totalPages;
+    const start = (clientPage - 1) * ROWS_PAGE_LIMIT;
+    const displayRows = total <= ROWS_PAGE_LIMIT ? rows : rows.slice(start, start + ROWS_PAGE_LIMIT);
+    const n = displayRows.length;
+    setCount(total);
+    if (total > ROWS_PAGE_LIMIT) setCount(total, start + 1, start + n);
+    if (total === 0) {
       tbody.innerHTML = '';
       if (tableWrap) { tableWrap.hidden = true; tableWrap.style.display = 'none'; }
       if (emptyEl) { emptyEl.hidden = false; emptyEl.removeAttribute('hidden'); emptyEl.style.display = ''; }
+      if (loadErrorEl) loadErrorEl.hidden = true;
+      var pagEl = document.getElementById('provTablePagination'); if (pagEl) pagEl.hidden = true;
       return;
     }
-
     if (tableWrap) { tableWrap.hidden = false; tableWrap.style.display = ''; }
     if (emptyEl) { emptyEl.hidden = true; emptyEl.setAttribute('hidden', ''); emptyEl.style.display = 'none'; }
-    tbody.innerHTML = rows.map(rowHTML).join('');
+    if (loadErrorEl) loadErrorEl.hidden = true;
+    const searchQ = (searchEl.value || '').trim();
+    tbody.innerHTML = displayRows.map(r => rowHTML(r, searchQ)).join('');
+    var pagEl = document.getElementById('provTablePagination');
+    if (pagEl) {
+      if (total <= ROWS_PAGE_LIMIT) { pagEl.hidden = true; } else {
+        pagEl.hidden = false;
+        var from = start + 1, to = start + n;
+        pagEl.innerHTML = '<span class="muted">Mostrando ' + from + '-' + to + ' de ' + total + '</span>' +
+          (clientPage > 1 ? ' <button type="button" class="btn btn--sm btn--ghost" id="provTablePrev">Anterior</button>' : '') +
+          (clientPage < totalPages ? ' <button type="button" class="btn btn--sm btn--ghost" id="provTableNext">Siguiente</button>' : '');
+        var prevBtn = document.getElementById('provTablePrev'); var nextBtn = document.getElementById('provTableNext');
+        if (prevBtn) prevBtn.onclick = function(){ clientPage--; render(lastFilteredRows); };
+        if (nextBtn) nextBtn.onclick = function(){ clientPage++; render(lastFilteredRows); };
+      }
+    }
   }
 
   function filter(){
+    clientPage = 1;
     const q = (searchEl.value || '').trim().toLowerCase();
     if (!q) return render(allRows);
     const filtered = allRows.filter(r => {
@@ -307,31 +375,64 @@
     render(filtered);
   }
 
+  const loadErrorEl = document.getElementById('provLoadError');
+  const loadErrorMsgEl = document.getElementById('provLoadErrorMsg');
+
   async function load(){
-    try{
-      const res = await fetch('/api/providers');
-      if(!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      if (Array.isArray(data)) {
-        allRows = data;
-      } else if (data && Array.isArray(data.data)) {
-        allRows = data.data;
-      } else if (data && Array.isArray(data.providers)) {
-        allRows = data.providers;
-      } else {
+    var skeletonShownAt = Date.now();
+    if (loadErrorEl) loadErrorEl.hidden = true;
+    if (emptyEl) { emptyEl.hidden = true; emptyEl.style.display = 'none'; }
+    if (tableWrap) { tableWrap.hidden = false; tableWrap.style.display = ''; }
+    tbody.innerHTML = (window.uiSkeletonTableRows && window.uiSkeletonTableRows(5, 5)) || '<tr><td colspan="5"><div class="skeleton" style="height: 46px; border-radius: 14px;"></div></td></tr>'.repeat(5);
+    try {
+      if (window.portalProgressBar) window.portalProgressBar.start();
+      const r = window.uiFetchJSON ? await window.uiFetchJSON('/api/providers') : { ok: false, status: 0, data: null, error: 'Helper no disponible' };
+      const list = window.uiGetListFromResponse ? window.uiGetListFromResponse(r.data) : (Array.isArray(r.data) ? r.data : []);
+      await (window.uiMinSkeletonDelay && window.uiMinSkeletonDelay(skeletonShownAt, 300));
+      if (r.ok && (!list || list.length === 0)) {
         allRows = [];
+        if (loadErrorEl) loadErrorEl.hidden = true;
+        if (tableWrap) tableWrap.hidden = true;
+        if (emptyEl) { emptyEl.hidden = false; emptyEl.style.display = ''; }
+        tbody.innerHTML = '';
+        return;
       }
+      if (r.status === 401) {
+        allRows = [];
+        if (loadErrorMsgEl) loadErrorMsgEl.innerHTML = window.uiSessionExpiredMessage ? window.uiSessionExpiredMessage() : 'Sesión expirada. <a href="/login">Inicia sesión</a>';
+        if (loadErrorEl) loadErrorEl.hidden = false;
+        if (tableWrap) tableWrap.hidden = true;
+        if (emptyEl) emptyEl.hidden = true;
+        tbody.innerHTML = '';
+        return;
+      }
+      if (!r.ok) {
+        allRows = [];
+        const msg = window.uiListLoadErrorText ? window.uiListLoadErrorText(r, 'proveedores') : (r.error || 'Revisa tu conexión e intenta de nuevo.');
+        if (loadErrorMsgEl) loadErrorMsgEl.textContent = msg;
+        if (loadErrorEl) loadErrorEl.hidden = false;
+        if (tableWrap) tableWrap.hidden = true;
+        if (emptyEl) emptyEl.hidden = true;
+        tbody.innerHTML = '';
+        return;
+      }
+      allRows = list;
       render(allRows);
-    }catch(e){
+    } catch (e) {
       allRows = [];
       tbody.innerHTML = '';
+      const fallbackMsg = 'Revisa tu conexión e intenta de nuevo.';
+      if (loadErrorMsgEl) loadErrorMsgEl.textContent = fallbackMsg;
+      if (loadErrorEl) loadErrorEl.hidden = false;
       if (tableWrap) tableWrap.hidden = true;
-      emptyEl.hidden = false;
-      if (window.portalToast) {
-        window.portalToast({ type:'danger', title:'Error', message:'No se pudo cargar proveedores' });
-      }
+      if (emptyEl) emptyEl.hidden = true;
+    } finally {
+      if (window.portalProgressBar) window.portalProgressBar.done();
     }
   }
+
+  const provLoadErrorRetry = document.getElementById('provLoadErrorRetry');
+  if (provLoadErrorRetry) provLoadErrorRetry.addEventListener('click', load);
 
   // Copy RFC
   document.addEventListener('click', async (e) => {
@@ -340,9 +441,9 @@
     const value = btn.getAttribute('data-copy') || '';
     try{
       await navigator.clipboard.writeText(value);
-      window.portalToast && window.portalToast({ type:'success', title:'Copiado', message:'RFC copiado al portapapeles' });
+      window.portalToast && window.portalToast({ type: 'success', title: 'Copiado', message: 'RFC copiado al portapapeles.' });
     }catch(_){
-      window.portalToast && window.portalToast({ type:'danger', title:'No se pudo copiar', message:'Tu navegador bloqueó el portapapeles' });
+      window.portalToast && window.portalToast({ type: 'danger', title: 'No se pudo copiar', message: 'Tu navegador bloqueó el portapapeles.' });
     }
   });
 
@@ -352,9 +453,16 @@
   const panelBackdrop = document.getElementById('providerInvoicesBackdrop');
   const panelClose = document.getElementById('providerInvoicesClose');
   const panelTitle = document.getElementById('providerInvoicesTitle');
+  const panelRfc = document.getElementById('providerInvoicesRfc');
   const panelLoading = document.getElementById('providerInvoicesLoading');
+  const panelSummary = document.getElementById('providerInvoicesSummary');
+  const panelSummaryCount = document.getElementById('providerInvoicesSummaryCount');
+  const panelSummaryTotal = document.getElementById('providerInvoicesSummaryTotal');
+  const panelSummaryVigentes = document.getElementById('providerInvoicesSummaryVigentes');
   const panelList = document.getElementById('providerInvoicesList');
   const panelEmpty = document.getElementById('providerInvoicesEmpty');
+  const panelError = document.getElementById('providerInvoicesError');
+  const panelErrorBody = document.getElementById('providerInvoicesErrorBody');
   const panelVerTodas = document.getElementById('providerInvoicesVerTodas');
   const panelPagination = document.getElementById('providerInvoicesPagination');
   const panelPageInfo = document.getElementById('providerInvoicesPageInfo');
@@ -378,18 +486,29 @@
 
   function renderInvoiceRow(inv) {
     const totalStr = inv.moneda === 'MXN' ? '$' + fmtMoney(inv.total) : fmtMoney(inv.total) + ' ' + (inv.moneda || '');
-    const pdfUrl = inv.uuid ? '/portal/sat/pdf/' + inv.uuid : '';
-    const statusCls = inv.status === '1' ? 'status-pill status-pill--ok' : 'status-pill';
+    const detailUrl = inv.uuid ? '/portal/cfdi/received/' + inv.uuid : '';
+    const pdfUrl = inv.uuid && inv.has_pdf ? '/portal/sat/pdf/' + inv.uuid : '';
+    const xmlUrl = inv.uuid && inv.has_pdf ? '/portal/sat/xml/' + inv.uuid : '';
+    const statusCls = inv.status === '1' ? 'provider-invoice-card__badge provider-invoice-card__badge--ok' : 'provider-invoice-card__badge';
     const statusTxt = inv.status === '1' ? 'Vigente' : (inv.status === '0' ? 'Cancelada' : (inv.status || '—'));
-    const row = document.createElement('div');
-    row.className = 'provider-invoice-row';
-    row.innerHTML = '<div class="provider-invoice-row__main">' +
-      '<span class="provider-invoice-row__date">' + formatDate(inv.fecha_emision) + '</span>' +
-      '<span class="provider-invoice-row__total">' + totalStr + '</span></div>' +
-      '<div class="provider-invoice-row__concepto">' + esc(inv.concepto || '—') + '</div>' +
-      '<div class="provider-invoice-row__meta">' +
-      '<span class="' + statusCls + '">' + statusTxt + '</span>' +
-      (pdfUrl && inv.has_pdf ? '<a href="' + pdfUrl + '" target="_blank" rel="noopener" class="btn btn-small">Ver PDF</a>' : '') +
+    const cardMod = inv.status === '1' ? ' provider-invoice-card--vigente' : (inv.status === '0' ? ' provider-invoice-card--cancelada' : '');
+    const concept = esc((inv.concepto || '—').substring(0, 200));
+    const row = document.createElement('article');
+    row.className = 'provider-invoice-card' + cardMod;
+    row.setAttribute('aria-label', 'Factura ' + formatDate(inv.fecha_emision) + ', ' + totalStr);
+    row.innerHTML =
+      '<div class="provider-invoice-card__top">' +
+        '<span class="provider-invoice-card__date">' + formatDate(inv.fecha_emision) + '</span>' +
+        '<span class="' + statusCls + '">' + statusTxt + '</span>' +
+      '</div>' +
+      '<div class="provider-invoice-card__total-wrap">' +
+        '<span class="provider-invoice-card__total">' + totalStr + '</span>' +
+      '</div>' +
+      '<p class="provider-invoice-card__concepto" title="' + esc(inv.concepto || '') + '">' + concept + '</p>' +
+      '<div class="provider-invoice-card__actions">' +
+        (detailUrl ? '<a href="' + detailUrl + '" class="provider-invoice-card__link">Ver detalle</a>' : '') +
+        (pdfUrl ? '<a href="' + pdfUrl + '" target="_blank" rel="noopener" class="provider-invoice-card__link">PDF</a>' : '') +
+        (xmlUrl ? '<a href="' + xmlUrl + '" target="_blank" rel="noopener" class="provider-invoice-card__link">XML</a>' : '') +
       '</div>';
     return row;
   }
@@ -402,40 +521,78 @@
     const slice = allInvoicesList.slice(from, from + PAGE_SIZE);
     panelList.innerHTML = '';
     slice.forEach(function(inv) { panelList.appendChild(renderInvoiceRow(inv)); });
-    if (panelPageInfo) panelPageInfo.textContent = 'Página ' + page + ' de ' + totalPages;
+    if (panelPageInfo) {
+      const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+      const from = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+      const to = Math.min(page * PAGE_SIZE, total);
+      if (total === 0) {
+        panelPageInfo.textContent = 'Sin facturas';
+      } else if (totalPages <= 1) {
+        panelPageInfo.textContent = total + ' factura' + (total !== 1 ? 's' : '');
+      } else {
+        panelPageInfo.textContent = 'Página ' + page + ' de ' + totalPages + ' · ' + from + '–' + to + ' de ' + total;
+      }
+    }
     if (panelPrev) { panelPrev.disabled = page <= 1; }
     if (panelNext) { panelNext.disabled = page >= totalPages; }
     panelList.scrollTop = 0;
   }
 
+  var lastProviderFocusEl = null;
+
   function openProviderInvoices(rfc, name) {
     if (!panel || !panelTitle || !panelList) return;
+    lastProviderFocusEl = document.activeElement;
     currentProviderRfc = rfc || '';
     currentProviderName = name || 'Proveedor';
     panelTitle.textContent = 'Facturas de ' + currentProviderName;
+    if (panelRfc) {
+      panelRfc.textContent = currentProviderRfc ? 'RFC ' + currentProviderRfc : '';
+      panelRfc.hidden = !currentProviderRfc;
+    }
     panelVerTodas.href = '/portal/invoices/received';
     panel.hidden = false;
     panel.setAttribute('aria-hidden', 'false');
-    panel.classList.add('provider-invoices-panel--open');
+    panel.classList.add('is-open');
     document.body.classList.add('no-scroll');
     panelList.innerHTML = '';
     panelEmpty.hidden = true;
-    panelEmpty.textContent = 'Sin facturas.';
+    if (panelSummary) panelSummary.hidden = true;
+    if (panelError) panelError.hidden = true;
+    if (panelErrorBody) panelErrorBody.innerHTML = '';
     if (panelPagination) panelPagination.hidden = true;
     if (panelDownloads) panelDownloads.hidden = true;
     if (panelLoading) panelLoading.hidden = false;
+    requestAnimationFrame(function() { if (panelClose) panelClose.focus(); });
 
     const url = '/api/provider-invoices?rfc=' + encodeURIComponent(rfc || '');
-    fetch(url)
-      .then(function(res) {
-        return res.json().then(function(data) {
-          if (!res.ok) throw new Error(data.detail || data.message || 'HTTP ' + res.status);
-          return data;
-        });
-      })
-      .then(function(data) {
+    if (window.portalProgressBar) window.portalProgressBar.start();
+    (window.uiFetchJSON ? window.uiFetchJSON(url, { credentials: 'same-origin' }) : (window.portalFetchWithTimeout ? window.portalFetchWithTimeout(url, { credentials: 'same-origin' }, 30000) : fetch(url, { credentials: 'same-origin' })).then(function(res) { return res.text().then(function(text) { var data = null; try { data = text ? JSON.parse(text) : null; } catch (_) {} return { ok: res.ok, status: res.status, data: data, error: (data && (data.detail || data.message)) || res.statusText || '' }; }); }).catch(function(e) { return { ok: false, status: 0, data: null, error: (e && e.message) || 'Error de conexión' }; }))
+      .then(function(r) {
         if (panelLoading) panelLoading.hidden = true;
-        const list = Array.isArray(data) ? data : [];
+        if (panelError) { panelError.hidden = true; panelErrorBody.innerHTML = ''; }
+        if (r.status === 401) {
+          panelList.innerHTML = '';
+          panelEmpty.hidden = true;
+          if (panelError && panelErrorBody) {
+            panelError.hidden = false;
+            panelErrorBody.innerHTML = '<p class="provider-drawer__error-text">' + (window.uiSessionExpiredMessage ? window.uiSessionExpiredMessage() : 'Sesión expirada. <a href="/login">Inicia sesión</a>') + '</p>';
+          }
+          return;
+        }
+        if (!r.ok) {
+          panelList.innerHTML = '';
+          panelEmpty.hidden = true;
+          if (panelError && panelErrorBody) {
+            panelError.hidden = false;
+            panelErrorBody.innerHTML = '<p class="provider-drawer__error-text">' + (r.error || 'No pudimos cargar esto ahora.') + '</p><button type="button" class="btn btn--secondary" id="providerInvoicesRetry">Reintentar</button>';
+            var retryBtn = document.getElementById('providerInvoicesRetry');
+            if (retryBtn) retryBtn.addEventListener('click', function() { openProviderInvoices(currentProviderRfc, currentProviderName); });
+          }
+          return;
+        }
+        var raw = r.data;
+        const list = Array.isArray(raw) ? raw : (raw && Array.isArray(raw.data) ? raw.data : []);
         list.sort(function(a, b) {
           const da = (a.fecha_emision || '').replace('T', '');
           const db = (b.fecha_emision || '').replace('T', '');
@@ -444,10 +601,18 @@
         allInvoicesList = list;
         if (list.length === 0) {
           panelEmpty.hidden = false;
-          panelEmpty.textContent = 'Sin facturas de este proveedor.';
+          if (panelSummary) panelSummary.hidden = true;
           return;
         }
         panelEmpty.hidden = true;
+        var totalRecibido = list.reduce(function(s, inv) { return s + (parseFloat(inv.total) || 0); }, 0);
+        var vigentes = list.filter(function(inv) { return String(inv.status || '') === '1'; }).length;
+        if (panelSummary && panelSummaryCount && panelSummaryTotal && panelSummaryVigentes) {
+          panelSummary.hidden = false;
+          panelSummaryCount.textContent = list.length;
+          panelSummaryTotal.textContent = '$' + totalRecibido.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+          panelSummaryVigentes.textContent = vigentes;
+        }
         if (panelPagination) panelPagination.hidden = false;
         if (panelDownloads) panelDownloads.hidden = false;
         if (panelDownloadPdf) panelDownloadPdf.href = '/api/provider-invoices/report?rfc=' + encodeURIComponent(currentProviderRfc) + '&format=pdf';
@@ -456,9 +621,17 @@
       })
       .catch(function(err) {
         if (panelLoading) panelLoading.hidden = true;
-        panelEmpty.hidden = false;
-        panelEmpty.textContent = 'Error al cargar. ' + (err && err.message ? err.message : 'Vuelve a intentar.');
-        if (window.portalToast) window.portalToast({ type: 'danger', title: 'Error', message: err && err.message ? err.message : 'No se pudieron cargar las facturas.' });
+        panelList.innerHTML = '';
+        panelEmpty.hidden = true;
+        if (panelError && panelErrorBody) {
+          panelError.hidden = false;
+          panelErrorBody.innerHTML = '<p class="provider-drawer__error-text">No pudimos cargar esto ahora.</p><button type="button" class="btn btn--secondary" id="providerInvoicesRetry">Reintentar</button>';
+          var retryBtn = document.getElementById('providerInvoicesRetry');
+          if (retryBtn) retryBtn.addEventListener('click', function() { openProviderInvoices(currentProviderRfc, currentProviderName); });
+        }
+      })
+      .finally(function() {
+        if (window.portalProgressBar) window.portalProgressBar.done();
       });
   }
 
@@ -466,8 +639,9 @@
     if (!panel) return;
     panel.hidden = true;
     panel.setAttribute('aria-hidden', 'true');
-    panel.classList.remove('provider-invoices-panel--open');
+    panel.classList.remove('is-open');
     document.body.classList.remove('no-scroll');
+    if (lastProviderFocusEl && typeof lastProviderFocusEl.focus === 'function') lastProviderFocusEl.focus();
   }
 
   if (panelPrev) panelPrev.addEventListener('click', function() { if (currentPage > 1) renderPage(currentPage - 1); });
@@ -487,9 +661,56 @@
   });
   if (panelClose) panelClose.addEventListener('click', closeProviderInvoices);
   if (panelBackdrop) panelBackdrop.addEventListener('click', closeProviderInvoices);
+  document.addEventListener('keydown', function(e) {
+    if (e.key !== 'Escape' || !panel || panel.hidden) return;
+    closeProviderInvoices();
+    e.preventDefault();
+    e.stopPropagation();
+  });
+  var drawerEl = document.getElementById('providerInvoicesDrawer');
+  function getDrawerFocusables() {
+    return drawerEl ? Array.prototype.slice.call(drawerEl.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')) : [];
+  }
+  if (drawerEl) {
+    drawerEl.addEventListener('keydown', function(e) {
+      if (e.key !== 'Tab' || !panel || panel.hidden) return;
+      var focusables = getDrawerFocusables();
+      var first = focusables[0], last = focusables[focusables.length - 1];
+      if (!first) return;
+      if (e.shiftKey) {
+        if (document.activeElement === first) { e.preventDefault(); if (last) last.focus(); }
+      } else {
+        if (document.activeElement === last) { e.preventDefault(); if (first) first.focus(); }
+      }
+    });
+  }
+  document.addEventListener('focusin', function(e) {
+    if (!panel || !drawerEl || !panel.classList.contains('is-open')) return;
+    if (drawerEl.contains(e.target)) return;
+    var focusables = getDrawerFocusables();
+    if (focusables.length) setTimeout(function() { focusables[0].focus(); }, 0);
+  });
 
-  // Search
-  searchEl.addEventListener('input', () => filter());
+  // P39: Search debounce 250ms + teclado Enter/Esc
+  var filterDebounce;
+  searchEl.addEventListener('input', function(){
+    clearTimeout(filterDebounce);
+    filterDebounce = setTimeout(filter, 250);
+  });
+  searchEl.addEventListener('keydown', function(e){
+    if (e.key === 'Escape') {
+      searchEl.value = '';
+      filter();
+      searchEl.blur();
+      e.preventDefault();
+      return;
+    }
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      var firstBtn = tbody && tbody.querySelector('button[data-provider-rfc]');
+      if (firstBtn) { firstBtn.focus(); firstBtn.click(); }
+    }
+  });
 
   load();
 })();
@@ -504,18 +725,11 @@
 .table-tools{ display:flex; align-items:center; gap: 10px; }
 .table-tools__search{ position:relative; display:flex; align-items:center; gap: 8px; }
 .table-tools__search .icon{ position:absolute; left: 12px; width:18px; height:18px; opacity:.75; }
-.table-tools__search input{ padding-left: 40px; width: 320px; }
+.table-tools__search input{ padding-left: 40px; }
 /* Proveedores: misma estructura que facturas emitidas/recibidas */
 #provTable td { vertical-align: middle; }
 #provTable .btn { margin-right: 6px; }
 #provTable .btn:last-child { margin-right: 0; }
-
-.empty-state{ padding: 24px; text-align:center; display:flex; flex-direction:column; align-items:center; gap: 10px; }
-.empty-state[hidden]{ display: none !important; }
-.empty-state__icon{ width: 44px; height: 44px; display:grid; place-items:center; border-radius: 14px; background: rgba(0,0,0,.04); border: 1px solid rgba(0,0,0,.06); }
-.empty-state__icon .icon{ width: 22px; height: 22px; opacity:.85; }
-.empty-state__title{ font-weight: 850; }
-.empty-state__desc{ color: var(--muted); font-size: 13px; max-width: 520px; }
 
 /* Modal (small, neutral) */
 .modal[hidden]{ display:none !important; }
@@ -533,38 +747,6 @@
 .grid-3{ display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
 .field{ display:flex; flex-direction:column; gap: 8px; }
 .label{ font-size: 12px; color: var(--muted); font-weight: 700; }
-
-/* Panel lateral: facturas del proveedor (no ocupa todo el alto; solo el body hace scroll) */
-.provider-invoices-panel{ position: fixed; inset: 0; z-index: 85; display: none; justify-content: flex-end; align-items: center; pointer-events: none; }
-.provider-invoices-panel.provider-invoices-panel--open,
-.provider-invoices-panel:not([hidden]){ display: flex !important; pointer-events: auto; }
-.provider-invoices-panel[hidden]{ display: none !important; }
-.provider-invoices-panel__backdrop{ position: absolute; inset: 0; background: rgba(0,0,0,.4); opacity: 0; transition: opacity .25s ease; pointer-events: auto; }
-.provider-invoices-panel--open .provider-invoices-panel__backdrop{ opacity: 1; }
-.provider-invoices-panel__drawer{ position: relative; width: min(380px, 75vw); max-width: 75vw; max-height: 88vh; margin: 12px; background: var(--surface); border-left: 1px solid var(--border); border-radius: 14px; box-shadow: -8px 0 32px rgba(0,0,0,.15); display: flex; flex-direction: column; transform: translateX(100%); transition: transform .3s ease; pointer-events: auto; overflow: hidden; }
-.provider-invoices-panel--open .provider-invoices-panel__drawer{ transform: translateX(0); }
-.provider-invoices-panel__head{ display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
-.provider-invoices-panel__title{ margin: 0; font-size: 15px; font-weight: 700; letter-spacing: -.02em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 8px; }
-.provider-invoices-panel__close{ width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border: none; border-radius: 10px; background: transparent; color: var(--muted); cursor: pointer; }
-.provider-invoices-panel__close:hover{ background: rgba(0,0,0,.06); color: var(--text); }
-.provider-invoices-panel__body{ flex: 1; overflow-y: auto; overflow-x: hidden; padding: 12px; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; min-height: 0; }
-.provider-invoices-panel__loading{ padding: 20px; text-align: center; color: var(--muted); }
-.provider-invoices-panel__empty{ padding: 20px; text-align: center; font-size: 13px; }
-.provider-invoices-panel__list{ display: flex; flex-direction: column; gap: 10px; }
-.provider-invoice-row{ padding: 12px; border-radius: 12px; border: 1px solid var(--border); background: rgba(0,0,0,.02); }
-.provider-invoice-row__main{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
-.provider-invoice-row__date{ font-size: 12px; color: var(--muted); font-weight: 600; }
-.provider-invoice-row__total{ font-weight: 700; font-size: 14px; }
-.provider-invoice-row__concepto{ font-size: 11px; color: var(--muted); line-height: 1.35; margin-bottom: 8px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-.provider-invoice-row__meta{ display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.provider-invoice-row__meta .status-pill{ font-size: 11px; }
-.provider-invoices-panel__pagination{ padding: 10px 16px; border-top: 1px solid var(--border); flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
-.provider-invoices-panel__page-info{ font-size: 12px; color: var(--muted); }
-.provider-invoices-panel__page-btns{ display: flex; gap: 8px; }
-.provider-invoices-panel__downloads{ padding: 10px 16px; border-top: 1px solid var(--border); flex-shrink: 0; display: flex; gap: 10px; flex-wrap: wrap; }
-.provider-invoices-panel__downloads .btn{ flex: 1; min-width: 120px; justify-content: center; }
-.provider-invoices-panel__foot{ padding: 12px 16px; border-top: 1px solid var(--border); flex-shrink: 0; }
-.provider-invoices-panel__foot .btn{ width: 100%; justify-content: center; }
 
 @media (max-width: 860px){
   .page-head{ flex-direction:column; align-items:stretch; }

@@ -4,12 +4,12 @@
 <header class="app-header app-header--with-back fiel-header">
   <div class="app-header__left">
     <a href="/portal/home" class="btn btn--ghost btn--sm app-header__back" style="text-decoration:none;">
-      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="18" height="18"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" width="18" height="18"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
       Inicio
     </a>
     <div>
       <h1 class="fiel-title">Conectar SAT</h1>
-      <p class="fiel-subtitle muted">Sube tu certificado (.cer) y tu clave privada (.key) para sincronizar CFDI.</p>
+      <p class="fiel-subtitle muted">La FIEL es tu firma electrónica del SAT; la necesitamos para descargar y validar tus facturas desde el portal del SAT. Sube tu certificado (.cer) y tu clave privada (.key) para sincronizar.</p>
     </div>
   </div>
 </header>
@@ -38,26 +38,30 @@
         </div>
       </div>
 
-      <form id="satCredForm" action="/portal/config/sat" method="post" enctype="multipart/form-data" class="fiel-form">
+      <form id="satCredForm" action="/portal/config/sat" method="post" enctype="multipart/form-data" class="fiel-form" data-state="idle">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token|default('') }}" />
         <div class="fiel-dropzone-wrap">
-          <label class="fiel-dropzone" id="dropzoneCer" for="fiel_cer">
+          <div class="fiel-dropzone-label">Certificado SAT (.cer)</div>
+          <label class="fiel-dropzone" id="dropzoneCer" for="fiel_cer" data-accept=".cer">
             <input type="file" id="fiel_cer" name="fiel_cer" accept=".cer" class="fiel-dropzone__input" required />
             <span class="fiel-dropzone__icon" aria-hidden="true">
-              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="32" height="32"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" width="36" height="36"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
             </span>
-            <span class="fiel-dropzone__text" id="dropzoneCerText">Arrastra o selecciona tu certificado (.cer)</span>
-            <span class="fiel-dropzone__file" id="dropzoneCerFile" hidden></span>
-            <button type="button" class="btn btn--sm btn--ghost fiel-dropzone__change" id="dropzoneCerChange" hidden>Cambiar</button>
+            <span class="fiel-dropzone__text" id="dropzoneCerText">Arrastra el archivo aquí o haz clic para seleccionar</span>
+            <span class="fiel-dropzone__file" id="dropzoneCerFile" hidden><span class="fiel-dropzone__filename" id="dropzoneCerFileName"></span><span class="fiel-dropzone__filesize muted" id="dropzoneCerFileSize"></span></span>
+            <button type="button" class="btn btn--sm btn--ghost fiel-dropzone__change" id="dropzoneCerChange" hidden>Cambiar archivo</button>
           </label>
-          <label class="fiel-dropzone" id="dropzoneKey" for="fiel_key">
+          <div class="fiel-dropzone-label">Clave privada (.key)</div>
+          <label class="fiel-dropzone" id="dropzoneKey" for="fiel_key" data-accept=".key">
             <input type="file" id="fiel_key" name="fiel_key" accept=".key" class="fiel-dropzone__input" required />
             <span class="fiel-dropzone__icon" aria-hidden="true">
-              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="32" height="32"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L15.5 13.5l-3-3 3-3z"/></svg>
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" width="36" height="36"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L15.5 13.5l-3-3 3-3z"/></svg>
             </span>
-            <span class="fiel-dropzone__text" id="dropzoneKeyText">Arrastra o selecciona tu clave privada (.key)</span>
-            <span class="fiel-dropzone__file" id="dropzoneKeyFile" hidden></span>
-            <button type="button" class="btn btn--sm btn--ghost fiel-dropzone__change" id="dropzoneKeyChange" hidden>Cambiar</button>
+            <span class="fiel-dropzone__text" id="dropzoneKeyText">Arrastra el archivo aquí o haz clic para seleccionar</span>
+            <span class="fiel-dropzone__file" id="dropzoneKeyFile" hidden><span class="fiel-dropzone__filename" id="dropzoneKeyFileName"></span><span class="fiel-dropzone__filesize muted" id="dropzoneKeyFileSize"></span></span>
+            <button type="button" class="btn btn--sm btn--ghost fiel-dropzone__change" id="dropzoneKeyChange" hidden>Cambiar archivo</button>
           </label>
+          <p class="fiel-dropzone-trust muted">Tus archivos se envían por conexión segura y solo se usan para sincronizar con el SAT.</p>
         </div>
 
         <div class="fiel-field">
@@ -65,8 +69,8 @@
           <div class="fiel-password-wrap">
             <input type="password" id="fiel_password" name="fiel_password" autocomplete="off" class="input fiel-password-input" placeholder="Contraseña" required />
             <button type="button" class="fiel-password-toggle" id="fielPasswordToggle" aria-label="Mostrar contraseña">
-              <svg class="icon fiel-password-toggle__show" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="20" height="20"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-              <svg class="icon fiel-password-toggle__hide" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="20" height="20" hidden><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+              <svg class="icon fiel-password-toggle__show" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" width="20" height="20"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              <svg class="icon fiel-password-toggle__hide" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" width="20" height="20" hidden><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
             </button>
           </div>
           <p class="fiel-helper">La contraseña que te entregó el SAT al emitir tu FIEL.</p>
@@ -82,22 +86,22 @@
     </div>
 
     <section class="fiel-privacy card p-20">
-      <h3 class="fiel-privacy__title">Privacidad y seguridad</h3>
-      <p class="fiel-privacy__text muted">Tus archivos se guardan con permisos restringidos en servidor y solo se usan para sincronizar con SAT.</p>
+      <h3 class="fiel-privacy__title">Privacidad y uso</h3>
+      <p class="fiel-privacy__text muted">Tus archivos .cer y .key se guardan en el servidor con permisos restringidos (solo el proceso de la aplicación puede leerlos) y solo se usan para sincronizar con el SAT. No los compartimos con terceros.</p>
     </section>
   </div>
 
   <aside class="fiel-sidebar">
-    <div class="card fiel-status-card">
+    <div class="card fiel-status-card" id="fielStatusCard">
       <h3 class="fiel-status__title">Estado</h3>
-      <p class="fiel-status__value">
-        {% if has_fiel %}<span class="fiel-status-badge fiel-status-badge--ok">Configurado</span>{% else %}<span class="fiel-status-badge fiel-status-badge--muted">No configurado</span>{% endif %}
+      <p class="fiel-status__value" id="fielStatusBadge">
+        {% if validation_ok %}<span class="fiel-status-badge fiel-status-badge--ok">Válida ✅</span>{% elif has_fiel and validation_at and not validation_ok %}<span class="fiel-status-badge fiel-status-badge--error">Error</span>{% elif has_fiel %}<span class="fiel-status-badge fiel-status-badge--pending">Pendiente de validar</span>{% else %}<span class="fiel-status-badge fiel-status-badge--muted">No configurado</span>{% endif %}
       </p>
       {% if validation_at %}
       <p class="fiel-status__meta muted">Última validación: {{ validation_at }}</p>
-      <p class="fiel-status__result">{% if validation_ok %}<span style="color:var(--success); font-weight:600;">FIEL válida ✓</span>{% else %}<span style="color:var(--danger); font-weight:600;">Error</span>{% if validation_message %}<br/><span class="fiel-status__error-text">{{ validation_message }}</span>{% endif %}{% endif %}</p>
+      <p class="fiel-status__result" id="fielStatusResult">{% if validation_ok %}<span class="fiel-status__ok">Tu FIEL está lista. Puedes sincronizar facturas desde el portal.</span>{% else %}{% if validation_message %}<span class="fiel-status__error-text fiel-status__error-text--block">{{ validation_message }}</span>{% else %}<span class="fiel-status__error-text fiel-status__error-text--block">No se pudo validar. Revisa contraseña y archivos.</span>{% endif %}{% endif %}</p>
       {% else %}
-      <p class="fiel-status__meta muted">Sube los archivos y guarda para validar.</p>
+      <p class="fiel-status__meta muted" id="fielStatusMeta">{% if has_fiel %}Usa «Validar de nuevo» para comprobar las credenciales.{% else %}Sube certificado (.cer) y clave (.key) con tu contraseña.{% endif %}</p>
       {% endif %}
       {% if has_fiel %}
       <button type="button" class="btn btn--sm btn--ghost fiel-status__btn" id="satValidateBtn">Validar de nuevo</button>
@@ -110,13 +114,14 @@
 <div id="satValidateResult" class="fiel-result card" hidden role="alert">
   <div id="satValidateResultContent"></div>
 </div>
+<div id="fielSavedValidationMessage" data-message="{{ (validation_message or '') | e }}" style="display:none;" aria-hidden="true"></div>
 
 <div id="fielReplaceModal" class="modal" hidden aria-hidden="true" role="dialog">
   <div class="modal__backdrop" data-close="true"></div>
   <div class="modal__panel">
     <div class="modal__head">
       <h2 class="modal__title">Reemplazar archivos FIEL</h2>
-      <button type="button" class="icon-btn" data-close="true" aria-label="Cerrar"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+      <button type="button" class="icon-btn" data-close="true" aria-label="Cerrar"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
     </div>
     <div class="modal__body">
       <p class="muted">Se subirán nuevos archivos .cer y .key. Deberás ingresar la contraseña de la nueva clave. ¿Continuar?</p>
@@ -149,30 +154,73 @@
     resultEl.style.borderLeft = '4px solid ' + (ok ? 'var(--success)' : 'var(--danger)');
   }
 
-  function updateDropzone(inputId, textId, fileId, changeId) {
+  function formatFileSize(bytes) {
+    if (bytes == null || bytes === 0) return '';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  }
+
+  function setupDropzone(inputId, textId, fileId, fileNameId, fileSizeId, changeId, labelId) {
     var input = document.getElementById(inputId);
     var text = document.getElementById(textId);
     var fileSpan = document.getElementById(fileId);
+    var fileNameEl = document.getElementById(fileNameId);
+    var fileSizeEl = document.getElementById(fileSizeId);
     var changeBtn = document.getElementById(changeId);
+    var label = document.getElementById(labelId);
     if (!input || !text) return;
     function update() {
-      var name = input.files && input.files[0] ? input.files[0].name : '';
-      if (name) {
+      var file = input.files && input.files[0];
+      if (file) {
         text.hidden = true;
-        if (fileSpan) { fileSpan.textContent = name; fileSpan.hidden = false; }
+        if (fileSpan) fileSpan.hidden = false;
+        if (fileNameEl) fileNameEl.textContent = file.name;
+        if (fileSizeEl) fileSizeEl.textContent = formatFileSize(file.size);
         if (changeBtn) changeBtn.hidden = false;
+        if (label) label.classList.add('fiel-dropzone--has-file');
       } else {
         text.hidden = false;
         if (fileSpan) fileSpan.hidden = true;
         if (changeBtn) changeBtn.hidden = true;
+        if (label) label.classList.remove('fiel-dropzone--has-file');
       }
     }
     input.addEventListener('change', update);
-    if (changeBtn) changeBtn.addEventListener('click', function(e){ e.preventDefault(); input.click(); });
+    if (changeBtn) changeBtn.addEventListener('click', function(e){ e.preventDefault(); e.stopPropagation(); input.value = ''; update(); input.click(); });
+    if (label) {
+      label.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        label.classList.add('fiel-dropzone--dragover');
+      });
+      label.addEventListener('dragleave', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        label.classList.remove('fiel-dropzone--dragover');
+      });
+      label.addEventListener('drop', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        label.classList.remove('fiel-dropzone--dragover');
+        var accept = label.getAttribute('data-accept');
+        var files = e.dataTransfer && e.dataTransfer.files;
+        if (files && files.length) {
+          var file = files[0];
+          var ext = (file.name || '').toLowerCase().slice(-4);
+          if (accept && ((accept === '.cer' && ext === '.cer') || (accept === '.key' && ext === '.key'))) {
+            var dt = new DataTransfer();
+            dt.items.add(file);
+            input.files = dt.files;
+            update();
+          }
+        }
+      });
+    }
     update();
   }
-  updateDropzone('fiel_cer', 'dropzoneCerText', 'dropzoneCerFile', 'dropzoneCerChange');
-  updateDropzone('fiel_key', 'dropzoneKeyText', 'dropzoneKeyFile', 'dropzoneKeyChange');
+  setupDropzone('fiel_cer', 'dropzoneCerText', 'dropzoneCerFile', 'dropzoneCerFileName', 'dropzoneCerFileSize', 'dropzoneCerChange', 'dropzoneCer');
+  setupDropzone('fiel_key', 'dropzoneKeyText', 'dropzoneKeyFile', 'dropzoneKeyFileName', 'dropzoneKeyFileSize', 'dropzoneKeyChange', 'dropzoneKey');
 
   var passInput = document.getElementById('fiel_password');
   var passToggle = document.getElementById('fielPasswordToggle');
@@ -187,31 +235,70 @@
   }
 
   if (form) {
+    var statusBadgeSubmit = document.getElementById('fielStatusBadge');
     form.addEventListener('submit', function() {
+      form.setAttribute('data-state', 'validating');
+      form.classList.add('fiel-form--validating');
       if (saveBtn) { saveBtn.disabled = true; saveBtn.querySelector('.fiel-submit__text').textContent = 'Validando…'; }
       if (saveSpinner) saveSpinner.hidden = false;
+      if (statusBadgeSubmit) statusBadgeSubmit.innerHTML = '<span class="fiel-status-badge fiel-status-badge--validating">Validando…</span>';
     });
   }
 
   if (validateBtn) {
+    var statusBadge = document.getElementById('fielStatusBadge');
     validateBtn.addEventListener('click', function() {
       validateBtn.disabled = true;
-      fetch('/portal/config/sat/validate', { method: 'POST', credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+      validateBtn.textContent = 'Validando…';
+      if (statusBadge) {
+        statusBadge.innerHTML = '<span class="fiel-status-badge fiel-status-badge--validating">Validando…</span>';
+      }
+      var statusResultEl = document.getElementById('fielStatusResult');
+      var statusMetaEl = document.getElementById('fielStatusMeta');
+      (window.portalFetchWithTimeout ? window.portalFetchWithTimeout('/portal/config/sat/validate', { method: 'POST', credentials: 'same-origin', headers: { 'Accept': 'application/json' } }, 30000) : fetch('/portal/config/sat/validate', { method: 'POST', credentials: 'same-origin', headers: { 'Accept': 'application/json' } }))
         .then(function(r){ return r.json(); })
         .then(function(data){
           showResult(data.ok, data.ok ? (data.message || 'FIEL válida.') : (data.message || 'Error.'));
-          if (data.ok) window.location.reload();
+          if (data.ok && window.uiSuccessOverlay) {
+            window.uiSuccessOverlay({ title: 'FIEL válida', message: data.message || 'Tus credenciales son correctas.', actions: [{ label: 'Entendido', onClick: function () { if (window.uiSuccessOverlayClose) window.uiSuccessOverlayClose(); window.location.reload(); } }] });
+          } else if (data.ok) {
+            window.location.reload();
+          } else {
+            if (statusBadge) statusBadge.innerHTML = '<span class="fiel-status-badge fiel-status-badge--error">Error</span>';
+            if (statusResultEl) statusResultEl.innerHTML = '<span class="fiel-status__error-text fiel-status__error-text--block">' + (data.message || 'No se pudo validar. Revisa contraseña y archivos.').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</span>';
+            if (statusMetaEl) statusMetaEl.textContent = '';
+          }
         })
-        .catch(function(){ showResult(false, 'Error de conexión.'); })
-        .finally(function(){ if (validateBtn) validateBtn.disabled = false; });
+        .catch(function(){ showResult(false, 'Error de conexión.'); if (statusBadge) statusBadge.innerHTML = '<span class="fiel-status-badge fiel-status-badge--error">Error</span>'; if (statusResultEl) statusResultEl.innerHTML = '<span class="fiel-status__error-text fiel-status__error-text--block">Error de conexión. Revisa tu red e intenta de nuevo.</span>'; })
+        .finally(function(){
+          if (validateBtn) { validateBtn.disabled = false; validateBtn.textContent = 'Validar de nuevo'; }
+          if (statusBadge && !statusBadge.querySelector('.fiel-status-badge--error')) {
+            var ok = {{ 'true' if validation_ok else 'false' }};
+            var hasFiel = {{ 'true' if has_fiel else 'false' }};
+            if (ok) statusBadge.innerHTML = '<span class="fiel-status-badge fiel-status-badge--ok">Válida ✅</span>';
+            else if (hasFiel) statusBadge.innerHTML = '<span class="fiel-status-badge fiel-status-badge--pending">Pendiente de validar</span>';
+            else statusBadge.innerHTML = '<span class="fiel-status-badge fiel-status-badge--muted">No configurado</span>';
+          }
+        });
     });
   }
 
   if (window.location.search.indexOf('saved=1') >= 0 && resultEl) {
     resultEl.hidden = false;
-    resultContent.innerHTML = '<p style="margin:0;">Credenciales guardadas. El estado de validación se muestra en el panel Estado (FIEL válida ✓ o mensaje de error).</p>';
-    resultEl.style.background = 'var(--surface-hover)';
-    resultEl.style.borderLeft = '4px solid var(--primary)';
+    if ({{ 'true' if validation_ok else 'false' }}) {
+      resultContent.innerHTML = '<p style="margin:0;"><span class="fiel-result__ok">✓</span> Credenciales guardadas. FIEL válida.</p>';
+      resultEl.style.background = 'var(--success-bg, rgba(22,163,74,.08))';
+      resultEl.style.borderLeft = '4px solid var(--success, #16a34a)';
+      if (window.uiSuccessOverlay) {
+        window.uiSuccessOverlay({ title: 'SAT Configurado', message: 'Tus credenciales se guardaron y la FIEL se validó correctamente.', actions: [{ label: 'Entendido', onClick: function () { if (window.uiSuccessOverlayClose) window.uiSuccessOverlayClose(); } }] });
+      }
+    } else {
+      var msgEl = document.getElementById('fielSavedValidationMessage');
+      var msg = (msgEl && msgEl.getAttribute('data-message')) ? msgEl.getAttribute('data-message') : 'Revisa contraseña y archivos.';
+      resultContent.innerHTML = '<p style="margin:0;"><span class="fiel-result__error">✗</span> Credenciales guardadas. La validación falló: <strong>' + msg.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</strong></p>';
+      resultEl.style.background = 'var(--danger-bg, rgba(185,28,28,.08))';
+      resultEl.style.borderLeft = '4px solid var(--danger, #b91c1c)';
+    }
   }
 
   if (replaceBtn && replaceModal) {

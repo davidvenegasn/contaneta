@@ -1,0 +1,110 @@
+{% extends "base_portal.html" %}
+{% set title = 'Factura rápida' %}
+{% set active_page = 'create' %}
+{% block content %}
+<div class="app-header mb-22">
+  <div class="app-header__left">
+    <div class="app-title"></div>
+    <div class="app-subtitle muted">Elige cliente y producto para abrir la factura con datos precargados.</div>
+  </div>
+  <div class="app-header__right">
+    <a href="/portal/home" class="btn btn-ghost btn-small" style="text-decoration:none;">Volver al inicio</a>
+  </div>
+</div>
+
+<div class="card p-20" style="max-width: 560px;">
+  <h2 class="section-title mb-14">Factura rápida</h2>
+  <p class="muted" style="margin:0 0 20px;">Los clientes y productos son los mismos que en <a href="/portal/clients">Clientes</a> y <a href="/portal/products">Productos</a>.</p>
+  <div class="quick-choose-form" style="display:flex; flex-direction:column; gap:20px;">
+    <div>
+      <label class="label" for="quickChooseCustomer">Cliente</label>
+      <select id="quickChooseCustomer" class="input" style="width:100%; padding:12px 14px; border-radius:12px; font-size:15px;" aria-label="Cliente">
+        <option value="">— Seleccionar cliente —</option>
+      </select>
+      <p class="muted" style="margin:6px 0 0; font-size:13px;">¿No tienes clientes? <a href="/portal/clients">Ir a Clientes</a></p>
+    </div>
+    <div>
+      <label class="label" for="quickChooseProduct">Producto</label>
+      <select id="quickChooseProduct" class="input" style="width:100%; padding:12px 14px; border-radius:12px; font-size:15px;" aria-label="Producto">
+        <option value="">— Seleccionar producto —</option>
+      </select>
+      <p class="muted" style="margin:6px 0 0; font-size:13px;">¿No tienes productos? <a href="/portal/products">Ir a Productos</a></p>
+    </div>
+    <div style="margin-top:8px;">
+      <a href="#" id="quickChooseSubmit" class="btn btn-primary" style="display:inline-block; text-decoration:none; pointer-events:none; opacity:0.7;" role="button">Abrir factura con estos datos</a>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var customerSelect = document.getElementById('quickChooseCustomer');
+  var productSelect = document.getElementById('quickChooseProduct');
+  var submitBtn = document.getElementById('quickChooseSubmit');
+  if (!customerSelect || !productSelect || !submitBtn) return;
+
+  function setSubmitLink() {
+    var cId = customerSelect.value;
+    var pId = productSelect.value;
+    if (cId && pId) {
+      submitBtn.href = '/portal/create/quick?customer_id=' + encodeURIComponent(cId) + '&product_id=' + encodeURIComponent(pId);
+      submitBtn.style.pointerEvents = 'auto';
+      submitBtn.style.opacity = '1';
+    } else {
+      submitBtn.href = '#';
+      submitBtn.style.pointerEvents = 'none';
+      submitBtn.style.opacity = '0.7';
+    }
+  }
+
+  function loadCustomers() {
+    var get = window.portalCatalogGetJson
+      ? window.portalCatalogGetJson('/api/customers').then(function(r) { return Array.isArray(r) ? r : (r && r.customers) || (r && r.data) || []; })
+      : (window.portalFetchWithTimeout ? window.portalFetchWithTimeout('/api/customers', { credentials: 'same-origin' }, 30000) : fetch('/api/customers', { credentials: 'same-origin' }))
+          .then(function(r) { return r.ok ? r.json() : []; })
+          .then(function(d) { return Array.isArray(d) ? d : (d && d.customers) || (d && d.data) || []; });
+    get.then(function(list) {
+      customerSelect.innerHTML = '<option value="">— Seleccionar cliente —</option>';
+      list.forEach(function(c) {
+        var o = document.createElement('option');
+        o.value = String(c.id != null ? c.id : '');
+        o.textContent = (c.legal_name || c.rfc || 'Sin nombre').trim() || '—';
+        customerSelect.appendChild(o);
+      });
+      setSubmitLink();
+    }).catch(function() { setSubmitLink(); });
+  }
+
+  function loadProducts() {
+    var get = window.portalCatalogGetJson
+      ? window.portalCatalogGetJson('/api/products').then(function(r) { return Array.isArray(r) ? r : (r && r.products) || (r && r.data) || []; })
+      : (window.portalFetchWithTimeout ? window.portalFetchWithTimeout('/api/products', { credentials: 'same-origin' }, 30000) : fetch('/api/products', { credentials: 'same-origin' }))
+          .then(function(r) { return r.ok ? r.json() : []; })
+          .then(function(d) { return Array.isArray(d) ? d : (d && d.products) || (d && d.data) || []; });
+    get.then(function(list) {
+      productSelect.innerHTML = '<option value="">— Seleccionar producto —</option>';
+      list.forEach(function(p) {
+        var o = document.createElement('option');
+        o.value = String(p.id != null ? p.id : '');
+        o.textContent = (p.description || p.product_key || 'Sin descripción').trim() || '—';
+        productSelect.appendChild(o);
+      });
+      setSubmitLink();
+    }).catch(function() { setSubmitLink(); });
+  }
+
+  customerSelect.addEventListener('change', setSubmitLink);
+  productSelect.addEventListener('change', setSubmitLink);
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() {
+      loadCustomers();
+      loadProducts();
+    });
+  } else {
+    loadCustomers();
+    loadProducts();
+  }
+})();
+</script>
+{% endblock %}
