@@ -3,12 +3,15 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="csrf-token" content="{{ csrf_token|default('') }}" />
     <meta name="theme-color" content="#f0fdf9" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <title>{{ title or "ContaNeta" }}</title>
     <script>if(localStorage.getItem('portal_nightmode')==='1')document.documentElement.classList.add('nightmode');</script>
+    <!-- P35: cache GET catalogs/customers/products (TTL 10 min); debe cargar antes del content para prefetch en Home -->
+    <script src="/static/js/catalog-cache.js"></script>
     <link rel="stylesheet" href="/static/css/form.css">
     <link rel="stylesheet" href="/static/css/portal_tokens.css">
     <link rel="stylesheet" href="/static/css/components.css">
@@ -29,10 +32,19 @@
       .welcome-popup__text { margin: 0 0 20px; font-size: 14px; color: var(--muted); line-height: 1.5; }
       .welcome-popup__actions { display: flex; flex-direction: column; gap: 10px; }
       .welcome-popup__btn { text-align: center; text-decoration: none; }
-      .impersonation-banner { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 16px; margin-bottom: 12px; background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border: 1px solid #f59e0b; border-radius: 12px; font-size: 14px; }
-      .impersonation-banner__text { color: #92400e; }
-      .impersonation-banner .btn { padding: 6px 12px; border-radius: 8px; font-size: 13px; font-weight: 600; background: #f59e0b; color: #fff; border: none; cursor: pointer; text-decoration: none; }
-      .impersonation-banner .btn:hover { background: #d97706; }
+      /* P44: impersonation UX — no confundir con usuario normal */
+      .impersonation-banner { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 20px; margin-bottom: 0; background: linear-gradient(135deg, #5b21b6 0%, #7c3aed 100%); border-bottom: 3px solid #4c1d95; border-radius: 0; font-size: 14px; position: sticky; top: 0; z-index: 80; box-shadow: 0 2px 12px rgba(91, 33, 182, 0.4); flex-wrap: wrap; }
+      .impersonation-banner__content { display: flex; flex-direction: column; gap: 2px; }
+      .impersonation-banner__text { color: #fff; font-weight: 500; }
+      .impersonation-banner__text strong { color: #e9d5ff; }
+      .impersonation-banner__sub { font-size: 12px; color: rgba(255,255,255,0.9); font-weight: 500; }
+      .impersonation-banner__badge { display: inline-block; margin-right: 8px; padding: 3px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; background: rgba(255,255,255,.28); color: #fff; border-radius: 6px; }
+      .impersonation-banner .btn, .impersonation-banner__btn { padding: 8px 18px; border-radius: 8px; font-size: 13px; font-weight: 600; background: #fff; color: #5b21b6; border: none; cursor: pointer; text-decoration: none; }
+      .impersonation-banner .btn:hover, .impersonation-banner__btn:hover { background: #f5f3ff; color: #4c1d95; }
+      .impersonation-float-btn { position: fixed; bottom: 24px; right: 24px; z-index: 9999; }
+      .impersonation-float-btn form { margin: 0; }
+      .impersonation-float-btn .btn { padding: 14px 22px; font-size: 14px; font-weight: 700; background: #5b21b6; color: #fff; border: 2px solid #4c1d95; border-radius: 12px; cursor: pointer; box-shadow: 0 4px 20px rgba(91, 33, 182, 0.45); }
+      .impersonation-float-btn .btn:hover { background: #4c1d95; color: #fff; border-color: #3b0764; }
       .demo-ui-hooks { position: fixed; bottom: 16px; right: 16px; z-index: 70; display: flex; flex-wrap: wrap; gap: 8px; padding: 10px; background: rgba(255,255,255,.95); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,.1); }
       .demo-ui-hooks[hidden] { display: none !important; }
       .user-menu__session-info { padding: 8px 12px; font-size: 12px; color: var(--muted, #64748b); display: flex; flex-direction: column; gap: 2px; }
@@ -42,127 +54,159 @@
       .user-menu__logout-form .user-menu__item--logout,
       .user-menu__item--logout { width: 100%; text-align: left; background: none; border: none; cursor: pointer; font: inherit; padding: 8px 12px; color: #b91c1c !important; font-weight: 600; }
       .user-menu__item--logout:hover { background: rgba(185, 28, 28, 0.08) !important; color: #991b1b !important; }
+      .account-checklist { padding: 8px 12px 10px; }
+      .account-checklist__title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted, #64748b); margin: 0 0 8px; }
+      .account-checklist__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+      .account-checklist__item { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-radius: 8px; text-decoration: none; color: var(--text, #1e293b); font-size: 13px; transition: background 0.15s ease; }
+      .account-checklist__item:hover { background: rgba(0,0,0,.05); }
+      .account-checklist__item:focus { outline: none; background: rgba(0,0,0,.06); }
+      .account-checklist__check { flex-shrink: 0; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #16a34a; }
+      .account-checklist__check--pending { color: var(--muted, #94a3b8); font-size: 10px; }
+      .account-checklist__complete { font-size: 13px; font-weight: 600; color: #16a34a; padding: 8px 12px; display: flex; align-items: center; gap: 8px; }
       .portal-footer { margin-top: 24px; padding: 12px 0; border-top: 1px solid var(--border, #e2e8f0); font-size: 12px; color: var(--muted, #64748b); }
       .portal-footer a { color: var(--link, #0ea5e9); text-decoration: none; }
       .portal-footer a:hover { text-decoration: underline; }
-      .confirm-modal { position: fixed; inset: 0; z-index: 9000; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(0,0,0,.4); }
-      .confirm-modal[hidden] { display: none !important; }
-      .confirm-modal__card { max-width: 400px; width: 100%; padding: 20px; background: var(--card-bg); border-radius: var(--radius); box-shadow: 0 20px 50px rgba(0,0,0,.2); }
-      .confirm-modal__title { margin: 0 0 10px; font-size: 1.1rem; }
-      .confirm-modal__text { margin: 0 0 18px; font-size: 14px; color: var(--muted); line-height: 1.5; }
-      .confirm-modal__actions { display: flex; gap: 10px; justify-content: flex-end; }
-      .confirm-modal__btn--cancel { background: var(--muted); color: #fff; }
-      .confirm-modal__btn--danger { background: #b91c1c; color: #fff; }
-      .confirm-modal__btn--danger:hover { background: #991b1b; }
+      /* P37: estilos del modal de confirmación en components.css */
     </style>
   </head>
 
   <body class="portal">
+{% if dev_debug_panel|default(false) %}
+<script>
+(function() {
+  window.__devFetchErrors = [];
+  var max = 20;
+  var orig = window.fetch;
+  window.fetch = function(input, init) {
+    var url = typeof input === 'string' ? input : (input && input.url) || '';
+    var method = (init && init.method) || 'GET';
+    var t = new Date().toLocaleTimeString('es-MX', { hour12: false });
+    return orig.apply(this, arguments).then(function(r) {
+      if (!r.ok) {
+        window.__devFetchErrors.push({ url: url, method: method, status: r.status, statusText: r.statusText || '', time: t, message: r.status + ' ' + (r.statusText || '') });
+        if (window.__devFetchErrors.length > max) window.__devFetchErrors.shift();
+        if (window.__devDebugPanelUpdate) window.__devDebugPanelUpdate();
+      }
+      return r;
+    }, function(err) {
+      window.__devFetchErrors.push({ url: url, method: method, status: 0, statusText: 'Network', time: t, message: (err && err.message) || 'Error de red' });
+      if (window.__devFetchErrors.length > max) window.__devFetchErrors.shift();
+      if (window.__devDebugPanelUpdate) window.__devDebugPanelUpdate();
+      throw err;
+    });
+  };
+})();
+</script>
+{% endif %}
 {% if is_impersonating|default(false) %}
-    <div class="impersonation-banner" role="alert">
-      <span class="impersonation-banner__text">Estás en modo admin/impersonation: viendo como <strong>{{ issuer_alias or issuer_rfc or 'Issuer' }}</strong></span>
+    <div class="impersonation-banner" role="alert" aria-live="assertive">
+      <div class="impersonation-banner__content">
+        <span class="impersonation-banner__text"><span class="impersonation-banner__badge">Modo soporte</span> Viendo como <strong>{{ issuer_alias or issuer_rfc or 'Issuer' }}</strong></span>
+        <span class="impersonation-banner__sub">No eres el titular de esta cuenta.</span>
+      </div>
       <form method="post" action="/admin/stop-impersonate" style="display:inline;">
-        <button type="submit" class="btn">Salir de impersonation</button>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token|default('') }}" />
+        <button type="submit" class="btn impersonation-banner__btn">Salir de impersonación</button>
       </form>
     </div>
 {% endif %}
 {% macro icon_home() %}
 <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-  <path d="M3 10.5 12 3l9 7.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M5.5 10.5V21h13V10.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M10 21v-6h4v6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M3 10.5 12 3l9 7.5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M5.5 10.5V21h13V10.5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M10 21v-6h4v6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
 {% endmacro %}
 
 {% macro icon_create() %}
 <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-  <path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M14 2v5h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M8 12h8M8 16h8M8 8h3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7z" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M14 2v5h5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M8 12h8M8 16h8M8 8h3" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
 {% endmacro %}
 
 {% macro icon_issued() %}
 <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-  <path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M14 2v5a1 1 0 0 0 1 1h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M12 12v6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-  <path d="m15 15-3-3-3 3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M14 2v5a1 1 0 0 0 1 1h5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M12 12v6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+  <path d="m15 15-3-3-3 3" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
 {% endmacro %}
 
 {% macro icon_received() %}
 <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-  <path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M14 2v5a1 1 0 0 0 1 1h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M12 18v-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-  <path d="m9 15 3 3 3-3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M14 2v5a1 1 0 0 0 1 1h5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M12 18v-6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+  <path d="m9 15 3 3 3-3" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
 {% endmacro %}
 
 {% macro icon_summary() %}
 <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-  <path d="M13 17V9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-  <path d="M18 17V5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-  <path d="M3 3v16a2 2 0 0 0 2 2h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M8 17v-3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+  <path d="M13 17V9" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+  <path d="M18 17V5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+  <path d="M3 3v16a2 2 0 0 0 2 2h16" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M8 17v-3" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
 </svg>
 {% endmacro %}
 
 {% macro icon_clients() %}
 <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-  <circle cx="9" cy="8" r="4" stroke="currentColor" stroke-width="1.8"/>
-  <path d="M3 20c0-3 3-5 6-5s6 2 6 5" stroke="currentColor" stroke-width="1.8"/>
-  <path d="M16 12l2 2 4-4" stroke="currentColor" stroke-width="1.8"/>
+  <circle cx="9" cy="8" r="4" stroke="currentColor" stroke-width="1.75"/>
+  <path d="M3 20c0-3 3-5 6-5s6 2 6 5" stroke="currentColor" stroke-width="1.75"/>
+  <path d="M16 12l2 2 4-4" stroke="currentColor" stroke-width="1.75"/>
 </svg>
 {% endmacro %}
 
 {% macro icon_providers() %}
 <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-  <circle cx="8" cy="9" r="3.5" stroke="currentColor" stroke-width="1.8"/>
-  <circle cx="16" cy="11" r="3" stroke="currentColor" stroke-width="1.8"/>
-  <path d="M2 20c0-3 3-5 6-5" stroke="currentColor" stroke-width="1.8"/>
-  <path d="M13 20c0-2.5 2-4 4.5-4S22 17.5 22 20" stroke="currentColor" stroke-width="1.8"/>
+  <circle cx="8" cy="9" r="3.5" stroke="currentColor" stroke-width="1.75"/>
+  <circle cx="16" cy="11" r="3" stroke="currentColor" stroke-width="1.75"/>
+  <path d="M2 20c0-3 3-5 6-5" stroke="currentColor" stroke-width="1.75"/>
+  <path d="M13 20c0-2.5 2-4 4.5-4S22 17.5 22 20" stroke="currentColor" stroke-width="1.75"/>
 </svg>
 {% endmacro %}
 
 {% macro icon_products() %}
 <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-  <path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
 {% endmacro %}
 
 {% macro icon_quotations() %}
 <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-  <path d="M8 4h8v2H8z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-  <path d="M8 10h8v2H8z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-  <path d="M8 16h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-  <path d="M6 2a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6H6z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M14 2v6h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M8 4h8v2H8z" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+  <path d="M8 10h8v2H8z" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+  <path d="M8 16h5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+  <path d="M6 2a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6H6z" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M14 2v6h6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
 {% endmacro %}
 
 {% macro icon_calendar() %}
 <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-  <rect x="3" y="4" width="18" height="18" rx="2" ry="2" stroke="currentColor" stroke-width="1.8"/>
-  <path d="M16 2v4M8 2v4M3 10h18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+  <rect x="3" y="4" width="18" height="18" rx="2" ry="2" stroke="currentColor" stroke-width="1.75"/>
+  <path d="M16 2v4M8 2v4M3 10h18" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
 </svg>
 {% endmacro %}
 
 {% macro icon_sync() %}
 <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-  <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M21 3v5h-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M3 21v-5h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M21 3v5h-5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M3 21v-5h5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
 {% endmacro %}
 
 {% macro icon_download() %}
 <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M7 10l5 5 5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M12 15V3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M7 10l5 5 5-5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M12 15V3" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
 </svg>
 {% endmacro %}
 
@@ -186,8 +230,9 @@
 </div>
 {% endmacro %}
     <div id="pageLoadingBar" class="page-loading-bar" aria-hidden="true"></div>
+    <div id="topProgress" class="top-progress" aria-hidden="true"></div>
     <div class="portal-shell">
-      <aside id="sidebar" class="sidebar sidebar-drawer" aria-hidden="true">
+      <aside id="sidebar" class="sidebar sidebar-drawer" aria-hidden="true" aria-label="Menú de navegación">
         <div class="sidebar-top">
           <div class="brand">
             <div class="brand-dot"></div>
@@ -293,9 +338,9 @@
                   aria-controls="sidebar"
                   aria-expanded="false">
             <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path d="M4 5h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-              <path d="M4 12h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-              <path d="M4 19h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+              <path d="M4 5h16" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+              <path d="M4 12h16" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+              <path d="M4 19h16" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
             </svg>
           </button>
 
@@ -382,20 +427,29 @@
             {% block topbar_actions %}{% endblock %}
           </div>
 
+          <!-- P36: chips de estado (SAT OK / Sync / Trial-Pro) fintech, clicables a FIEL / Mi plan -->
+          <div class="topbar-status-chips" id="topbarStatusChips" aria-label="Estado de cuenta" hidden>
+            <a href="/portal/config/sat" class="topbar-status-chip topbar-status-chip--sat" id="topbarChipSat" title="FIEL SAT" data-status="none">SAT</a>
+            <a href="/portal/config/sat" class="topbar-status-chip topbar-status-chip--sync" id="topbarChipSync" title="Sincronización SAT" data-status="ok">—</a>
+            <a href="/portal/plan" class="topbar-status-chip topbar-status-chip--plan" id="topbarChipPlan" title="Mi plan" style="display:none;" data-plan="">Plan</a>
+          </div>
+
           <!-- Menú usuario -->
           <div class="user-menu-wrap">
-            <button type="button" class="topbar-user" id="userMenuBtn" aria-haspopup="menu" aria-expanded="false" title="{{ issuer_alias }}">
+            <button type="button" class="topbar-user{% if is_impersonating|default(false) %} topbar-user--impersonating{% endif %}" id="userMenuBtn" aria-haspopup="menu" aria-expanded="false" title="{{ issuer_alias }}">
+              {% if is_impersonating|default(false) %}<span class="topbar-user__pill" aria-hidden="true">Soporte</span>{% endif %}
               <span class="topbar-user__dot" aria-hidden="true"></span>
               <span class="topbar-user__text">{{ issuer_alias }}</span>
               <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path d="m6 9 6 6 6-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="m6 9 6 6 6-6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
             </button>
 
             <div class="user-menu" id="userMenu" role="menu" hidden>
               {% if is_impersonating|default(false) %}
               <form method="post" action="/admin/stop-impersonate" class="user-menu__impersonate-form">
-                <button type="submit" class="user-menu__item user-menu__item--action" role="menuitem">Volver a mi cuenta</button>
+                <input type="hidden" name="csrf_token" value="{{ csrf_token|default('') }}" />
+                <button type="submit" class="user-menu__item user-menu__item--action" role="menuitem">Salir de impersonación</button>
               </form>
               <div class="user-menu__sep" aria-hidden="true"></div>
               {% endif %}
@@ -404,21 +458,23 @@
                 <span class="user-menu__section-sub">SAT y seguridad</span>
               </div>
               <a class="user-menu__item user-menu__item--with-icon" href="/portal/config/sat" role="menuitem">
-                <span class="user-menu__item-icon" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span>
+                <span class="user-menu__item-icon" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span>
                 Conectar SAT (FIEL)
               </a>
               <a class="user-menu__item user-menu__item--with-icon" href="/portal/datos-fiscales" role="menuitem">
-                <span class="user-menu__item-icon" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
+                <span class="user-menu__item-icon" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
                 Datos fiscales
               </a>
-              <a class="user-menu__item user-menu__item--with-icon" href="/portal/info" role="menuitem">
-                <span class="user-menu__item-icon" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span>
+              <a class="user-menu__item user-menu__item--with-icon" href="/seguridad" role="menuitem">
+                <span class="user-menu__item-icon" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span>
                 Seguridad
               </a>
               <div class="user-menu__sep" aria-hidden="true"></div>
-              <div class="user-menu__status">
-                <span class="user-menu__status-chip {% if menu_sat_configured|default(false) %}user-menu__status-chip--ok{% else %}user-menu__status-chip--muted{% endif %}">SAT: {{ 'Configurado' if menu_sat_configured|default(false) else 'No configurado' }}</span>
-                <span class="user-menu__status-chip {% if menu_catalog_ok|default(false) %}user-menu__status-chip--ok{% else %}user-menu__status-chip--muted{% endif %}">Catálogo: {{ 'OK' if menu_catalog_ok|default(false) else 'Pendiente' }}</span>
+              <div class="account-checklist" id="accountChecklist" aria-label="Mi cuenta — activación">
+                <div class="account-checklist__title">Mi cuenta</div>
+                <div id="accountChecklistContent">
+                  <span class="muted" style="font-size:12px;">Cargando…</span>
+                </div>
               </div>
               <div class="user-menu__sep" aria-hidden="true"></div>
               <div class="user-menu__session-info" role="status">
@@ -429,11 +485,11 @@
               </div>
               <div class="user-menu__sep" aria-hidden="true"></div>
               <a class="user-menu__item user-menu__item--with-icon" href="/portal/summary" role="menuitem">
-                <span class="user-menu__item-icon" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 12a9 9 0 1 1-9-9" stroke-linecap="round"/><path d="M21 3v6h-6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                <span class="user-menu__item-icon" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M21 12a9 9 0 1 1-9-9" stroke-linecap="round"/><path d="M21 3v6h-6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
                 Resumen
               </a>
               <a class="user-menu__item user-menu__item--with-icon" href="/portal/home" role="menuitem">
-                <span class="user-menu__item-icon" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 10.5 12 3l9 7.5"/><path d="M5.5 10.5V21h13V10.5"/><path d="M10 21v-6h4v6"/></svg></span>
+                <span class="user-menu__item-icon" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M3 10.5 12 3l9 7.5"/><path d="M5.5 10.5V21h13V10.5"/><path d="M10 21v-6h4v6"/></svg></span>
                 Inicio
               </a>
               <div class="user-menu__sep" aria-hidden="true"></div>
@@ -443,8 +499,8 @@
                     <span class="nightmode-toggle__label nightmode-toggle__label--day">Día</span>
                     <span class="nightmode-toggle__label nightmode-toggle__label--night">Noche</span>
                     <span class="nightmode-toggle__thumb" aria-hidden="true">
-                      <svg class="nightmode-toggle__icon nightmode-toggle__icon--sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
-                      <svg class="nightmode-toggle__icon nightmode-toggle__icon--moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                      <svg class="nightmode-toggle__icon nightmode-toggle__icon--sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+                      <svg class="nightmode-toggle__icon nightmode-toggle__icon--moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
                     </span>
                   </span>
                 </button>
@@ -459,12 +515,13 @@
       </header>
 
       <main class="main">
+        <div id="pageContent" class="page-enter">
         <div class="main-inner page">
           {% if is_impersonating|default(false) %}
-          <div class="demo-banner" role="status">
-            <span class="demo-banner__text">Estás viendo el portal como <strong>{{ issuer_alias }}</strong>.</span>
-            <form method="post" action="/admin/stop-impersonate" style="display:inline;">
-              <button type="submit" class="demo-banner__link" style="background:none;border:none;cursor:pointer;padding:0;font:inherit;color:inherit;text-decoration:underline;">Volver a mi cuenta</button>
+          <div class="impersonation-float-btn" role="complementary" aria-label="Salir de impersonación">
+            <form method="post" action="/admin/stop-impersonate">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token|default('') }}" />
+              <button type="submit" class="btn">Salir de impersonación</button>
             </form>
           </div>
           {% endif %}
@@ -474,6 +531,7 @@
             <a href="/portal/exit-demo-view" class="demo-banner__link">Volver a mi portal</a>
           </div>
           {% endif %}
+          <!-- P25: contenedor único para toasts (success/error/info); máx 3 visibles; no usar en carga de listas -->
           <div id="toastStack" class="toast-stack" aria-live="polite" aria-relevant="additions"></div>
 
           <!-- Demo UI hooks: ?demo=1 para mostrar botones de simulación -->
@@ -484,11 +542,14 @@
             <button type="button" class="btn btn--sm btn--secondary" data-demo-overlay">Simular overlay</button>
           </div>
 
+          <!-- Cargar ui.js antes del content para que las listas (productos, clientes, emitidas, etc.) tengan uiFetchJSON en la primera carga -->
+          <script src="/static/js/ui.js"></script>
           {% block content %}{% endblock %}
           <footer class="portal-footer" role="contentinfo">
-            Protegemos tu sesión con cookies seguras. No compartas tu acceso.
-            <a href="/portal/info">Seguridad e información</a>
+            Tu sesión está protegida. No compartas tu acceso.
+            <a href="/seguridad">Seguridad</a>
           </footer>
+        </div>
         </div>
       </main>
 
@@ -500,6 +561,17 @@
           <div class="confirm-modal__actions">
             <button type="button" id="portalConfirmCancel" class="btn confirm-modal__btn--cancel">Cancelar</button>
             <button type="button" id="portalConfirmOk" class="btn confirm-modal__btn--danger"></button>
+          </div>
+        </div>
+      </div>
+
+      <!-- P45: Modal sesión expirada (401) -->
+      <div id="sessionExpiredModal" class="modal confirm-modal session-expired-modal" role="dialog" aria-modal="true" aria-labelledby="sessionExpiredTitle" aria-live="assertive" hidden>
+        <div class="confirm-modal__card">
+          <h2 id="sessionExpiredTitle" class="confirm-modal__title">Sesión expirada</h2>
+          <p class="confirm-modal__text">Tu sesión ha expirado. Inicia sesión para continuar.</p>
+          <div class="confirm-modal__actions">
+            <a href="/login" class="btn btn--primary" id="sessionExpiredLoginBtn" style="text-decoration:none;">Iniciar sesión</a>
           </div>
         </div>
       </div>
@@ -564,7 +636,8 @@
 })();
     </script>
     <script>
-// Modal de confirmación para acciones irreversibles. Uso: window.portalConfirm({ title, message, confirmLabel, cancelLabel, onConfirm })
+// P37: Modal de confirmación reutilizable (uiConfirm/portalConfirm). Sin alert/confirm nativo.
+// Uso: await portalConfirm({ title, message, confirmLabel, cancelLabel }); retorna Promise<boolean>
 (function () {
   const modal = document.getElementById('portalConfirmModal');
   const titleEl = document.getElementById('portalConfirmTitle');
@@ -596,6 +669,7 @@
     modal.removeAttribute('aria-hidden');
     document.body.style.overflow = 'hidden';
     onConfirmCb = typeof o.onConfirm === 'function' ? o.onConfirm : null;
+    requestAnimationFrame(function () { cancelBtn.focus(); });
     return new Promise(function (resolve) {
       resolvePromise = resolve;
     });
@@ -612,11 +686,12 @@
 
   const setOpen = (open) => {
     document.body.classList.toggle('sidebar-open', open);
+    document.documentElement.classList.toggle('sidebar-open', open);
     btn.setAttribute('aria-expanded', open ? 'true' : 'false');
     sidebar.setAttribute('aria-hidden', open ? 'false' : 'true');
     // Backdrop should not take clicks when closed
     backdrop.hidden = !open;
-    // Prevent body scroll when drawer is open
+    // Bloquear scroll de la página: solo el menú lateral puede hacer scroll
     document.body.classList.toggle('no-scroll', open);
   };
 
@@ -635,24 +710,14 @@
     if (!a) return;
 
     const isOpen = document.body.classList.contains('sidebar-open');
-    if (!isOpen) return; // allow normal navigation when drawer isn't open
+    if (!isOpen) return;
 
-    // If the link opens in a new tab/window, don't interfere
+    const href = (a.getAttribute('href') || '').trim();
+    if (!href || href.startsWith('#') || href.startsWith('javascript:')) return;
     if (a.target && a.target !== '_self') return;
 
-    // Only intercept same-origin navigations
-    const href = a.getAttribute('href') || '';
-    if (!href || href.startsWith('#') || href.startsWith('javascript:')) return;
-
-    e.preventDefault();
+    // Portal link: solo cerrar drawer; la transición y navegación las maneja P23 (ui.js)
     setOpen(false);
-    document.body.classList.add('page-leave');
-
-    // Give the CSS transition time to play
-    const delay = 220;
-    window.setTimeout(() => {
-      window.location.href = a.href;
-    }, delay);
   });
 
   // Ensure closed on first paint
@@ -710,7 +775,7 @@
     if (status === 404) return 'No encontrado.';
     if (status >= 500) return 'El servidor no respondió. Intenta de nuevo en unos minutos.';
     if (typeof detail === 'string' && detail.length > 0) return detail;
-    return 'Revisa tu conexión e intenta de nuevo.';
+    return 'Puedes intentar de nuevo.';
   };
 
   function sanitizeErrorMessage(msg) {
@@ -732,23 +797,33 @@
     });
   };
 
-  // ============ Toast helper (window.portalToast) ============
+  // ============ Toast unificado P25: contenedor único, máx 3, animación in/out ============
   const toastStack = document.getElementById('toastStack');
+  const TOAST_MAX_VISIBLE = 3;
   window.portalToast = (opts) => {
     if (!toastStack) return;
     const o = opts || {};
-    const type = o.type || 'success'; // success | danger | warning
+    let type = o.type || 'success'; // success | danger | warning | info (error → danger)
+    if (type === 'error') type = 'danger';
     const title = o.title || 'Listo';
     let msg = o.message || '';
     if (type === 'danger' && msg) msg = sanitizeErrorMessage(msg);
-    const defaultTtl = type === 'danger' ? 5000 : 3200;
+    const defaultTtl = (type === 'danger' ? 5000 : (type === 'info' ? 4000 : 3200));
     const ttl = Number.isFinite(o.ttl) ? o.ttl : defaultTtl;
+
+    while (toastStack.children.length >= TOAST_MAX_VISIBLE) {
+      toastStack.removeChild(toastStack.firstChild);
+    }
 
     const el = document.createElement('div');
     el.className = `toast toast--${type}`;
     el.setAttribute('role', 'status');
+    el.setAttribute('aria-live', 'polite');
+    el.style.opacity = '0';
+    el.style.transform = 'translateY(8px)';
+    el.style.transition = 'opacity 200ms ease, transform 200ms ease';
 
-    const escape = (s) => { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; };
+    const escape = (s) => { const d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; };
     el.innerHTML = `
       <div>
         <p class="toast__title">${escape(title)}</p>
@@ -757,10 +832,14 @@
     `;
 
     toastStack.appendChild(el);
+    requestAnimationFrame(function() {
+      el.style.opacity = '1';
+      el.style.transform = 'translateY(0)';
+    });
     window.setTimeout(() => {
       el.style.opacity = '0';
-      el.style.transform = 'translateY(-6px) scale(.98)';
-      window.setTimeout(() => el.remove(), 180);
+      el.style.transform = 'translateY(-6px) scale(0.98)';
+      window.setTimeout(() => { if (el.parentNode) el.remove(); }, 220);
     }, ttl);
   };
 
@@ -776,7 +855,107 @@
     if (!userBtn || !userMenu) return;
     userMenu.hidden = false;
     userBtn.setAttribute('aria-expanded', 'true');
+    if (window.loadAccountChecklist) window.loadAccountChecklist();
   };
+
+  // Checklist "Mi cuenta" + P36 chips topbar: datos desde /api/account/status
+  function relativeTimeShort(isoStr) {
+    if (!isoStr) return '';
+    var date = new Date(isoStr);
+    if (isNaN(date.getTime())) return '';
+    var sec = Math.floor((Date.now() - date.getTime()) / 1000);
+    if (sec < 60) return sec + ' seg';
+    var min = Math.floor(sec / 60);
+    if (min < 60) return min + ' min';
+    var h = Math.floor(min / 60);
+    if (h < 24) return h + ' h';
+    return Math.floor(h / 24) + ' d';
+  }
+
+  window.loadAccountChecklist = function() {
+    const el = document.getElementById('accountChecklistContent');
+    const chipsWrap = document.getElementById('topbarStatusChips');
+    const chipSat = document.getElementById('topbarChipSat');
+    const chipSync = document.getElementById('topbarChipSync');
+    const chipPlan = document.getElementById('topbarChipPlan');
+    (window.portalFetchWithTimeout ? window.portalFetchWithTimeout('/api/account/status', { credentials: 'same-origin' }, 30000) : fetch('/api/account/status', { credentials: 'same-origin' }))
+      .then(function(r) { return r.ok ? r.json() : null; })
+      .then(function(data) {
+        if (!data || typeof data.completed !== 'number') {
+          if (el) el.innerHTML = '<span class="muted" style="font-size:12px;">No pudimos cargar</span>';
+          return;
+        }
+        var completed = data.completed;
+        var total = data.total || 4;
+        if (el) {
+          if (completed >= total) {
+            el.innerHTML = '<div class="account-checklist__complete" role="status"><span aria-hidden="true">✅</span> Completo</div>';
+          } else {
+            var steps = [
+              { key: 'issuer_ok', label: 'Datos fiscales', href: '/portal/datos-fiscales' },
+              { key: 'sat_ok', label: 'FIEL', href: '/portal/config/sat' },
+              { key: 'has_customer', label: '1 cliente', href: '/portal/clients' },
+              { key: 'has_product', label: '1 producto', href: '/portal/products' }
+            ];
+            var html = '<ul class="account-checklist__list">';
+            steps.forEach(function(s) {
+              var done = !!data[s.key];
+              var checkClass = done ? 'account-checklist__check' : 'account-checklist__check account-checklist__check--pending';
+              var checkChar = done ? '✓' : '○';
+              html += '<li><a class="account-checklist__item" href="' + s.href + '" role="menuitem">' +
+                '<span class="' + checkClass + '" aria-hidden="true">' + checkChar + '</span>' +
+                '<span>' + s.label + '</span></a></li>';
+            });
+            html += '</ul>';
+            el.innerHTML = html;
+          }
+        }
+        // P36: chips de estado (SAT OK / No configurado / Error — Sync hace X min / En proceso — Trial/Pro)
+        if (chipsWrap && chipSat && chipSync) {
+          chipsWrap.hidden = false;
+          var satStatus = data.sat_status || (data.sat_ok ? 'ok' : 'none');
+          chipSat.setAttribute('data-status', satStatus);
+          chipSat.textContent = satStatus === 'ok' ? 'SAT OK' : satStatus === 'error' ? 'Error' : 'No configurado';
+          chipSat.title = satStatus === 'ok' ? 'FIEL configurada' : satStatus === 'error' ? 'Revisar FIEL' : 'Conectar SAT (FIEL)';
+          chipSat.href = '/portal/config/sat';
+          var syncStatus = data.sync_status || 'ok';
+          chipSync.setAttribute('data-status', syncStatus);
+          if (syncStatus === 'running') {
+            chipSync.textContent = 'En proceso';
+            chipSync.title = 'Sincronización en proceso';
+          } else if (syncStatus === 'error') {
+            chipSync.textContent = 'Error';
+            chipSync.title = 'Error de sincronización';
+          } else {
+            var syncLabel = data.last_sync_at ? 'hace ' + relativeTimeShort(data.last_sync_at) : '—';
+            chipSync.textContent = syncLabel;
+            chipSync.title = data.last_sync_at ? 'Último sync: ' + syncLabel : 'Sin sync';
+          }
+          chipSync.href = '/portal/config/sat';
+          if (chipPlan && data.plan_label) {
+            chipPlan.style.display = '';
+            chipPlan.textContent = data.plan_label;
+            chipPlan.setAttribute('data-plan', (data.plan_label || '').toLowerCase());
+            chipPlan.title = 'Mi plan: ' + data.plan_label;
+            chipPlan.href = '/portal/plan';
+          } else if (chipPlan) {
+            chipPlan.style.display = 'none';
+          }
+        }
+      })
+      .catch(function() {
+        if (el) el.innerHTML = '<span class="muted" style="font-size:12px;">No pudimos cargar</span>';
+      });
+  };
+
+  // P36: cargar estado (chips + checklist) al montar para que chips se vean sin abrir dropdown
+  if (document.getElementById('accountChecklistContent') || document.getElementById('topbarStatusChips')) {
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', function() { window.loadAccountChecklist(); });
+    } else {
+      window.loadAccountChecklist();
+    }
+  }
 
   if (userBtn && userMenu) {
     userBtn.addEventListener('click', (e) => {
@@ -939,7 +1118,7 @@
 
   function setPdfModalError(msg) {
     if (pdfModalError) {
-      pdfModalError.textContent = msg || 'No se pudo cargar el PDF.';
+      pdfModalError.textContent = msg || 'No pudimos cargar el PDF.';
       pdfModalError.hidden = false;
       pdfModalError.classList.add('pdf-modal__error--visible');
     }
@@ -967,7 +1146,7 @@
     pdfModal.classList.add('pdf-modal--open');
     document.body.classList.add('no-scroll');
 
-    fetch(fullUrl, { credentials: 'same-origin' })
+    (window.portalFetchWithTimeout ? window.portalFetchWithTimeout(fullUrl, { credentials: 'same-origin' }, 45000) : fetch(fullUrl, { credentials: 'same-origin' }))
       .then(function(res) {
         if (!res.ok) throw new Error(res.status === 403 ? 'Sin permiso' : res.status === 404 ? 'No encontrado' : 'Error ' + res.status);
         return res.blob();
@@ -980,9 +1159,9 @@
       .catch(function(err) {
         var msg = (err && err.message) ? err.message : '';
         if (/rechazó la conexión|failed to fetch|NetworkError|Load failed/i.test(msg)) {
-          msg = 'No se pudo cargar el PDF. Usa «Ver en otra pestaña» o «Descargar» si el problema continúa.';
+          msg = 'No pudimos cargar el PDF. Usa «Ver en otra pestaña» o «Descargar» si el problema continúa.';
         }
-        setPdfModalError(msg || 'No se pudo cargar el PDF.');
+        setPdfModalError(msg || 'No pudimos cargar el PDF.');
       });
   };
 
@@ -993,7 +1172,7 @@
         if (doc && doc.getElementById('pdf-error-msg')) {
           var msgEl = doc.getElementById('pdf-error-msg');
           var hintEl = doc.querySelector('.pdf-error-hint');
-          var text = (msgEl && msgEl.innerText) || 'No se pudo cargar el PDF.';
+          var text = (msgEl && msgEl.innerText) || 'No pudimos cargar el PDF.';
           if (hintEl && hintEl.innerText) text += ' ' + hintEl.innerText;
           if (pdfModalError) {
             pdfModalError.textContent = text;
@@ -1037,7 +1216,190 @@
   });
 })();
 </script>
-<script src="/static/js/ui.js"></script>
+<script>
+  // P47: Atajos de teclado (pro) — / focus search, g h/i/r navegación, Esc cierra modales/drawers. Respetar inputs (no robar foco).
+  (function () {
+    var pendingG = false;
+    var gTimeout = null;
+    var SEARCH_IDS = ['searchInput', 'custSearch', 'prodSearch', 'provSearch'];
+
+    function isInputFocused() {
+      var el = document.activeElement;
+      if (!el) return false;
+      var tag = (el.tagName || '').toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
+      if (el.isContentEditable) return true;
+      return false;
+    }
+
+    function focusSearch() {
+      var searchInput = document.getElementById('searchInput');
+      if (searchInput) {
+        var panel = document.getElementById('filtersPanel');
+        var toggleBtn = document.getElementById('filtersToggleBtn');
+        if (panel && panel.hidden && toggleBtn) {
+          panel.hidden = false;
+          panel.setAttribute('aria-hidden', 'false');
+          toggleBtn.setAttribute('aria-expanded', 'true');
+        }
+        if (!searchInput.hidden) {
+          searchInput.focus();
+          return true;
+        }
+      }
+      for (var i = 1; i < SEARCH_IDS.length; i++) {
+        var el = document.getElementById(SEARCH_IDS[i]);
+        if (el && !el.hidden && el.offsetParent !== null) {
+          el.focus();
+          return true;
+        }
+      }
+      return false;
+    }
+
+    function closeTopmostOverlay() {
+      var pdfModal = document.getElementById('pdfModal');
+      if (pdfModal && pdfModal.classList.contains('pdf-modal--open')) {
+        if (window.closePdfModal) window.closePdfModal();
+        return true;
+      }
+      var confirmModal = document.getElementById('portalConfirmModal');
+      if (confirmModal && !confirmModal.hidden) {
+        var cancelBtn = document.getElementById('portalConfirmCancel');
+        if (cancelBtn) cancelBtn.click();
+        return true;
+      }
+      var sessionModal = document.getElementById('sessionExpiredModal');
+      if (sessionModal && !sessionModal.hidden) return true;
+      var cfdiBackdrop = document.getElementById('cfdiDrawerBackdrop');
+      if (cfdiBackdrop && cfdiBackdrop.closest('.ui-overlay.is-open')) {
+        cfdiBackdrop.click();
+        return true;
+      }
+      var provBackdrop = document.getElementById('providerInvoicesBackdrop');
+      if (provBackdrop && provBackdrop.closest('.ui-overlay.is-open')) {
+        provBackdrop.click();
+        return true;
+      }
+      var quotModal = document.getElementById('quotModal');
+      if (quotModal && !quotModal.hidden) {
+        var qClose = quotModal.querySelector('[data-close="true"]');
+        if (qClose) qClose.click();
+        return true;
+      }
+      var linkModal = document.getElementById('quotLinkModal');
+      if (linkModal && !linkModal.hidden) {
+        var lClose = linkModal.querySelector('[data-close="true"]');
+        if (lClose) lClose.click();
+        return true;
+      }
+      var userMenu = document.getElementById('userMenu');
+      if (userMenu && !userMenu.hidden) {
+        var menuBtn = document.getElementById('userMenuBtn');
+        if (menuBtn && menuBtn.getAttribute('aria-expanded') === 'true') menuBtn.click();
+        return true;
+      }
+      var sidebarOpen = document.body.classList.contains('sidebar-open');
+      if (sidebarOpen) {
+        document.body.classList.remove('sidebar-open');
+        document.documentElement.classList.remove('sidebar-open');
+        var sidebar = document.getElementById('sidebar');
+        var sidebarBackdrop = document.getElementById('sidebarBackdrop');
+        if (sidebar) sidebar.setAttribute('aria-hidden', 'true');
+        if (sidebarBackdrop) { sidebarBackdrop.hidden = true; }
+        var sbBtn = document.getElementById('sidebarToggle');
+        if (sbBtn) sbBtn.setAttribute('aria-expanded', 'false');
+        return true;
+      }
+      return false;
+    }
+
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') {
+        if (closeTopmostOverlay()) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+        return;
+      }
+
+      if (e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        if (!isInputFocused()) {
+          if (focusSearch()) {
+            e.preventDefault();
+          }
+        }
+        return;
+      }
+
+      if (e.key === 'g' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        if (!isInputFocused()) {
+          e.preventDefault();
+          pendingG = true;
+          clearTimeout(gTimeout);
+          gTimeout = setTimeout(function () { pendingG = false; }, 800);
+        }
+        return;
+      }
+
+      if (pendingG) {
+        clearTimeout(gTimeout);
+        gTimeout = null;
+        if (e.key === 'h') {
+          e.preventDefault();
+          pendingG = false;
+          window.location.href = '/portal/home';
+          return;
+        }
+        if (e.key === 'i') {
+          e.preventDefault();
+          pendingG = false;
+          window.location.href = '/portal/invoices/issued';
+          return;
+        }
+        if (e.key === 'r') {
+          e.preventDefault();
+          pendingG = false;
+          window.location.href = '/portal/invoices/received';
+          return;
+        }
+        pendingG = false;
+      }
+    }, true);
+  })();
+</script>
+<script>
+  // P45: Sesión expirada (401) — modal "Sesión expirada" + botón Iniciar sesión; cerrar drawers/overlays para no dejar UI rota
+  window.showSessionExpiredModal = function () {
+    var modal = document.getElementById('sessionExpiredModal');
+    document.body.classList.remove('no-scroll');
+    document.querySelectorAll('.ui-overlay.is-open, .cfdi-drawer-overlay.is-open, .provider-drawer-overlay.is-open').forEach(function (el) {
+      el.classList.remove('is-open');
+      el.hidden = true;
+      el.setAttribute('aria-hidden', 'true');
+    });
+    var pdfModal = document.getElementById('pdfModal');
+    if (pdfModal && pdfModal.classList.contains('pdf-modal--open')) {
+      pdfModal.classList.remove('pdf-modal--open');
+      pdfModal.setAttribute('aria-hidden', 'true');
+    }
+    var sidebar = document.getElementById('sidebar');
+    var sidebarBackdrop = document.getElementById('sidebarBackdrop');
+    document.body.classList.remove('sidebar-open');
+    document.documentElement.classList.remove('sidebar-open');
+    if (sidebar) sidebar.setAttribute('aria-hidden', 'true');
+    if (sidebarBackdrop) { sidebarBackdrop.hidden = true; sidebarBackdrop.setAttribute('aria-hidden', 'true'); }
+    var userMenu = document.getElementById('userMenu');
+    var userMenuBtn = document.getElementById('userMenuBtn');
+    if (userMenu) { userMenu.hidden = true; userMenu.setAttribute('aria-hidden', 'true'); }
+    if (userMenuBtn) userMenuBtn.setAttribute('aria-expanded', 'false');
+    if (modal) {
+      modal.hidden = false;
+      modal.setAttribute('aria-hidden', 'false');
+      document.body.classList.add('no-scroll');
+    }
+  };
+</script>
 <script>
   // Alias: uiToast usa timeout; portalToast acepta ttl y type 'info'
   (function () {
@@ -1127,23 +1489,55 @@
     if (!syncBtn || (!syncBlock && !listBar)) return;
     var metaEl = document.getElementById('satSyncMeta');
     var statusEl = document.getElementById('satSyncStatus');
+    var chipEl = document.getElementById('satSyncChip');
     var errorEl = document.getElementById('satSyncError');
     var pollInterval = (syncBlock && syncBlock.getAttribute('data-poll-interval')) ? parseInt(syncBlock.getAttribute('data-poll-interval'), 10) : 8000;
     var pollTimer = null;
     var loadingText = syncBtn.getAttribute('data-loading-text') || 'Encolando…';
 
+    function relativeTime(isoStr) {
+      if (!isoStr) return '';
+      var date = new Date(isoStr);
+      if (isNaN(date.getTime())) return isoStr.slice ? isoStr.slice(0, 19) : isoStr;
+      var sec = Math.floor((Date.now() - date.getTime()) / 1000);
+      if (sec < 60) return 'hace ' + sec + ' seg';
+      var min = Math.floor(sec / 60);
+      if (min < 60) return 'hace ' + min + ' min';
+      var h = Math.floor(min / 60);
+      if (h < 24) return 'hace ' + h + ' h';
+      var d = Math.floor(h / 24);
+      return 'hace ' + d + ' d';
+    }
+
     function updateUI(data) {
-      if (metaEl) metaEl.textContent = data.last_sync_at ? ('Último sync: ' + (data.last_sync_at.slice ? data.last_sync_at.slice(0, 19) : data.last_sync_at)) : 'Aún no se ha sincronizado';
-      if (statusEl) {
-        statusEl.setAttribute('data-status', data.status || 'ok');
-        var spinner = statusEl.querySelector('.spinner');
-        if (data.status === 'running') {
-          if (!spinner) { spinner = document.createElement('span'); spinner.className = 'spinner spinner--sm'; spinner.setAttribute('aria-hidden', 'true'); statusEl.insertBefore(spinner, statusEl.firstChild); }
+      var status = data.status || 'ok';
+      if (listBar) listBar.setAttribute('data-status', status);
+      if (chipEl) {
+        var chipText = status === 'running' ? 'En proceso' : status === 'error' ? 'Error' : (data.last_sync_at ? ('Último sync: ' + relativeTime(data.last_sync_at)) : 'Aún no se ha sincronizado');
+        if (status === 'error' && data.message) chipEl.setAttribute('title', data.message);
+        else chipEl.removeAttribute('title');
+        var spinner = chipEl.querySelector('.spinner');
+        if (status === 'running') {
+          if (!spinner) { spinner = document.createElement('span'); spinner.className = 'spinner spinner--sm'; spinner.setAttribute('aria-hidden', 'true'); chipEl.insertBefore(spinner, chipEl.firstChild); }
           spinner.style.display = '';
+          var tail = chipEl.lastChild; if (tail && tail.nodeType === 3) chipEl.removeChild(tail);
+          chipEl.appendChild(document.createTextNode(' ' + chipText));
+        } else {
+          if (spinner) spinner.style.display = 'none';
+          chipEl.textContent = chipText;
+        }
+      }
+      if (metaEl) metaEl.textContent = data.last_sync_at ? ('Último sync: ' + relativeTime(data.last_sync_at)) : 'Aún no se ha sincronizado';
+      if (statusEl) {
+        statusEl.setAttribute('data-status', status);
+        var statusSpinner = statusEl.querySelector('.spinner');
+        if (data.status === 'running') {
+          if (!statusSpinner) { statusSpinner = document.createElement('span'); statusSpinner.className = 'spinner spinner--sm'; statusSpinner.setAttribute('aria-hidden', 'true'); statusEl.insertBefore(statusSpinner, statusEl.firstChild); }
+          statusSpinner.style.display = '';
           var txt = statusEl.lastChild; if (txt && txt.nodeType === 3) statusEl.removeChild(txt);
           statusEl.appendChild(document.createTextNode(' Sincronizando…'));
         } else {
-          if (spinner) spinner.style.display = 'none';
+          if (statusSpinner) statusSpinner.style.display = 'none';
           var t = statusEl.lastChild; if (t && t.nodeType === 3) statusEl.removeChild(t);
         }
       }
@@ -1158,7 +1552,7 @@
     function stopPolling() { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } }
 
     function fetchStatus() {
-      fetch('/portal/sat/status', { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+      (window.portalFetchWithTimeout ? window.portalFetchWithTimeout('/portal/sat/status', { credentials: 'same-origin', headers: { 'Accept': 'application/json' } }, 30000) : fetch('/portal/sat/status', { credentials: 'same-origin', headers: { 'Accept': 'application/json' } }))
         .then(function (r) { return r.json(); })
         .then(function (data) { if (data && data.ok) updateUI(data); })
         .catch(function () {});
@@ -1169,19 +1563,162 @@
       syncBtn.disabled = true;
       var label = syncBtn.querySelector('.list-sync-bar__btn-label') || syncBtn.querySelector('.fiel-submit__text') || syncBtn.childNodes[0];
       var origText = label ? label.textContent : syncBtn.textContent;
+      var loadingSpinner = syncBtn.querySelector('.list-sync-bar__btn-spinner');
+      if (!loadingSpinner) { loadingSpinner = document.createElement('span'); loadingSpinner.className = 'spinner spinner--sm list-sync-bar__btn-spinner'; loadingSpinner.setAttribute('aria-hidden', 'true'); syncBtn.insertBefore(loadingSpinner, syncBtn.firstChild); }
+      loadingSpinner.style.display = 'inline-block';
       if (label) label.textContent = loadingText;
-      fetch('/portal/sat/sync', { method: 'POST', credentials: 'same-origin', headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' } })
+      (window.portalFetchWithTimeout ? window.portalFetchWithTimeout('/portal/sat/sync', { method: 'POST', credentials: 'same-origin', headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' } }, 30000) : fetch('/portal/sat/sync', { method: 'POST', credentials: 'same-origin', headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' } }))
         .then(function (r) { return r.json(); })
         .then(function (data) {
-          if (data && data.ok) { fetchStatus(); updateUI({ status: 'running', last_sync_at: null }); }
-          else if (data && !data.ok && metaEl) metaEl.textContent = data.message || 'No se pudo iniciar.';
+          if (data && data.ok) {
+            fetchStatus();
+            updateUI({ status: 'running', last_sync_at: null });
+            if (window.uiSuccessOverlay) window.uiSuccessOverlay({ title: 'Sincronización iniciada', message: 'Los CFDI se están descargando en segundo plano. Puedes seguir usando el portal.', actions: [{ label: 'Entendido', onClick: function () { if (window.uiSuccessOverlayClose) window.uiSuccessOverlayClose(); } }] });
+            else if (window.portalToast) window.portalToast({ type: 'info', title: 'Sync iniciado', message: 'Los CFDI se descargan en segundo plano.' });
+          } else if (data && !data.ok) {
+            var errMsg = data.message || 'No se pudo iniciar.';
+            if (metaEl) metaEl.textContent = errMsg;
+            if (metaEl) metaEl.removeAttribute('aria-hidden');
+            if (chipEl) { chipEl.textContent = 'Error'; chipEl.title = errMsg; }
+            if (listBar) listBar.setAttribute('data-status', 'error');
+            if (window.portalToast) window.portalToast({ type: 'error', title: 'Sync', message: errMsg });
+            else if (window.uiSuccessOverlay) window.uiSuccessOverlay({ title: 'No se pudo sincronizar', message: errMsg, actions: [{ label: 'Entendido', onClick: function () { if (window.uiSuccessOverlayClose) window.uiSuccessOverlayClose(); } }] });
+          }
         })
-        .catch(function () { if (metaEl) metaEl.textContent = 'Error de conexión.'; })
-        .finally(function () { syncBtn.disabled = false; if (label) label.textContent = origText; });
+        .catch(function () {
+          if (metaEl) metaEl.textContent = 'Error de conexión.';
+          if (chipEl) { chipEl.textContent = 'Error'; chipEl.title = 'Error de conexión.'; }
+          if (listBar) listBar.setAttribute('data-status', 'error');
+        })
+        .finally(function () {
+          syncBtn.disabled = false;
+          if (label) label.textContent = origText;
+          var sp = syncBtn.querySelector('.list-sync-bar__btn-spinner');
+          if (sp) sp.style.display = 'none';
+        });
     });
 
     fetchStatus();
   })();
 </script>
+{% if dev_debug_panel|default(false) %}
+<div id="devDebugPanel" class="dev-debug-panel" aria-label="Panel de debug (solo desarrollo)" data-env="dev">
+  <button type="button" class="dev-debug-panel__toggle" id="devDebugPanelToggle" aria-expanded="false" aria-controls="devDebugPanelList" title="Ver últimos errores de peticiones (solo desarrollo)">Debug <span id="devDebugPanelCount">0</span></button>
+  <div id="devDebugPanelList" class="dev-debug-panel__list" hidden>
+    <div class="dev-debug-panel__head">
+      <span>Últimos errores de red</span>
+      <button type="button" class="dev-debug-panel__clear" id="devDebugPanelClear">Limpiar</button>
+    </div>
+    <p class="dev-debug-panel__hint muted">Endpoint, código de estado y hora. Útil para ver qué falló sin abrir consola.</p>
+    <ul id="devDebugPanelItems" class="dev-debug-panel__items"></ul>
+    <p id="devDebugPanelEmpty" class="dev-debug-panel__empty muted">Aún no hay errores. Las peticiones fallidas aparecerán aquí.</p>
+  </div>
+</div>
+<style>
+.dev-debug-panel { position: fixed; bottom: 16px; left: 16px; z-index: 9998; font-family: ui-sans-serif, system-ui, sans-serif; font-size: 12px; }
+.dev-debug-panel__toggle { padding: 10px 14px; background: #1e293b; color: #e2e8f0; border: none; border-radius: 10px; cursor: pointer; font-weight: 600; box-shadow: 0 4px 12px rgba(0,0,0,.2); }
+.dev-debug-panel__toggle:hover { background: #334155; }
+.dev-debug-panel__list { margin-top: 8px; max-width: 440px; max-height: 360px; overflow: auto; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,.15); padding: 14px; }
+.dev-debug-panel__head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-weight: 700; font-size: 13px; }
+.dev-debug-panel__hint { margin: 0 0 12px; font-size: 11px; line-height: 1.4; }
+.dev-debug-panel__clear { padding: 6px 10px; font-size: 12px; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 8px; cursor: pointer; font-weight: 500; }
+.dev-debug-panel__clear:hover { background: #e2e8f0; }
+.dev-debug-panel__items { list-style: none; margin: 0; padding: 0; }
+.dev-debug-panel__item { padding: 12px 0; border-bottom: 1px solid #f1f5f9; }
+.dev-debug-panel__item:last-child { border-bottom: none; }
+.dev-debug-panel__endpoint { word-break: break-all; color: #0f172a; font-weight: 600; font-size: 13px; }
+.dev-debug-panel__meta { margin-top: 6px; color: #64748b; font-size: 12px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.dev-debug-panel__meta code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; }
+.dev-debug-panel__status { font-weight: 600; }
+.dev-debug-panel__status--4xx { color: #b45309; }
+.dev-debug-panel__status--5xx { color: #b91c1c; }
+.dev-debug-panel__status--0 { color: #b91c1c; }
+.dev-debug-panel__empty { margin: 0; font-size: 12px; }
+</style>
+<script>
+(function() {
+  var panel = document.getElementById('devDebugPanel');
+  var toggle = document.getElementById('devDebugPanelToggle');
+  var list = document.getElementById('devDebugPanelList');
+  var countEl = document.getElementById('devDebugPanelCount');
+  var itemsEl = document.getElementById('devDebugPanelItems');
+  var emptyEl = document.getElementById('devDebugPanelEmpty');
+  var clearBtn = document.getElementById('devDebugPanelClear');
+
+  function statusLabel(status, statusText) {
+    if (status === 0) return { text: 'Error de red', cls: 'dev-debug-panel__status--0' };
+    var labels = {
+      400: 'Petición incorrecta',
+      401: 'No autorizado (sesión)',
+      403: 'Sin permiso',
+      404: 'No encontrado',
+      408: 'Tiempo agotado',
+      422: 'Datos no válidos',
+      500: 'Error del servidor',
+      502: 'Servidor no disponible',
+      503: 'Servicio no disponible'
+    };
+    var label = labels[status] || ('HTTP ' + status);
+    var cls = status >= 500 ? 'dev-debug-panel__status--5xx' : (status >= 400 ? 'dev-debug-panel__status--4xx' : '');
+    return { text: status + ' — ' + label, cls: cls };
+  }
+
+  function pathFromUrl(url) {
+    if (!url || typeof url !== 'string') return '(vacío)';
+    try {
+      var a = url.indexOf('//');
+      var start = a >= 0 ? url.indexOf('/', a + 2) : 0;
+      if (start < 0) return url;
+      var path = url.slice(start);
+      var q = path.indexOf('?');
+      return q >= 0 ? path.slice(0, q) : path;
+    } catch (e) { return url; }
+  }
+
+  function escapeHtml(s) {
+    if (s == null) return '';
+    var d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  function update() {
+    var errs = window.__devFetchErrors || [];
+    if (countEl) countEl.textContent = errs.length;
+    if (itemsEl) {
+      itemsEl.innerHTML = '';
+      errs.slice().reverse().forEach(function(e) {
+        var li = document.createElement('li');
+        li.className = 'dev-debug-panel__item';
+        var endpoint = pathFromUrl(e.url);
+        var fullUrl = (e.url && e.url !== endpoint) ? e.url : '';
+        var sl = statusLabel(e.status, e.statusText);
+        var method = (e.method || 'GET').toUpperCase();
+        li.innerHTML =
+          '<div class="dev-debug-panel__endpoint" title="' + escapeHtml(fullUrl) + '">' + escapeHtml(endpoint) + '</div>' +
+          '<div class="dev-debug-panel__meta">' +
+            '<code>' + escapeHtml(method) + '</code>' +
+            '<span class="dev-debug-panel__status ' + sl.cls + '">' + escapeHtml(sl.text) + '</span>' +
+            '<span>' + (e.time || '') + '</span>' +
+          '</div>';
+        itemsEl.appendChild(li);
+      });
+    }
+    if (emptyEl) emptyEl.hidden = errs.length > 0;
+  }
+  window.__devDebugPanelUpdate = update;
+  if (toggle && list) toggle.addEventListener('click', function() {
+    var open = list.hidden;
+    list.hidden = !open;
+    toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+  if (clearBtn) clearBtn.addEventListener('click', function() {
+    window.__devFetchErrors = [];
+    update();
+  });
+  update();
+})();
+</script>
+{% endif %}
   </body>
 </html>
