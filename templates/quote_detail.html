@@ -1,6 +1,6 @@
 {% extends "base_portal.html" %}
 {% set title = 'Cotización' %}
-{% set page_icon = '<svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M8 4h8v2H8z" stroke="currentColor" stroke-width="1.8"/><path d="M8 10h8v2H8z" stroke="currentColor" stroke-width="1.8"/><path d="M8 16h5" stroke="currentColor" stroke-width="1.8"/><path d="M6 2a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6H6z" stroke="currentColor" stroke-width="1.8"/><path d="M14 2v6h6" stroke="currentColor" stroke-width="1.8"/></svg>' %}
+{% set page_icon = '<svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M8 4h8v2H8z" stroke="currentColor" stroke-width="1.75"/><path d="M8 10h8v2H8z" stroke="currentColor" stroke-width="1.75"/><path d="M8 16h5" stroke="currentColor" stroke-width="1.75"/><path d="M6 2a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6H6z" stroke="currentColor" stroke-width="1.75"/><path d="M14 2v6h6" stroke="currentColor" stroke-width="1.75"/></svg>' %}
 
 {% macro status_badge(s) %}
   {% set st = (s|default('')|string)|lower %}
@@ -21,96 +21,101 @@
 
 {% block content %}
 <section class="page-section page-section--quote-detail">
-  <header class="app-header" style="margin-bottom:16px;">
+  <header class="app-header app-header--with-back">
     <div class="app-header__left">
-      <a href="/portal/cotizaciones" class="btn btn-ghost btn-small" style="text-decoration:none;">← Cotizaciones</a>
-      <div class="app-title" style="margin-top:8px;"></div>
+      <div class="portal-breadcrumb">
+        <a href="/portal/home">Inicio</a> / <a href="/portal/cotizaciones">Cotizaciones</a> / <span>Cotización {{ quote.folio or quote.id }}</span>
+      </div>
+      <a href="/portal/cotizaciones" class="btn btn-ghost btn-small app-header__back">← Cotizaciones</a>
+      <div class="app-title"></div>
       <div class="app-subtitle muted">Cotización {{ quote.folio or quote.id }}</div>
     </div>
     <div class="app-header__right">
+      <a href="/portal/quotations/{{ quote.id }}/pdf" class="btn btn-small btn-primary" target="_blank" rel="noopener">Ver PDF</a>
+      <a href="/portal/quotations/{{ quote.id }}/pdf?download=1" class="btn btn-small btn-ghost" download>Descargar PDF</a>
       {{ status_badge(quote.status) }}
     </div>
   </header>
 
   <div class="card p-20">
     <div class="quote-detail-meta">
-      <p class="muted" style="margin:0 0 8px;"><strong>Cliente:</strong> {{ quote.customer_legal_name }}</p>
-      {% if quote.customer_rfc %}<p class="muted" style="margin:0 0 8px;">RFC {{ quote.customer_rfc }}</p>{% endif %}
-      {% if quote.customer_email %}<p class="muted" style="margin:0 0 8px;">Email {{ quote.customer_email }}</p>{% endif %}
-      <p class="muted" style="margin:0;">Fecha: {{ quote.created_at[:10] if quote.created_at else '-' }}</p>
+      <p class="muted"><strong>Cliente:</strong> {{ quote.customer_legal_name }}</p>
+      {% if quote.customer_rfc %}<p class="muted">RFC {{ quote.customer_rfc }}</p>{% endif %}
+      {% if quote.customer_email %}<p class="muted">Email {{ quote.customer_email }}</p>{% endif %}
+      <p class="muted">Fecha: {{ quote.created_at[:10] if quote.created_at else '-' }}</p>
     </div>
 
-    <div style="overflow-x:auto; margin-top:16px;">
+    <div class="quote-detail-table-wrap">
       <table class="table">
         <thead>
           <tr>
             <th>Descripción</th>
-            <th style="text-align:right;">Cant.</th>
-            <th style="text-align:right;">P. unit.</th>
-            <th style="text-align:right;">Importe</th>
+            <th class="u-ta-right">Cant.</th>
+            <th class="u-ta-right">P. unit.</th>
+            <th class="u-ta-right">Importe</th>
           </tr>
         </thead>
         <tbody>
           {% for it in quote.items %}
           <tr>
             <td>{{ it.description }}</td>
-            <td style="text-align:right;">{{ '{:,.2f}'.format(it.quantity) }}</td>
-            <td style="text-align:right;">${{ '{:,.2f}'.format(it.unit_price) }}</td>
-            <td style="text-align:right;">${{ '{:,.2f}'.format(it.total_line) }}</td>
+            <td class="u-ta-right">{{ '{:,.2f}'.format(it.quantity) }}</td>
+            <td class="u-ta-right">${{ '{:,.2f}'.format(it.unit_price) }}</td>
+            <td class="u-ta-right">${{ '{:,.2f}'.format(it.total_line) }}</td>
           </tr>
           {% endfor %}
-          <tr style="border-top:2px solid var(--border); font-weight:700;">
-            <td colspan="3" style="text-align:right;">Subtotal</td>
-            <td style="text-align:right;">${{ '{:,.2f}'.format(quote.subtotal) }}</td>
+          <tr class="quote-detail-totals-row">
+            <td colspan="3" class="u-ta-right">Subtotal</td>
+            <td class="u-ta-right">${{ '{:,.2f}'.format(quote.subtotal) }}</td>
           </tr>
           <tr>
-            <td colspan="3" style="text-align:right;">IVA</td>
-            <td style="text-align:right;">${{ '{:,.2f}'.format(quote.iva_total) }}</td>
+            <td colspan="3" class="u-ta-right">IVA</td>
+            <td class="u-ta-right">${{ '{:,.2f}'.format(quote.iva_total) }}</td>
           </tr>
           <tr>
-            <td colspan="3" style="text-align:right;">Total (MXN)</td>
-            <td style="text-align:right;">${{ '{:,.2f}'.format(quote.total) }}</td>
+            <td colspan="3" class="u-ta-right">Total (MXN)</td>
+            <td class="u-ta-right">${{ '{:,.2f}'.format(quote.total) }}</td>
           </tr>
         </tbody>
       </table>
     </div>
 
     {% if quote.notes %}
-    <div class="quote-detail-notes muted" style="margin-top:16px; padding-top:16px; border-top:1px solid var(--border); font-size:13px; white-space:pre-wrap;">{{ quote.notes }}</div>
+    <div class="quote-detail-notes muted">{{ quote.notes }}</div>
     {% endif %}
 
     {% if quote.status == 'rejected' and quote.rejection_reason %}
-    <div class="quote-detail-rejected" style="margin-top:16px; padding:12px; background:rgba(185,28,28,.08); border-radius:12px; border:1px solid rgba(185,28,28,.2);">
+    <div class="quote-detail-rejected">
       <strong>Motivo de rechazo:</strong> {{ quote.rejection_reason }}
     </div>
     {% endif %}
 
     {% if quote.status == 'accepted' %}
-    <div class="quote-detail-accepted" style="margin-top:20px; padding:14px; background:rgba(33,193,107,.1); border-radius:12px; border:1px solid rgba(33,193,107,.3);">
-      <p style="margin:0 0 12px; font-weight:600;">Aceptada por el cliente</p>
-      <a href="/portal/create?quote_id={{ quote.id }}" class="btn btn-primary" style="text-decoration:none;">Facturar desde esta cotización</a>
+    <div class="quote-detail-accepted">
+      <p>Aceptada por el cliente</p>
+      <a href="/portal/create?quote_id={{ quote.id }}" class="btn btn-primary">Facturar desde esta cotización</a>
     </div>
     {% endif %}
   </div>
 
-  <div class="card p-20" style="margin-top:16px;">
-    <h3 class="section-title" style="margin:0 0 12px;">Vista previa PDF</h3>
-    <p class="muted" style="margin:0 0 12px; font-size:13px;">La cotización en formato PDF se muestra abajo. Puedes abrirlo en otra pestaña o descargarlo.</p>
-    <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:12px;">
-      <a href="/portal/quotations/{{ quote.id }}/pdf" class="btn btn-ghost" target="_blank" rel="noopener" style="text-decoration:none;">Abrir PDF en nueva pestaña</a>
-      <a href="/portal/quotations/{{ quote.id }}/pdf?download=1" class="btn btn-ghost" download style="text-decoration:none;">Descargar PDF</a>
+  <div class="card p-20 quote-detail-pdf-card">
+    <h3 class="section-title quote-detail-pdf-title">PDF</h3>
+    <p class="muted quote-detail-pdf-desc">Abre en otra pestaña o descarga la cotización en PDF.</p>
+    <div class="quote-detail-pdf-actions">
+      <a href="/portal/quotations/{{ quote.id }}/pdf" class="btn btn-primary" target="_blank" rel="noopener">Ver PDF</a>
+      <a href="/portal/quotations/{{ quote.id }}/pdf?download=1" class="btn btn--secondary" download>Descargar PDF</a>
       {% if quote.status == 'sent' or quote.status == 'draft' %}
-      <div style="display:flex; align-items:center; gap:8px;">
-        <input type="text" id="quoteLinkInput" class="input" readonly value="" style="width:280px;" />
+      <div class="quote-detail-link-row">
+        <input type="text" id="quoteLinkInput" class="input" readonly value="" />
         <button type="button" class="btn btn-ghost" id="quoteCopyLink">Copiar link</button>
       </div>
       {% endif %}
     </div>
-    <div class="quote-pdf-preview" style="border:1px solid var(--border); border-radius:12px; overflow:hidden; background:#f9f9f9;">
+    <div class="quote-pdf-preview">
       <iframe
         title="PDF Cotización {{ quote.folio or quote.id }}"
         src="/portal/quotations/{{ quote.id }}/pdf"
-        style="width:100%; height:min(80vh, 720px); border:none; display:block;"
+        class="quote-pdf-preview__frame"
       ></iframe>
     </div>
   </div>

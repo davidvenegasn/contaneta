@@ -4752,6 +4752,234 @@ body.no-scroll {
 .portal-breadcrumb a:hover {
   text-decoration: underline;
 }
+
+/* ======================================================
+   CFDI detail (mover desde template)
+   ====================================================== */
+.cfdi-detail-header {
+  margin-bottom: var(--space-4);
+}
+.cfdi-detail-header__top {
+  margin-bottom: var(--space-2);
+}
+.cfdi-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+.cfdi-detail-actions__title {
+  min-width: 0;
+}
+.cfdi-detail-title {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: var(--fw-bold);
+  letter-spacing: -0.02em;
+}
+.cfdi-detail-uuid {
+  margin: 4px 0 0;
+  font-size: var(--text-xs);
+  font-family: ui-monospace, monospace;
+  word-break: break-all;
+}
+.cfdi-detail-actions__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.cfdi-detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+  align-items: start;
+}
+.cfdi-detail-grid--narrow {
+  max-width: 560px;
+  margin-top: var(--space-6);
+}
+@media (max-width: 860px) {
+  .cfdi-detail-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.cfdi-detail-main.card,
+.cfdi-detail-side .card {
+  padding: var(--space-4);
+}
+.cfdi-detail-section-title {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-md);
+  font-weight: var(--fw-bold);
+  letter-spacing: -0.015em;
+}
+.cfdi-detail-dl {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.cfdi-detail-dl__row {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: var(--space-2);
+  align-items: baseline;
+}
+.cfdi-detail-dl__row dt {
+  font-size: var(--text-xs);
+  font-weight: var(--fw-semibold);
+}
+.cfdi-detail-dl__row dd {
+  margin: 0;
+  font-size: var(--text-base);
+}
+.cfdi-detail-total {
+  font-size: var(--text-lg);
+  font-weight: var(--fw-bold);
+}
+.cfdi-detail-name {
+  display: block;
+  font-weight: var(--fw-semibold);
+}
+.cfdi-detail-rfc {
+  display: block;
+  font-size: var(--text-xs);
+  font-family: ui-monospace, monospace;
+}
+.cfdi-detail-uuid-code {
+  font-size: var(--text-xs);
+  word-break: break-all;
+  background: var(--surface-hover);
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+.cfdi-detail-side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.cfdi-detail-concepto {
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.cfdi-detail-table {
+  font-size: var(--text-sm);
+}
+.cfdi-detail-table td {
+  padding: var(--space-2) var(--space-3);
+}
+.cfdi-detail-totals-row {
+  font-weight: var(--fw-bold);
+  border-top: 1px solid var(--border);
+}
+.cfdi-detail-notfound-card {
+  text-align: center;
+  padding: 2rem;
+}
+.cfdi-detail-notfound-desc {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+.cfdi-detail-no-xml {
+  font-size: var(--text-sm);
+}
+
+/* ======================================================
+   Cotización detail (evitar inline styles)
+   ====================================================== */
+.page-section--quote-detail .app-header {
+  margin-bottom: 16px;
+}
+.page-section--quote-detail .app-header__right {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.page-section--quote-detail .app-title {
+  margin-top: 8px;
+}
+.page-section--quote-detail .quote-detail-meta p {
+  margin: 0 0 8px;
+}
+.page-section--quote-detail .quote-detail-meta p:last-child {
+  margin-bottom: 0;
+}
+.page-section--quote-detail .quote-detail-table-wrap {
+  overflow-x: auto;
+  margin-top: 16px;
+}
+.page-section--quote-detail .quote-detail-totals-row {
+  border-top: 2px solid var(--border);
+  font-weight: 700;
+}
+.page-section--quote-detail .quote-detail-notes {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+  white-space: pre-wrap;
+}
+.page-section--quote-detail .quote-detail-rejected {
+  margin-top: 16px;
+  padding: 12px;
+  background: rgba(185,28,28,.08);
+  border-radius: 12px;
+  border: 1px solid rgba(185,28,28,.2);
+}
+.page-section--quote-detail .quote-detail-accepted {
+  margin-top: 20px;
+  padding: 14px;
+  background: rgba(33,193,107,.1);
+  border-radius: 12px;
+  border: 1px solid rgba(33,193,107,.3);
+}
+.page-section--quote-detail .quote-detail-accepted p {
+  margin: 0 0 12px;
+  font-weight: 600;
+}
+.page-section--quote-detail .quote-detail-pdf-card {
+  margin-top: 16px;
+}
+.page-section--quote-detail .quote-detail-pdf-title {
+  margin: 0 0 12px;
+}
+.page-section--quote-detail .quote-detail-pdf-desc {
+  margin: 0 0 12px;
+  font-size: 13px;
+}
+.page-section--quote-detail .quote-detail-pdf-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.page-section--quote-detail .quote-detail-link-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.page-section--quote-detail #quoteLinkInput {
+  width: 280px;
+  max-width: 100%;
+}
+.page-section--quote-detail .quote-pdf-preview {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  background: #f9f9f9;
+}
+.page-section--quote-detail .quote-pdf-preview__frame {
+  width: 100%;
+  height: min(80vh, 720px);
+  border: none;
+  display: block;
+}
 .datos-fiscales-list {
   margin: 0;
   display: flex;

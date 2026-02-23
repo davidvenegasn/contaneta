@@ -7,104 +7,237 @@
 {% endmacro %}
 
 {% macro money(x, m) %}
-  {% if x is not none %}${{ '{:,.2f}'.format(x|float) }} {{ m or 'MXN' }}{% else %}—{% endif %}
+  {% if x is not none and x != '' %}${{ '{:,.2f}'.format(x|float) }} {{ m or 'MXN' }}{% else %}—{% endif %}
 {% endmacro %}
 
-{% macro status_pill(s) %}
+{% macro safe(val) %}
+  {% if val is none %}{{ '—' }}{% elif val == '' %}{{ '—' }}{% else %}{{ val }}{% endif %}
+{% endmacro %}
+
+{% macro status_badge(s) %}
   {% set st = (s|default('')|string)|upper %}
   {% if st in ['V','VIGENTE','1'] %}
-    <span class="pill" style="border-color:#cfead9; background:#f3fcf6;">Vigente</span>
+    <span class="badge badge--success">Vigente</span>
   {% elif st in ['C','CANCELADO','0'] %}
-    <span class="pill" style="border-color:#f2c9c9; background:#fff4f4;">Cancelada</span>
+    <span class="badge badge--danger">Cancelada</span>
+  {% elif 'CANCELACION' in st or 'CANCELACIÓN' in st %}
+    <span class="badge badge--warn">En cancelación</span>
   {% elif st in ['NO ENCONTRADO',''] or not s %}
-    <span class="pill" style="border-color:#e0e0e0; background:#f5f5f5;">{{ s or 'Sin estatus' }}</span>
+    <span class="badge badge--neutral">Sin estatus</span>
   {% else %}
-    <span class="pill">{{ s }}</span>
+    <span class="badge badge--neutral">{{ s }}</span>
   {% endif %}
 {% endmacro %}
 
 {% block content %}
-  <header class="app-header" style="margin-bottom:16px;">
-    <div class="app-header__left">
-      <a href="{{ '/portal/invoices/issued' if direction == 'issued' else '/portal/invoices/received' }}" class="btn btn-ghost" style="text-decoration:none; margin-bottom:8px;">
-        ← Volver al listado
-      </a>
-      <div class="app-title">Detalle del CFDI</div>
-      <div class="app-subtitle muted">UUID: {{ cfdi.uuid or '—' }}</div>
+  {% if error == 'not_found' %}
+  <header class="cfdi-detail-header">
+    <div class="cfdi-detail-header__top">
+      <div class="portal-breadcrumb">
+        <a href="/portal/home">Inicio</a> /
+        <a href="{{ '/portal/invoices/issued' if direction == 'issued' else '/portal/invoices/received' }}">{{ 'Facturas emitidas' if direction == 'issued' else 'Facturas recibidas' }}</a>
+        / <span>Detalle CFDI</span>
+      </div>
+      <a href="{{ '/portal/invoices/issued' if direction == 'issued' else '/portal/invoices/received' }}" class="btn btn--ghost btn--sm">← Volver al listado</a>
+    </div>
+  </header>
+  <div class="cfdi-detail-grid cfdi-detail-grid--narrow">
+    <div class="card cfdi-detail-notfound-card">
+      <p class="muted u-m0">CFDI no encontrado</p>
+      <p class="cfdi-detail-notfound-desc u-mt-4">El comprobante con UUID <code>{{ requested_uuid or '—' }}</code> no existe o no tienes permiso para verlo.</p>
+      <a href="{{ '/portal/invoices/issued' if direction == 'issued' else '/portal/invoices/received' }}" class="btn btn--primary u-mt-4">Ir al listado</a>
+    </div>
+  </div>
+  {% else %}
+  <header class="cfdi-detail-header">
+    <div class="cfdi-detail-header__top">
+      <div class="portal-breadcrumb">
+        <a href="/portal/home">Inicio</a> /
+        <a href="{{ '/portal/invoices/issued' if direction == 'issued' else '/portal/invoices/received' }}">{{ 'Facturas emitidas' if direction == 'issued' else 'Facturas recibidas' }}</a>
+        / <span>Detalle CFDI</span>
+      </div>
+      <a href="{{ '/portal/invoices/issued' if direction == 'issued' else '/portal/invoices/received' }}" class="btn btn--ghost btn--sm">← Volver al listado</a>
+    </div>
+
+    <!-- Acciones arriba -->
+    <div class="cfdi-detail-actions">
+      <div class="cfdi-detail-actions__title">
+        <h1 class="cfdi-detail-title">Detalle del CFDI</h1>
+        <div class="uuid-copy-wrap cfdi-detail-uuid-wrap">
+          <span class="cfdi-detail-uuid muted uuid-copy-wrap__text">{{ cfdi.uuid or '—' }}</span>
+          {% if cfdi.uuid %}
+          <button type="button" class="uuid-copy-btn" data-copy-uuid="{{ cfdi.uuid | e }}" aria-label="Copiar UUID" title="Copiar UUID"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+          {% endif %}
+        </div>
+      </div>
+      <div class="cfdi-detail-actions__buttons">
+        {% if cfdi.xml_path %}
+          <a href="/portal/sat/xml/{{ cfdi.uuid }}" class="btn btn--sm" target="_blank" rel="noopener" data-download-toast>Descargar XML</a>
+          <a href="/portal/sat/pdf/{{ cfdi.uuid }}?dl=1" class="btn btn--sm btn--secondary" download data-download-toast>Descargar PDF</a>
+          <button type="button" class="btn btn--sm btn--ghost" data-pdf-url="/portal/sat/pdf/{{ cfdi.uuid }}" title="Ver PDF">Ver PDF</button>
+        {% else %}
+          <span class="muted cfdi-detail-no-xml">Sin XML almacenado</span>
+          {% if cfdi.xml_status == 'pending' %}
+            <span class="badge badge--neutral">Descargando…</span>
+          {% elif cfdi.xml_status == 'error' %}
+            <span class="badge badge--danger">Error XML</span>
+          {% endif %}
+        {% endif %}
+        <button type="button" class="btn btn--sm btn--ghost" id="copyUuidBtn" data-uuid="{{ cfdi.uuid or '' }}" title="Copiar UUID">Copiar UUID</button>
+        <a href="{{ request.url }}" class="btn btn--sm btn--ghost" target="_blank" rel="noopener" title="Abrir en nueva pestaña">Abrir en nueva pestaña</a>
+      </div>
     </div>
   </header>
 
-  <div class="card" style="margin-bottom:16px;">
-    <div class="card-title-row">
-      <h3 class="section-title">Datos del comprobante</h3>
+  <div class="cfdi-detail-grid">
+    <!-- Columna izquierda: datos principales -->
+    <div class="cfdi-detail-main card">
+      <h2 class="cfdi-detail-section-title">Datos del comprobante</h2>
+      <dl class="cfdi-detail-dl">
+        <div class="cfdi-detail-dl__row">
+          <dt class="muted">UUID</dt>
+          <dd class="uuid-copy-wrap">
+            <code class="cfdi-detail-uuid-code">{{ cfdi.uuid or '—' }}</code>
+            {% if cfdi.uuid %}
+            <button type="button" class="uuid-copy-btn" data-copy-uuid="{{ cfdi.uuid | e }}" aria-label="Copiar UUID" title="Copiar UUID"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+            {% endif %}
+          </dd>
+        </div>
+        <div class="cfdi-detail-dl__row">
+          <dt class="muted">Fecha de emisión</dt>
+          <dd>{{ date_dd_mm_yyyy(cfdi.fecha_emision) }}</dd>
+        </div>
+        <div class="cfdi-detail-dl__row">
+          <dt class="muted">Total</dt>
+          <dd class="cfdi-detail-total">{{ money(cfdi.total, cfdi.moneda) }}</dd>
+        </div>
+        <div class="cfdi-detail-dl__row">
+          <dt class="muted">Emisor</dt>
+          <dd>
+            <span class="cfdi-detail-name">{{ safe(cfdi.nombre_emisor) }}</span>
+            <span class="muted cfdi-detail-rfc">{{ safe(cfdi.rfc_emisor) }}</span>
+          </dd>
+        </div>
+        <div class="cfdi-detail-dl__row">
+          <dt class="muted">Receptor</dt>
+          <dd>
+            <span class="cfdi-detail-name">{{ safe(cfdi.nombre_receptor) }}</span>
+            <span class="muted cfdi-detail-rfc">{{ safe(cfdi.rfc_receptor) }}</span>
+          </dd>
+        </div>
+        <div class="cfdi-detail-dl__row">
+          <dt class="muted">Serie / Folio</dt>
+          <dd>{{ safe(cfdi.serie) }} / {{ safe(cfdi.folio) }}</dd>
+        </div>
+        <div class="cfdi-detail-dl__row">
+          <dt class="muted">Forma de pago</dt>
+          <dd>{{ safe(cfdi.forma_pago) }}</dd>
+        </div>
+        <div class="cfdi-detail-dl__row">
+          <dt class="muted">Método de pago</dt>
+          <dd>{{ safe(cfdi.metodo_pago) }}</dd>
+        </div>
+        <div class="cfdi-detail-dl__row">
+          <dt class="muted">Uso CFDI</dt>
+          <dd>{{ safe(cfdi.uso_cfdi) }}</dd>
+        </div>
+        <div class="cfdi-detail-dl__row">
+          <dt class="muted">Estatus SAT</dt>
+          <dd>{{ status_badge(cfdi.status) }}</dd>
+        </div>
+        {% if cfdi.tipo_comprobante is not none and cfdi.tipo_comprobante != '' %}
+        <div class="cfdi-detail-dl__row">
+          <dt class="muted">Tipo comprobante</dt>
+          <dd>{{ cfdi.tipo_comprobante }}</dd>
+        </div>
+        {% endif %}
+      </dl>
     </div>
-    <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap:16px;">
-      <div>
-        <div class="muted" style="font-size:12px;">Emisor</div>
-        <div style="font-weight:600;">{{ cfdi.nombre_emisor or '—' }}</div>
-        <div class="muted" style="font-size:12px;">{{ cfdi.rfc_emisor or '' }}</div>
+
+    <!-- Columna derecha: conceptos e impuestos -->
+    <div class="cfdi-detail-side">
+      <div class="card cfdi-detail-card">
+        <h3 class="cfdi-detail-section-title">Concepto</h3>
+        <div class="cfdi-detail-concepto">
+          {{ cfdi.concepto or '—' }}
+        </div>
       </div>
-      <div>
-        <div class="muted" style="font-size:12px;">Receptor</div>
-        <div style="font-weight:600;">{{ cfdi.nombre_receptor or '—' }}</div>
-        <div class="muted" style="font-size:12px;">{{ cfdi.rfc_receptor or '' }}</div>
+
+      <div class="card cfdi-detail-card">
+        <h3 class="cfdi-detail-section-title">Desglose</h3>
+        <div class="table-wrap">
+          <table class="table cfdi-detail-table">
+            <tbody>
+              <tr>
+                <td class="muted">Subtotal</td>
+                <td class="u-ta-right">{{ money(cfdi.subtotal, cfdi.moneda) }}</td>
+              </tr>
+              {% if cfdi.descuento is not none and (cfdi.descuento|float) != 0 %}
+              <tr>
+                <td class="muted">Descuento</td>
+                <td class="u-ta-right">{{ money(cfdi.descuento, cfdi.moneda) }}</td>
+              </tr>
+              {% endif %}
+              <tr>
+                <td class="muted">Impuestos</td>
+                <td class="u-ta-right">{{ money(cfdi.impuestos, cfdi.moneda) }}</td>
+              </tr>
+              {% if cfdi.retenciones is not none and (cfdi.retenciones|float) != 0 %}
+              <tr>
+                <td class="muted">Retenciones</td>
+                <td class="u-ta-right">{{ money(cfdi.retenciones, cfdi.moneda) }}</td>
+              </tr>
+              {% endif %}
+              <tr class="cfdi-detail-totals-row">
+                <td>Total</td>
+                <td class="u-ta-right">{{ money(cfdi.total, cfdi.moneda) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
-      <div>
-        <div class="muted" style="font-size:12px;">Fecha de emisión</div>
-        <div>{{ date_dd_mm_yyyy(cfdi.fecha_emision) }}</div>
-      </div>
-      <div>
-        <div class="muted" style="font-size:12px;">Total</div>
-        <div style="font-weight:650;">{{ money(cfdi.total, cfdi.moneda) }}</div>
-      </div>
-      <div>
-        <div class="muted" style="font-size:12px;">Serie / Folio</div>
-        <div>{{ cfdi.serie or '—' }} / {{ cfdi.folio or '—' }}</div>
-      </div>
-      <div>
-        <div class="muted" style="font-size:12px;">Forma y método de pago</div>
-        <div>{{ cfdi.forma_pago or '—' }} / {{ cfdi.metodo_pago or '—' }}</div>
-      </div>
-      <div>
-        <div class="muted" style="font-size:12px;">Uso CFDI</div>
-        <div>{{ cfdi.uso_cfdi or '—' }}</div>
-      </div>
-      <div>
-        <div class="muted" style="font-size:12px;">Estatus SAT</div>
-        <div>{{ status_pill(cfdi.status) }}</div>
-      </div>
-      {% if cfdi.subtotal is not none or cfdi.impuestos is not none %}
-      <div>
-        <div class="muted" style="font-size:12px;">Subtotal / IVA</div>
-        <div>{{ money(cfdi.subtotal, cfdi.moneda) }} / {{ money(cfdi.impuestos, cfdi.moneda) }}</div>
-      </div>
-      {% endif %}
     </div>
-    {% if cfdi.concepto %}
-    <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--border, #eee);">
-      <div class="muted" style="font-size:12px;">Concepto</div>
-      <div>{{ cfdi.concepto }}</div>
-    </div>
-    {% endif %}
   </div>
 
-  <div class="card">
-    <div class="card-title-row">
-      <h3 class="section-title">Descargas</h3>
-    </div>
-    <div class="btn-group" style="flex-wrap:wrap; gap:10px;">
-      {% if cfdi.xml_path %}
-        <a href="/portal/sat/xml/{{ cfdi.uuid }}" class="btn" target="_blank" rel="noopener" style="text-decoration:none;">Descargar XML</a>
-        <button type="button" class="btn" data-pdf-url="/portal/sat/pdf/{{ cfdi.uuid }}">Ver PDF</button>
-        <a href="/portal/sat/pdf/{{ cfdi.uuid }}?dl=1" class="btn" style="text-decoration:none;">Descargar PDF</a>
-      {% else %}
-        <span class="muted">Sin XML almacenado para este CFDI. No hay descarga disponible.</span>
-        {% if cfdi.xml_status == 'pending' %}
-          <span class="pill" style="font-size:12px;">Descargando...</span>
-        {% elif cfdi.xml_status == 'error' %}
-          <span class="pill" style="font-size:12px; color:#c00;">Error al obtener XML</span>
-        {% endif %}
-      {% endif %}
-    </div>
-  </div>
+  <script>
+  (function() {
+    function copyUuidAndToast(uuid) {
+      if (!uuid || !navigator.clipboard || !navigator.clipboard.writeText) return;
+      navigator.clipboard.writeText(uuid).then(function() {
+        var toast = window.portalToast || window.uiToast;
+        if (toast) toast({ type: 'success', title: 'Copiado', message: '', timeout: 2000 });
+      }).catch(function() {
+        if (window.portalToast) window.portalToast({ type: 'danger', title: 'Error', message: 'No se pudo copiar' });
+      });
+    }
+    var copyBtn = document.getElementById('copyUuidBtn');
+    if (copyBtn) {
+      copyBtn.addEventListener('click', function() {
+        var uuid = (copyBtn.getAttribute('data-uuid') || '').trim();
+        if (uuid) copyUuidAndToast(uuid);
+      });
+    }
+    document.addEventListener('click', function(e) {
+      var btn = e.target && e.target.closest ? e.target.closest('[data-copy-uuid]') : null;
+      if (btn) {
+        e.preventDefault();
+        e.stopPropagation();
+        copyUuidAndToast((btn.getAttribute('data-copy-uuid') || '').trim());
+      }
+    });
+    document.addEventListener('click', function(e) {
+      var btn = e.target && e.target.closest ? e.target.closest('[data-pdf-url]') : null;
+      if (btn) {
+        var url = btn.getAttribute('data-pdf-url');
+        if (window.openPdfModal) window.openPdfModal(url);
+        return;
+      }
+      var dl = e.target && e.target.closest ? e.target.closest('[data-download-toast]') : null;
+      if (dl && window.portalToast) window.portalToast({ type: 'success', title: 'Descargado', message: 'El archivo se está descargando.' });
+    });
+  })();
+  </script>
+  {% endif %}
+
+  {# estilos movidos a static/css/portal.css #}
 {% endblock %}
