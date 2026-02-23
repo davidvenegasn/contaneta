@@ -24,30 +24,30 @@
       </div>
       <div class="card-header__right">
         <h3 class="section-title">Listado</h3>
-        <p class="muted" style="margin:0;"><span id="prodCount">Cargando…</span></p>
+        <p class="muted u-m0"><span id="prodCount">Cargando…</span></p>
       </div>
     </div>
     <p class="card-legend muted">Guarda productos y servicios (conceptos) para reutilizarlos al generar facturas. Incluye descripción, Clave ProdServ, unidad SAT, precio e IVA.</p>
 
     <div class="card-list-sep">
-    <div style="overflow:auto;" id="prodTableWrap">
-      <table class="table ui-table" id="prodTable" style="min-width:1000px;">
+    <div class="table-wrap" id="prodTableWrap">
+      <table class="table ui-table" id="prodTable">
         <thead>
           <tr>
-            <th style="min-width:220px;">Descripción</th>
-            <th style="min-width:160px;">Clave ProdServ</th>
-            <th style="min-width:120px;">Unidad</th>
-            <th style="min-width:120px;">Precio unit.</th>
-            <th style="min-width:90px;">IVA</th>
-            <th style="min-width:200px;">Acciones</th>
+            <th>Descripción</th>
+            <th>Clave ProdServ</th>
+            <th>Unidad</th>
+            <th>Precio unit.</th>
+            <th>IVA</th>
+            <th>Acciones</th>
           </tr>
         </thead>
         <tbody id="prodTbody">
-          <tr><td colspan="6"><div class="skeleton" style="height: 46px; border-radius: 14px;"></div></td></tr>
-          <tr><td colspan="6"><div class="skeleton" style="height: 46px; border-radius: 14px;"></div></td></tr>
-          <tr><td colspan="6"><div class="skeleton" style="height: 46px; border-radius: 14px;"></div></td></tr>
-          <tr><td colspan="6"><div class="skeleton" style="height: 46px; border-radius: 14px;"></div></td></tr>
-          <tr><td colspan="6"><div class="skeleton" style="height: 46px; border-radius: 14px;"></div></td></tr>
+          <tr><td colspan="6"><div class="skeleton skeleton--row-46"></div></td></tr>
+          <tr><td colspan="6"><div class="skeleton skeleton--row-46"></div></td></tr>
+          <tr><td colspan="6"><div class="skeleton skeleton--row-46"></div></td></tr>
+          <tr><td colspan="6"><div class="skeleton skeleton--row-46"></div></td></tr>
+          <tr><td colspan="6"><div class="skeleton skeleton--row-46"></div></td></tr>
         </tbody>
       </table>
     </div>
@@ -262,7 +262,7 @@
         <td class="muted">${iva}</td>
         <td>
           <button type="button" class="btn btn-small btn-ghost" data-copy="${esc(r.product_key)}">Copiar clave</button>
-          <a href="${createUrl}" class="btn btn-small" style="text-decoration:none;">Usar en factura</a>
+          <a href="${createUrl}" class="btn btn-small">Usar en factura</a>
           <button type="button" class="btn btn-small btn-ghost prod-delete-btn" data-delete-id="${r.id}" data-delete-desc="${esc(r.description || r.product_key || '')}" title="Eliminar producto" aria-label="Eliminar producto">
             <svg class="icon icon-trash" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 7h16v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7z" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </button>
@@ -330,7 +330,7 @@
     if (loadErrorEl) loadErrorEl.hidden = true;
     if (emptyEl) { emptyEl.hidden = true; emptyEl.style.display = 'none'; }
     if (tableWrap) { tableWrap.hidden = false; tableWrap.style.display = ''; }
-    tbody.innerHTML = (window.uiSkeletonTableRows && window.uiSkeletonTableRows(6, 5)) || '<tr><td colspan="6"><div class="skeleton" style="height: 46px; border-radius: 14px;"></div></td></tr>'.repeat(5);
+    tbody.innerHTML = (window.uiSkeletonTableRows && window.uiSkeletonTableRows(6, 5)) || '<tr><td colspan="6"><div class="skeleton skeleton--row-46"></div></td></tr>'.repeat(5);
     try {
       if (window.portalProgressBar) window.portalProgressBar.start();
       const r = window.uiFetchJSON ? await window.uiFetchJSON('/api/products') : { ok: false, status: 0, data: null, error: 'Helper no disponible' };

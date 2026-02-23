@@ -1,18 +1,15 @@
 {% extends "base_portal.html" %}
 
 {% set title = 'Facturas recibidas' %}
-{% set page_icon = '<svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 2v5a1 1 0 0 0 1 1h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 18v-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="m9 15 3 3 3-3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>' %}
+{% set page_icon = '<svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 2v5a1 1 0 0 0 1 1h5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 18v-6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/><path d="m9 15 3 3 3-3" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>' %}
 
 {% block content %}
-  {% if has_fiel_validated is defined and sat_sync_status is defined %}
-    {% include "portal_list_sync_bar.html" %}
-  {% endif %}
-  <div class="card ym-card" style="margin-bottom: var(--space-4);">
-    <div class="ym-selector" style="margin-bottom: var(--space-3);">
+  <div class="card ym-card">
+    <div class="ym-selector">
       {{ month_picker('/portal/invoices/received', token, ym, ym_label) }}
     </div>
     {% set mt = month_totals|default({}) %}
-    <div class="dashboard-metrics" style="margin:0;">
+    <div class="dashboard-metrics">
       <div class="card metric-card">
         <div class="metric-label">Total egresos</div>
         <div class="metric-value">${{ '{:,.2f}'.format(mt.total_base|default(0)) }}</div>
@@ -37,8 +34,11 @@
     <div class="card__header card__header--row ui-card__header">
       <h3 class="card__title section-title">Facturas recibidas</h3>
       <div class="card__header-actions card__header-actions--wrap">
+        {% if has_fiel_validated is defined and sat_sync_status is defined %}
+          {% include "portal_list_sync_bar.html" %}
+        {% endif %}
         <button type="button" class="btn btn--sm btn--ghost filters-toggle" id="filtersToggleBtn" aria-expanded="false" aria-controls="filtersPanel">
-          <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true" width="18" height="18"><path d="M4 6h16M4 12h10M4 18h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true" width="18" height="18"><path d="M4 6h16M4 12h10M4 18h6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
           <span>Filtros</span>
           <span class="filters-toggle__badge" id="filtersBadge" aria-hidden="true"></span>
         </button>
@@ -49,7 +49,7 @@
     <div class="filters-panel" id="filtersPanel" hidden aria-hidden="true">
       <div class="filters-panel__inner">
         <div class="filters-panel__search">
-          <svg class="icon filters-panel__search-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" stroke="currentColor" stroke-width="1.8"/><path d="M16.2 16.2 21 21" stroke="currentColor" stroke-width="1.8"/></svg>
+          <svg class="icon filters-panel__search-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" stroke="currentColor" stroke-width="1.75"/><path d="M16.2 16.2 21 21" stroke="currentColor" stroke-width="1.75"/></svg>
           <input type="search" id="searchInput" class="input input--compact" placeholder="Buscar UUID, RFC, concepto..." />
         </div>
         <div class="filters-panel__row">
@@ -72,56 +72,60 @@
       </div>
     </div>
 
-    <div class="card__body ui-card__body" style="padding-top: 0;">
+    <div class="card__body ui-card__body">
       <!-- Tabla -->
       <div class="table-wrap ui-table-wrap" id="tableWrap">
-        <table class="table table--zebra ui-table ui-table--zebra" id="invoicesTable" style="min-width: 1200px;">
+        <table class="table table--zebra ui-table ui-table--zebra" id="invoicesTable">
           <thead>
             <tr>
-              <th style="min-width: 100px;">Fecha</th>
-              <th style="min-width: 200px;">Emisor</th>
-              <th style="min-width: 220px;">Concepto</th>
-              <th style="min-width: 140px;">UUID</th>
-              <th style="min-width: 110px;">Total</th>
-              <th style="min-width: 100px;">IVA pagado</th>
-              <th style="min-width: 80px;">Pago</th>
-              <th style="min-width: 100px;">Estatus</th>
-              <th style="min-width: 200px; text-align: right;">Acciones</th>
+              <th>Fecha</th>
+              <th>Emisor</th>
+              <th>Concepto</th>
+              <th>UUID</th>
+              <th>Total</th>
+              <th>IVA pagado</th>
+              <th>Pago</th>
+              <th>Estatus</th>
+              <th>Acciones</th>
             </tr>
           </thead>
           <tbody id="tableBody">
-            <tr>
-              <td colspan="9">
-                <div class="skeleton" style="height: 46px; border-radius: 14px;"></div>
-              </td>
-            </tr>
+            <tr><td colspan="9"><div class="skeleton skeleton--row-46"></div></td></tr>
+            <tr><td colspan="9"><div class="skeleton skeleton--row-46"></div></td></tr>
+            <tr><td colspan="9"><div class="skeleton skeleton--row-46"></div></td></tr>
+            <tr><td colspan="9"><div class="skeleton skeleton--row-46"></div></td></tr>
+            <tr><td colspan="9"><div class="skeleton skeleton--row-46"></div></td></tr>
           </tbody>
         </table>
       </div>
 
-      <!-- Lista en cards para móvil -->
-      <div class="invoice-list-mobile" id="invoiceListMobile" aria-label="Lista de facturas recibidas"></div>
+      <!-- Lista en cards para móvil; P27 skeleton inicial para no salto -->
+      <div class="invoice-list-mobile" id="invoiceListMobile" aria-label="Lista de facturas recibidas">
+        <div class="invoice-card-mobile"><div class="skeleton skeleton--card-72"></div></div>
+        <div class="invoice-card-mobile"><div class="skeleton skeleton--card-72"></div></div>
+        <div class="invoice-card-mobile"><div class="skeleton skeleton--card-72"></div></div>
+      </div>
 
       <!-- Paginación -->
-      <div class="pagination" id="pagination" style="display: none; margin-top: var(--space-4); padding-top: var(--space-3); border-top: 1px solid var(--border); justify-content: space-between; align-items: center;">
-        <div class="pagination__info" style="font-size: var(--text-sm); color: var(--text-muted);"></div>
-        <div class="pagination__controls" style="display: flex; gap: var(--space-2); align-items: center;">
+      <div class="pagination" id="pagination" hidden>
+        <div class="pagination__info"></div>
+        <div class="pagination__controls">
           <button type="button" class="btn btn--sm btn--ghost" id="prevPageBtn" disabled>Anterior</button>
-          <span class="pagination__page" style="font-size: var(--text-sm); font-weight: var(--fw-semibold);"></span>
+          <span class="pagination__page"></span>
           <button type="button" class="btn btn--sm btn--ghost" id="nextPageBtn" disabled>Siguiente</button>
         </div>
       </div>
 
       <!-- Error de carga -->
-      <div class="empty-state" id="loadErrorState" hidden aria-live="polite">
-        <div class="empty-state__title">No se pudo cargar el listado</div>
-        <p class="empty-state__desc" id="loadErrorStateMsg">Revisa tu conexión e intenta de nuevo.</p>
+      <div class="empty-state empty-state--error" id="loadErrorState" hidden aria-live="polite">
+        <div class="empty-state__title">No pudimos cargar esto ahora.</div>
+        <p class="empty-state__desc" id="loadErrorStateMsg">Puedes intentar de nuevo.</p>
         <button type="button" class="btn btn--secondary" id="loadErrorStateRetry">Reintentar</button>
       </div>
       <!-- Empty state (0 facturas este mes) -->
-      <div class="empty-state" id="emptyState" hidden>
+      <div class="empty-state empty-state--empty" id="emptyState" hidden>
         <div class="empty-state__icon" aria-hidden="true">
-          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
             <path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/>
             <path d="M14 2v5a1 1 0 0 0 1 1h5"/>
             <path d="M12 18v-6"/>
@@ -137,15 +141,45 @@
     </div>
   </div>
 
+  <!-- Drawer detalle CFDI (P41) -->
+  <!-- P41: Drawer detalle CFDI — click fila/card o "Detalle" abre sin recargar; ESC, overlay, scroll interno -->
+  <div class="ui-overlay cfdi-drawer-overlay" id="cfdiDrawerOverlay" hidden aria-hidden="true">
+    <div class="ui-overlay__backdrop" id="cfdiDrawerBackdrop"></div>
+    <div class="ui-drawer cfdi-drawer" role="dialog" aria-labelledby="cfdiDrawerTitle" aria-modal="true">
+      <div class="cfdi-drawer__header">
+        <h2 id="cfdiDrawerTitle" class="cfdi-drawer__title">Detalle CFDI</h2>
+        <button type="button" class="ui-drawer__close cfdi-drawer__close" id="cfdiDrawerClose" aria-label="Cerrar">&times;</button>
+      </div>
+      <div class="cfdi-drawer__body">
+        <dl class="cfdi-drawer__grid">
+          <dt>UUID</dt><dd id="cfdiDrawerUuid" class="cfdi-drawer__uuid"></dd>
+          <dt id="cfdiDrawerPartyLabel">Emisor</dt><dd id="cfdiDrawerParty"></dd>
+          <dt>Concepto</dt><dd id="cfdiDrawerConcepto"></dd>
+          <dt>Total</dt><dd id="cfdiDrawerTotal"></dd>
+          <dt>IVA</dt><dd id="cfdiDrawerIva"></dd>
+          <dt>Estatus</dt><dd id="cfdiDrawerStatus"></dd>
+        </dl>
+      </div>
+      <div class="cfdi-drawer__footer">
+        <button type="button" class="btn btn--sm btn--ghost" id="cfdiDrawerCopyUuid">Copiar UUID</button>
+        <a id="cfdiDrawerXml" href="#" target="_blank" rel="noopener" class="btn btn--sm" style="text-decoration:none; display:none;">XML</a>
+        <button type="button" class="btn btn--sm" id="cfdiDrawerPdf" data-pdf-url="" style="display:none;">PDF</button>
+        <a id="cfdiDrawerFullPage" href="#" class="btn btn--sm btn--ghost" style="text-decoration:none;">Ver página completa</a>
+      </div>
+    </div>
+  </div>
+
 <script>
 (function() {
   const API_BASE = '/api/invoices/received';
   const currentYM = '{{ ym }}';
+  const CFDI_DIRECTION = 'received';
   let currentPage = 1;
   const perPage = 50;
   let filters = {};
   let debounceTimer = null;
   let currentPagination = null;
+  let lastRenderedRows = [];
 
   // Parse URL params
   function parseURLParams() {
@@ -222,19 +256,20 @@
 
   // Load data from API
   async function loadData() {
+    var skeletonShownAt = Date.now();
     const tableBody = document.getElementById('tableBody');
     const tableWrap = document.getElementById('tableWrap');
     const emptyState = document.getElementById('emptyState');
     const pagination = document.getElementById('pagination');
     
-    tableBody.innerHTML = (window.uiSkeletonTableRows && window.uiSkeletonTableRows(9, 5)) || '<tr><td colspan="9"><div class="skeleton" style="height: 46px; border-radius: 14px;"></div></td></tr>';
+    tableBody.innerHTML = (window.uiSkeletonTableRows && window.uiSkeletonTableRows(9, 5)) || '<tr><td colspan="9"><div class="skeleton" style="height: 46px; border-radius: 14px;"></div></td></tr>'.repeat(5);
     tableWrap.style.display = '';
     var mobileList = document.getElementById('invoiceListMobile');
-    if (mobileList) mobileList.innerHTML = '<div class="invoice-card-mobile"><div class="skeleton" style="height:72px;border-radius:12px;"></div></div><div class="invoice-card-mobile"><div class="skeleton" style="height:72px;border-radius:12px;"></div></div><div class="invoice-card-mobile"><div class="skeleton" style="height:72px;border-radius:12px;"></div></div>';
+    if (mobileList) mobileList.innerHTML = (window.uiSkeletonCards && window.uiSkeletonCards(3)) || '<div class="invoice-card-mobile"><div class="skeleton" style="height:72px;border-radius:12px;"></div></div>'.repeat(3);
     emptyState.hidden = true;
     var loadErr0 = document.getElementById('loadErrorState');
     if (loadErr0) loadErr0.hidden = true;
-    pagination.style.display = 'none';
+    pagination.hidden = true;
 
     const params = new URLSearchParams();
     params.set('ym', filters.ym || currentYM);
@@ -247,10 +282,34 @@
     params.set('per_page', perPage.toString());
 
     try {
-      const res = await fetch(`${API_BASE}?${params.toString()}`);
-      if (!res.ok) {
-        const data = await res.json().catch(function() { return {}; });
-        const msg = window.portalListLoadErrorMessage ? window.portalListLoadErrorMessage(res, data, 'recibidas') : (window.portalApiErrorMessage && window.portalApiErrorMessage(data)) || 'Revisa tu conexión e intenta de nuevo.';
+      if (window.portalProgressBar) window.portalProgressBar.start();
+      const r = window.uiFetchJSON ? await window.uiFetchJSON(`${API_BASE}?${params.toString()}`) : { ok: false, status: 0, data: null, error: 'Helper no disponible' };
+      var list = (r.data && r.data.data) ? r.data.data : [];
+      await (window.uiMinSkeletonDelay && window.uiMinSkeletonDelay(skeletonShownAt, 300));
+      if (r.ok && (!list || list.length === 0)) {
+        tableWrap.style.display = 'none';
+        var mobileListEmpty = document.getElementById('invoiceListMobile');
+        if (mobileListEmpty) mobileListEmpty.innerHTML = '';
+        emptyState.hidden = false;
+        var loadErrHide = document.getElementById('loadErrorState');
+        if (loadErrHide) loadErrHide.hidden = true;
+        pagination.hidden = true;
+        return;
+      }
+      if (r.status === 401) {
+        tableWrap.style.display = 'none';
+        var mobileList401 = document.getElementById('invoiceListMobile');
+        if (mobileList401) mobileList401.innerHTML = '';
+        emptyState.hidden = true;
+        var loadErr401 = document.getElementById('loadErrorState');
+        var loadErrMsg401 = document.getElementById('loadErrorStateMsg');
+        if (loadErrMsg401) loadErrMsg401.innerHTML = window.uiSessionExpiredMessage ? window.uiSessionExpiredMessage() : 'Sesión expirada. <a href="/login">Inicia sesión</a>';
+        if (loadErr401) loadErr401.hidden = false;
+        pagination.hidden = true;
+        return;
+      }
+      if (!r.ok) {
+        const msg = window.uiListLoadErrorText ? window.uiListLoadErrorText(r, 'recibidas') : (r.error || 'Revisa tu conexión e intenta de nuevo.');
         tableWrap.style.display = 'none';
         var mobileListErr = document.getElementById('invoiceListMobile');
         if (mobileListErr) mobileListErr.innerHTML = '';
@@ -259,25 +318,13 @@
         var loadErrMsg = document.getElementById('loadErrorStateMsg');
         if (loadErrMsg) loadErrMsg.textContent = msg;
         if (loadErr) loadErr.hidden = false;
-        pagination.style.display = 'none';
-        return;
-      }
-      const data = await res.json();
-
-      if (!data.data || data.data.length === 0) {
-        tableWrap.style.display = 'none';
-        var mobileList = document.getElementById('invoiceListMobile');
-        if (mobileList) mobileList.innerHTML = '';
-        emptyState.hidden = false;
-        var loadErrHide = document.getElementById('loadErrorState');
-        if (loadErrHide) loadErrHide.hidden = true;
-        pagination.style.display = 'none';
+        pagination.hidden = true;
         return;
       }
 
-      renderTable(data.data);
-      currentPagination = data.pagination;
-      renderPagination(data.pagination);
+      renderTable(list);
+      currentPagination = r.data.pagination;
+      renderPagination(r.data.pagination);
       updateURL();
     } catch (err) {
       const fallbackMsg = 'Revisa tu conexión e intenta de nuevo.';
@@ -289,7 +336,9 @@
       var loadErrMsg = document.getElementById('loadErrorStateMsg');
       if (loadErrMsg) loadErrMsg.textContent = fallbackMsg;
       if (loadErr) loadErr.hidden = false;
-      pagination.style.display = 'none';
+      pagination.hidden = true;
+    } finally {
+      if (window.portalProgressBar) window.portalProgressBar.done();
     }
   }
 
@@ -298,17 +347,20 @@
 
   // Render table rows y lista móvil (cards)
   function renderTable(rows) {
+    lastRenderedRows = rows;
     const tbody = document.getElementById('tableBody');
     const mobileEl = document.getElementById('invoiceListMobile');
     const fragment = document.createDocumentFragment();
     const temp = document.createElement('tbody');
     const mobileCards = [];
-    for (const row of rows) {
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
       const fecha = row.fecha_emision ? formatDate(row.fecha_emision) : '—';
       const emisor = escapeHtml(row.nombre_emisor || '—');
       const rfc = escapeHtml(row.rfc_emisor || '');
       const concepto = truncate(escapeHtml(row.concepto || '—'), 60);
       const uuid = row.uuid ? `${row.uuid.substring(0, 8)}…${row.uuid.substring(row.uuid.length - 4)}` : '—';
+      const uuidCopyBtn = row.uuid ? `<button type="button" class="uuid-copy-btn" data-copy-uuid="${escapeHtml(row.uuid)}" aria-label="Copiar UUID" title="Copiar UUID"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>` : '';
       const total = formatMoney(row.total, row.moneda);
       const iva = formatMoney(row.impuestos || 0, row.moneda);
       const metodoPago = row.metodo_pago ? `<span class="badge badge--neutral" style="font-size: 11px;">${escapeHtml(row.metodo_pago)}</span>` : '<span class="muted">—</span>';
@@ -317,17 +369,17 @@
       const detailUrl = `/portal/cfdi/received/${row.uuid}`;
       const xmlUrl = hasXML ? `/portal/sat/xml/${row.uuid}` : null;
       const pdfUrl = hasXML ? `/portal/sat/pdf/${row.uuid}` : null;
-      temp.innerHTML = `<tr>
+      temp.innerHTML = `<tr data-row-index="${i}">
         <td class="muted">${fecha}</td>
         <td><div style="font-weight: var(--fw-semibold);">${emisor}</div><div class="muted" style="font-size: var(--text-xs); font-family: ui-monospace, monospace;">${rfc}</div></td>
         <td class="concepto-cell">${concepto}</td>
-        <td><div style="font-family: ui-monospace, monospace; font-size: var(--text-xs);">${uuid}</div></td>
+        <td><div class="uuid-copy-wrap"><span class="uuid-copy-wrap__text">${uuid}</span>${uuidCopyBtn}</div></td>
         <td style="font-weight: var(--fw-semibold);">${total}</td>
         <td class="muted">${iva}</td>
         <td>${metodoPago}</td>
         <td>${status}</td>
         <td style="text-align: right;"><div style="display: flex; gap: var(--space-1); justify-content: flex-end; flex-wrap: wrap;">
-          <a href="${detailUrl}" class="btn btn--sm btn--ghost" style="text-decoration: none;">Detalle</a>
+          <a href="${detailUrl}" class="btn btn--sm btn--ghost cfdi-detail-link" style="text-decoration: none;">Detalle</a>
           ${xmlUrl ? `<a href="${xmlUrl}" target="_blank" rel="noopener" class="btn btn--sm" style="text-decoration: none;">XML</a>` : ''}
           ${pdfUrl ? `<button type="button" class="btn btn--sm" data-pdf-url="${pdfUrl}">PDF</button>` : ''}
         </div></td>
@@ -336,15 +388,19 @@
 
       if (mobileEl) {
         const actions = [
-          '<a href="' + detailUrl + '" class="btn btn--sm btn--ghost" style="text-decoration:none;">Detalle</a>',
+          '<a href="' + detailUrl + '" class="btn btn--sm btn--ghost cfdi-detail-link" style="text-decoration:none;" data-row-index="' + i + '">Detalle</a>',
           xmlUrl ? '<a href="' + xmlUrl + '" target="_blank" rel="noopener" class="btn btn--sm btn--secondary" style="text-decoration:none;">XML</a>' : '',
           pdfUrl ? '<button type="button" class="btn btn--sm btn--secondary" data-pdf-url="' + escapeHtml(pdfUrl) + '">PDF</button>' : ''
         ].filter(Boolean).join('');
-        mobileCards.push('<div class="invoice-card-mobile">' +
+        const mobileUuidCopy = row.uuid ? '<button type="button" class="uuid-copy-btn" data-copy-uuid="' + escapeHtml(row.uuid) + '" aria-label="Copiar UUID" title="Copiar UUID"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>' : '';
+        mobileCards.push('<div class="invoice-card-mobile" data-row-index="' + i + '">' +
           '<div class="invoice-card-mobile__row">' +
             '<div class="invoice-card-mobile__main">' +
               '<div class="invoice-card-mobile__title">' + emisor + '</div>' +
               '<div class="invoice-card-mobile__meta muted">' + fecha + (rfc ? ' · ' + rfc : '') + '</div>' +
+              '<div class="invoice-card-mobile__uuid uuid-copy-wrap" style="margin-top:4px;">' +
+                '<span class="uuid-copy-wrap__text">' + uuid + '</span>' + mobileUuidCopy +
+              '</div>' +
               '<div class="invoice-card-mobile__concept" title="' + escapeHtml(row.concepto || '') + '">' + concepto + '</div>' +
             '</div>' +
             '<div class="invoice-card-mobile__total">' + total + '</div>' +
@@ -362,10 +418,10 @@
   function renderPagination(pag) {
     const pagination = document.getElementById('pagination');
     if (pag.pages <= 1) {
-      pagination.style.display = 'none';
+      pagination.hidden = true;
       return;
     }
-    pagination.style.display = 'flex';
+    pagination.hidden = false;
     document.getElementById('prevPageBtn').disabled = pag.page <= 1;
     document.getElementById('nextPageBtn').disabled = pag.page >= pag.pages;
     document.querySelector('.pagination__info').textContent = 
@@ -462,6 +518,115 @@
     if (btn) {
       const url = btn.getAttribute('data-pdf-url');
       if (window.openPdfModal) window.openPdfModal(url);
+    }
+  });
+
+  // —— Drawer detalle CFDI (P41) ——
+  const cfdiDrawerOverlay = document.getElementById('cfdiDrawerOverlay');
+  const cfdiDrawerBackdrop = document.getElementById('cfdiDrawerBackdrop');
+  const cfdiDrawerClose = document.getElementById('cfdiDrawerClose');
+
+  function openCfdiDrawer(row) {
+    if (!row || !cfdiDrawerOverlay) return;
+    const partyLabel = document.getElementById('cfdiDrawerPartyLabel');
+    const partyValue = document.getElementById('cfdiDrawerParty');
+    const uuidEl = document.getElementById('cfdiDrawerUuid');
+    const conceptoEl = document.getElementById('cfdiDrawerConcepto');
+    const totalEl = document.getElementById('cfdiDrawerTotal');
+    const ivaEl = document.getElementById('cfdiDrawerIva');
+    const statusEl = document.getElementById('cfdiDrawerStatus');
+    const xmlLink = document.getElementById('cfdiDrawerXml');
+    const pdfBtn = document.getElementById('cfdiDrawerPdf');
+    const fullPageLink = document.getElementById('cfdiDrawerFullPage');
+    const copyBtn = document.getElementById('cfdiDrawerCopyUuid');
+
+    if (partyLabel) partyLabel.textContent = 'Emisor';
+    if (uuidEl) uuidEl.textContent = row.uuid || '—';
+    if (partyValue) partyValue.innerHTML = (row.nombre_emisor ? escapeHtml(row.nombre_emisor) : '—') + (row.rfc_emisor ? '<div class="muted" style="font-size: var(--text-xs); font-family: ui-monospace;">' + escapeHtml(row.rfc_emisor) + '</div>' : '');
+    if (conceptoEl) conceptoEl.textContent = row.concepto || '—';
+    if (totalEl) totalEl.textContent = formatMoney(row.total, row.moneda);
+    if (ivaEl) ivaEl.textContent = formatMoney(row.impuestos || 0, row.moneda);
+    if (statusEl) statusEl.innerHTML = renderStatus(row.status);
+
+    const hasXML = row.xml_path && row.xml_path.trim();
+    if (xmlLink) {
+      xmlLink.style.display = hasXML ? '' : 'none';
+      xmlLink.href = hasXML ? '/portal/sat/xml/' + row.uuid : '#';
+    }
+    if (pdfBtn) {
+      pdfBtn.style.display = hasXML ? '' : 'none';
+      pdfBtn.setAttribute('data-pdf-url', hasXML ? '/portal/sat/pdf/' + row.uuid : '');
+    }
+    if (fullPageLink) fullPageLink.href = '/portal/cfdi/received/' + (row.uuid || '');
+
+    copyBtn.textContent = 'Copiar UUID';
+    copyBtn.onclick = function() {
+      if (row.uuid && navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(row.uuid).then(function() {
+          var toast = window.uiToast || window.portalToast;
+          if (toast) toast({ type: 'success', title: 'Copiado', message: '', timeout: 2000 });
+          else copyBtn.textContent = 'Copiado';
+        });
+      }
+    };
+
+    cfdiDrawerOverlay.hidden = false;
+    cfdiDrawerOverlay.classList.add('is-open');
+    cfdiDrawerOverlay.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('no-scroll');
+  }
+
+  function closeCfdiDrawer() {
+    if (!cfdiDrawerOverlay) return;
+    cfdiDrawerOverlay.hidden = true;
+    cfdiDrawerOverlay.classList.remove('is-open');
+    cfdiDrawerOverlay.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('no-scroll');
+  }
+
+  if (cfdiDrawerBackdrop) cfdiDrawerBackdrop.addEventListener('click', closeCfdiDrawer);
+  if (cfdiDrawerClose) cfdiDrawerClose.addEventListener('click', closeCfdiDrawer);
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && cfdiDrawerOverlay && cfdiDrawerOverlay.classList.contains('is-open')) closeCfdiDrawer();
+  });
+
+  // P49: one-click copy UUID (tabla y móvil)
+  document.addEventListener('click', function(e) {
+    var copyBtn = e.target && e.target.closest ? e.target.closest('[data-copy-uuid]') : null;
+    if (copyBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      var uuid = (copyBtn.getAttribute('data-copy-uuid') || '').trim();
+      if (!uuid || !navigator.clipboard || !navigator.clipboard.writeText) return;
+      navigator.clipboard.writeText(uuid).then(function() {
+        var toast = window.uiToast || window.portalToast;
+        if (toast) toast({ type: 'success', title: 'Copiado', message: '', timeout: 2000 });
+      }).catch(function() {});
+    }
+  });
+
+  document.getElementById('tableWrap')?.addEventListener('click', function(e) {
+    const link = e.target.closest('a.cfdi-detail-link');
+    const tr = e.target.closest('tr[data-row-index]');
+    if (link) {
+      e.preventDefault();
+      const idx = tr ? tr.getAttribute('data-row-index') : link.getAttribute('data-row-index');
+      if (idx != null && lastRenderedRows[parseInt(idx, 10)]) openCfdiDrawer(lastRenderedRows[parseInt(idx, 10)]);
+    } else if (tr && !e.target.closest('a, button')) {
+      const idx = tr.getAttribute('data-row-index');
+      if (idx != null && lastRenderedRows[parseInt(idx, 10)]) openCfdiDrawer(lastRenderedRows[parseInt(idx, 10)]);
+    }
+  });
+  document.getElementById('invoiceListMobile')?.addEventListener('click', function(e) {
+    const link = e.target.closest('a.cfdi-detail-link');
+    const card = e.target.closest('.invoice-card-mobile[data-row-index]');
+    if (link) {
+      e.preventDefault();
+      const idx = (link.getAttribute('data-row-index') ?? card?.getAttribute('data-row-index'));
+      if (idx != null && lastRenderedRows[parseInt(idx, 10)]) openCfdiDrawer(lastRenderedRows[parseInt(idx, 10)]);
+    } else if (card && !e.target.closest('a, button')) {
+      const idx = card.getAttribute('data-row-index');
+      if (idx != null && lastRenderedRows[parseInt(idx, 10)]) openCfdiDrawer(lastRenderedRows[parseInt(idx, 10)]);
     }
   });
 
