@@ -1,90 +1,100 @@
 {% extends "base_portal.html" %}
+{% set title = title|default('Productos') %}
 
 {% block content %}
-<section class="page-section page-section--clients">
+<section class="page-section page-section--products">
   <div class="card ui-card">
     <div class="card-header card-header--with-tools ui-card__header">
       <div class="card-header__left">
         <div class="table-tools table-tools--inline">
-          <div class="table-tools__search">
+          <form class="table-tools__search" method="get" action="/portal/products">
             <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <path d="M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
               <path d="M16.2 16.2 21 21" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
             </svg>
-            <input id="prodSearch" class="input ui-input" type="search" placeholder="Buscar por descripción o clave" autocomplete="off" />
-          </div>
-          <button id="prodNewBtn" type="button" class="btn btn-primary ui-btn ui-btn--primary">
-            <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path d="M12 5v14" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
-              <path d="M5 12h14" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
-            </svg>
-            Agregar producto
-          </button>
+            <input class="input ui-input" type="search" name="q" value="{{ q|default('')|e }}" placeholder="Buscar por nombre o clave" autocomplete="off" />
+          </form>
+          <button id="newBtn" type="button" class="btn btn-primary">Nuevo producto</button>
         </div>
       </div>
       <div class="card-header__right">
-        <h3 class="section-title">Listado</h3>
-        <p class="muted u-m0"><span id="prodCount">Cargando…</span></p>
+        <h3 class="section-title">Productos</h3>
+        <p class="muted u-m0">{% if rows and rows|length %}Total: {{ rows|length }}{% else %}Sin datos{% endif %}</p>
       </div>
     </div>
-    <p class="card-legend muted">Guarda productos y servicios (conceptos) para reutilizarlos al generar facturas. Incluye descripción, Clave ProdServ, unidad SAT, precio e IVA.</p>
+
+    <p class="card-legend muted">
+      Catálogo confirmado. Puedes editar y activar/desactivar productos. Para crear rápido desde CFDI, usa “Productos sugeridos”.
+    </p>
 
     <div class="card-list-sep">
-    <div class="table-wrap" id="prodTableWrap">
-      <table class="table ui-table" id="prodTable">
-        <thead>
-          <tr>
-            <th>Descripción</th>
-            <th>Clave ProdServ</th>
-            <th>Unidad</th>
-            <th>Precio unit.</th>
-            <th>IVA</th>
-            <th>Acciones</th>
-          </tr>
-        </thead>
-        <tbody id="prodTbody">
-          <tr><td colspan="6"><div class="skeleton skeleton--row-46"></div></td></tr>
-          <tr><td colspan="6"><div class="skeleton skeleton--row-46"></div></td></tr>
-          <tr><td colspan="6"><div class="skeleton skeleton--row-46"></div></td></tr>
-          <tr><td colspan="6"><div class="skeleton skeleton--row-46"></div></td></tr>
-          <tr><td colspan="6"><div class="skeleton skeleton--row-46"></div></td></tr>
-        </tbody>
-      </table>
-    </div>
-    <div id="prodTablePagination" class="table-pagination" hidden aria-label="Paginación del listado"></div>
-
-    <div class="empty-state empty-state--error" id="prodLoadError" hidden aria-live="polite">
-      <div class="empty-state__title">No pudimos cargar esto ahora.</div>
-      <p class="empty-state__desc" id="prodLoadErrorMsg">Puedes intentar de nuevo.</p>
-      <button type="button" class="btn btn--secondary" id="prodLoadErrorRetry">Reintentar</button>
-    </div>
-    <div class="empty-state empty-state--empty" id="prodEmpty" hidden>
-      <div class="empty-state__icon" aria-hidden="true">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
+      {% if not rows or rows|length == 0 %}
+        <div class="empty-state empty-state--empty">
+          <div class="empty-state__title">Aún no tienes productos confirmados</div>
+          <div class="empty-state__desc">Crea uno manualmente o conviértelo desde “Productos sugeridos”.</div>
+          <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:center;">
+            <button type="button" class="btn btn-primary" id="newBtnEmpty">Crear producto</button>
+            <a class="btn btn--secondary" href="/portal/products/suggestions">Ver productos sugeridos</a>
+          </div>
+        </div>
+      {% else %}
+      <div class="table-wrap">
+        <table class="table ui-table ui-table--zebra">
+          <thead>
+            <tr>
+              <th>Activo</th>
+              <th>Nombre</th>
+              <th>ProdServ</th>
+              <th>Clave unidad</th>
+              <th>Unidad</th>
+              <th>Precio default</th>
+              <th>Moneda</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in rows %}
+            <tr>
+              <td>{% if r.active == 1 %}<span class="chip chip--success">Sí</span>{% else %}<span class="chip">No</span>{% endif %}</td>
+              <td style="font-weight:650;">{{ r.name }}</td>
+              <td class="muted"><code>{{ r.clave_prod_serv or '—' }}</code></td>
+              <td class="muted"><code>{{ r.clave_unidad or '—' }}</code></td>
+              <td class="muted">{{ r.unidad or '—' }}</td>
+              <td>{{ '$' ~ ('{:,.2f}'.format(r.default_unit_price|float)) if r.default_unit_price is not none else '—' }}</td>
+              <td class="muted">{{ r.default_currency or '—' }}</td>
+              <td>
+                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                  <button type="button" class="btn btn--sm btn--secondary js-edit"
+                    data-id="{{ r.id }}"
+                    data-name="{{ (r.name or '')|e }}"
+                    data-prodserv="{{ (r.clave_prod_serv or '')|e }}"
+                    data-unitkey="{{ (r.clave_unidad or '')|e }}"
+                    data-unidad="{{ (r.unidad or '')|e }}"
+                    data-price="{{ r.default_unit_price if r.default_unit_price is not none else '' }}"
+                    data-currency="{{ (r.default_currency or '')|e }}"
+                    data-active="{{ r.active }}"
+                  >Editar</button>
+                  <button type="button" class="btn btn--sm btn--ghost js-toggle" data-id="{{ r.id }}">
+                    {% if r.active == 1 %}Desactivar{% else %}Activar{% endif %}
+                  </button>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
       </div>
-      <div class="empty-state__title">Aún no tienes productos</div>
-      <div class="empty-state__desc">Registra lo que vendes (descripción, precio e IVA) y úsalo en tus facturas sin volver a escribirlo.</div>
-      <button type="button" class="btn btn-primary" id="prodEmptyBtn">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path d="M12 5v14" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
-          <path d="M5 12h14" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
-        </svg>
-        Crear primer producto
-      </button>
-    </div>
+      {% endif %}
     </div>
   </div>
 
-  <!-- Modal: agregar producto -->
   <div class="modal" id="prodModal" hidden aria-hidden="true">
     <div class="modal__backdrop" data-close="true"></div>
     <div class="modal__panel" role="dialog" aria-modal="true" aria-labelledby="prodModalTitle">
       <div class="modal__head">
         <div>
-          <div class="modal__title" id="prodModalTitle">Agregar producto</div>
-          <div class="modal__subtitle">Descripción, Clave ProdServ (SAT), unidad, precio unitario e IVA. Al facturar solo ingresarás cantidad y descuento.</div>
+          <div class="modal__title" id="prodModalTitle">Producto</div>
+          <div class="modal__subtitle">Editar catálogo confirmado.</div>
         </div>
         <button type="button" class="icon-btn" data-close="true" aria-label="Cerrar">
           <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -93,646 +103,164 @@
           </svg>
         </button>
       </div>
-
       <div class="modal__body">
+        <input type="hidden" id="pId" />
         <div class="field">
-          <label class="label">Descripción *</label>
-          <input id="prodDesc" class="input" type="text" placeholder="Ej. Asesoría contable mensual" autocomplete="off" />
-          <div class="help" id="prodDescHelp" hidden>La descripción es obligatoria.</div>
+          <label class="label">Nombre *</label>
+          <input id="pName" class="input" type="text" autocomplete="off" />
         </div>
-
-        <div class="field">
-          <label class="label">Clave ProdServ (SAT) *</label>
-          <p class="muted" style="margin:0 0 8px; font-size:12px;">Catálogo SAT de productos y servicios. Escribe en el campo o usa «Buscar en catálogo».</p>
-          <div class="prodserv-wrap prodserv-wrap--inline">
-            <div class="prodserv-input">
-              <input id="prodKey" class="input" type="text" placeholder="Ej. asesoría, 80141600, contabilidad" autocomplete="off" />
-              <div id="prodKeyResults" class="prod-results" hidden></div>
-            </div>
-            <button type="button" class="btn btn--secondary prodservBtn" id="prodKeySearchBtn" aria-label="Buscar en catálogo SAT" title="Buscar en catálogo SAT">
-              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" width="18" height="18"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.75"/><path d="M20 20l-3.5-3.5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
-              Buscar en catálogo
-            </button>
-          </div>
-          <div class="help" id="prodKeyHelp" hidden>Selecciona una clave del catálogo SAT.</div>
-        </div>
-
-        <div class="field">
-          <label class="label">Unidad (SAT) *</label>
-          <select id="prodUnit" class="input">
-            <option value="E48">E48 — Unidad de servicio</option>
-            <option value="H87">H87 — Pieza</option>
-            <option value="ACT">ACT — Actividad</option>
-            <option value="HUR">HUR — Hora</option>
-            <option value="DAY">DAY — Día</option>
-            <option value="KGM">KGM — Kilogramo</option>
-            <option value="LTR">LTR — Litro</option>
-            <option value="XBX">XBX — Caja</option>
-          </select>
-        </div>
-
         <div class="grid-2">
           <div class="field">
-            <label class="label">Precio unitario *</label>
-            <input id="prodPrice" class="input" type="number" step="0.01" min="0" placeholder="0.00" />
-            <div class="help" id="prodPriceHelp" hidden>Precio unitario inválido.</div>
+            <label class="label">Clave ProdServ</label>
+            <input id="pProdServ" class="input" type="text" autocomplete="off" placeholder="84111500" />
           </div>
           <div class="field">
-            <label class="label">IVA *</label>
-            <select id="prodIva" class="input">
-              <option value="0.16" selected>16%</option>
-              <option value="0.08">8%</option>
-              <option value="0.00">0%</option>
+            <label class="label">Clave unidad</label>
+            <input id="pUnitKey" class="input" type="text" autocomplete="off" placeholder="E48" />
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="field">
+            <label class="label">Unidad</label>
+            <input id="pUnidad" class="input" type="text" autocomplete="off" placeholder="Unidad de servicio" />
+          </div>
+          <div class="field">
+            <label class="label">Moneda</label>
+            <input id="pCurrency" class="input" type="text" autocomplete="off" placeholder="MXN" />
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="field">
+            <label class="label">Precio default</label>
+            <input id="pPrice" class="input" type="number" step="0.01" min="0" placeholder="0.00" />
+          </div>
+          <div class="field">
+            <label class="label">Activo</label>
+            <select id="pActive" class="input">
+              <option value="1">Sí</option>
+              <option value="0">No</option>
             </select>
           </div>
         </div>
       </div>
-
       <div class="modal__foot">
         <button type="button" class="btn btn-ghost" data-close="true">Cancelar</button>
-        <button type="button" class="btn btn-primary" id="prodSaveBtn">Guardar</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal Buscar Clave ProdServ (catálogo SAT, como en generar factura) -->
-  <div id="prodservModal" class="modal prodserv-modal" role="dialog" aria-modal="true" aria-labelledby="prodservModalTitle" hidden>
-    <div class="modal__backdrop" id="prodservModalBackdrop"></div>
-    <div class="modal__panel" style="max-width: 480px;">
-      <div class="modal__head">
-        <div>
-          <div class="modal__title" id="prodservModalTitle">Buscar Clave ProdServ</div>
-          <p class="muted" style="margin:4px 0 0; font-size:12px;">Escribe una palabra común (ej. asesoría, contabilidad, renta) o una clave del catálogo SAT.</p>
-        </div>
-        <button type="button" class="icon-btn" id="prodservModalClose" aria-label="Cerrar">
-          <svg class="icon" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18" stroke="currentColor" stroke-width="1.75"/><path d="M6 6l12 12" stroke="currentColor" stroke-width="1.75"/></svg>
-        </button>
-      </div>
-      <div class="modal__body">
-        <input id="prodservModalInput" class="input" type="text" placeholder="Buscar…" autocomplete="off" />
-        <div id="prodservModalResults" class="prodserv-modal-results"></div>
+        <button type="button" class="btn btn-primary" id="saveBtn">Guardar</button>
       </div>
     </div>
   </div>
 </section>
 
 <script>
-(function(){
-  function getToken(){
-    var p = new URLSearchParams(window.location.search);
-    return p.get('token') || "{{ token }}";
-  }
-  const token = getToken();
-  const tbody = document.getElementById('prodTbody');
-  const countEl = document.getElementById('prodCount');
-  const emptyEl = document.getElementById('prodEmpty');
-  const tableWrap = document.getElementById('prodTableWrap');
-  const searchEl = document.getElementById('prodSearch');
+(function () {
+  function $(id){ return document.getElementById(id); }
+  var modal = $('prodModal');
+  var saveBtn = $('saveBtn');
+  var newBtn = $('newBtn');
+  var newBtnEmpty = $('newBtnEmpty');
 
-  const modal = document.getElementById('prodModal');
-  const openBtn = document.getElementById('prodNewBtn');
-  const emptyBtn = document.getElementById('prodEmptyBtn');
-  const saveBtn = document.getElementById('prodSaveBtn');
-  const descEl = document.getElementById('prodDesc');
-  const keyEl = document.getElementById('prodKey');
-  const keyResults = document.getElementById('prodKeyResults');
-  const unitEl = document.getElementById('prodUnit');
-  const priceEl = document.getElementById('prodPrice');
-  const ivaEl = document.getElementById('prodIva');
-
-  const UNIT_LABELS = {
-    'E48': 'E48 — Unidad de servicio',
-    'H87': 'H87 — Pieza',
-    'ACT': 'ACT — Actividad',
-    'HUR': 'HUR — Hora',
-    'DAY': 'DAY — Día',
-    'KGM': 'KGM — Kilogramo',
-    'LTR': 'LTR — Litro',
-    'XBX': 'XBX — Caja'
-  };
-
-  let allRows = [];
-  let prodservDebounce = null;
-
-  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const hl = (text, q) => (window.uiHighlightSearch ? window.uiHighlightSearch(text, q) : esc(text));
-
-  const ROWS_PAGE_LIMIT = 200;
-  var clientPage = 1;
-  var lastFilteredRows = [];
-  function setCount(n, from, to){
-    if (from != null && to != null && n > ROWS_PAGE_LIMIT)
-      countEl.textContent = 'Mostrando ' + from + '-' + to + ' de ' + n + ' productos';
-    else
-      countEl.textContent = (n === 1) ? 'Total: 1 producto' : 'Total: ' + n + ' productos';
+  function openModal() { if (!modal) return; modal.hidden = false; modal.setAttribute('aria-hidden', 'false'); }
+  function closeModal() { if (!modal) return; modal.hidden = true; modal.setAttribute('aria-hidden', 'true'); }
+  function fill(p) {
+    $('pId').value = p.id || '';
+    $('pName').value = p.name || '';
+    $('pProdServ').value = p.clave_prod_serv || '';
+    $('pUnitKey').value = p.clave_unidad || '';
+    $('pUnidad').value = p.unidad || '';
+    $('pPrice').value = (p.default_unit_price != null ? String(p.default_unit_price) : '');
+    $('pCurrency').value = p.default_currency || '';
+    $('pActive').value = (p.active != null ? String(p.active) : '1');
   }
 
-  function ivaPct(rate) {
-    const r = parseFloat(rate);
-    if (r === 0) return '0%';
-    if (Math.abs(r - 0.08) < 0.001) return '8%';
-    return '16%';
-  }
+  function openNew() { fill({}); openModal(); setTimeout(function(){ $('pName').focus(); }, 80); }
 
-  function buildCreateUrl(p) {
-    return '/portal/create?' +
-      'concept_desc=' + encodeURIComponent(String(p.description || '')) +
-      '&concept_key=' + encodeURIComponent(String(p.product_key || '')) +
-      '&concept_unit=' + encodeURIComponent(String(p.unit_key || 'E48')) +
-      '&concept_price=' + encodeURIComponent(String(p.unit_price ?? '')) +
-      '&concept_iva=' + encodeURIComponent(String(p.iva_rate ?? '0.16'));
-  }
+  if (newBtn) newBtn.addEventListener('click', openNew);
+  if (newBtnEmpty) newBtnEmpty.addEventListener('click', openNew);
 
-  function rowHTML(r, searchQ){
-    const q = (searchQ || '').trim();
-    const desc = q ? hl(r.description, q) : esc(r.description);
-    const key = q ? hl(r.product_key, q) : esc(r.product_key);
-    const unitLabel = UNIT_LABELS[r.unit_key] || r.unit_key;
-    const price = Number(r.unit_price);
-    const priceStr = Number.isFinite(price) ? price.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00';
-    const iva = ivaPct(r.iva_rate);
-    const createUrl = buildCreateUrl(r);
+  if (modal) modal.addEventListener('click', function(e){
+    if (e.target && e.target.dataset && e.target.dataset.close === 'true') closeModal();
+  });
 
-    return `
-      <tr>
-        <td><div style="font-weight:650;">${desc}</div></td>
-        <td><code>${key}</code></td>
-        <td class="muted">${esc(unitLabel)}</td>
-        <td>$${priceStr}</td>
-        <td class="muted">${iva}</td>
-        <td>
-          <button type="button" class="btn btn-small btn-ghost" data-copy="${esc(r.product_key)}">Copiar clave</button>
-          <a href="${createUrl}" class="btn btn-small">Usar en factura</a>
-          <button type="button" class="btn btn-small btn-ghost prod-delete-btn" data-delete-id="${r.id}" data-delete-desc="${esc(r.description || r.product_key || '')}" title="Eliminar producto" aria-label="Eliminar producto">
-            <svg class="icon icon-trash" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 7h16v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7z" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </button>
-        </td>
-      </tr>
-    `;
-  }
-
-  function render(rows){
-    lastFilteredRows = rows;
-    const total = rows.length;
-    const totalPages = Math.max(1, Math.ceil(total / ROWS_PAGE_LIMIT));
-    if (clientPage > totalPages) clientPage = totalPages;
-    const start = (clientPage - 1) * ROWS_PAGE_LIMIT;
-    const displayRows = total <= ROWS_PAGE_LIMIT ? rows : rows.slice(start, start + ROWS_PAGE_LIMIT);
-    const n = displayRows.length;
-    setCount(total);
-    if (total > ROWS_PAGE_LIMIT) setCount(total, start + 1, start + n);
-    if (total === 0) {
-      tbody.innerHTML = '';
-      if (tableWrap) { tableWrap.hidden = true; tableWrap.style.display = 'none'; }
-      if (emptyEl) { emptyEl.hidden = false; emptyEl.removeAttribute('hidden'); emptyEl.style.display = ''; }
-      var errEl = document.getElementById('prodLoadError'); if (errEl) errEl.hidden = true;
-      var pagEl = document.getElementById('prodTablePagination'); if (pagEl) pagEl.hidden = true;
-      return;
-    }
-    if (tableWrap) { tableWrap.hidden = false; tableWrap.style.display = ''; }
-    if (emptyEl) { emptyEl.hidden = true; emptyEl.setAttribute('hidden', ''); emptyEl.style.display = 'none'; }
-    if (document.getElementById('prodLoadError')) document.getElementById('prodLoadError').hidden = true;
-    const searchQ = (searchEl.value || '').trim();
-    tbody.innerHTML = displayRows.map(r => rowHTML(r, searchQ)).join('');
-    var pagEl = document.getElementById('prodTablePagination');
-    if (pagEl) {
-      if (total <= ROWS_PAGE_LIMIT) { pagEl.hidden = true; } else {
-        pagEl.hidden = false;
-        var from = start + 1, to = start + n;
-        pagEl.innerHTML = '<span class="muted">Mostrando ' + from + '-' + to + ' de ' + total + '</span>' +
-          (clientPage > 1 ? ' <button type="button" class="btn btn--sm btn--ghost" id="prodTablePrev">Anterior</button>' : '') +
-          (clientPage < totalPages ? ' <button type="button" class="btn btn--sm btn--ghost" id="prodTableNext">Siguiente</button>' : '');
-        var prevBtn = document.getElementById('prodTablePrev'); var nextBtn = document.getElementById('prodTableNext');
-        if (prevBtn) prevBtn.onclick = function(){ clientPage--; render(lastFilteredRows); };
-        if (nextBtn) nextBtn.onclick = function(){ clientPage++; render(lastFilteredRows); };
-      }
-    }
-  }
-
-  function filter(){
-    clientPage = 1;
-    const q = (searchEl.value || '').trim().toLowerCase();
-    if (!q) return render(allRows);
-    const filtered = allRows.filter(r => {
-      return String(r.description || '').toLowerCase().includes(q)
-        || String(r.product_key || '').toLowerCase().includes(q);
+  document.querySelectorAll('.js-edit').forEach(function (b) {
+    b.addEventListener('click', function () {
+      fill({
+        id: b.getAttribute('data-id'),
+        name: b.getAttribute('data-name'),
+        clave_prod_serv: b.getAttribute('data-prodserv'),
+        clave_unidad: b.getAttribute('data-unitkey'),
+        unidad: b.getAttribute('data-unidad'),
+        default_unit_price: b.getAttribute('data-price'),
+        default_currency: b.getAttribute('data-currency'),
+        active: b.getAttribute('data-active')
+      });
+      openModal();
     });
-    render(filtered);
-  }
-
-  let loadErrorEl = null;
-  let loadErrorMsgEl = null;
-
-  async function load(){
-    var skeletonShownAt = Date.now();
-    loadErrorEl = document.getElementById('prodLoadError');
-    loadErrorMsgEl = document.getElementById('prodLoadErrorMsg');
-    if (loadErrorEl) loadErrorEl.hidden = true;
-    if (emptyEl) { emptyEl.hidden = true; emptyEl.style.display = 'none'; }
-    if (tableWrap) { tableWrap.hidden = false; tableWrap.style.display = ''; }
-    tbody.innerHTML = (window.uiSkeletonTableRows && window.uiSkeletonTableRows(6, 5)) || '<tr><td colspan="6"><div class="skeleton skeleton--row-46"></div></td></tr>'.repeat(5);
-    try {
-      if (window.portalProgressBar) window.portalProgressBar.start();
-      const r = window.uiFetchJSON ? await window.uiFetchJSON('/api/products') : { ok: false, status: 0, data: null, error: 'Helper no disponible' };
-      const list = window.uiGetListFromResponse ? window.uiGetListFromResponse(r.data) : (Array.isArray(r.data) ? r.data : []);
-      await (window.uiMinSkeletonDelay && window.uiMinSkeletonDelay(skeletonShownAt, 300));
-      if (r.ok && (!list || list.length === 0)) {
-        allRows = [];
-        if (loadErrorEl) loadErrorEl.hidden = true;
-        if (tableWrap) tableWrap.hidden = true;
-        if (emptyEl) { emptyEl.hidden = false; emptyEl.style.display = ''; }
-        tbody.innerHTML = '';
-        return;
-      }
-      if (r.status === 401) {
-        allRows = [];
-        if (loadErrorMsgEl) loadErrorMsgEl.innerHTML = window.uiSessionExpiredMessage ? window.uiSessionExpiredMessage() : 'Sesión expirada. <a href="/login">Inicia sesión</a>';
-        if (loadErrorEl) loadErrorEl.hidden = false;
-        if (tableWrap) tableWrap.hidden = true;
-        if (emptyEl) emptyEl.hidden = true;
-        tbody.innerHTML = '';
-        return;
-      }
-      if (!r.ok) {
-        allRows = [];
-        const msg = window.uiListLoadErrorText ? window.uiListLoadErrorText(r, 'productos') : (r.error || 'Revisa tu conexión e intenta de nuevo.');
-        if (loadErrorMsgEl) loadErrorMsgEl.textContent = msg;
-        if (loadErrorEl) loadErrorEl.hidden = false;
-        if (tableWrap) tableWrap.hidden = true;
-        if (emptyEl) emptyEl.hidden = true;
-        tbody.innerHTML = '';
-        return;
-      }
-      allRows = list;
-      render(allRows);
-    } catch (e) {
-      allRows = [];
-      tbody.innerHTML = '';
-      const fallbackMsg = 'Revisa tu conexión e intenta de nuevo.';
-      if (loadErrorMsgEl) loadErrorMsgEl.textContent = fallbackMsg;
-      if (loadErrorEl) loadErrorEl.hidden = false;
-      if (tableWrap) tableWrap.hidden = true;
-      if (emptyEl) emptyEl.hidden = true;
-    } finally {
-      if (window.portalProgressBar) window.portalProgressBar.done();
-    }
-  }
-
-  const prodLoadErrorRetry = document.getElementById('prodLoadErrorRetry');
-  if (prodLoadErrorRetry) prodLoadErrorRetry.addEventListener('click', load);
-
-  // ProdServ búsqueda catálogo SAT: debounce 250ms + cancelar request anterior
-  var prodservAbort = null;
-  async function searchProdserv(q) {
-    var term = (q || '').trim();
-    if (term.length < 2) {
-      keyResults.hidden = true;
-      keyResults.innerHTML = '';
-      return;
-    }
-    if (prodservAbort) prodservAbort.abort();
-    prodservAbort = new AbortController();
-    var signal = prodservAbort.signal;
-    try {
-      var url = '/api/catalogs/prodserv?q=' + encodeURIComponent(term) + '&limit=15';
-      var data = window.portalCatalogGetJson
-        ? await window.portalCatalogGetJson(url, { signal: signal })
-        : await (window.portalFetchJSON ? window.portalFetchJSON(url, { signal: signal, credentials: 'same-origin' }, { timeoutMs: 30000, retry: 1 }) : Promise.resolve({ ok: false, status: 0, data: [] }))
-            .then(function(r) { return (r && r.ok) ? (r.data || []) : []; });
-      var items = Array.isArray(data) ? data : [];
-      keyResults.innerHTML = items.map(function(it) {
-        var k = (it.key || it.clave || it.code || '').toString();
-        var d = (it.label || it.descripcion || it.texto || '').toString();
-        var text = d ? k + ' — ' + d : k;
-        return '<button type="button" class="prod-results-item" data-key="' + esc(k) + '" data-label="' + esc(text) + '">' + esc(text) + '</button>';
-      }).join('');
-      keyResults.hidden = items.length === 0;
-    } catch (err) {
-      if (err.name === 'AbortError') return;
-      keyResults.hidden = true;
-      keyResults.innerHTML = '';
-    } finally {
-      if (prodservAbort && prodservAbort.signal === signal) prodservAbort = null;
-    }
-  }
-
-  keyEl.addEventListener('input', function() {
-    clearTimeout(prodservDebounce);
-    prodservDebounce = setTimeout(function() { searchProdserv(keyEl.value); }, 250);
-  });
-  keyEl.addEventListener('focus', () => { if (keyEl.value.trim().length >= 2) searchProdserv(keyEl.value); });
-  keyResults.addEventListener('click', (e) => {
-    const btn = e.target.closest('.prod-results-item');
-    if (!btn) return;
-    keyEl.value = btn.getAttribute('data-label') || btn.getAttribute('data-key') || '';
-    keyResults.hidden = true;
-    keyResults.innerHTML = '';
-  });
-  document.addEventListener('click', () => { keyResults.hidden = true; });
-  keyEl.addEventListener('click', (e) => e.stopPropagation());
-
-  // Modal Buscar Clave ProdServ (catálogo SAT)
-  var prodservModal = document.getElementById('prodservModal');
-  var prodservModalInput = document.getElementById('prodservModalInput');
-  var prodservModalResults = document.getElementById('prodservModalResults');
-  var prodservModalClose = document.getElementById('prodservModalClose');
-  var prodservModalBackdrop = document.getElementById('prodservModalBackdrop');
-  var prodKeySearchBtn = document.getElementById('prodKeySearchBtn');
-  var prodservModalAbort = null;
-  var prodservModalDebounce = null;
-
-  function openProdservModal() {
-    if (!prodservModal || !prodservModalInput) return;
-    prodservModal.hidden = false;
-    prodservModal.removeAttribute('aria-hidden');
-    prodservModalInput.value = '';
-    prodservModalResults.innerHTML = '';
-    prodservModalResults.style.display = 'none';
-    document.body.classList.add('no-scroll');
-    setTimeout(function() { prodservModalInput.focus(); }, 50);
-  }
-
-  function closeProdservModal() {
-    if (!prodservModal) return;
-    prodservModal.hidden = true;
-    prodservModal.setAttribute('aria-hidden', 'true');
-    document.body.classList.remove('no-scroll');
-  }
-
-  async function searchProdservModal(term) {
-    term = (term || '').trim();
-    if (term.length < 2) {
-      prodservModalResults.innerHTML = '';
-      prodservModalResults.style.display = 'none';
-      return;
-    }
-    if (prodservModalAbort) prodservModalAbort.abort();
-    prodservModalAbort = new AbortController();
-    var signal = prodservModalAbort.signal;
-    try {
-      var url = '/api/catalogs/prodserv?q=' + encodeURIComponent(term) + '&limit=20';
-      var data = window.portalCatalogGetJson
-        ? await window.portalCatalogGetJson(url, { signal: signal })
-        : await (window.portalFetchJSON ? window.portalFetchJSON(url, { signal: signal, credentials: 'same-origin' }, { timeoutMs: 30000, retry: 1 }) : Promise.resolve({ ok: false, status: 0, data: [] }))
-            .then(function(r) { return (r && r.ok) ? (r.data || []) : []; });
-      var items = Array.isArray(data) ? data : [];
-      prodservModalResults.innerHTML = items.map(function(it) {
-        var k = (it.key || it.clave || it.code || '').toString();
-        var d = (it.label || it.descripcion || it.texto || '').toString();
-        var text = d ? k + ' — ' + d : k;
-        return '<button type="button" class="prod-results-item" data-key="' + esc(k) + '" data-label="' + esc(text) + '">' + esc(text) + '</button>';
-      }).join('');
-      prodservModalResults.style.display = items.length ? 'block' : 'none';
-    } catch (err) {
-      if (err.name === 'AbortError') return;
-      prodservModalResults.innerHTML = '';
-      prodservModalResults.style.display = 'none';
-    } finally {
-      if (prodservModalAbort && prodservModalAbort.signal === signal) prodservModalAbort = null;
-    }
-  }
-
-  if (prodKeySearchBtn) prodKeySearchBtn.addEventListener('click', openProdservModal);
-  if (prodservModalClose) prodservModalClose.addEventListener('click', closeProdservModal);
-  if (prodservModalBackdrop) prodservModalBackdrop.addEventListener('click', closeProdservModal);
-  prodservModal && prodservModal.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') closeProdservModal();
   });
 
-  if (prodservModalInput) {
-    prodservModalInput.addEventListener('input', function() {
-      clearTimeout(prodservModalDebounce);
-      prodservModalDebounce = setTimeout(function() { searchProdservModal(prodservModalInput.value); }, 250);
+  document.querySelectorAll('.js-toggle').forEach(function (b) {
+    b.addEventListener('click', async function () {
+      var id = b.getAttribute('data-id');
+      if (!id) return;
+      if (window.uiSetButtonLoading) window.uiSetButtonLoading(b, true, 'Actualizando…');
+      try {
+        var res = await (window.portalFetchJSON
+          ? window.portalFetchJSON('/portal/products/' + encodeURIComponent(id) + '/toggle', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({})
+            }, { timeoutMs: 30000, retry: 0 })
+          : Promise.resolve({ ok: false, detail: 'Helper no disponible' })
+        );
+        if (window.uiSetButtonLoading) window.uiSetButtonLoading(b, false);
+        if (!res || !res.ok || !res.data || !res.data.ok) {
+          var msg = (res && res.data && (res.data.detail || res.data.message)) ? String(res.data.detail || res.data.message) : ((res && res.detail) || 'No se pudo actualizar.');
+          if (window.uiToast) window.uiToast({ type: 'danger', title: 'Error', message: msg });
+          return;
+        }
+        window.location.reload();
+      } catch (e) {
+        if (window.uiSetButtonLoading) window.uiSetButtonLoading(b, false);
+        if (window.uiToast) window.uiToast({ type: 'danger', title: 'Error', message: (e && e.message) || 'Error de red.' });
+      }
     });
-  }
-  if (prodservModalResults) {
-    prodservModalResults.addEventListener('click', function(e) {
-      var btn = e.target && e.target.closest ? e.target.closest('.prod-results-item') : null;
-      if (!btn) return;
-      var label = btn.getAttribute('data-label') || btn.getAttribute('data-key') || '';
-      if (keyEl) keyEl.value = label;
-      closeProdservModal();
-    });
-  }
-
-  function openModal() {
-    descEl.value = '';
-    keyEl.value = '';
-    keyResults.hidden = true;
-    keyResults.innerHTML = '';
-    unitEl.value = 'E48';
-    priceEl.value = '';
-    ivaEl.value = '0.16';
-    document.getElementById('prodDescHelp').hidden = true;
-    document.getElementById('prodKeyHelp').hidden = true;
-    document.getElementById('prodPriceHelp').hidden = true;
-    modal.hidden = false;
-    modal.setAttribute('aria-hidden', 'false');
-    document.body.style.overflow = 'hidden';
-    setTimeout(() => descEl.focus(), 30);
-  }
-
-  function closeModal() {
-    modal.hidden = true;
-    modal.setAttribute('aria-hidden', 'true');
-    document.body.style.overflow = '';
-    if (typeof closeProdservModal === 'function') closeProdservModal();
-  }
-
-  [openBtn, emptyBtn].forEach(b => b && b.addEventListener('click', openModal));
-  modal.addEventListener('click', (e) => {
-    if (e.target.closest('[data-close="true"]') || e.target.classList.contains('modal__backdrop')) closeModal();
   });
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !modal.hidden) closeModal(); });
 
-  function validate() {
-    let ok = true;
-    const desc = (descEl.value || '').trim();
-    const keyRaw = (keyEl.value || '').trim();
-    const key = keyRaw.includes(' — ') ? keyRaw.split(' — ')[0].trim() : keyRaw;
-    const price = parseFloat(priceEl.value);
-    if (!desc) {
-      document.getElementById('prodDescHelp').hidden = false;
-      ok = false;
-    } else document.getElementById('prodDescHelp').hidden = true;
-    if (!key) {
-      document.getElementById('prodKeyHelp').hidden = false;
-      ok = false;
-    } else document.getElementById('prodKeyHelp').hidden = true;
-    if (!Number.isFinite(price) || price < 0) {
-      document.getElementById('prodPriceHelp').hidden = false;
-      ok = false;
-    } else document.getElementById('prodPriceHelp').hidden = true;
-    return ok;
-  }
-
-  async function save() {
-    if (!validate()) {
-      window.portalToast && window.portalToast({ type: 'warning', title: 'Faltan datos', message: 'Completa descripción, Clave ProdServ y precio unitario.' });
-      return;
-    }
-    const keyRaw = (keyEl.value || '').trim();
-    const product_key = keyRaw.includes(' — ') ? keyRaw.split(' — ')[0].trim() : keyRaw;
-    const payload = {
-      token,
-      description: (descEl.value || '').trim(),
-      product_key,
-      unit_key: (unitEl.value || 'E48').trim(),
-      unit_price: parseFloat(priceEl.value),
-      iva_rate: parseFloat(ivaEl.value) || 0.16,
+  if (saveBtn) saveBtn.addEventListener('click', async function () {
+    var payload = {
+      id: $('pId').value || null,
+      name: $('pName').value,
+      clave_prod_serv: $('pProdServ').value,
+      clave_unidad: $('pUnitKey').value,
+      unidad: $('pUnidad').value,
+      default_unit_price: $('pPrice').value,
+      default_currency: $('pCurrency').value,
+      active: $('pActive').value
     };
     if (window.uiSetButtonLoading) window.uiSetButtonLoading(saveBtn, true, 'Guardando…');
     try {
-      const r = window.portalFetchJSON
-        ? await window.portalFetchJSON('/api/products/create', {
+      var res = await (window.portalFetchJSON
+        ? window.portalFetchJSON('/portal/products/save', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
+            body: JSON.stringify(payload)
           }, { timeoutMs: 30000, retry: 0 })
-        : { ok: false, status: 0, data: null, detail: 'Helper no disponible' };
-      if (r.status === 401) return;
-      const data = r.data || {};
-      if (!r.ok) throw new Error(window.portalApiErrorMessage ? window.portalApiErrorMessage(data) : (data.detail || `HTTP ${r.status}`));
-      if (window.uiToast) window.uiToast({ type: 'success', title: 'Guardado', message: 'Producto guardado correctamente.', timeout: 3200 });
-      closeModal();
-      await load();
-      if (window.uiSuccessOverlay) window.uiSuccessOverlay({ title: 'Producto guardado', message: 'Los datos se guardaron correctamente.', actions: [{ label: 'Entendido', onClick: function () { if (window.uiSuccessOverlayClose) window.uiSuccessOverlayClose(); } }] });
-      else if (window.portalToast) window.portalToast({ type: 'success', title: 'Guardado', message: 'Producto guardado correctamente.' });
-    } catch (e) {
-      if (window.uiToastError) window.uiToastError(e, 'No pudimos guardar', 'Revisa descripción, clave ProdServ y precio e intenta de nuevo.');
-      else if (window.portalToastError) window.portalToastError(e, 'No pudimos guardar', 'Revisa descripción, clave ProdServ y precio e intenta de nuevo.');
-    } finally {
+        : Promise.resolve({ ok: false, detail: 'Helper no disponible' })
+      );
       if (window.uiSetButtonLoading) window.uiSetButtonLoading(saveBtn, false);
-      else { saveBtn.disabled = false; saveBtn.textContent = 'Guardar'; }
-    }
-  }
-
-  saveBtn.addEventListener('click', save);
-
-  document.addEventListener('click', async (e) => {
-    const deleteBtn = e.target && e.target.closest ? e.target.closest('[data-delete-id]') : null;
-    if (deleteBtn) {
-      const id = deleteBtn.getAttribute('data-delete-id') || '';
-      const desc = (deleteBtn.getAttribute('data-delete-desc') || '').replace(/"/g, '');
-      if (!id) return;
-      const confirmed = window.uiConfirm ? await window.uiConfirm({
-        title: 'Eliminar producto',
-        message: desc ? '¿Eliminar el producto "' + desc + '"? Esta acción no se puede deshacer.' : '¿Eliminar este producto? Esta acción no se puede deshacer.',
-        confirmText: 'Eliminar',
-        cancelText: 'Cancelar',
-      }) : false;
-      if (!confirmed) return;
-      deleteBtn.disabled = true;
-      try {
-        const r = window.portalFetchJSON
-          ? await window.portalFetchJSON('/api/products/delete', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              credentials: 'same-origin',
-              body: JSON.stringify({ id: id }),
-            }, { timeoutMs: 30000, retry: 0 })
-          : { ok: false, status: 0, data: null, detail: 'Helper no disponible' };
-        if (r.status === 401) return;
-        const data = r.data || {};
-        if (!r.ok) throw new Error((data && data.detail) || r.detail || 'Error al eliminar');
-        /* P38: borrado irreversible — no inventar Undo; success overlay (patrón mutación importante) */
-        if (window.uiSuccessOverlay) {
-          window.uiSuccessOverlay({
-            title: 'Producto eliminado',
-            message: 'Puedes agregar otro producto cuando quieras.',
-            actions: [{ label: 'Entendido', onClick: function () { if (window.uiSuccessOverlayClose) window.uiSuccessOverlayClose(); } }]
-          });
-        } else if (window.portalToast) {
-          window.portalToast({ type: 'success', title: 'Eliminado', message: 'Puedes agregar otro producto cuando quieras.', ttl: 4500 });
-        }
-        await load();
-      } catch (err) {
-        window.portalToastError && window.portalToastError(err, 'No se pudo eliminar', 'Revisa e intenta de nuevo o recarga la página.');
-      } finally {
-        deleteBtn.disabled = false;
+      if (!res || !res.ok || !res.data || !res.data.ok) {
+        var msg = (res && res.data && (res.data.detail || res.data.message)) ? String(res.data.detail || res.data.message) : ((res && res.detail) || 'No se pudo guardar.');
+        if (window.uiToast) window.uiToast({ type: 'danger', title: 'Error', message: msg });
+        return;
       }
-      return;
-    }
-    const copyBtn = e.target && e.target.closest ? e.target.closest('[data-copy]') : null;
-    if (!copyBtn) return;
-    const value = copyBtn.getAttribute('data-copy') || '';
-    try {
-      await navigator.clipboard.writeText(value);
-      window.portalToast && window.portalToast({ type: 'success', title: 'Copiado', message: 'Clave copiada al portapapeles.' });
-    } catch (_) {
-      window.portalToast && window.portalToast({ type: 'danger', title: 'No se pudo copiar', message: 'Tu navegador bloqueó el portapapeles.' });
+      closeModal();
+      if (window.uiToast) window.uiToast({ type: 'success', title: 'Guardado', message: 'Producto actualizado.' });
+      setTimeout(function(){ window.location.reload(); }, 400);
+    } catch (e) {
+      if (window.uiSetButtonLoading) window.uiSetButtonLoading(saveBtn, false);
+      if (window.uiToast) window.uiToast({ type: 'danger', title: 'Error', message: (e && e.message) || 'Error de red.' });
     }
   });
-
-  var filterDebounce;
-  searchEl.addEventListener('input', function() {
-    clearTimeout(filterDebounce);
-    filterDebounce = setTimeout(filter, 250);
-  });
-  searchEl.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') {
-      searchEl.value = '';
-      filter();
-      searchEl.blur();
-      e.preventDefault();
-      return;
-    }
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      var firstLink = tbody && tbody.querySelector('a[href*="/portal/create"]');
-      if (firstLink) { firstLink.focus(); firstLink.click(); }
-    }
-  });
-
-  load();
 })();
 </script>
-
-<style>
-.page-section{ display:flex; flex-direction:column; gap: 14px; }
-.page-section--clients .card-list-sep{ margin-top: 20px; }
-.card-legend{ margin: 0 16px 12px; padding: 0; font-size: 13px; line-height: 1.4; }
-.table-tools__search .icon{ position:absolute; left: 12px; width:18px; height:18px; opacity:.75; }
-.table-tools__search input{ padding-left: 40px; }
-
-#prodTable td { vertical-align: middle; }
-#prodTable .btn { margin-right: 6px; }
-#prodTable .btn:last-child { margin-right: 0; }
-.prod-delete-btn { color: var(--muted, #64748b); }
-.prod-delete-btn:hover { color: var(--text); background: rgba(0,0,0,.06); }
-.prod-delete-btn .icon { width: 16px; height: 16px; }
-
-/* Clave ProdServ: input + botón Buscar en catálogo (como en generar factura) */
-.prodserv-wrap{ display:flex; gap:10px; align-items:flex-start; width:100%; min-width:0; }
-.prodserv-wrap .prodserv-input{ flex:1; min-width:0; position:relative; }
-.prodserv-wrap .prodservBtn{ flex-shrink:0; display:inline-flex; align-items:center; gap:6px; white-space:nowrap; }
-.prod-results{ position:absolute; left:0; right:0; top:100%; margin-top:4px; background:#fff; border:1px solid var(--border); border-radius:12px; box-shadow: var(--shadow-md); max-height:220px; overflow:auto; z-index:10; }
-.prod-results-item{ display:block; width:100%; text-align:left; padding:10px 12px; border:none; background:0; font-size:13px; cursor:pointer; color: var(--text); }
-.prod-results-item:hover{ background: rgba(0,0,0,.05); }
-/* Modal Buscar Clave ProdServ: área de resultados */
-.prodserv-modal-results{ max-height:280px; overflow-y:auto; margin-top:8px; border:1px solid var(--border); border-radius:12px; }
-.prodserv-modal-results .prod-results-item{ border-radius:0; }
-.prodserv-modal-results .prod-results-item:first-child{ border-radius: 12px 12px 0 0; }
-.prodserv-modal-results .prod-results-item:last-child{ border-radius: 0 0 12px 12px; }
-
-.modal[hidden]{ display:none !important; }
-.modal__backdrop{ position:absolute; inset:0; background: rgba(0,0,0,.35); cursor:pointer; }
-.modal__panel{ position:relative; width: min(560px, calc(100vw - 28px)); min-width: 320px; background: rgba(255,255,255,.94); backdrop-filter: blur(12px); border: 1px solid rgba(0,0,0,.10); border-radius: 18px; box-shadow: var(--shadow-md); overflow:hidden; }
-.modal__head{ display:flex; justify-content:space-between; align-items:flex-start; padding: 14px 14px 10px; border-bottom: 1px solid var(--border); }
-.modal__title{ font-weight: 900; }
-.modal__subtitle{ color: var(--muted); font-size: 12px; margin-top: 2px; }
-.modal__body{ padding: 14px; display:flex; flex-direction:column; gap: 12px; }
-.modal__foot{ padding: 12px 14px 14px; border-top: 1px solid var(--border); display:flex; justify-content:flex-end; gap: 10px; }
-.icon-btn{ width: 36px; height: 36px; display:grid; place-items:center; border-radius: 12px; border: 1px solid var(--border); background: rgba(255,255,255,.8); }
-.icon-btn:hover{ background: rgba(0,0,0,.03); }
-.grid-2{ display:grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.field{ display:flex; flex-direction:column; gap: 8px; }
-.label{ font-size: 12px; color: var(--muted); font-weight: 700; }
-.help{ font-size: 12px; color: #b42318; }
-
-@media (max-width: 860px){
-  .table-tools__search input{ width: 100%; }
-  .grid-2{ grid-template-columns: 1fr; }
-}
-</style>
 {% endblock %}
+

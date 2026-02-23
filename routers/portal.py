@@ -1070,10 +1070,46 @@ def get_portal_router(templates):
         )
 
     @router.get("/clients", response_class=HTMLResponse)
-    def portal_clients(request: Request, issuer: dict = Depends(get_portal_issuer)):
+    def portal_clients(request: Request, issuer: dict = Depends(get_portal_issuer), q: str = Query("")):
         try:
+            issuer_id = int(issuer.get("id") or 0)
+            query = (q or "").strip()
+            rows = []
+            if issuer_id > 0:
+                conn = db()
+                try:
+                    if query:
+                        like = f"%{query}%"
+                        rows = conn.execute(
+                            """
+                            SELECT id, rfc, name, cp, regimen_fiscal, uso_cfdi_default, email, phone, last_seen_at
+                            FROM clients
+                            WHERE issuer_id = ? AND (rfc LIKE ? OR COALESCE(name,'') LIKE ?)
+                            ORDER BY COALESCE(last_seen_at, created_at) DESC
+                            LIMIT 500
+                            """,
+                            (issuer_id, like, like),
+                        ).fetchall()
+                    else:
+                        rows = conn.execute(
+                            """
+                            SELECT id, rfc, name, cp, regimen_fiscal, uso_cfdi_default, email, phone, last_seen_at
+                            FROM clients
+                            WHERE issuer_id = ?
+                            ORDER BY COALESCE(last_seen_at, created_at) DESC
+                            LIMIT 500
+                            """,
+                            (issuer_id,),
+                        ).fetchall()
+                finally:
+                    conn.close()
             return _render_portal(
-                request, issuer=issuer, template_name="portal_clients.html", active_page="clients", title="Clientes"
+                request,
+                issuer=issuer,
+                template_name="portal_clients.html",
+                active_page="clients",
+                title="Clientes",
+                extra={"rows": [dict(r) for r in rows] if rows else [], "q": query},
             )
         except Exception:
             logger.exception("portal: error renderizando /portal/clients")
@@ -1090,14 +1126,324 @@ def get_portal_router(templates):
             raise
 
     @router.get("/products", response_class=HTMLResponse)
-    def portal_products(request: Request, issuer: dict = Depends(get_portal_issuer)):
+    def portal_products(request: Request, issuer: dict = Depends(get_portal_issuer), q: str = Query("")):
         try:
+            issuer_id = int(issuer.get("id") or 0)
+            query = (q or "").strip()
+            rows = []
+            if issuer_id > 0:
+                conn = db()
+                try:
+                    if query:
+                        like = f"%{query}%"
+                        rows = conn.execute(
+                            """
+                            SELECT id, name, clave_prod_serv, clave_unidad, unidad,
+                                   default_unit_price, default_currency, active, updated_at
+                            FROM products
+                            WHERE issuer_id = ?
+                              AND (COALESCE(name,'') LIKE ? OR COALESCE(clave_prod_serv,'') LIKE ?)
+                            ORDER BY active DESC, updated_at DESC
+                            LIMIT 500
+                            """,
+                            (issuer_id, like, like),
+                        ).fetchall()
+                    else:
+                        rows = conn.execute(
+                            """
+                            SELECT id, name, clave_prod_serv, clave_unidad, unidad,
+                                   default_unit_price, default_currency, active, updated_at
+                            FROM products
+                            WHERE issuer_id = ?
+                            ORDER BY active DESC, updated_at DESC
+                            LIMIT 500
+                            """,
+                            (issuer_id,),
+                        ).fetchall()
+                finally:
+                    conn.close()
             return _render_portal(
-                request, issuer=issuer, template_name="portal_products.html", active_page="products", title="Productos"
+                request,
+                issuer=issuer,
+                template_name="portal_products.html",
+                active_page="products",
+                title="Productos",
+                extra={"rows": [dict(r) for r in rows] if rows else [], "q": query},
             )
         except Exception:
             logger.exception("portal: error renderizando /portal/products")
             raise
+
+    @router.get("/products/suggestions", response_class=HTMLResponse)
+    def portal_products_suggestions(request: Request, issuer: dict = Depends(get_portal_issuer), q: str = Query("")):
+        try:
+            issuer_id = int(issuer.get("id") or 0)
+            query = (q or "").strip()
+            rows = []
+            if issuer_id > 0:
+                conn = db()
+                try:
+                    if query:
+                        like = f"%{query}%"
+                        rows = conn.execute(
+                            """
+                            SELECT id, clave_prod_serv, raw_description, clave_unidad, unidad,
+                                   unit_price_hint, currency, times_seen, last_seen_at
+                            FROM product_observations
+                            WHERE issuer_id = ?
+                              AND (COALESCE(raw_description,'') LIKE ? OR COALESCE(clave_prod_serv,'') LIKE ?)
+                            ORDER BY times_seen DESC, last_seen_at DESC
+                            LIMIT 500
+                            """,
+                            (issuer_id, like, like),
+                        ).fetchall()
+                    else:
+                        rows = conn.execute(
+                            """
+                            SELECT id, clave_prod_serv, raw_description, clave_unidad, unidad,
+                                   unit_price_hint, currency, times_seen, last_seen_at
+                            FROM product_observations
+                            WHERE issuer_id = ?
+                            ORDER BY times_seen DESC, last_seen_at DESC
+                            LIMIT 500
+                            """,
+                            (issuer_id,),
+                        ).fetchall()
+                finally:
+                    conn.close()
+            return _render_portal(
+                request,
+                issuer=issuer,
+                template_name="portal_product_suggestions.html",
+                active_page="product_suggestions",
+                title="Productos sugeridos",
+                extra={"rows": [dict(r) for r in rows] if rows else [], "q": query},
+            )
+        except Exception:
+            logger.exception("portal: error renderizando /portal/products/suggestions")
+            raise
+
+    @router.post("/products/suggestions/{observation_id}/convert", response_class=JSONResponse)
+    def portal_products_suggestions_convert(
+        request: Request,
+        observation_id: int,
+        payload: dict = Body(default_factory=dict),
+        issuer: dict = Depends(get_portal_issuer),
+    ):
+        issuer_id = int(issuer.get("id") or 0)
+        if issuer_id <= 0:
+            raise HTTPException(status_code=401, detail="Sesión inválida")
+        try:
+            obs_id = int(observation_id)
+        except Exception:
+            raise HTTPException(status_code=400, detail="ID inválido")
+
+        name_override = (payload.get("name") if isinstance(payload, dict) else "") or ""
+        name_override = str(name_override).strip()
+
+        conn = db()
+        try:
+            obs = conn.execute(
+                """
+                SELECT id, clave_prod_serv, clave_unidad, unidad, raw_description, unit_price_hint, currency
+                FROM product_observations
+                WHERE issuer_id = ? AND id = ?
+                LIMIT 1
+                """,
+                (issuer_id, obs_id),
+            ).fetchone()
+            if not obs:
+                raise HTTPException(status_code=404, detail="Sugerencia no encontrada")
+
+            name = name_override or (obs["raw_description"] or "").strip()
+            if not name:
+                raise HTTPException(status_code=400, detail="Nombre del producto es obligatorio")
+
+            cps = (obs["clave_prod_serv"] or "").strip() or None
+            cu = (obs["clave_unidad"] or "").strip() or None
+            unidad = (obs["unidad"] or "").strip() or None
+            price = obs["unit_price_hint"]
+            currency = (obs["currency"] or "").strip().upper() or None
+
+            conn.execute(
+                """
+                INSERT INTO products (
+                  issuer_id, name, clave_prod_serv, clave_unidad, unidad,
+                  default_unit_price, default_currency, active, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, datetime('now'), datetime('now'))
+                ON CONFLICT(issuer_id, name, clave_prod_serv, clave_unidad) DO UPDATE SET
+                  unidad = COALESCE(excluded.unidad, products.unidad),
+                  default_unit_price = COALESCE(excluded.default_unit_price, products.default_unit_price),
+                  default_currency = COALESCE(excluded.default_currency, products.default_currency),
+                  active = 1,
+                  updated_at = datetime('now')
+                """,
+                (issuer_id, name, cps, cu, unidad, price, currency),
+            )
+            conn.commit()
+            row = conn.execute(
+                """
+                SELECT id FROM products
+                WHERE issuer_id = ? AND name = ? AND COALESCE(clave_prod_serv,'') = COALESCE(?, '')
+                  AND COALESCE(clave_unidad,'') = COALESCE(?, '')
+                ORDER BY id DESC LIMIT 1
+                """,
+                (issuer_id, name, cps, cu),
+            ).fetchone()
+            prod_id = int(row["id"]) if row else None
+        finally:
+            conn.close()
+
+        log_action(request, "product_converted_from_observation", issuer_id=issuer_id, entity_id=str(obs_id))
+        return JSONResponse({"ok": True, "product_id": prod_id})
+
+    @router.post("/products/save", response_class=JSONResponse)
+    def portal_products_save(
+        request: Request,
+        payload: dict = Body(...),
+        issuer: dict = Depends(get_portal_issuer),
+    ):
+        issuer_id = int(issuer.get("id") or 0)
+        if issuer_id <= 0:
+            raise HTTPException(status_code=401, detail="Sesión inválida")
+        if not isinstance(payload, dict):
+            raise HTTPException(status_code=400, detail="Payload inválido")
+
+        prod_id = payload.get("id")
+        name = str(payload.get("name") or "").strip()
+        clave_prod_serv = str(payload.get("clave_prod_serv") or "").strip() or None
+        clave_unidad = str(payload.get("clave_unidad") or "").strip() or None
+        unidad = str(payload.get("unidad") or "").strip() or None
+        default_currency = str(payload.get("default_currency") or "").strip().upper() or None
+        active = 1 if str(payload.get("active") or "1").strip() not in ("0", "false", "False") else 0
+        default_unit_price = payload.get("default_unit_price")
+        try:
+            default_unit_price = float(default_unit_price) if default_unit_price not in (None, "", "null") else None
+        except Exception:
+            raise HTTPException(status_code=400, detail="Precio inválido")
+
+        if not name:
+            raise HTTPException(status_code=400, detail="Nombre es obligatorio")
+
+        conn = db()
+        try:
+            if prod_id is not None and str(prod_id).strip():
+                pid = int(prod_id)
+                cur = conn.execute(
+                    """
+                    UPDATE products SET
+                      name = ?,
+                      clave_prod_serv = ?,
+                      clave_unidad = ?,
+                      unidad = ?,
+                      default_unit_price = ?,
+                      default_currency = ?,
+                      active = ?,
+                      updated_at = datetime('now')
+                    WHERE issuer_id = ? AND id = ?
+                    """,
+                    (name, clave_prod_serv, clave_unidad, unidad, default_unit_price, default_currency, active, issuer_id, pid),
+                )
+                if cur.rowcount == 0:
+                    raise HTTPException(status_code=404, detail="Producto no encontrado")
+                conn.commit()
+                return JSONResponse({"ok": True, "id": pid})
+
+            conn.execute(
+                """
+                INSERT INTO products (
+                  issuer_id, name, clave_prod_serv, clave_unidad, unidad,
+                  default_unit_price, default_currency, active, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+                ON CONFLICT(issuer_id, name, clave_prod_serv, clave_unidad) DO UPDATE SET
+                  unidad = COALESCE(excluded.unidad, products.unidad),
+                  default_unit_price = COALESCE(excluded.default_unit_price, products.default_unit_price),
+                  default_currency = COALESCE(excluded.default_currency, products.default_currency),
+                  active = excluded.active,
+                  updated_at = datetime('now')
+                """,
+                (issuer_id, name, clave_prod_serv, clave_unidad, unidad, default_unit_price, default_currency, active),
+            )
+            conn.commit()
+            row = conn.execute(
+                """
+                SELECT id FROM products
+                WHERE issuer_id = ? AND name = ? AND COALESCE(clave_prod_serv,'') = COALESCE(?, '')
+                  AND COALESCE(clave_unidad,'') = COALESCE(?, '')
+                ORDER BY id DESC LIMIT 1
+                """,
+                (issuer_id, name, clave_prod_serv, clave_unidad),
+            ).fetchone()
+            return JSONResponse({"ok": True, "id": int(row["id"]) if row else None})
+        finally:
+            conn.close()
+
+    @router.post("/products/{product_id}/toggle", response_class=JSONResponse)
+    def portal_products_toggle(request: Request, product_id: int, issuer: dict = Depends(get_portal_issuer)):
+        issuer_id = int(issuer.get("id") or 0)
+        if issuer_id <= 0:
+            raise HTTPException(status_code=401, detail="Sesión inválida")
+        pid = int(product_id)
+        conn = db()
+        try:
+            row = conn.execute(
+                "SELECT active FROM products WHERE issuer_id = ? AND id = ? LIMIT 1",
+                (issuer_id, pid),
+            ).fetchone()
+            if not row:
+                raise HTTPException(status_code=404, detail="Producto no encontrado")
+            new_val = 0 if int(row["active"] or 0) == 1 else 1
+            conn.execute(
+                "UPDATE products SET active = ?, updated_at = datetime('now') WHERE issuer_id = ? AND id = ?",
+                (new_val, issuer_id, pid),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+        return JSONResponse({"ok": True, "active": new_val})
+
+    @router.post("/clients/save", response_class=JSONResponse)
+    def portal_clients_save(request: Request, payload: dict = Body(...), issuer: dict = Depends(get_portal_issuer)):
+        issuer_id = int(issuer.get("id") or 0)
+        if issuer_id <= 0:
+            raise HTTPException(status_code=401, detail="Sesión inválida")
+        if not isinstance(payload, dict):
+            raise HTTPException(status_code=400, detail="Payload inválido")
+
+        cid = payload.get("id")
+        name = str(payload.get("name") or "").strip() or None
+        cp = str(payload.get("cp") or "").strip() or None
+        regimen = str(payload.get("regimen_fiscal") or "").strip() or None
+        uso = str(payload.get("uso_cfdi_default") or "").strip().upper() or None
+        email = str(payload.get("email") or "").strip() or None
+        phone = str(payload.get("phone") or "").strip() or None
+
+        if cid is None or not str(cid).strip():
+            raise HTTPException(status_code=400, detail="ID requerido")
+        client_id = int(cid)
+
+        conn = db()
+        try:
+            cur = conn.execute(
+                """
+                UPDATE clients SET
+                  name = COALESCE(?, name),
+                  cp = COALESCE(?, cp),
+                  regimen_fiscal = COALESCE(?, regimen_fiscal),
+                  uso_cfdi_default = COALESCE(?, uso_cfdi_default),
+                  email = COALESCE(?, email),
+                  phone = COALESCE(?, phone),
+                  updated_at = datetime('now')
+                WHERE issuer_id = ? AND id = ?
+                """,
+                (name, cp, regimen, uso, email, phone, issuer_id, client_id),
+            )
+            if cur.rowcount == 0:
+                raise HTTPException(status_code=404, detail="Cliente no encontrado")
+            conn.commit()
+        finally:
+            conn.close()
+        return JSONResponse({"ok": True, "id": client_id})
 
     @router.get("/datos-fiscales", response_class=HTMLResponse)
     def portal_datos_fiscales(request: Request, issuer: dict = Depends(get_portal_issuer)):
@@ -1410,7 +1756,7 @@ def get_portal_router(templates):
         xlsx_abs_path = safe_join(storage_root, xlsx_rel_path)
 
         try:
-            meta = convert_pdf_to_xlsx(pdf_abs_path, xlsx_abs_path)
+            meta = convert_pdf_to_xlsx(pdf_abs_path, xlsx_abs_path, issuer_id=issuer_id)
         except Exception as e:
             logger.exception("bank pdf-to-excel: error convirtiendo issuer=%s pdf=%s", issuer_id, pdf_rel_path)
             raise HTTPException(status_code=500, detail="No se pudo convertir el PDF. Intenta con otro archivo o revisa que el PDF tenga texto.")

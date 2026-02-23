@@ -1,0 +1,157 @@
+{% extends "base_portal.html" %}
+{% set title = title|default('Productos sugeridos') %}
+
+{% block content %}
+<section class="page-section page-section--product-suggestions">
+  <div class="card ui-card">
+    <div class="card-header card-header--with-tools ui-card__header">
+      <div class="card-header__left">
+        <div class="table-tools table-tools--inline">
+          <form class="table-tools__search" method="get" action="/portal/products/suggestions">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M16.2 16.2 21 21" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+            </svg>
+            <input class="input ui-input" type="search" name="q" value="{{ q|default('')|e }}" placeholder="Buscar por descripción o clave" autocomplete="off" />
+          </form>
+          <button id="backfillBtn" type="button" class="btn btn--secondary">Actualizar desde mis facturas emitidas</button>
+        </div>
+      </div>
+      <div class="card-header__right">
+        <h3 class="section-title">Sugerencias</h3>
+        <p class="muted u-m0">
+          {% if rows and rows|length %}
+            Total: {{ rows|length }}
+          {% else %}
+            Sin datos
+          {% endif %}
+        </p>
+      </div>
+    </div>
+
+    <p class="card-legend muted">
+      Estas sugerencias se detectan automáticamente desde tus CFDI emitidos. Convierte las mejores a productos confirmados.
+    </p>
+
+    <div class="card-list-sep">
+      {% if not rows or rows|length == 0 %}
+        <div class="empty-state empty-state--empty">
+          <div class="empty-state__title">Aún no hay productos sugeridos</div>
+          <div class="empty-state__desc">Haz clic en “Actualizar desde mis facturas emitidas” para generar sugerencias desde tus CFDI.</div>
+          <button type="button" class="btn btn-primary" id="backfillBtnEmpty">Actualizar ahora</button>
+        </div>
+      {% else %}
+      <div class="table-wrap">
+        <table class="table ui-table ui-table--zebra">
+          <thead>
+            <tr>
+              <th>Clave ProdServ</th>
+              <th>Descripción (raw)</th>
+              <th>Clave unidad</th>
+              <th>Unidad</th>
+              <th>Precio sugerido</th>
+              <th>Veces visto</th>
+              <th>Última vez visto</th>
+              <th>Acción</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in rows %}
+            <tr>
+              <td class="muted"><code>{{ r.clave_prod_serv or '—' }}</code></td>
+              <td style="font-weight:650;">{{ r.raw_description }}</td>
+              <td class="muted"><code>{{ r.clave_unidad or '—' }}</code></td>
+              <td class="muted">{{ r.unidad or '—' }}</td>
+              <td>{{ '$' ~ ('{:,.2f}'.format(r.unit_price_hint|float)) if r.unit_price_hint is not none else '—' }}{% if r.currency %} <span class="muted">{{ r.currency }}</span>{% endif %}</td>
+              <td><span class="chip">{{ r.times_seen }}</span></td>
+              <td class="muted" style="font-size:12px;">{{ r.last_seen_at or '—' }}</td>
+              <td>
+                <button
+                  type="button"
+                  class="btn btn--sm btn--secondary js-convert"
+                  data-id="{{ r.id }}"
+                  data-name="{{ (r.raw_description or '')|e }}"
+                  data-prodserv="{{ (r.clave_prod_serv or '')|e }}"
+                  data-unitkey="{{ (r.clave_unidad or '')|e }}"
+                >Convertir a producto</button>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+<script>
+(function () {
+  function $(id){ return document.getElementById(id); }
+  var btn = $('backfillBtn');
+  var btnEmpty = $('backfillBtnEmpty');
+
+  async function runBackfill(triggerBtn) {
+    if (triggerBtn && window.uiSetButtonLoading) window.uiSetButtonLoading(triggerBtn, true, 'Actualizando…');
+    try {
+      var res = await (window.portalFetchJSON
+        ? window.portalFetchJSON('/portal/catalog/backfill', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ limit: 500 })
+          }, { timeoutMs: 60000, retry: 0 })
+        : Promise.resolve({ ok: false, detail: 'Helper no disponible' })
+      );
+      if (triggerBtn && window.uiSetButtonLoading) window.uiSetButtonLoading(triggerBtn, false);
+      if (!res || !res.ok || !res.data || !res.data.ok) {
+        var msg = (res && res.data && (res.data.detail || res.data.message)) ? String(res.data.detail || res.data.message) : ((res && res.detail) || 'No se pudo actualizar.');
+        if (window.uiToast) window.uiToast({ type: 'danger', title: 'Error', message: msg });
+        return;
+      }
+      var d = res.data;
+      if (window.uiToast) window.uiToast({ type: 'success', title: 'Actualizado', message: 'Procesados: ' + d.processed + ' · Clientes: ' + d.clients_upserted + ' · Sugerencias: ' + d.observations_upserted });
+      setTimeout(function(){ window.location.reload(); }, 600);
+    } catch (e) {
+      if (triggerBtn && window.uiSetButtonLoading) window.uiSetButtonLoading(triggerBtn, false);
+      if (window.uiToast) window.uiToast({ type: 'danger', title: 'Error', message: (e && e.message) || 'Error de red.' });
+    }
+  }
+
+  if (btn) btn.addEventListener('click', function(){ runBackfill(btn); });
+  if (btnEmpty) btnEmpty.addEventListener('click', function(){ runBackfill(btnEmpty); });
+
+  document.querySelectorAll('.js-convert').forEach(function (b) {
+    b.addEventListener('click', async function () {
+      var id = b.getAttribute('data-id');
+      var defaultName = b.getAttribute('data-name') || '';
+      var name = window.prompt('Nombre del producto (editable):', defaultName) || '';
+      name = String(name || '').trim();
+      if (!name) return;
+      if (window.uiSetButtonLoading) window.uiSetButtonLoading(b, true, 'Convirtiendo…');
+      try {
+        var res = await (window.portalFetchJSON
+          ? window.portalFetchJSON('/portal/products/suggestions/' + encodeURIComponent(id) + '/convert', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ name: name })
+            }, { timeoutMs: 30000, retry: 0 })
+          : Promise.resolve({ ok: false, detail: 'Helper no disponible' })
+        );
+        if (window.uiSetButtonLoading) window.uiSetButtonLoading(b, false);
+        if (!res || !res.ok || !res.data || !res.data.ok) {
+          var msg = (res && res.data && (res.data.detail || res.data.message)) ? String(res.data.detail || res.data.message) : ((res && res.detail) || 'No se pudo convertir.');
+          if (window.uiToast) window.uiToast({ type: 'danger', title: 'Error', message: msg });
+          return;
+        }
+        if (window.uiToast) window.uiToast({ type: 'success', title: 'Listo', message: 'Producto creado.' });
+        setTimeout(function(){ window.location.href = '/portal/products'; }, 500);
+      } catch (e) {
+        if (window.uiSetButtonLoading) window.uiSetButtonLoading(b, false);
+        if (window.uiToast) window.uiToast({ type: 'danger', title: 'Error', message: (e && e.message) || 'Error de red.' });
+      }
+    });
+  });
+})();
+</script>
+{% endblock %}
+

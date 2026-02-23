@@ -7,87 +7,81 @@
     <div class="card-header card-header--with-tools ui-card__header">
       <div class="card-header__left">
         <div class="table-tools table-tools--inline">
-          <div class="table-tools__search">
+          <form class="table-tools__search" method="get" action="/portal/clients">
             <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <path d="M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
               <path d="M16.2 16.2 21 21" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
             </svg>
-            <input id="custSearch" class="input ui-input" type="search" placeholder="Buscar por RFC, razón social o alias" autocomplete="off" />
-          </div>
-          <button id="custNewBtn" type="button" class="btn btn-primary ui-btn ui-btn--primary">
-            <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path d="M12 5v14" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
-              <path d="M5 12h14" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
-            </svg>
-            Nuevo cliente
-          </button>
+            <input class="input ui-input" type="search" name="q" value="{{ q|default('')|e }}" placeholder="Buscar por RFC o nombre" autocomplete="off" />
+          </form>
+          <button id="backfillBtn" type="button" class="btn btn--secondary">Actualizar desde mis facturas emitidas</button>
         </div>
       </div>
       <div class="card-header__right">
-        <h3 class="section-title">Listado</h3>
-        <p class="muted u-m0"><span id="custCount">Cargando…</span></p>
+        <h3 class="section-title">Clientes</h3>
+        <p class="muted u-m0">{% if rows and rows|length %}Total: {{ rows|length }}{% else %}Sin datos{% endif %}</p>
       </div>
     </div>
+
+    <p class="card-legend muted">
+      Lista sugerida (auto-captura) desde tus CFDI emitidos. Puedes editar campos para dejarlos “limpios”.
+    </p>
 
     <div class="card-list-sep">
-    <div class="table-wrap" id="custTableWrap">
-      <table class="table table--zebra ui-table ui-table--zebra" id="custTable">
-        <thead>
-          <tr>
-            <th>RFC</th>
-            <th>Razón social</th>
-            <th>Alias</th>
-            <th>C.P.</th>
-            <th>Régimen</th>
-            <th>Email</th>
-            <th>Acciones</th>
-          </tr>
-        </thead>
-        <tbody id="custTbody">
-          <tr><td colspan="7"><div class="skeleton skeleton--row-46"></div></td></tr>
-          <tr><td colspan="7"><div class="skeleton skeleton--row-46"></div></td></tr>
-          <tr><td colspan="7"><div class="skeleton skeleton--row-46"></div></td></tr>
-          <tr><td colspan="7"><div class="skeleton skeleton--row-46"></div></td></tr>
-          <tr><td colspan="7"><div class="skeleton skeleton--row-46"></div></td></tr>
-        </tbody>
-      </table>
-    </div>
-    <div id="custTablePagination" class="table-pagination" hidden aria-label="Paginación del listado"></div>
-
-    <div class="empty-state empty-state--error" id="custLoadError" hidden aria-live="polite">
-      <div class="empty-state__title">No pudimos cargar esto ahora.</div>
-      <p class="empty-state__desc" id="custLoadErrorMsg">Puedes intentar de nuevo.</p>
-      <button type="button" class="btn btn--secondary" id="custLoadErrorRetry">Reintentar</button>
-    </div>
-    <div class="empty-state empty-state--empty" id="custEmpty" hidden>
-      <div class="empty-state__icon" aria-hidden="true">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <circle cx="9" cy="8" r="4" stroke="currentColor" stroke-width="1.75"/>
-          <path d="M3 20c0-3 3-5 6-5s6 2 6 5" stroke="currentColor" stroke-width="1.75"/>
-          <path d="M16 12l2 2 4-4" stroke="currentColor" stroke-width="1.75"/>
-        </svg>
+      {% if not rows or rows|length == 0 %}
+        <div class="empty-state empty-state--empty">
+          <div class="empty-state__title">Aún no hay clientes detectados</div>
+          <div class="empty-state__desc">Haz clic en “Actualizar desde mis facturas emitidas” para crear tu lista automáticamente.</div>
+          <button type="button" class="btn btn-primary" id="backfillBtnEmpty">Actualizar ahora</button>
+        </div>
+      {% else %}
+      <div class="table-wrap">
+        <table class="table ui-table ui-table--zebra">
+          <thead>
+            <tr>
+              <th>RFC</th>
+              <th>Nombre</th>
+              <th>CP</th>
+              <th>Última vez visto</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in rows %}
+            <tr>
+              <td><code>{{ r.rfc }}</code></td>
+              <td style="font-weight:650;">{{ r.name or '—' }}</td>
+              <td class="muted">{{ r.cp or '—' }}</td>
+              <td class="muted" style="font-size:12px;">{{ r.last_seen_at or '—' }}</td>
+              <td>
+                <button
+                  type="button"
+                  class="btn btn--sm btn--secondary js-edit"
+                  data-id="{{ r.id }}"
+                  data-name="{{ (r.name or '')|e }}"
+                  data-cp="{{ (r.cp or '')|e }}"
+                  data-regimen="{{ (r.regimen_fiscal or '')|e }}"
+                  data-uso="{{ (r.uso_cfdi_default or '')|e }}"
+                  data-email="{{ (r.email or '')|e }}"
+                  data-phone="{{ (r.phone or '')|e }}"
+                >Editar</button>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
       </div>
-      <div class="empty-state__title">Aún no tienes clientes</div>
-      <div class="empty-state__desc">Guarda los datos de quien te paga para reutilizarlos en cada factura y ahorrar tiempo.</div>
-      <button type="button" class="btn btn-primary ui-btn ui-btn--primary" id="custEmptyBtn">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path d="M12 5v14" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
-          <path d="M5 12h14" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
-        </svg>
-        Crear primer cliente
-      </button>
-    </div>
+      {% endif %}
     </div>
   </div>
 
-  <!-- Modal: create/update (MVP) -->
-  <div class="modal" id="custModal" hidden aria-hidden="true">
+  <div class="modal" id="editModal" hidden aria-hidden="true">
     <div class="modal__backdrop" data-close="true"></div>
-    <div class="modal__panel" role="dialog" aria-modal="true" aria-labelledby="custModalTitle">
+    <div class="modal__panel" role="dialog" aria-modal="true" aria-labelledby="editModalTitle">
       <div class="modal__head">
         <div>
-          <div class="modal__title" id="custModalTitle">Nuevo cliente</div>
-          <div class="modal__subtitle">Guarda datos para reutilizar al facturar.</div>
+          <div class="modal__title" id="editModalTitle">Editar cliente</div>
+          <div class="modal__subtitle">Campos opcionales para normalizar la información detectada.</div>
         </div>
         <button type="button" class="icon-btn" data-close="true" aria-label="Cerrar">
           <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -96,538 +90,137 @@
           </svg>
         </button>
       </div>
-
       <div class="modal__body">
-        <div class="grid-2">
-          <div class="field">
-            <label class="label">RFC *</label>
-            <input id="custRfc" class="input" type="text" placeholder="XAXX010101000" autocomplete="off" maxlength="13" />
-            <div class="help" id="custRfcHelp" hidden>Revisa el RFC: 12 o 13 caracteres, solo letras y números.</div>
-          </div>
-          <div class="field">
-            <label class="label">Alias (opcional)</label>
-            <input id="custAlias" class="input" type="text" placeholder="Ej. Cliente frecuente" autocomplete="off" />
-          </div>
-        </div>
-
+        <input type="hidden" id="cId" />
         <div class="field">
-          <label class="label">Razón social *</label>
-          <input id="custName" class="input" type="text" placeholder="Nombre / Razón social" autocomplete="off" />
-          <div class="help" id="custNameHelp" hidden>Escribe la razón social o nombre del cliente.</div>
+          <label class="label">Nombre</label>
+          <input id="cName" class="input" type="text" autocomplete="off" />
         </div>
-
         <div class="grid-3">
           <div class="field">
-            <label class="label">C.P. (opcional)</label>
-            <input id="custZip" class="input" type="text" placeholder="64000" autocomplete="off" maxlength="5" inputmode="numeric" pattern="[0-9]*" />
-            <div class="help" id="custZipHelp" hidden>El código postal debe tener 5 dígitos.</div>
+            <label class="label">CP</label>
+            <input id="cCp" class="input" type="text" autocomplete="off" maxlength="5" />
           </div>
           <div class="field">
-            <label class="label">Régimen (opcional)</label>
-            <input id="custTax" class="input" type="text" placeholder="601, 612, etc" autocomplete="off" />
+            <label class="label">Régimen</label>
+            <input id="cRegimen" class="input" type="text" autocomplete="off" placeholder="601, 612, etc" />
           </div>
           <div class="field">
-            <label class="label">Email (opcional)</label>
-            <input id="custEmail" class="input" type="email" placeholder="correo@dominio.com" autocomplete="off" />
-            <div class="help" id="custEmailHelp" hidden>Revisa el formato del correo (ej. nombre@dominio.com).</div>
+            <label class="label">Uso CFDI default</label>
+            <input id="cUso" class="input" type="text" autocomplete="off" placeholder="G03" />
           </div>
         </div>
-
-        <div class="hint">
-          Tip: en el futuro, desde aquí podrás seleccionar un cliente y abrir <b>Factura rápida</b> con sus datos precargados.
+        <div class="grid-2">
+          <div class="field">
+            <label class="label">Email</label>
+            <input id="cEmail" class="input" type="email" autocomplete="off" />
+          </div>
+          <div class="field">
+            <label class="label">Teléfono</label>
+            <input id="cPhone" class="input" type="text" autocomplete="off" />
+          </div>
         </div>
       </div>
-
       <div class="modal__foot">
         <button type="button" class="btn btn-ghost" data-close="true">Cancelar</button>
-        <button type="button" class="btn btn-primary" id="custSaveBtn">Guardar</button>
+        <button type="button" class="btn btn-primary" id="saveBtn">Guardar</button>
       </div>
     </div>
   </div>
 </section>
 
 <script>
-(function(){
-  function getToken(){
-    var p = new URLSearchParams(window.location.search);
-    return p.get('token') || "{{ token }}";
-  }
-  const token = getToken();
+(function () {
+  function $(id){ return document.getElementById(id); }
+  var backfillBtn = $('backfillBtn');
+  var backfillBtnEmpty = $('backfillBtnEmpty');
+  var modal = $('editModal');
+  var saveBtn = $('saveBtn');
 
-  const tbody = document.getElementById('custTbody');
-  const countEl = document.getElementById('custCount');
-  const emptyEl = document.getElementById('custEmpty');
-  const tableWrap = document.getElementById('custTableWrap');
-  const searchEl = document.getElementById('custSearch');
+  function openModal() { if (!modal) return; modal.hidden = false; modal.setAttribute('aria-hidden', 'false'); }
+  function closeModal() { if (!modal) return; modal.hidden = true; modal.setAttribute('aria-hidden', 'true'); }
 
-  const modal = document.getElementById('custModal');
-  const openBtn = document.getElementById('custNewBtn');
-  const emptyBtn = document.getElementById('custEmptyBtn');
-  const saveBtn = document.getElementById('custSaveBtn');
-
-  const rfcEl = document.getElementById('custRfc');
-  const aliasEl = document.getElementById('custAlias');
-  const nameEl = document.getElementById('custName');
-  const zipEl = document.getElementById('custZip');
-  const taxEl = document.getElementById('custTax');
-  const emailEl = document.getElementById('custEmail');
-  const rfcHelp = document.getElementById('custRfcHelp');
-  const nameHelp = document.getElementById('custNameHelp');
-  const zipHelp = document.getElementById('custZipHelp');
-  const emailHelp = document.getElementById('custEmailHelp');
-
-  let allRows = [];
-
-  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const hl = (text, q) => (window.uiHighlightSearch ? window.uiHighlightSearch(text, q) : esc(text));
-
-  function setCount(n, from, to){
-    if (from != null && to != null && n > ROWS_PAGE_LIMIT)
-      countEl.textContent = 'Mostrando ' + from + '-' + to + ' de ' + n + ' clientes';
-    else
-      countEl.textContent = (n === 1) ? 'Total: 1 cliente' : 'Total: ' + n + ' clientes';
-  }
-
-  function rowHTML(r, searchQ){
-    const q = (searchQ || '').trim();
-    const rfc = q ? hl(r.rfc, q) : esc(r.rfc);
-    const name = q ? hl(r.legal_name, q) : esc(r.legal_name);
-    const alias = q ? hl(r.alias || '', q) : esc(r.alias || '');
-    const zip = esc(r.zip || '');
-    const ts = esc(r.tax_system || '');
-    const email = esc(r.email || '');
-
-    const createUrl = '/portal/create?' +
-      'customer_rfc=' + encodeURIComponent(String(r.rfc || '')) +
-      '&customer_legal_name=' + encodeURIComponent(String(r.legal_name || '')) +
-      '&customer_zip=' + encodeURIComponent(String(r.zip || '')) +
-      '&customer_tax_system=' + encodeURIComponent(String(r.tax_system || '')) +
-      '&customer_email=' + encodeURIComponent(String(r.email || ''));
-    return `
-      <tr>
-        <td><code>${rfc}</code></td>
-        <td><div style="font-weight:650;">${name}</div></td>
-        <td>${alias}</td>
-        <td class="muted">${zip}</td>
-        <td class="muted">${ts}</td>
-        <td style="font-size:12px;">${email}</td>
-        <td>
-          <div class="cust-actions-cell">
-            <button type="button" class="btn btn-small btn-ghost" data-copy="${esc(r.rfc || '')}">Copiar RFC</button>
-            <div class="cust-actions-row">
-              <a href="${createUrl}" class="btn btn-small" style="text-decoration:none;">Generar factura</a>
-              <button type="button" class="btn btn-small btn-ghost cust-delete-btn" data-delete-rfc="${esc(r.rfc || '')}" data-delete-name="${esc(r.legal_name || r.rfc || '')}" title="Eliminar cliente" aria-label="Eliminar cliente">
-                <svg class="icon icon-trash" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                  <path d="M4 7h16v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7z" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
-                  <path d="M9 11v6M15 11v6M3 7l2-3h14l2 3M10 4v1M14 4v1" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
-                </svg>
-              </button>
-            </div>
-          </div>
-        </td>
-      </tr>
-    `;
-  }
-
-  const ROWS_PAGE_LIMIT = 200;
-  let clientPage = 1;
-  let lastFilteredRows = [];
-
-  function render(rows){
-    lastFilteredRows = rows;
-    const total = rows.length;
-    const totalPages = Math.max(1, Math.ceil(total / ROWS_PAGE_LIMIT));
-    if (clientPage > totalPages) clientPage = totalPages;
-    const start = (clientPage - 1) * ROWS_PAGE_LIMIT;
-    const displayRows = total <= ROWS_PAGE_LIMIT ? rows : rows.slice(start, start + ROWS_PAGE_LIMIT);
-    const n = displayRows.length;
-
-    setCount(total);
-    if (total > ROWS_PAGE_LIMIT) {
-      setCount(total, (clientPage - 1) * ROWS_PAGE_LIMIT + 1, (clientPage - 1) * ROWS_PAGE_LIMIT + n);
-    }
-
-    if (total === 0) {
-      tbody.innerHTML = '';
-      if (tableWrap) { tableWrap.hidden = true; tableWrap.style.display = 'none'; }
-      if (emptyEl) { emptyEl.hidden = false; emptyEl.removeAttribute('hidden'); emptyEl.style.display = ''; }
-      document.getElementById('custTablePagination') && (document.getElementById('custTablePagination').hidden = true);
-      return;
-    }
-
-    if (tableWrap) { tableWrap.hidden = false; tableWrap.style.display = ''; }
-    if (emptyEl) { emptyEl.hidden = true; emptyEl.setAttribute('hidden', ''); emptyEl.style.display = 'none'; }
-    const searchQ = (searchEl.value || '').trim();
-    tbody.innerHTML = displayRows.map(r => rowHTML(r, searchQ)).join('');
-
-    var pagEl = document.getElementById('custTablePagination');
-    if (pagEl) {
-      if (total <= ROWS_PAGE_LIMIT) {
-        pagEl.hidden = true;
-      } else {
-        pagEl.hidden = false;
-        var from = (clientPage - 1) * ROWS_PAGE_LIMIT + 1;
-        var to = (clientPage - 1) * ROWS_PAGE_LIMIT + n;
-        pagEl.innerHTML = '<span class="muted">Mostrando ' + from + '-' + to + ' de ' + total + '</span>' +
-          (clientPage > 1 ? ' <button type="button" class="btn btn--sm btn--ghost" id="custTablePrev">Anterior</button>' : '') +
-          (clientPage < totalPages ? ' <button type="button" class="btn btn--sm btn--ghost" id="custTableNext">Siguiente</button>' : '');
-        var prevBtn = document.getElementById('custTablePrev');
-        var nextBtn = document.getElementById('custTableNext');
-        if (prevBtn) prevBtn.onclick = function(){ clientPage--; render(lastFilteredRows); };
-        if (nextBtn) nextBtn.onclick = function(){ clientPage++; render(lastFilteredRows); };
-      }
-    }
-  }
-
-  function filter(){
-    clientPage = 1;
-    const q = (searchEl.value || '').trim().toLowerCase();
-    if (!q) return render(allRows);
-    const filtered = allRows.filter(r => {
-      return String(r.rfc || '').toLowerCase().includes(q)
-        || String(r.legal_name || '').toLowerCase().includes(q)
-        || String(r.alias || '').toLowerCase().includes(q);
-    });
-    render(filtered);
-  }
-
-  const loadErrorEl = document.getElementById('custLoadError');
-  const loadErrorMsgEl = document.getElementById('custLoadErrorMsg');
-
-  async function load(){
-    var skeletonShownAt = Date.now();
-    if (loadErrorEl) loadErrorEl.hidden = true;
-    if (emptyEl) { emptyEl.hidden = true; emptyEl.style.display = 'none'; }
-    if (tableWrap) { tableWrap.hidden = false; tableWrap.style.display = ''; }
-    tbody.innerHTML = (window.uiSkeletonTableRows && window.uiSkeletonTableRows(7, 5)) || '<tr><td colspan="7"><div class="skeleton" style="height: 46px; border-radius: 14px;"></div></td></tr>'.repeat(5);
+  async function runBackfill(triggerBtn) {
+    if (triggerBtn && window.uiSetButtonLoading) window.uiSetButtonLoading(triggerBtn, true, 'Actualizando…');
     try {
-      if (window.portalProgressBar) window.portalProgressBar.start();
-      const r = window.uiFetchJSON ? await window.uiFetchJSON('/api/customers') : { ok: false, status: 0, data: null, error: 'Helper no disponible' };
-      const list = window.uiGetListFromResponse ? window.uiGetListFromResponse(r.data) : (Array.isArray(r.data) ? r.data : []);
-      await (window.uiMinSkeletonDelay && window.uiMinSkeletonDelay(skeletonShownAt, 300));
-      if (r.ok && (!list || list.length === 0)) {
-        allRows = [];
-        if (loadErrorEl) loadErrorEl.hidden = true;
-        if (tableWrap) tableWrap.hidden = true;
-        if (emptyEl) { emptyEl.hidden = false; emptyEl.style.display = ''; }
-        tbody.innerHTML = '';
-        return;
-      }
-      if (r.status === 401) {
-        allRows = [];
-        if (loadErrorMsgEl) loadErrorMsgEl.innerHTML = window.uiSessionExpiredMessage ? window.uiSessionExpiredMessage() : 'Sesión expirada. <a href="/login">Inicia sesión</a>';
-        if (loadErrorEl) loadErrorEl.hidden = false;
-        if (tableWrap) tableWrap.hidden = true;
-        if (emptyEl) emptyEl.hidden = true;
-        tbody.innerHTML = '';
-        return;
-      }
-      if (!r.ok) {
-        allRows = [];
-        const msg = window.uiListLoadErrorText ? window.uiListLoadErrorText(r, 'clientes') : (r.error || 'Revisa tu conexión e intenta de nuevo.');
-        if (loadErrorMsgEl) loadErrorMsgEl.textContent = msg;
-        if (loadErrorEl) loadErrorEl.hidden = false;
-        if (tableWrap) tableWrap.hidden = true;
-        if (emptyEl) emptyEl.hidden = true;
-        tbody.innerHTML = '';
-        return;
-      }
-      allRows = list;
-      render(allRows);
-    } catch (e) {
-      allRows = [];
-      tbody.innerHTML = '';
-      const fallbackMsg = 'Revisa tu conexión e intenta de nuevo.';
-      if (loadErrorMsgEl) loadErrorMsgEl.textContent = fallbackMsg;
-      if (loadErrorEl) loadErrorEl.hidden = false;
-      if (tableWrap) tableWrap.hidden = true;
-      if (emptyEl) emptyEl.hidden = true;
-    } finally {
-      if (window.portalProgressBar) window.portalProgressBar.done();
-    }
-  }
-
-  // Clipboard
-  document.addEventListener('click', async (e) => {
-    const copyBtn = e.target && e.target.closest ? e.target.closest('[data-copy]') : null;
-    if (copyBtn) {
-      const value = copyBtn.getAttribute('data-copy') || '';
-      try{
-        await navigator.clipboard.writeText(value);
-        window.portalToast && window.portalToast({ type: 'success', title: 'Copiado', message: 'RFC copiado al portapapeles.' });
-      }catch(_){
-        window.portalToast && window.portalToast({ type: 'danger', title: 'No se pudo copiar', message: 'Tu navegador bloqueó el portapapeles.' });
-      }
-      return;
-    }
-
-    // Eliminar cliente (modal de confirmación para acción irreversible)
-    const deleteBtn = e.target && e.target.closest ? e.target.closest('[data-delete-rfc]') : null;
-    if (deleteBtn) {
-      const rfc = deleteBtn.getAttribute('data-delete-rfc') || '';
-      const name = deleteBtn.getAttribute('data-delete-name') || rfc;
-      if (!rfc) return;
-      const confirmed = window.uiConfirm ? await window.uiConfirm({
-        title: 'Eliminar cliente',
-        message: '¿Eliminar el cliente "' + (name || rfc).replace(/"/g, '') + '" (RFC ' + rfc + ')? Esta acción no se puede deshacer.',
-        confirmText: 'Eliminar',
-        cancelText: 'Cancelar',
-      }) : false;
-      if (!confirmed) return;
-      deleteBtn.disabled = true;
-      try {
-        const r = window.portalFetchJSON
-          ? await window.portalFetchJSON('/api/customers/delete', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ token, rfc }),
-            }, { timeoutMs: 30000, retry: 0 })
-          : { ok: false, status: 0, data: null, detail: 'Helper no disponible' };
-        if (r.status === 401) return;
-        const data = r.data || {};
-        if (!r.ok) throw new Error(window.portalApiErrorMessage ? window.portalApiErrorMessage(data) : (data.detail || 'Error al eliminar'));
-        /* P38: borrado irreversible — no inventar Undo; success overlay (patrón mutación importante) */
-        if (window.uiSuccessOverlay) {
-          window.uiSuccessOverlay({
-            title: 'Cliente eliminado',
-            message: 'Puedes agregar otro cliente cuando quieras.',
-            actions: [{ label: 'Entendido', onClick: function () { if (window.uiSuccessOverlayClose) window.uiSuccessOverlayClose(); } }]
-          });
-        } else if (window.portalToast) {
-          window.portalToast({ type: 'success', title: 'Eliminado', message: 'Puedes agregar otro cliente cuando quieras.', ttl: 4500 });
-        }
-        await load();
-      } catch (err) {
-        window.portalToastError && window.portalToastError(err, 'No se pudo eliminar', 'Revisa e intenta de nuevo o recarga la página.');
-      } finally {
-        deleteBtn.disabled = false;
-      }
-      return;
-    }
-  });
-
-  // P39: Search debounce 250ms + teclado Enter/Esc
-  var filterDebounce;
-  searchEl.addEventListener('input', function(){
-    clearTimeout(filterDebounce);
-    filterDebounce = setTimeout(filter, 250);
-  });
-  searchEl.addEventListener('keydown', function(e){
-    if (e.key === 'Escape') {
-      searchEl.value = '';
-      filter();
-      searchEl.blur();
-      e.preventDefault();
-      return;
-    }
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      var firstLink = tbody && tbody.querySelector('a[href*="/portal/create"]');
-      if (firstLink) { firstLink.focus(); firstLink.click(); }
-    }
-  });
-
-  // Modal
-  const openModal = () => {
-    modal.hidden = false;
-    modal.setAttribute('aria-hidden','false');
-    document.body.style.overflow = 'hidden';
-    setTimeout(() => rfcEl && rfcEl.focus(), 30);
-  };
-
-  const closeModal = () => {
-    modal.hidden = true;
-    modal.setAttribute('aria-hidden','true');
-    document.body.style.overflow = '';
-    // reset
-    [rfcEl, aliasEl, nameEl, zipEl, taxEl, emailEl].forEach(x => x && (x.value = ''));
-    rfcHelp.hidden = true;
-    nameHelp.hidden = true;
-    rfcEl.classList.remove('input--error');
-    nameEl.classList.remove('input--error');
-  };
-
-  [openBtn, emptyBtn].forEach(b => b && b.addEventListener('click', () => openModal()));
-
-  modal.addEventListener('click', (e) => {
-    const t = e.target;
-    const direct = t && t.getAttribute && t.getAttribute('data-close') === 'true';
-    const nested = t && t.closest && t.closest('[data-close="true"]');
-    const backdrop = t && t.classList && t.classList.contains('modal__backdrop');
-    if (direct || nested || backdrop) closeModal();
-  });
-
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && !modal.hidden) closeModal();
-  });
-
-  function validate(){
-    const rfcRaw = (rfcEl.value || '').trim();
-    const rfc = rfcRaw.toUpperCase();
-    if (rfcRaw !== rfc && rfcEl.value) rfcEl.value = rfc;
-    const name = (nameEl.value || '').trim();
-    const zip = (zipEl.value || '').trim();
-    const email = (emailEl.value || '').trim();
-
-    let ok = true;
-    if (!rfc) {
-      ok = false;
-      if (rfcHelp) { rfcHelp.textContent = 'El RFC es obligatorio.'; rfcHelp.hidden = false; }
-      if (rfcEl) rfcEl.classList.add('input--error');
-    } else if (rfc.length !== 12 && rfc.length !== 13) {
-      ok = false;
-      if (rfcHelp) { rfcHelp.textContent = 'El RFC debe tener 12 caracteres (moral) o 13 (física).'; rfcHelp.hidden = false; }
-      if (rfcEl) rfcEl.classList.add('input--error');
-    } else if (!/^[A-Z&Ñ][0-9A-Z&Ñ]{11,12}$/.test(rfc)) {
-      ok = false;
-      if (rfcHelp) { rfcHelp.textContent = 'Solo letras y números, sin espacios ni caracteres especiales.'; rfcHelp.hidden = false; }
-      if (rfcEl) rfcEl.classList.add('input--error');
-    } else {
-      if (rfcHelp) rfcHelp.hidden = true;
-      if (rfcEl) rfcEl.classList.remove('input--error');
-    }
-
-    if (!name) {
-      ok = false;
-      if (nameHelp) { nameHelp.hidden = false; nameHelp.textContent = 'Escribe la razón social o nombre del cliente.'; }
-      if (nameEl) nameEl.classList.add('input--error');
-    } else {
-      if (nameHelp) nameHelp.hidden = true;
-      if (nameEl) nameEl.classList.remove('input--error');
-    }
-
-    if (zip && !/^[0-9]{5}$/.test(zip)) {
-      ok = false;
-      if (zipHelp) { zipHelp.hidden = false; }
-      if (zipEl) zipEl.classList.add('input--error');
-    } else {
-      if (zipHelp) zipHelp.hidden = true;
-      if (zipEl) zipEl.classList.remove('input--error');
-    }
-
-    if (email && !/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email)) {
-      ok = false;
-      if (emailHelp) { emailHelp.hidden = false; }
-      if (emailEl) emailEl.classList.add('input--error');
-    } else {
-      if (emailHelp) emailHelp.hidden = true;
-      if (emailEl) emailEl.classList.remove('input--error');
-    }
-
-    return ok;
-  }
-
-  async function save(){
-    if (!validate()) {
-      window.portalToast && window.portalToast({ type: 'warning', title: 'Revisa los datos', message: 'Completa RFC y razón social. Si usas CP o email, revisa el formato.' });
-      return;
-    }
-
-    const payload = {
-      token,
-      rfc: (rfcEl.value || '').trim().toUpperCase(),
-      legal_name: (nameEl.value || '').trim(),
-      alias: (aliasEl.value || '').trim() || null,
-      zip: (zipEl.value || '').trim() || null,
-      tax_system: (taxEl.value || '').trim() || null,
-      email: (emailEl.value || '').trim() || null,
-    };
-
-    if (window.uiSetButtonLoading) window.uiSetButtonLoading(saveBtn, true, 'Guardando…');
-
-    try{
-      const r = window.portalFetchJSON
-        ? await window.portalFetchJSON('/api/customers/create', {
+      var res = await (window.portalFetchJSON
+        ? window.portalFetchJSON('/portal/catalog/backfill', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-          }, { timeoutMs: 30000, retry: 0 })
-        : { ok: false, status: 0, data: null, detail: 'Helper no disponible' };
-      if (r.status === 401) return;
-      const data = r.data || {};
-      if (!r.ok) throw new Error(window.portalApiErrorMessage ? window.portalApiErrorMessage(data) : (data.detail || `HTTP ${r.status}`));
-
-      closeModal();
-      await load();
-      if (window.uiSuccessOverlay) window.uiSuccessOverlay({ title: 'Cliente guardado', message: 'Los datos se guardaron correctamente.', actions: [{ label: 'Entendido', onClick: function () { if (window.uiSuccessOverlayClose) window.uiSuccessOverlayClose(); } }] });
-      else if (window.portalToast) window.portalToast({ type: 'success', title: 'Guardado', message: 'Cliente guardado correctamente.' });
-    }catch(e){
-      if (window.uiToastError) window.uiToastError(e, 'No pudimos guardar', 'Revisa RFC, razón social y CP e intenta de nuevo.');
-      else if (window.portalToastError) window.portalToastError(e, 'No pudimos guardar', 'Revisa RFC, razón social y CP e intenta de nuevo.');
-    }finally{
-      if (window.uiSetButtonLoading) window.uiSetButtonLoading(saveBtn, false);
-      else { saveBtn.disabled = false; saveBtn.textContent = 'Guardar'; }
+            body: JSON.stringify({ limit: 500 })
+          }, { timeoutMs: 60000, retry: 0 })
+        : Promise.resolve({ ok: false, detail: 'Helper no disponible' })
+      );
+      if (triggerBtn && window.uiSetButtonLoading) window.uiSetButtonLoading(triggerBtn, false);
+      if (!res || !res.ok || !res.data || !res.data.ok) {
+        var msg = (res && res.data && (res.data.detail || res.data.message)) ? String(res.data.detail || res.data.message) : ((res && res.detail) || 'No se pudo actualizar.');
+        if (window.uiToast) window.uiToast({ type: 'danger', title: 'Error', message: msg });
+        return;
+      }
+      var d = res.data;
+      if (window.uiToast) window.uiToast({ type: 'success', title: 'Actualizado', message: 'Procesados: ' + d.processed + ' · Clientes: ' + d.clients_upserted + ' · Sugerencias: ' + d.observations_upserted });
+      setTimeout(function(){ window.location.reload(); }, 600);
+    } catch (e) {
+      if (triggerBtn && window.uiSetButtonLoading) window.uiSetButtonLoading(triggerBtn, false);
+      if (window.uiToast) window.uiToast({ type: 'danger', title: 'Error', message: (e && e.message) || 'Error de red.' });
     }
   }
 
-  saveBtn.addEventListener('click', () => save());
-  const retryBtn = document.getElementById('custLoadErrorRetry');
-  if (retryBtn) retryBtn.addEventListener('click', load);
+  if (backfillBtn) backfillBtn.addEventListener('click', function(){ runBackfill(backfillBtn); });
+  if (backfillBtnEmpty) backfillBtnEmpty.addEventListener('click', function(){ runBackfill(backfillBtnEmpty); });
 
-  load();
+  if (modal) modal.addEventListener('click', function(e){
+    if (e.target && e.target.dataset && e.target.dataset.close === 'true') closeModal();
+  });
+
+  document.querySelectorAll('.js-edit').forEach(function (b) {
+    b.addEventListener('click', function () {
+      $('cId').value = b.getAttribute('data-id') || '';
+      $('cName').value = b.getAttribute('data-name') || '';
+      $('cCp').value = b.getAttribute('data-cp') || '';
+      $('cRegimen').value = b.getAttribute('data-regimen') || '';
+      $('cUso').value = b.getAttribute('data-uso') || '';
+      $('cEmail').value = b.getAttribute('data-email') || '';
+      $('cPhone').value = b.getAttribute('data-phone') || '';
+      openModal();
+    });
+  });
+
+  if (saveBtn) saveBtn.addEventListener('click', async function () {
+    var payload = {
+      id: $('cId').value,
+      name: $('cName').value,
+      cp: $('cCp').value,
+      regimen_fiscal: $('cRegimen').value,
+      uso_cfdi_default: $('cUso').value,
+      email: $('cEmail').value,
+      phone: $('cPhone').value
+    };
+    if (window.uiSetButtonLoading) window.uiSetButtonLoading(saveBtn, true, 'Guardando…');
+    try {
+      var res = await (window.portalFetchJSON
+        ? window.portalFetchJSON('/portal/clients/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          }, { timeoutMs: 30000, retry: 0 })
+        : Promise.resolve({ ok: false, detail: 'Helper no disponible' })
+      );
+      if (window.uiSetButtonLoading) window.uiSetButtonLoading(saveBtn, false);
+      if (!res || !res.ok || !res.data || !res.data.ok) {
+        var msg = (res && res.data && (res.data.detail || res.data.message)) ? String(res.data.detail || res.data.message) : ((res && res.detail) || 'No se pudo guardar.');
+        if (window.uiToast) window.uiToast({ type: 'danger', title: 'Error', message: msg });
+        return;
+      }
+      closeModal();
+      if (window.uiToast) window.uiToast({ type: 'success', title: 'Guardado', message: 'Cliente actualizado.' });
+      setTimeout(function(){ window.location.reload(); }, 400);
+    } catch (e) {
+      if (window.uiSetButtonLoading) window.uiSetButtonLoading(saveBtn, false);
+      if (window.uiToast) window.uiToast({ type: 'danger', title: 'Error', message: (e && e.message) || 'Error de red.' });
+    }
+  });
 })();
 </script>
-
-<style>
-/* Page local layout helpers (keep minimal) */
-.page-section{ display:flex; flex-direction:column; gap: 14px; }
-.page-section--clients{ margin-top: 8px; }
-.page-section--clients .card-list-sep{ margin-top: 20px; }
-.page-head{ display:flex; justify-content:space-between; align-items:flex-end; gap: 14px; margin-bottom: 2px; }
-.page-title{ margin:0; font-size: 20px; font-weight: 850; letter-spacing: -.02em; }
-.page-subtitle{ margin: 6px 0 0; color: var(--muted); font-size: 13px; }
-.table-tools{ display:flex; align-items:center; gap: 10px; }
-.table-tools__search{ position:relative; display:flex; align-items:center; gap: 8px; }
-.table-tools__search .icon{ position:absolute; left: 12px; width:18px; height:18px; opacity:.75; }
-.table-tools__search input{ padding-left: 40px; }
-/* Clientes: misma estructura que facturas emitidas/recibidas (min-width en tabla y th, sin table-layout fixed) */
-#custTable td { vertical-align: middle; }
-#custTable .btn { margin-right: 6px; }
-#custTable .btn:last-child { margin-right: 0; }
-
-/* Acciones: Copiar RFC arriba; Generar factura y basurita en la misma fila */
-.cust-actions-cell { display: flex; flex-direction: column; gap: 8px; }
-.cust-actions-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.cust-delete-btn {
-  color: var(--muted);
-  border-color: var(--border);
-  background: rgba(0,0,0,.04);
-  padding: 6px 10px;
-  min-width: 36px;
-}
-.cust-delete-btn:hover {
-  color: var(--text);
-  background: rgba(0,0,0,.08);
-  border-color: var(--border-strong);
-}
-.cust-delete-btn .icon { width: 16px; height: 16px; }
-
-/* Modal */
-.modal[hidden]{ display:none !important; }
-.modal__backdrop{ position:absolute; inset:0; background: rgba(0,0,0,.35); cursor:pointer; }
-.modal__panel{ position:relative; width: min(660px, calc(100vw - 28px)); min-width: 320px; background: rgba(255,255,255,.94); backdrop-filter: blur(12px);
-  border: 1px solid rgba(0,0,0,.10); border-radius: 18px; box-shadow: var(--shadow-md); overflow:hidden; }
-.modal__head{ display:flex; justify-content:space-between; align-items:flex-start; padding: 14px 14px 10px; border-bottom: 1px solid var(--border); }
-.modal__title{ font-weight: 900; }
-.modal__subtitle{ color: var(--muted); font-size: 12px; margin-top: 2px; }
-.modal__body{ padding: 14px; display:flex; flex-direction:column; gap: 12px; }
-.modal__foot{ padding: 12px 14px 14px; border-top: 1px solid var(--border); display:flex; justify-content:flex-end; gap: 10px; }
-.icon-btn{ width: 36px; height: 36px; display:grid; place-items:center; border-radius: 12px; border: 1px solid var(--border); background: rgba(255,255,255,.8); }
-.icon-btn:hover{ background: rgba(0,0,0,.03); }
-.grid-2{ display:grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.grid-3{ display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
-.field{ display:flex; flex-direction:column; gap: 8px; }
-.label{ font-size: 12px; color: var(--muted); font-weight: 700; }
-.help{ font-size: 12px; color: #b42318; }
-.hint{ font-size: 12px; color: var(--muted); padding: 10px 12px; border-radius: 14px; background: rgba(0,0,0,.03); border: 1px solid rgba(0,0,0,.06); }
-.input--error{ border-color: rgba(240,68,56,.55) !important; box-shadow: 0 0 0 3px rgba(240,68,56,.15) !important; }
-
-@media (max-width: 860px){
-  .page-head{ flex-direction:column; align-items:stretch; }
-  .table-tools{ justify-content:space-between; }
-  .table-tools__search input{ width: 100%; }
-  .grid-2{ grid-template-columns: 1fr; }
-  .grid-3{ grid-template-columns: 1fr; }
-}
-</style>
 {% endblock %}
+
