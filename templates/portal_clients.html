@@ -387,8 +387,16 @@
         }));
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(window.portalApiErrorMessage ? window.portalApiErrorMessage(data) : (data.detail || 'Error al eliminar'));
-        /* P38: borrado irreversible — no inventar Undo; mostrar "Eliminado" y sugerir recrear */
-        window.portalToast && window.portalToast({ type: 'success', title: 'Eliminado', message: 'Puedes agregar otro cliente cuando quieras.', ttl: 4500 });
+        /* P38: borrado irreversible — no inventar Undo; success overlay (patrón mutación importante) */
+        if (window.uiSuccessOverlay) {
+          window.uiSuccessOverlay({
+            title: 'Cliente eliminado',
+            message: 'Puedes agregar otro cliente cuando quieras.',
+            actions: [{ label: 'Entendido', onClick: function () { if (window.uiSuccessOverlayClose) window.uiSuccessOverlayClose(); } }]
+          });
+        } else if (window.portalToast) {
+          window.portalToast({ type: 'success', title: 'Eliminado', message: 'Puedes agregar otro cliente cuando quieras.', ttl: 4500 });
+        }
         await load();
       } catch (err) {
         window.portalToastError && window.portalToastError(err, 'No se pudo eliminar', 'Revisa e intenta de nuevo o recarga la página.');

@@ -120,11 +120,24 @@
           </div>
         </div>
         <div id="providerInvoicesList" class="provider-invoices-panel__list"></div>
-        <div id="providerInvoicesEmpty" class="provider-drawer__empty" hidden>
-          <p class="provider-drawer__empty-text muted">No hay facturas para este proveedor.</p>
+        <div id="providerInvoicesEmpty" class="empty-state empty-state--empty provider-drawer__empty" hidden>
+          <div class="empty-state__icon" aria-hidden="true">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M14 2v5a1 1 0 0 0 1 1h5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M8 12h8M8 16h8" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <div class="empty-state__title">No hay facturas para este proveedor</div>
+          <div class="empty-state__desc">Si esperabas ver facturas, intenta sincronizar con SAT o revisa Facturas recibidas.</div>
+          <div class="empty-state__actions">
+            <a href="/portal/invoices/received" class="btn btn--secondary provider-drawer__link">Ver facturas recibidas</a>
+          </div>
         </div>
-        <div id="providerInvoicesError" class="provider-drawer__error" hidden aria-live="polite">
-          <div id="providerInvoicesErrorBody"></div>
+        <div id="providerInvoicesError" class="empty-state empty-state--error provider-drawer__error" hidden aria-live="polite">
+          <div class="empty-state__title">No pudimos cargar esto ahora.</div>
+          <p class="empty-state__desc" id="providerInvoicesErrorMsg">Puedes intentar de nuevo.</p>
+          <button type="button" class="btn btn--secondary" id="providerInvoicesRetry">Reintentar</button>
         </div>
       </div>
       <footer class="ui-drawer__footer provider-drawer__footer">
@@ -462,7 +475,8 @@
   const panelList = document.getElementById('providerInvoicesList');
   const panelEmpty = document.getElementById('providerInvoicesEmpty');
   const panelError = document.getElementById('providerInvoicesError');
-  const panelErrorBody = document.getElementById('providerInvoicesErrorBody');
+  const panelErrorMsg = document.getElementById('providerInvoicesErrorMsg');
+  const panelRetryBtn = document.getElementById('providerInvoicesRetry');
   const panelVerTodas = document.getElementById('providerInvoicesVerTodas');
   const panelPagination = document.getElementById('providerInvoicesPagination');
   const panelPageInfo = document.getElementById('providerInvoicesPageInfo');
@@ -559,7 +573,7 @@
     panelEmpty.hidden = true;
     if (panelSummary) panelSummary.hidden = true;
     if (panelError) panelError.hidden = true;
-    if (panelErrorBody) panelErrorBody.innerHTML = '';
+    if (panelErrorMsg) panelErrorMsg.textContent = 'Puedes intentar de nuevo.';
     if (panelPagination) panelPagination.hidden = true;
     if (panelDownloads) panelDownloads.hidden = true;
     if (panelLoading) panelLoading.hidden = false;
@@ -570,25 +584,20 @@
     (window.uiFetchJSON ? window.uiFetchJSON(url, { credentials: 'same-origin' }) : (window.portalFetchWithTimeout ? window.portalFetchWithTimeout(url, { credentials: 'same-origin' }, 30000) : fetch(url, { credentials: 'same-origin' })).then(function(res) { return res.text().then(function(text) { var data = null; try { data = text ? JSON.parse(text) : null; } catch (_) {} return { ok: res.ok, status: res.status, data: data, error: (data && (data.detail || data.message)) || res.statusText || '' }; }); }).catch(function(e) { return { ok: false, status: 0, data: null, error: (e && e.message) || 'Error de conexión' }; }))
       .then(function(r) {
         if (panelLoading) panelLoading.hidden = true;
-        if (panelError) { panelError.hidden = true; panelErrorBody.innerHTML = ''; }
+        if (panelError) panelError.hidden = true;
+        if (panelErrorMsg) panelErrorMsg.textContent = 'Puedes intentar de nuevo.';
         if (r.status === 401) {
           panelList.innerHTML = '';
           panelEmpty.hidden = true;
-          if (panelError && panelErrorBody) {
-            panelError.hidden = false;
-            panelErrorBody.innerHTML = '<p class="provider-drawer__error-text">' + (window.uiSessionExpiredMessage ? window.uiSessionExpiredMessage() : 'Sesión expirada. <a href="/login">Inicia sesión</a>') + '</p>';
-          }
+          if (panelError) panelError.hidden = false;
+          if (panelErrorMsg) panelErrorMsg.innerHTML = (window.uiSessionExpiredMessage ? window.uiSessionExpiredMessage() : 'Sesión expirada. <a href="/login">Inicia sesión</a>');
           return;
         }
         if (!r.ok) {
           panelList.innerHTML = '';
           panelEmpty.hidden = true;
-          if (panelError && panelErrorBody) {
-            panelError.hidden = false;
-            panelErrorBody.innerHTML = '<p class="provider-drawer__error-text">' + (r.error || 'No pudimos cargar esto ahora.') + '</p><button type="button" class="btn btn--secondary" id="providerInvoicesRetry">Reintentar</button>';
-            var retryBtn = document.getElementById('providerInvoicesRetry');
-            if (retryBtn) retryBtn.addEventListener('click', function() { openProviderInvoices(currentProviderRfc, currentProviderName); });
-          }
+          if (panelError) panelError.hidden = false;
+          if (panelErrorMsg) panelErrorMsg.textContent = (r.error || 'No pudimos cargar esto ahora.');
           return;
         }
         var raw = r.data;
@@ -623,16 +632,18 @@
         if (panelLoading) panelLoading.hidden = true;
         panelList.innerHTML = '';
         panelEmpty.hidden = true;
-        if (panelError && panelErrorBody) {
-          panelError.hidden = false;
-          panelErrorBody.innerHTML = '<p class="provider-drawer__error-text">No pudimos cargar esto ahora.</p><button type="button" class="btn btn--secondary" id="providerInvoicesRetry">Reintentar</button>';
-          var retryBtn = document.getElementById('providerInvoicesRetry');
-          if (retryBtn) retryBtn.addEventListener('click', function() { openProviderInvoices(currentProviderRfc, currentProviderName); });
-        }
+        if (panelError) panelError.hidden = false;
+        if (panelErrorMsg) panelErrorMsg.textContent = 'No pudimos cargar esto ahora.';
       })
       .finally(function() {
         if (window.portalProgressBar) window.portalProgressBar.done();
       });
+  }
+
+  if (panelRetryBtn) {
+    panelRetryBtn.addEventListener('click', function () {
+      openProviderInvoices(currentProviderRfc, currentProviderName);
+    });
   }
 
   function closeProviderInvoices() {

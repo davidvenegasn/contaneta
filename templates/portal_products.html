@@ -638,8 +638,16 @@
         }));
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.detail || 'Error al eliminar');
-        /* P38: borrado irreversible — no inventar Undo; mostrar "Eliminado" y sugerir recrear */
-        window.portalToast && window.portalToast({ type: 'success', title: 'Eliminado', message: 'Puedes agregar otro producto cuando quieras.', ttl: 4500 });
+        /* P38: borrado irreversible — no inventar Undo; success overlay (patrón mutación importante) */
+        if (window.uiSuccessOverlay) {
+          window.uiSuccessOverlay({
+            title: 'Producto eliminado',
+            message: 'Puedes agregar otro producto cuando quieras.',
+            actions: [{ label: 'Entendido', onClick: function () { if (window.uiSuccessOverlayClose) window.uiSuccessOverlayClose(); } }]
+          });
+        } else if (window.portalToast) {
+          window.portalToast({ type: 'success', title: 'Eliminado', message: 'Puedes agregar otro producto cuando quieras.', ttl: 4500 });
+        }
         await load();
       } catch (err) {
         window.portalToastError && window.portalToastError(err, 'No se pudo eliminar', 'Revisa e intenta de nuevo o recarga la página.');
