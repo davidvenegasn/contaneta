@@ -10,6 +10,22 @@
     <p class="muted" style="margin:0 0 14px;">
       Arrastra y suelta tu PDF (estado de cuenta) para convertirlo a Excel (.xlsx).
     </p>
+
+    <div class="empty-state empty-state--info" style="margin: 0 0 14px;">
+      <div class="empty-state__title">¿Qué contiene el Excel?</div>
+      <div class="empty-state__message">
+        <div class="muted" style="margin:0 0 10px;">
+          El archivo se genera con hojas pensadas para contabilidad y conciliación:
+        </div>
+        <ul class="muted" style="margin:0;padding-left:18px;line-height:1.55;">
+          <li><b>Movimientos</b>: todos los cargos y abonos, normalizados y clasificados.</li>
+          <li><b>Gastos</b> y <b>Ingresos</b>: separados para revisar totales.</li>
+          <li><b>Conciliación CFDI</b>: sugerencias de facturas recibidas para linkear movimientos.</li>
+          <li><b>Gastos sin factura</b>: posibles gastos sin CFDI (para revisar).</li>
+        </ul>
+      </div>
+    </div>
+
     <div class="empty-state empty-state--info" style="margin: 0 0 14px;">
       <div class="empty-state__title">Tip</div>
       <div class="empty-state__message">
@@ -30,9 +46,42 @@
         <span class="bank-convert-status__label">Estatus</span>
         <span class="bank-convert-status__value" id="uploadStatus">—</span>
       </div>
+      <div class="bank-convert-status__row" id="summaryRow" hidden>
+        <span class="bank-convert-status__label">Resumen</span>
+        <span class="bank-convert-status__value" id="summaryText">—</span>
+      </div>
+      <div class="bank-result" id="resultPanel" hidden>
+        <div class="bank-result__grid">
+          <div class="bank-result__metric">
+            <div class="bank-result__k">Movimientos detectados</div>
+            <div class="bank-result__v" id="mDetected">—</div>
+          </div>
+          <div class="bank-result__metric">
+            <div class="bank-result__k">Total ingresos</div>
+            <div class="bank-result__v" id="mIngresos">—</div>
+          </div>
+          <div class="bank-result__metric">
+            <div class="bank-result__k">Total gastos</div>
+            <div class="bank-result__v" id="mGastos">—</div>
+          </div>
+          <div class="bank-result__metric">
+            <div class="bank-result__k">Baja confianza</div>
+            <div class="bank-result__v" id="mLow">—</div>
+          </div>
+        </div>
+        <div class="bank-result__note muted" id="parseMessage" hidden></div>
+      </div>
+
+      <div class="bank-quality" id="qualityPanel" hidden>
+        <div class="bank-quality__title">Calidad de extracción</div>
+        <ul class="bank-quality__list">
+          <li><b>Si ves movimientos partidos</b> o faltantes, usa la hoja <b>RAW</b> del Excel.</li>
+          <li>Si el PDF fuera <b>escaneado</b>, necesitará <b>OCR (v2)</b>.</li>
+        </ul>
+      </div>
       <div class="bank-convert-status__error" id="uploadError" hidden role="alert"></div>
       <div class="bank-convert-status__actions">
-        <a class="btn btn-primary" id="downloadBtn" href="#" hidden>Descargar Excel</a>
+        <a class="btn btn-primary" id="downloadBtn" href="#" hidden>Descargar Excel contable</a>
         <button type="button" class="btn btn-ghost" id="resetBtn" hidden>Convertir otro PDF</button>
       </div>
     </div>
@@ -46,6 +95,15 @@
   var meta = document.getElementById('pdfFileMeta');
   var uploadRow = document.getElementById('uploadRow');
   var statusEl = document.getElementById('uploadStatus');
+  var summaryRow = document.getElementById('summaryRow');
+  var summaryText = document.getElementById('summaryText');
+  var resultPanel = document.getElementById('resultPanel');
+  var qualityPanel = document.getElementById('qualityPanel');
+  var mDetected = document.getElementById('mDetected');
+  var mIngresos = document.getElementById('mIngresos');
+  var mGastos = document.getElementById('mGastos');
+  var mLow = document.getElementById('mLow');
+  var parseMessage = document.getElementById('parseMessage');
   var errorEl = document.getElementById('uploadError');
   var downloadBtn = document.getElementById('downloadBtn');
   var resetBtn = document.getElementById('resetBtn');
@@ -67,9 +125,17 @@
     if (uploadRow) uploadRow.hidden = false;
     if (statusEl) statusEl.textContent = msg || '—';
   }
+  function setSummary(text) {
+    if (summaryRow) summaryRow.hidden = !text;
+    if (summaryText) summaryText.textContent = text || '—';
+  }
   function resetUi() {
     uploading = false;
     clearError();
+    setSummary('');
+    if (resultPanel) resultPanel.hidden = true;
+    if (qualityPanel) qualityPanel.hidden = true;
+    if (parseMessage) { parseMessage.hidden = true; parseMessage.textContent = ''; }
     if (downloadBtn) { downloadBtn.hidden = true; downloadBtn.href = '#'; }
     if (resetBtn) resetBtn.hidden = true;
     if (uploadRow) uploadRow.hidden = true;
@@ -81,6 +147,15 @@
     if (!Number.isFinite(n)) return '';
     var mb = n / (1024 * 1024);
     return mb.toFixed(mb >= 10 ? 0 : 1) + ' MB';
+  }
+  function fmtMoney(n) {
+    var x = Number(n);
+    if (!Number.isFinite(x)) return '—';
+    try {
+      return x.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' });
+    } catch (_) {
+      return '$' + x.toFixed(2);
+    }
   }
 
   async function uploadFile(file) {
@@ -137,6 +212,50 @@
       }
 
       setStatus('Listo');
+      var m = json.meta || {};
+      var processed = Number(json.processed_count);
+      if (!Number.isFinite(processed)) processed = Number(m.processed_count || m.rows || 0);
+      if (!Number.isFinite(processed)) processed = 0;
+
+      var ingresos = Number(json.total_ingresos);
+      if (!Number.isFinite(ingresos)) ingresos = Number(m.total_ingresos || 0);
+      if (!Number.isFinite(ingresos)) ingresos = 0;
+
+      var gastos = Number(json.total_gastos);
+      if (!Number.isFinite(gastos)) gastos = Number(m.total_gastos || 0);
+      if (!Number.isFinite(gastos)) gastos = 0;
+
+      var sinFactura = Number(json.sin_factura_count);
+      if (!Number.isFinite(sinFactura)) sinFactura = Number(m.sin_factura_count || 0);
+      if (!Number.isFinite(sinFactura)) sinFactura = 0;
+
+      setSummary(
+        processed + ' movimientos • ' +
+        'Ingresos ' + fmtMoney(ingresos) + ' • ' +
+        'Gastos ' + fmtMoney(gastos) + ' • ' +
+        (sinFactura ? (sinFactura + ' gastos sin factura (estimados)') : '0 gastos sin factura (estimados)')
+      );
+
+      var low = Number(m.low_confidence_count || 0);
+      if (!Number.isFinite(low)) low = 0;
+      if (resultPanel) resultPanel.hidden = false;
+      if (qualityPanel) qualityPanel.hidden = false;
+      if (mDetected) mDetected.textContent = String(processed);
+      if (mIngresos) mIngresos.textContent = fmtMoney(ingresos);
+      if (mGastos) mGastos.textContent = fmtMoney(gastos);
+      if (mLow) mLow.textContent = String(low);
+
+      var msg = '';
+      if (processed === 0) {
+        msg = (m && m.no_movements_reason) ? String(m.no_movements_reason) : 'No se encontraron movimientos.';
+      } else if (m && m.partial_parse) {
+        msg = (m.partial_reason ? String(m.partial_reason) : 'El parse fue parcial. Revisa RAW.');
+      }
+      if (parseMessage) {
+        parseMessage.textContent = msg || '';
+        parseMessage.hidden = !msg;
+      }
+
       if (downloadBtn && json.download_url) {
         downloadBtn.href = json.download_url;
         downloadBtn.hidden = false;
