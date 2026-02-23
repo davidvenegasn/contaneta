@@ -1,21 +1,22 @@
 # Portal HTML routes and helpers
 import json
+import logging
 import os
 import stat
 import subprocess
-import time
-from collections import defaultdict
 from datetime import datetime, date
 from typing import Optional
 
 from fastapi import APIRouter, Request, Depends, Query, HTTPException, File, UploadFile, Form
 from fastapi.responses import HTMLResponse, Response, RedirectResponse, JSONResponse
 
-from config import BASE_DIR, REGIMEN_LABEL_TO_CODE, COOKIE_DEMO_VIEW, DB_PATH
+from config import BASE_DIR, REGIMEN_LABEL_TO_CODE, COOKIE_DEMO_VIEW, DB_PATH, DEV_MODE
 from database import db, db_rows, has_column
 from routers.deps import get_portal_issuer
-from services import quotations as quotations_service, session as session_service, audit, subscription as subscription_service, csrf as csrf_service
+from services import quotations as quotations_service, rate_limit as rate_limit_service, session as session_service, audit, subscription as subscription_service, csrf as csrf_service
 from services.action_log import log_action
+
+logger = logging.getLogger(__name__)
 
 # ----------------------------
 # Helpers
@@ -285,9 +286,11 @@ def get_portal_router(templates):
             "is_impersonating": is_impersonating,
             "menu_sat_configured": menu_sat_configured,
             "menu_catalog_ok": menu_catalog_ok,
+            "dev_debug_panel": DEV_MODE,
         }
         if extra:
             payload.update(extra)
+        payload.setdefault("csrf_token", csrf_service.generate_csrf_token())
         return templates.TemplateResponse(template_name, payload, status_code=status_code)
 
     def _portal_quotations_impl(request: Request, issuer: dict):
@@ -299,11 +302,9 @@ def get_portal_router(templates):
                 active_page="quotations",
                 title="Cotizaciones",
             )
-        except Exception as e:
-            return HTMLResponse(
-                f"<h3>Error</h3><p>No se pudo cargar la página de cotizaciones.</p><p><small>{str(e)}</small></p>",
-                status_code=400,
-            )
+        except Exception:
+            logger.exception("portal: error renderizando cotizaciones")
+            raise
 
     router = APIRouter(prefix="/portal", tags=["portal"])
 
@@ -363,8 +364,9 @@ def get_portal_router(templates):
         log_action(request, "quotation_pdf", issuer_id=issuer["id"], quotation_id=qid)
         try:
             pdf_bytes = quotations_service.build_quotation_pdf(quote)
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
+        except Exception:
+            logger.exception("portal: error generando PDF de cotización qid=%s", qid)
+            raise
         disposition = "attachment" if download == "1" else "inline"
         return Response(
             content=pdf_bytes,
@@ -435,7 +437,7 @@ def get_portal_router(templates):
                   WHERE issuer_id = ? AND direction = 'received' AND fecha_emision IS NOT NULL
                     AND total IS NOT NULL AND total >= 0.01
                     AND (tipo_comprobante IS NULL OR UPPER(TRIM(tipo_comprobante)) != 'N')
-                ) ORDER BY fecha_emision DESC LIMIT 3
+                ) ORDER BY fecha_emision DESC LIMIT 50
                 """,
                 (issuer_id, issuer_id),
             )
@@ -498,8 +500,11 @@ def get_portal_router(templates):
                         out[k] = v
                 return out
 
-            quick_customers_json = json.dumps([_serialize_row(r) for r in quick_customers])
-            quick_products_json = json.dumps([_serialize_row(r) for r in quick_products])
+            # Escapar para incrustar en <script>: evitar que </script> en datos cierre el tag
+            def _script_safe(s: str) -> str:
+                return (s or "").replace("</", "<\\/")
+            quick_customers_json = _script_safe(json.dumps([_serialize_row(r) for r in quick_customers]))
+            quick_products_json = _script_safe(json.dumps([_serialize_row(r) for r in quick_products]))
 
             return _render_portal(
                 request,
@@ -520,6 +525,8 @@ def get_portal_router(templates):
                     "iva_retenciones": iva_retenciones,
                     "iva_pagado": iva_pagado,
                     "onboarding": onboarding,
+                    "quick_customers": quick_customers,
+                    "quick_products": quick_products,
                     "quick_customers_json": quick_customers_json,
                     "quick_products_json": quick_products_json,
                     "sat_sync_status": _get_sat_sync_status(issuer_id),
@@ -531,8 +538,9 @@ def get_portal_router(templates):
                     ),
                 },
             )
-        except Exception as e:
-            return HTMLResponse(f"<h3>Error</h3><p>{str(e)}</p>", status_code=400)
+        except Exception:
+            logger.exception("portal: error renderizando home")
+            raise
 
     @router.get("/create", response_class=HTMLResponse)
     def portal_create(
@@ -626,17 +634,75 @@ def get_portal_router(templates):
                     "csrf_token": csrf_service.generate_csrf_token(),
                 },
             )
-        except Exception as e:
-            return HTMLResponse(f"<h3>Error</h3><p>{str(e)}</p>", status_code=400)
+        except Exception:
+            logger.exception("portal: error renderizando /portal/create")
+            raise
 
     @router.get("/create/quick", response_class=HTMLResponse)
-    def portal_create_quick(request: Request, issuer: dict = Depends(get_portal_issuer)):
+    def portal_create_quick(
+        request: Request,
+        issuer: dict = Depends(get_portal_issuer),
+        customer_id: Optional[int] = Query(None),
+        product_id: Optional[int] = Query(None),
+    ):
+        # Sin cliente y producto: página para elegir (misma fuente que Clientes y Productos: /api/customers, /api/products)
+        if customer_id is None or product_id is None:
+            try:
+                return _render_portal(
+                    request,
+                    issuer=issuer,
+                    template_name="portal_create_quick_choose.html",
+                    active_page="create",
+                    title="Factura rápida",
+                )
+            except Exception:
+                logger.exception("portal: error renderizando selector factura rápida")
+                raise
+        customer_prefill = None
+        concept_prefill = None
+        issuer_id = issuer["id"]
+        cust = db_rows(
+            "SELECT id, rfc, legal_name, zip, tax_system, email FROM customer_profiles WHERE issuer_id = ? AND id = ? LIMIT 1",
+            (issuer_id, customer_id),
+        )
+        prod = db_rows(
+            "SELECT id, description, product_key, unit_key, unit_price, iva_rate FROM issuer_products WHERE issuer_id = ? AND id = ? LIMIT 1",
+            (issuer_id, product_id),
+        )
+        if cust and prod:
+            c = cust[0]
+            p = prod[0]
+            customer_prefill = {
+                "customer_rfc": (c.get("rfc") or "").strip(),
+                "customer_legal_name": (c.get("legal_name") or "").strip(),
+                "customer_zip": (c.get("zip") or "").strip(),
+                "customer_tax_system": (c.get("tax_system") or "").strip(),
+                "customer_email": (c.get("email") or "").strip(),
+            }
+            concept_prefill = {
+                "description": (p.get("description") or "").strip(),
+                "product_key": (p.get("product_key") or "").strip(),
+                "unit_key": (p.get("unit_key") or "").strip() or "E48",
+                "unit_price": str(p.get("unit_price") or ""),
+                "iva_rate": str(p.get("iva_rate") or "0.16"),
+            }
         try:
             return _render_portal(
-                request, issuer=issuer, template_name="form.html", active_page="create_quick", title="Factura rápida", extra={"create_mode": "quick", "csrf_token": csrf_service.generate_csrf_token()}
+                request,
+                issuer=issuer,
+                template_name="form.html",
+                active_page="create_quick",
+                title="Factura rápida",
+                extra={
+                    "create_mode": "quick",
+                    "csrf_token": csrf_service.generate_csrf_token(),
+                    "customer_prefill": customer_prefill,
+                    "concept_prefill": concept_prefill,
+                },
             )
-        except Exception as e:
-            return HTMLResponse(f"<h3>Error</h3><p>{str(e)}</p>", status_code=400)
+        except Exception:
+            logger.exception("portal: error renderizando /portal/create/quick")
+            raise
 
     @router.get("/create/multi", response_class=HTMLResponse)
     def portal_create_multi(request: Request, issuer: dict = Depends(get_portal_issuer)):
@@ -644,8 +710,9 @@ def get_portal_router(templates):
             return _render_portal(
                 request, issuer=issuer, template_name="form.html", active_page="create_multi", title="Factura múltiple", extra={"create_mode": "multi", "csrf_token": csrf_service.generate_csrf_token()}
             )
-        except Exception as e:
-            return HTMLResponse(f"<h3>Error</h3><p>{str(e)}</p>", status_code=400)
+        except Exception:
+            logger.exception("portal: error renderizando /portal/create/multi")
+            raise
 
     @router.get("/invoices", response_class=HTMLResponse)
     def portal_invoices(request: Request, issuer: dict = Depends(get_portal_issuer)):
@@ -653,8 +720,9 @@ def get_portal_router(templates):
             return _render_portal(
                 request, issuer=issuer, template_name="portal_invoices.html", active_page="issued", title="Mis facturas"
             )
-        except Exception as e:
-            return HTMLResponse(f"<h3>Error</h3><p>{str(e)}</p>", status_code=400)
+        except Exception:
+            logger.exception("portal: error renderizando /portal/invoices")
+            raise
 
     @router.get("/invoices/issued", response_class=HTMLResponse)
     def portal_invoices_issued(request: Request, issuer: dict = Depends(get_portal_issuer), ym: str = None):
@@ -712,8 +780,9 @@ def get_portal_router(templates):
                     "has_fiel_validated": bool(db_rows("SELECT 1 FROM sat_credentials WHERE issuer_id = ? AND validation_ok = 1 LIMIT 1", (issuer_id,))),
                 },
             )
-        except Exception as e:
-            return HTMLResponse(f"<h3>Error</h3><p>{str(e)}</p>", status_code=400)
+        except Exception:
+            logger.exception("portal: error renderizando /portal/invoices/issued ym=%s", ym)
+            raise
 
     @router.get("/invoices/received", response_class=HTMLResponse)
     def portal_invoices_received(request: Request, issuer: dict = Depends(get_portal_issuer), ym: str = None):
@@ -773,8 +842,9 @@ def get_portal_router(templates):
                     "has_fiel_validated": bool(db_rows("SELECT 1 FROM sat_credentials WHERE issuer_id = ? AND validation_ok = 1 LIMIT 1", (issuer_id,))),
                 },
             )
-        except Exception as e:
-            return HTMLResponse(f"<h3>Error</h3><p>{str(e)}</p>", status_code=400)
+        except Exception:
+            logger.exception("portal: error renderizando /portal/invoices/received ym=%s", ym)
+            raise
 
     @router.get("/invoices/nomina", response_class=HTMLResponse)
     def portal_invoices_nomina(request: Request, issuer: dict = Depends(get_portal_issuer), ym: str = None):
@@ -819,8 +889,9 @@ def get_portal_router(templates):
                     "months": months,
                 },
             )
-        except Exception as e:
-            return HTMLResponse(f"<h3>Error</h3><p>{str(e)}</p>", status_code=400)
+        except Exception:
+            logger.exception("portal: error renderizando /portal/invoices/nomina ym=%s", ym)
+            raise
 
     def _audit_user_issuer(request: Request):
         cookie_val = request.cookies.get(session_service.get_session_cookie_name())
@@ -849,8 +920,8 @@ def get_portal_router(templates):
         if not os.path.exists(abs_path):
             raise HTTPException(status_code=404, detail="Archivo XML no existe en disco")
         uid, iid = _audit_user_issuer(request)
-        if uid and uid > 0 and not subscription_service.is_subscription_active(uid):
-            raise HTTPException(status_code=402, detail="Actualiza a Pro para descargar XML. Ve a Mi plan.")
+        if not subscription_service.can_issuer_use_sync_and_timbrado(issuer["id"], uid or 0):
+            raise HTTPException(status_code=402, detail="Actualiza tu plan para descargar XML. Ve a /pricing.")
         audit.log(
             action="download_xml",
             user_id=uid,
@@ -889,8 +960,8 @@ def get_portal_router(templates):
         if not os.path.exists(abs_path):
             raise HTTPException(status_code=404, detail="Archivo XML no existe en disco")
         uid, _ = _audit_user_issuer(request)
-        if uid and uid > 0 and not subscription_service.is_subscription_active(uid):
-            raise HTTPException(status_code=402, detail="Actualiza a Pro para descargar PDF. Ve a Mi plan.")
+        if not subscription_service.can_issuer_use_sync_and_timbrado(issuer["id"], uid or 0):
+            raise HTTPException(status_code=402, detail="Actualiza tu plan para descargar PDF. Ve a /pricing.")
         audit.log(
             action="download_pdf",
             user_id=uid,
@@ -906,13 +977,15 @@ def get_portal_router(templates):
             data = parse_cfdi_xml(abs_path)
             pdf_bytes = build_pdf(data)
         except Exception as e:
-            err_msg = str(e)
-            hint = " Instala dependencias: pip install -r requirements.txt" if "reportlab" in err_msg.lower() else ""
+            err_msg = str(e or "")
+            hint = "Instala dependencias: pip install -r requirements.txt" if "reportlab" in err_msg.lower() else ""
+            logger.exception("portal: error generando PDF uuid=%s", uuid_clean[:36])
             return HTMLResponse(
-                f'<!DOCTYPE html><html><head><meta charset="utf-8"><title>Error PDF</title></head>'
-                f'<body id="pdf-error" style="margin:1rem;font-family:system-ui,sans-serif;">'
-                f'<p id="pdf-error-msg">No se pudo generar el PDF: {err_msg}</p>'
-                f'<p class="pdf-error-hint" style="color:#666;">{hint}</p></body></html>',
+                "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>Error PDF</title></head>"
+                "<body id=\"pdf-error\" style=\"margin:1rem;font-family:system-ui,sans-serif;\">"
+                "<p id=\"pdf-error-msg\">No se pudo generar el PDF. Intenta de nuevo más tarde.</p>"
+                + (f"<p class=\"pdf-error-hint\" style=\"color:#666;\">{hint}</p>" if hint else "")
+                + "</body></html>",
                 status_code=500,
             )
         if not pdf_bytes:
@@ -998,8 +1071,9 @@ def get_portal_router(templates):
             return _render_portal(
                 request, issuer=issuer, template_name="portal_clients.html", active_page="clients", title="Clientes"
             )
-        except Exception as e:
-            return HTMLResponse(f"<h3>Error</h3><p>{str(e)}</p>", status_code=400)
+        except Exception:
+            logger.exception("portal: error renderizando /portal/clients")
+            raise
 
     @router.get("/providers", response_class=HTMLResponse)
     def portal_providers(request: Request, issuer: dict = Depends(get_portal_issuer)):
@@ -1007,8 +1081,9 @@ def get_portal_router(templates):
             return _render_portal(
                 request, issuer=issuer, template_name="portal_providers.html", active_page="providers", title="Proveedores"
             )
-        except Exception as e:
-            return HTMLResponse(f"<h3>Error</h3><p>{str(e)}</p>", status_code=400)
+        except Exception:
+            logger.exception("portal: error renderizando /portal/providers")
+            raise
 
     @router.get("/products", response_class=HTMLResponse)
     def portal_products(request: Request, issuer: dict = Depends(get_portal_issuer)):
@@ -1016,8 +1091,9 @@ def get_portal_router(templates):
             return _render_portal(
                 request, issuer=issuer, template_name="portal_products.html", active_page="products", title="Productos"
             )
-        except Exception as e:
-            return HTMLResponse(f"<h3>Error</h3><p>{str(e)}</p>", status_code=400)
+        except Exception:
+            logger.exception("portal: error renderizando /portal/products")
+            raise
 
     @router.get("/datos-fiscales", response_class=HTMLResponse)
     def portal_datos_fiscales(request: Request, issuer: dict = Depends(get_portal_issuer)):
@@ -1089,8 +1165,9 @@ def get_portal_router(templates):
                     "iva_pagado": iva_pagado,
                 },
             )
-        except Exception as e:
-            return HTMLResponse(f"<h3>Error</h3><p>{str(e)}</p>", status_code=400)
+        except Exception:
+            logger.exception("portal: error renderizando /portal/summary ym=%s", ym)
+            raise
 
     @router.get("/plan", response_class=HTMLResponse)
     def portal_plan(request: Request, issuer: dict = Depends(get_portal_issuer), success: str = Query(""), canceled: str = Query("")):
@@ -1111,21 +1188,24 @@ def get_portal_router(templates):
             },
         )
 
-    @router.get("/info", response_class=HTMLResponse)
-    def portal_info(request: Request, issuer: dict = Depends(get_portal_issuer)):
-        return _render_portal(
-            request,
-            issuer=issuer,
-            template_name="portal_info.html",
-            active_page="info",
-            title="Seguridad e información",
-        )
+    @router.get("/info", response_class=RedirectResponse)
+    def portal_info():
+        """Redirige a la página pública de seguridad (misma para usuarios y visitantes)."""
+        return RedirectResponse(url="/seguridad", status_code=302)
 
     # ---------- SAT sync (encolar desde UI; el worker procesa) ----------
     @router.post("/sat/sync", response_class=JSONResponse)
     def portal_sat_sync(request: Request, issuer: dict = Depends(get_portal_issuer)):
         """Encola sincronización SAT (issued + received). Requiere FIEL configurada y validada."""
+        if rate_limit_service.is_rate_limited(request, "sat_sync"):
+            return JSONResponse({"ok": False, "message": "Demasiados intentos. Espera un minuto."}, status_code=429)
         issuer_id = issuer["id"]
+        user_id = getattr(request.state, "user_id", 0) or 0
+        if not subscription_service.can_issuer_use_sync_and_timbrado(issuer_id, user_id):
+            return JSONResponse(
+                {"ok": False, "message": "Tu periodo de prueba ha terminado. Actualiza tu plan para seguir sincronizando."},
+                status_code=402,
+            )
         conn = db()
         try:
             _ensure_sat_credentials_validation_columns(conn)
@@ -1241,8 +1321,12 @@ def get_portal_router(templates):
         fiel_cer: UploadFile = File(...),
         fiel_key: UploadFile = File(...),
         fiel_password: str = Form(""),
+        csrf_token: str | None = Form(None),
     ):
-        if _cred_rate_limit(request, "upload"):
+        token_val = (csrf_token or request.headers.get("X-CSRF-Token") or "").strip()
+        if not csrf_service.verify_csrf_token(token_val):
+            raise HTTPException(status_code=403, detail="Token CSRF inválido o expirado")
+        if rate_limit_service.is_rate_limited(request, "upload"):
             raise HTTPException(status_code=429, detail="Demasiados intentos. Espera un minuto.")
         issuer_id = issuer["id"]
         # Validar extensiones
@@ -1267,8 +1351,9 @@ def get_portal_router(templates):
             f.write(cer_body)
         with open(key_path, "wb") as f:
             f.write(key_body)
-        os.chmod(cer_path, stat.S_IRUSR | stat.S_IWUSR)
-        os.chmod(key_path, stat.S_IRUSR | stat.S_IWUSR)
+        # Permisos 0600: solo el propietario puede leer/escribir (sin prometer cifrado)
+        os.chmod(cer_path, 0o600)
+        os.chmod(key_path, 0o600)
         password = fiel_password.strip()
         conn = db()
         try:
@@ -1301,7 +1386,7 @@ def get_portal_router(templates):
 
     @router.post("/config/sat/validate", response_class=JSONResponse)
     def portal_config_sat_validate(request: Request, issuer: dict = Depends(get_portal_issuer)):
-        if _cred_rate_limit(request, "validate"):
+        if rate_limit_service.is_rate_limited(request, "validate"):
             return JSONResponse({"ok": False, "message": "Demasiados intentos. Espera un minuto."}, status_code=429)
         issuer_id = issuer["id"]
         ok, message = _run_fiel_validation(issuer_id)
