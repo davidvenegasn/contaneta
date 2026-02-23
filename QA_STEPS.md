@@ -17,6 +17,18 @@ cd /ruta/del/proyecto
 ```
 Debe terminar con **"OK"** y código de salida 0. Si falla, no lanzar.
 
+### A2. QA Portal Smoke — P50 (~5 min para saber si algo se rompió)
+```bash
+./scripts/qa_portal_smoke.sh
+# Con URL distinta:
+BASE_URL=https://tu-dominio.com ./scripts/qa_portal_smoke.sh
+# En prod: exige 302 a /login cuando no hay cookie
+ENV=prod BASE_URL=https://tu-dominio.com ./scripts/qa_portal_smoke.sh
+# Revisar logs si LOG_FILE está definido en el entorno del servidor
+LOG_FILE=/var/log/conta/app.log ./scripts/qa_portal_smoke.sh
+```
+Comprueba: `/health` y `/ready` → 200; `/portal/home` sin cookie → 302 a `/login` (obligatorio si `ENV=prod`). Opcional: aviso si hay ERROR/CRITICAL en las últimas 500 líneas de `LOG_FILE`. Ver `scripts/qa_portal_smoke.sh` (cabecera) para más opciones.
+
 ### B. Health (terminal)
 ```bash
 curl -s http://127.0.0.1:8000/health
@@ -66,6 +78,24 @@ Verificación de empty states, feedback, móvil y flujos cerrados. Base: sesión
 | U16 | Abrir **menú usuario** (topbar) con sesión iniciada. | Bloque "Mi cuenta" con **Activación: X/4**, barra de progreso y 4 pasos clicables (Datos fiscales, Conectar SAT, Primer cliente, Primer producto). Enlaces "Completar"/"Ver" con área táctil ≥44px. Si todo está completo: "✅ Configuración completa" y botón "Ocultar". |
 
 Si U1–U16 pasan, el pulido UX está verificado. Detalle en **UX_AUDIT_REPORT.md** y **MOBILE_CHECKLIST.md**.
+
+---
+
+## Pruebas de continuidad (10 min) — timeouts + 401 consistente
+
+Estas pruebas buscan confirmar la definición de listo de continuidad:
+
+- **No** queda “Cargando…” infinito.
+- **Timeout** → error claro + posibilidad de **Reintentar**.
+- **401** → modal **“Sesión expirada”** y la UI no queda rota (overlays/drawers cerrados).
+
+| # | Acción | Esperado |
+|---|--------|----------|
+| C1 | Abrir DevTools → Network → activar “Offline”. Ir a **Clientes** y recargar. | No se queda cargando infinito: aparece bloque de error con **Reintentar**. |
+| C2 | Con “Offline”, esperar ~30s en una carga de listado (Clientes/Productos/Emitidas). | Se aborta por timeout y aparece mensaje “La solicitud tardó demasiado…” (o equivalente). |
+| C3 | Volver a “Online” y presionar **Reintentar**. | La lista carga normalmente. |
+| C4 | Con sesión iniciada, borrar la cookie de sesión (DevTools → Application → Cookies) y presionar “Reintentar” en un listado o disparar una acción (guardar/eliminar). | Aparece modal **Sesión expirada** y el overlay/drawer (si había) se cierra. No queda UI bloqueada. |
+| C5 | Abrir “Ver PDF” desde un CFDI y simular red mala (throttle). | Si tarda demasiado, muestra error claro en el modal (sin stack/paths). |
 
 ---
 
@@ -246,7 +276,7 @@ Flujo completo para probar que un usuario puede configurar FIEL y sincronizar si
 | 12b.7 | Si el estado muestra **Error** (p. ej. FIEL inválida o worker no configurado). | Un solo bloque de error con mensaje claro y enlace "Ver detalle / Revalidar FIEL" a `/portal/config/sat`; no doble mensaje (toast + bloque). |
 | 12b.8 | Comprobar que **worker** procesa la cola: ejecutar `APP_DB_PATH=invoicing.db python3 scripts/sat_worker.py` tras encolar desde el portal. | Jobs en `sat_jobs` con status `queued` pasan a `running` y luego `ok` o `error`; `last_error` y `finished_at` actualizados. |
 
-Ver **SELF_SERVE_SAT.md** (guía usuario) y **OPS_RUNBOOK.md** (cron worker).
+Ver **SELF_SERVE_SAT.md** (guía usuario) y **OPERATIONS.md** (cron worker).
 
 ---
 
@@ -273,6 +303,22 @@ Requiere `requests` y un token válido (ej. `DEV_TOKEN` o uno de `issuer_tokens`
 
 ---
 
+## Test multi-tenant descargas XML/PDF
+
+Comprueba que el emisor A **no** puede descargar el XML/PDF de un UUID del emisor B (aislamiento por tenant).
+
+| Paso | Acción | Esperado |
+|------|--------|----------|
+| 1 | Desde la raíz del proyecto, con dependencias instaladas (`pip install -r requirements.txt`), ejecutar: `python3 scripts/test_tenant_downloads.py` | Salida: `OK: Test multi-tenant descargas XML/PDF pasado...` y código de salida 0. |
+| 2 | (Opcional) Usar una DB de test fija: `APP_DB_PATH=/tmp/test_tenant.db python3 scripts/test_tenant_downloads.py` | Mismo resultado; la DB queda en `/tmp/test_tenant.db` para inspección. |
+| 3 | Si no se define `APP_DB_PATH`, el script usa una DB temporal y la borra al finalizar. | No se modifica la DB de desarrollo/producción. |
+
+**Qué hace el test:** Crea 2 usuarios/issuers en la DB de test, inserta 2 `sat_cfdi` con UUID distintos (A y B). Simula sesión por cookie para cada tenant y llama a `GET /portal/sat/xml/{uuid}` y `GET /portal/sat/pdf/{uuid}`. **Esperado:** A solo puede descargar su UUID (200); el UUID de B → 404 (o 403). Y viceversa para B.
+
+Requisitos: `fastapi`, `httpx` (TestClient) y el resto de `requirements.txt`. No hace falta levantar el servidor (usa TestClient contra la app).
+
+---
+
 ## Checklist rápido pre-lanzamiento
 
 - [ ] `DEV_MODE=0` en producción.
@@ -282,4 +328,4 @@ Requiere `requests` y un token válido (ej. `DEV_TOKEN` o uno de `issuer_tokens`
 - [ ] Rate limit de login verificado (máx. 5 intentos por IP en 60 s).
 - [ ] Health y scripts de backup probados.
 
-Ver **LAUNCH_CHECKLIST.md** y **SECURITY_NOTES.md** para más detalle.
+Ver **OPERATIONS.md** (checklist de producción) y **SECURITY_NOTES.md** para más detalle.
