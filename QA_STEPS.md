@@ -58,6 +58,46 @@ Si todo lo anterior pasa, el lanzamiento mínimo está verificado. Para pruebas 
 
 Verificación de empty states, feedback, móvil y flujos cerrados. Base: sesión iniciada en el portal.
 
+---
+
+## Auto-captura: clientes y productos sugeridos desde CFDI emitidos
+
+Objetivo: a partir de CFDI emitidos ya descargados (con `sat_cfdi.xml_path`), generar:
+- `clients` (RFC + datos del receptor)
+- `product_observations` (conceptos vistos)
+
+### Prerrequisitos
+- Tener al menos 1 CFDI emitido en `sat_cfdi` con `xml_path` válido (archivo existe en disco).
+- Migraciones aplicadas (reiniciar el servidor después de `git pull`).
+
+### Disparar backfill (con sesión)
+1. Inicia sesión y entra al portal.
+2. Abre DevTools → Console y ejecuta:
+
+```js
+await window.portalFetchJSON('/portal/catalog/backfill', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ limit: 200 })
+}, { timeoutMs: 60000, retry: 0 });
+```
+
+Esperado: JSON `{ ok: true, processed, clients_upserted, observations_upserted, errors_count, errors_sample }`.
+
+### Verificar datos (SQLite)
+En terminal (ajusta ruta si usas `APP_DB_PATH`):
+
+```bash
+sqlite3 invoicing.db "select count(*) from clients;"
+sqlite3 invoicing.db "select count(*) from product_observations;"
+sqlite3 invoicing.db "select issuer_id,rfc,name,last_seen_at from clients order by last_seen_at desc limit 5;"
+sqlite3 invoicing.db "select issuer_id,raw_description,times_seen,last_seen_at from product_observations order by times_seen desc limit 5;"
+```
+
+### Casos de error esperados
+- Si el PDF/XML está escaneado o el XML no existe en disco: `errors_count > 0` y `errors_sample` con `uuid=...`.
+- Si no hay emitidas con `xml_path`: `processed` puede ser 0.
+
 | # | Acción | Esperado |
 |---|--------|----------|
 | U1 | Ir a **Clientes** sin tener clientes. | Empty state "Aún no tienes clientes" con CTA "Crear primer cliente"; **no** alerta ni toast de error. |
