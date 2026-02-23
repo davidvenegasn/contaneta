@@ -9,7 +9,7 @@ import subprocess
 from datetime import datetime, date
 from typing import Optional
 
-from fastapi import APIRouter, Request, Depends, Query, HTTPException, File, UploadFile, Form
+from fastapi import APIRouter, Request, Depends, Query, HTTPException, File, UploadFile, Form, Body
 from fastapi.responses import HTMLResponse, Response, RedirectResponse, JSONResponse, FileResponse
 
 from config import BASE_DIR, REGIMEN_LABEL_TO_CODE, COOKIE_DEMO_VIEW, DB_PATH, DEV_MODE
@@ -18,6 +18,7 @@ from routers.deps import get_portal_issuer
 from services import quotations as quotations_service, rate_limit as rate_limit_service, session as session_service, audit, subscription as subscription_service, csrf as csrf_service
 from services.action_log import log_action
 from services.pdf_to_excel import convert_pdf_to_xlsx, get_storage_root, safe_join, ensure_parent_dir
+from services.catalog_from_cfdi import backfill_catalog_from_existing_cfdi
 
 logger = logging.getLogger(__name__)
 
@@ -1283,6 +1284,46 @@ def get_portal_router(templates):
             "status": status,
             "message": message,
         })
+
+    # ---------- Catálogo sugerido desde CFDI emitidos (auto-captura) ----------
+    @router.post("/catalog/backfill", response_class=JSONResponse)
+    def portal_catalog_backfill(
+        request: Request,
+        payload: dict = Body(default_factory=dict),
+        issuer: dict = Depends(get_portal_issuer),
+    ):
+        """
+        Dispara backfill de catálogo sugerido (clients + product_observations) desde CFDI emitidos ya guardados.
+        Responde JSON con métricas. Multi-issuer: siempre filtra por issuer_id actual.
+        """
+        if rate_limit_service.is_rate_limited(request, "catalog_backfill"):
+            return JSONResponse({"ok": False, "detail": "Demasiados intentos. Espera un minuto."}, status_code=429)
+        issuer_id = int(issuer.get("id") or 0)
+        if issuer_id <= 0:
+            raise HTTPException(status_code=401, detail="Sesión inválida")
+
+        limit = payload.get("limit") if isinstance(payload, dict) else None
+        since = payload.get("since") if isinstance(payload, dict) else None
+        try:
+            result = backfill_catalog_from_existing_cfdi(
+                issuer_id,
+                limit=int(limit) if limit is not None and str(limit).strip() else None,
+                since=str(since).strip() if since is not None and str(since).strip() else None,
+            )
+        except Exception as e:
+            logger.exception("portal catalog backfill: issuer=%s", issuer_id)
+            raise HTTPException(status_code=500, detail="No se pudo ejecutar el backfill. Revisa que existan XML emitidos y que las migraciones estén aplicadas.")
+
+        return JSONResponse(
+            {
+                "ok": True,
+                "processed": result.processed,
+                "clients_upserted": result.clients_upserted,
+                "observations_upserted": result.observations_upserted,
+                "errors_count": result.errors_count,
+                "errors_sample": (result.errors or [])[:10],
+            }
+        )
 
     # ---------- Bank: PDF → Excel (estado de cuenta) ----------
     MAX_BANK_PDF_SIZE = 15 * 1024 * 1024  # 15MB
