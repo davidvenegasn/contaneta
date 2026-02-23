@@ -210,6 +210,15 @@
 </svg>
 {% endmacro %}
 
+{% macro icon_bank() %}
+<svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+  <path d="M3 10h18" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+  <path d="M5 10V20m4-10V20m6-10V20m4-10V20" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+  <path d="M2.5 10 12 4l9.5 6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M4 20h16" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+</svg>
+{% endmacro %}
+
 {% macro month_picker(base_url, token, ym, ym_label) %}
 <div class="month-picker" data-base-url="{{ base_url }}" data-ym="{{ ym }}" data-ym-label="{{ ym_label }}">
   <div class="month-picker__trigger-wrap">
@@ -314,6 +323,10 @@
                 <span class="nav-icon" aria-hidden="true">{{ icon_summary() }}</span>
                 <span class="nav-label">Resumen</span>
               </a>
+              <a class="nav-item {{ 'active' if active_page=='bank_pdf_to_excel' else '' }}" href="/portal/bank/pdf-to-excel" data-tip="Convertir Edo. de Cuenta">
+                <span class="nav-icon" aria-hidden="true">{{ icon_bank() }}</span>
+                <span class="nav-label">Convertir Edo. de Cuenta</span>
+              </a>
               <a class="nav-item {{ 'active' if active_page=='plan' else '' }}" href="/portal/plan" data-tip="Mi plan">
                 <span class="nav-icon" aria-hidden="true">{{ icon_summary() }}</span>
                 <span class="nav-label">Mi plan</span>
@@ -382,6 +395,9 @@
             {% elif active_page == 'summary' %}
               <span class="portal-topbar__breadcrumb-sep" aria-hidden="true">›</span>
               <span class="portal-topbar__breadcrumb-item portal-topbar__breadcrumb-item--current">Resumen</span>
+            {% elif active_page == 'bank_pdf_to_excel' %}
+              <span class="portal-topbar__breadcrumb-sep" aria-hidden="true">›</span>
+              <span class="portal-topbar__breadcrumb-item portal-topbar__breadcrumb-item--current">Convertir Edo. de Cuenta</span>
             {% elif active_page == 'plan' %}
               <span class="portal-topbar__breadcrumb-sep" aria-hidden="true">›</span>
               <span class="portal-topbar__breadcrumb-item portal-topbar__breadcrumb-item--current">Mi plan</span>
@@ -410,6 +426,7 @@
               {% elif active_page=='products' %}{% set _auto_icon = icon_products() %}
               {% elif active_page=='quotations' %}{% set _auto_icon = icon_quotations() %}
               {% elif active_page=='summary' %}{% set _auto_icon = icon_summary() %}
+              {% elif active_page=='bank_pdf_to_excel' %}{% set _auto_icon = icon_bank() %}
               {% elif active_page=='config_sat' %}{% set _auto_icon = icon_summary() %}
               {% elif active_page=='datos_fiscales' %}{% set _auto_icon = icon_summary() %}
               {% endif %}
