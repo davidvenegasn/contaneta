@@ -142,39 +142,99 @@
   <!-- Modal factura rápida: precálculo editable + Timbrar -->
   <div id="quickInvoiceModal" class="quick-invoice-modal" role="dialog" aria-modal="true" aria-labelledby="quickInvoiceModalTitle" aria-describedby="quickInvoiceModalDesc" hidden>
     <div class="quick-invoice-modal__backdrop" id="quickInvoiceModalBackdrop"></div>
-    <div class="quick-invoice-modal__panel" id="quickInvoiceModalPanel" tabindex="-1">
+    <div class="quick-invoice-modal__panel quick-invoice-modal__panel--precalc" id="quickInvoiceModalPanel" tabindex="-1">
       <div class="quick-invoice-modal__header">
         <h2 id="quickInvoiceModalTitle" class="quick-invoice-modal__title">Factura rápida</h2>
         <button type="button" class="quick-invoice-modal__close" id="quickInvoiceModalClose" aria-label="Cerrar">&times;</button>
       </div>
-      <p id="quickInvoiceModalDesc" class="quick-invoice-modal__desc muted">Revisa los datos y edita cantidad o precio si lo necesitas.</p>
+      <p id="quickInvoiceModalDesc" class="quick-invoice-modal__desc muted">Precálculo editable. Puedes ajustar receptor, concepto e impuestos antes de timbrar.</p>
       <div class="quick-invoice-modal__body">
-        <div class="quick-invoice-modal__row">
-          <span class="quick-invoice-modal__label">Cliente</span>
-          <span id="quickModalCustomerName" class="quick-invoice-modal__value"></span>
-          <span id="quickModalCustomerRfc" class="muted" style="font-size:12px;"></span>
-        </div>
-        <div class="quick-invoice-modal__row">
-          <span class="quick-invoice-modal__label">Concepto</span>
-          <span id="quickModalProductDesc" class="quick-invoice-modal__value"></span>
-        </div>
-        <div class="quick-invoice-modal__edits">
-          <div>
-            <label for="quickModalQty" class="label">Cantidad</label>
-            <input type="number" id="quickModalQty" class="input" min="0.01" step="0.01" value="1" aria-label="Cantidad" style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--border);" />
+        <div class="quick-invoice-modal__section">
+          <div class="quick-invoice-modal__section-title">Receptor</div>
+          <div class="quick-invoice-modal__row">
+            <span id="quickModalCustomerRfc" class="muted" style="font-size:12px;"></span>
           </div>
-          <div>
-            <label for="quickModalUnitPrice" class="label">P. unit. (sin IVA)</label>
-            <input type="number" id="quickModalUnitPrice" class="input" min="0" step="0.01" aria-label="Precio unitario" style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--border);" />
+          <div class="quick-form-grid">
+            <div class="quick-form-field quick-form-field--full">
+              <label for="quickModalCustomerName" class="label">Razón social</label>
+              <input id="quickModalCustomerName" class="input" autocomplete="off" />
+            </div>
+            <div class="quick-form-field">
+              <label for="quickModalCustomerZip" class="label">CP</label>
+              <input id="quickModalCustomerZip" class="input" autocomplete="off" />
+            </div>
+            <div class="quick-form-field">
+              <label for="quickModalCustomerTaxSystem" class="label">Régimen</label>
+              <input id="quickModalCustomerTaxSystem" class="input" autocomplete="off" />
+            </div>
+            <div class="quick-form-field quick-form-field--full">
+              <label for="quickModalCustomerEmail" class="label">Email</label>
+              <input id="quickModalCustomerEmail" class="input" type="email" autocomplete="off" />
+            </div>
           </div>
         </div>
-        <div class="quick-invoice-modal__row">
-          <span class="quick-invoice-modal__label">IVA</span>
-          <span id="quickModalIvaPct" class="quick-invoice-modal__value"></span>
+
+        <div class="quick-invoice-modal__section">
+          <div class="quick-invoice-modal__section-title">Concepto</div>
+          <div class="quick-form-grid">
+            <div class="quick-form-field quick-form-field--full">
+              <label for="quickModalProductDesc" class="label">Descripción</label>
+              <input id="quickModalProductDesc" class="input" autocomplete="off" />
+            </div>
+            <div class="quick-form-field">
+              <label for="quickModalProductKey" class="label">ProdServ</label>
+              <input id="quickModalProductKey" class="input" autocomplete="off" />
+            </div>
+            <div class="quick-form-field">
+              <label for="quickModalUnitKey" class="label">Unidad</label>
+              <input id="quickModalUnitKey" class="input" autocomplete="off" />
+            </div>
+            <div class="quick-form-field">
+              <label for="quickModalQty" class="label">Cantidad</label>
+              <input type="number" id="quickModalQty" class="input" min="0.01" step="0.01" value="1" aria-label="Cantidad" />
+            </div>
+            <div class="quick-form-field">
+              <label for="quickModalUnitPrice" class="label">P. unit. (sin IVA)</label>
+              <input type="number" id="quickModalUnitPrice" class="input" min="0" step="0.01" aria-label="Precio unitario" />
+            </div>
+            <div class="quick-form-field">
+              <label for="quickModalIvaRate" class="label">IVA rate</label>
+              <input type="number" id="quickModalIvaRate" class="input" min="0" max="1" step="0.01" value="0.16" />
+            </div>
+            <div class="quick-form-field">
+              <label for="quickModalIsrRetRate" class="label">Ret ISR rate</label>
+              <input type="number" id="quickModalIsrRetRate" class="input" min="0" max="1" step="0.01" value="0" />
+            </div>
+            <div class="quick-form-field">
+              <label for="quickModalIvaRetRate" class="label">Ret IVA rate</label>
+              <input type="number" id="quickModalIvaRetRate" class="input" min="0" max="1" step="0.01" value="0" />
+            </div>
+          </div>
+          <p class="muted" style="margin:8px 0 0; font-size:12px;">Ret IVA aplica sobre el IVA trasladado. Ret ISR aplica sobre la base.</p>
         </div>
+
+        <div class="quick-invoice-modal__section">
+          <div class="quick-invoice-modal__section-title">Comprobante</div>
+          <div class="quick-form-grid">
+            <div class="quick-form-field">
+              <label for="quickModalCfdiUse" class="label">Uso CFDI</label>
+              <input id="quickModalCfdiUse" class="input" autocomplete="off" value="G03" />
+            </div>
+            <div class="quick-form-field">
+              <label for="quickModalPaymentForm" class="label">Forma de pago</label>
+              <input id="quickModalPaymentForm" class="input" autocomplete="off" value="03" />
+            </div>
+            <div class="quick-form-field">
+              <label for="quickModalPaymentMethod" class="label">Método</label>
+              <input id="quickModalPaymentMethod" class="input" autocomplete="off" value="PUE" />
+            </div>
+          </div>
+        </div>
+
         <div class="quick-invoice-modal__totals">
           <div class="quick-invoice-modal__total-row"><span>Subtotal</span><span id="quickModalSubtotal">$0.00</span></div>
           <div class="quick-invoice-modal__total-row"><span>IVA</span><span id="quickModalIva">$0.00</span></div>
+          <div class="quick-invoice-modal__total-row"><span>Retenciones</span><span id="quickModalRetenciones">$0.00</span></div>
           <div class="quick-invoice-modal__total-row quick-invoice-modal__total-row--final"><span>Total</span><span id="quickModalTotal">$0.00</span></div>
         </div>
       </div>
@@ -275,6 +335,7 @@
     .quick-invoice-modal[hidden] { display: none !important; }
     .quick-invoice-modal__backdrop { position: absolute; inset: 0; background: rgba(0,0,0,.4); }
     .quick-invoice-modal__panel { position: relative; background: var(--surface, #fff); border-radius: 16px; box-shadow: 0 20px 50px rgba(0,0,0,.15); max-width: 420px; width: 100%; max-height: 90vh; overflow-y: auto; outline: none; }
+    .quick-invoice-modal__panel--precalc { max-width: 920px; }
     body.quick-invoice-modal-open { overflow: hidden; }
     .quick-invoice-modal__header { display: flex; align-items: center; justify-content: space-between; padding: 18px 20px; border-bottom: 1px solid var(--border, #e2e8f0); }
     .quick-invoice-modal__title { margin: 0; font-size: 1.2rem; font-weight: 700; }
@@ -286,6 +347,9 @@
     .quick-invoice-modal__label { font-weight: 600; font-size: 12px; color: var(--text-muted); display: block; margin-bottom: 2px; }
     .quick-invoice-modal__value { font-size: 14px; }
     .quick-invoice-modal__edits { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 14px 0; }
+    .quick-invoice-modal__section { padding: 14px 0; border-bottom: 1px solid var(--border, #e2e8f0); }
+    .quick-invoice-modal__section:last-of-type { border-bottom: none; }
+    .quick-invoice-modal__section-title { font-weight: 800; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted, #64748b); margin-bottom: 10px; }
     .quick-invoice-modal__totals { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
     .quick-invoice-modal__total-row { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 6px; }
     .quick-invoice-modal__total-row--final { font-weight: 700; font-size: 16px; margin-top: 8px; }
@@ -293,6 +357,9 @@
     .quick-invoice-modal__footer { display: flex; justify-content: flex-end; gap: 10px; padding: 16px 20px; border-top: 1px solid var(--border); }
     .quick-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     .quick-form-field--full { grid-column: 1 / -1; }
+    @media (max-width: 520px) {
+      .quick-form-grid { grid-template-columns: 1fr; }
+    }
   </style>
 
   <script>
@@ -393,17 +460,39 @@
     var modalError = document.getElementById('quickInvoiceModalError');
     var modalQty = document.getElementById('quickModalQty');
     var modalUnitPrice = document.getElementById('quickModalUnitPrice');
+    var modalCustomerName = document.getElementById('quickModalCustomerName');
+    var modalCustomerZip = document.getElementById('quickModalCustomerZip');
+    var modalCustomerTaxSystem = document.getElementById('quickModalCustomerTaxSystem');
+    var modalCustomerEmail = document.getElementById('quickModalCustomerEmail');
+    var modalProductDesc = document.getElementById('quickModalProductDesc');
+    var modalProductKey = document.getElementById('quickModalProductKey');
+    var modalUnitKey = document.getElementById('quickModalUnitKey');
+    var modalIvaRate = document.getElementById('quickModalIvaRate');
+    var modalIsrRetRate = document.getElementById('quickModalIsrRetRate');
+    var modalIvaRetRate = document.getElementById('quickModalIvaRetRate');
+    var modalCfdiUse = document.getElementById('quickModalCfdiUse');
+    var modalPaymentForm = document.getElementById('quickModalPaymentForm');
+    var modalPaymentMethod = document.getElementById('quickModalPaymentMethod');
 
     function fmtMoney(n) { return '$' + (Number(n).toFixed(2)).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
     function updateModalTotals() {
       var qty = parseFloat(modalQty.value) || 0;
       var pu = parseFloat(modalUnitPrice.value) || 0;
-      var ivaRate = window.__quickCurrentIva !== undefined ? window.__quickCurrentIva : 0.16;
+      var ivaRate = parseFloat((modalIvaRate && modalIvaRate.value) || '') ;
+      ivaRate = Number.isFinite(ivaRate) ? Math.max(0, Math.min(1, ivaRate)) : (window.__quickCurrentIva !== undefined ? window.__quickCurrentIva : 0.16);
+      var isrRetRate = parseFloat((modalIsrRetRate && modalIsrRetRate.value) || '');
+      isrRetRate = Number.isFinite(isrRetRate) ? Math.max(0, Math.min(1, isrRetRate)) : 0;
+      var ivaRetRate = parseFloat((modalIvaRetRate && modalIvaRetRate.value) || '');
+      ivaRetRate = Number.isFinite(ivaRetRate) ? Math.max(0, Math.min(1, ivaRetRate)) : 0;
       var subtotal = Math.round(qty * pu * 100) / 100;
       var iva = Math.round(subtotal * ivaRate * 100) / 100;
-      var total = Math.round((subtotal + iva) * 100) / 100;
+      var retIsr = Math.round(subtotal * isrRetRate * 100) / 100;
+      var retIva = Math.round(iva * ivaRetRate * 100) / 100;
+      var retTot = Math.round((retIsr + retIva) * 100) / 100;
+      var total = Math.round((subtotal + iva - retTot) * 100) / 100;
       document.getElementById('quickModalSubtotal').textContent = fmtMoney(subtotal);
       document.getElementById('quickModalIva').textContent = fmtMoney(iva);
+      document.getElementById('quickModalRetenciones').textContent = fmtMoney(retTot);
       document.getElementById('quickModalTotal').textContent = fmtMoney(total);
     }
 
@@ -420,12 +509,22 @@
       window.__quickCurrentCustomerId = cId;
       window.__quickCurrentProductId = pId;
       window.__quickCurrentIva = parseFloat(prod.iva_rate) || 0.16;
-      document.getElementById('quickModalCustomerName').textContent = (cust.legal_name || cust.rfc || '—').trim();
-      document.getElementById('quickModalCustomerRfc').textContent = cust.rfc ? 'RFC ' + cust.rfc : '';
-      document.getElementById('quickModalProductDesc').textContent = (prod.description || prod.product_key || '—').trim();
-      document.getElementById('quickModalIvaPct').textContent = (window.__quickCurrentIva * 100).toFixed(0) + '%';
+      document.getElementById('quickModalCustomerRfc').textContent = cust.rfc ? ('RFC ' + cust.rfc) : '';
+      if (modalCustomerName) modalCustomerName.value = (cust.legal_name || '').trim();
+      if (modalCustomerZip) modalCustomerZip.value = (cust.zip || '').trim();
+      if (modalCustomerTaxSystem) modalCustomerTaxSystem.value = (cust.tax_system || '').trim();
+      if (modalCustomerEmail) modalCustomerEmail.value = (cust.email || '').trim();
+      if (modalProductDesc) modalProductDesc.value = (prod.description || '').trim();
+      if (modalProductKey) modalProductKey.value = (prod.product_key || '').trim();
+      if (modalUnitKey) modalUnitKey.value = (prod.unit_key || 'E48').trim();
       modalQty.value = '1';
       modalUnitPrice.value = String(prod.unit_price != null ? prod.unit_price : '');
+      if (modalIvaRate) modalIvaRate.value = String(window.__quickCurrentIva);
+      if (modalIsrRetRate) modalIsrRetRate.value = '0';
+      if (modalIvaRetRate) modalIvaRetRate.value = '0';
+      if (modalCfdiUse) modalCfdiUse.value = 'G03';
+      if (modalPaymentForm) modalPaymentForm.value = '03';
+      if (modalPaymentMethod) modalPaymentMethod.value = 'PUE';
       modalError.hidden = true;
       modalError.textContent = '';
       updateModalTotals();
@@ -442,8 +541,9 @@
       if (btn) btn.focus();
     }
 
-    if (modalQty) modalQty.addEventListener('input', updateModalTotals);
-    if (modalUnitPrice) modalUnitPrice.addEventListener('input', updateModalTotals);
+    [modalQty, modalUnitPrice, modalIvaRate, modalIsrRetRate, modalIvaRetRate].forEach(function(el) {
+      if (el) el.addEventListener('input', updateModalTotals);
+    });
 
     if (modalBackdrop) modalBackdrop.addEventListener('click', closeQuickModal);
     if (modalClose) modalClose.addEventListener('click', closeQuickModal);
@@ -467,6 +567,22 @@
       }
       modalError.hidden = true;
       modalSubmit.disabled = true;
+      var custName = (modalCustomerName && modalCustomerName.value || '').trim();
+      var custZip = (modalCustomerZip && modalCustomerZip.value || '').trim();
+      var custTaxSystem = (modalCustomerTaxSystem && modalCustomerTaxSystem.value || '').trim();
+      var custEmail = (modalCustomerEmail && modalCustomerEmail.value || '').trim();
+      var desc = (modalProductDesc && modalProductDesc.value || '').trim();
+      var productKey = (modalProductKey && modalProductKey.value || '').trim();
+      var unitKey = (modalUnitKey && modalUnitKey.value || '').trim();
+      var ivaRate = parseFloat((modalIvaRate && modalIvaRate.value) || '');
+      ivaRate = Number.isFinite(ivaRate) ? ivaRate : undefined;
+      var isrRetRate = parseFloat((modalIsrRetRate && modalIsrRetRate.value) || '');
+      isrRetRate = Number.isFinite(isrRetRate) ? isrRetRate : 0;
+      var ivaRetRate = parseFloat((modalIvaRetRate && modalIvaRetRate.value) || '');
+      ivaRetRate = Number.isFinite(ivaRetRate) ? ivaRetRate : 0;
+      var cfdiUse = (modalCfdiUse && modalCfdiUse.value || '').trim().toUpperCase();
+      var paymentForm = (modalPaymentForm && modalPaymentForm.value || '').trim();
+      var paymentMethod = (modalPaymentMethod && modalPaymentMethod.value || '').trim().toUpperCase();
       var csrf = document.querySelector('meta[name="csrf-token"]') && document.querySelector('meta[name="csrf-token"]').getAttribute('content');
       var headers = { 'Content-Type': 'application/json' };
       if (csrf) headers['X-CSRF-Token'] = csrf;
@@ -474,7 +590,25 @@
         method: 'POST',
         credentials: 'same-origin',
         headers: headers,
-        body: JSON.stringify({ customer_id: parseInt(customerId, 10), product_id: parseInt(productId, 10), quantity: qty, unit_price: unitPrice })
+        body: JSON.stringify({
+          customer_id: parseInt(customerId, 10),
+          product_id: parseInt(productId, 10),
+          quantity: qty,
+          unit_price: unitPrice,
+          iva_rate: ivaRate,
+          isr_ret_rate: isrRetRate,
+          iva_ret_rate: ivaRetRate,
+          customer_legal_name: custName,
+          customer_zip: custZip,
+          customer_tax_system: custTaxSystem,
+          customer_email: custEmail,
+          description: desc,
+          product_key: productKey,
+          unit_key: unitKey,
+          cfdi_use: cfdiUse,
+          payment_form: paymentForm,
+          payment_method: paymentMethod
+        })
       }, { timeoutMs: 30000, retry: 0 }) : Promise.resolve({ ok: false, status: 0, data: null, detail: 'Helper no disponible' }))
         .then(function(res) {
           modalSubmit.disabled = false;
@@ -482,13 +616,17 @@
           if (res && res.ok && res.data && res.data.ok) {
             closeQuickModal();
             if (window.uiSuccessOverlay) {
+              var uuid = res.data.uuid;
               window.uiSuccessOverlay({
                 title: 'Factura timbrada',
-                message: 'Total ' + fmtMoney(res.data.total || 0) + '. Ya puedes verla en Facturas emitidas.',
+                message: 'Total ' + fmtMoney(res.data.total || 0) + '. Puedes descargar XML/PDF o verla en emitidas.',
                 actions: [
-                  { label: 'Ver facturas emitidas', href: '/portal/issued' },
+                  uuid ? { label: 'Ver PDF', onClick: function () { if (window.openPdfModal) window.openPdfModal('/portal/sat/pdf/' + uuid); } } : null,
+                  uuid ? { label: 'Descargar XML', href: '/portal/sat/xml/' + uuid } : null,
+                  uuid ? { label: 'Descargar PDF', href: '/portal/sat/pdf/' + uuid + '?dl=1' } : null,
+                  { label: 'Ver facturas emitidas', href: '/portal/invoices/issued' },
                   { label: 'Entendido', onClick: function () { if (window.uiSuccessOverlayClose) window.uiSuccessOverlayClose(); } }
-                ]
+                ].filter(Boolean)
               });
             } else if (window.portalToast) {
               window.portalToast({ type: 'success', title: 'Factura timbrada', message: 'Total ' + fmtMoney(res.data.total || 0) });
