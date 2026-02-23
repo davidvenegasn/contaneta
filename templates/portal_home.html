@@ -127,7 +127,10 @@
         <select id="quickProduct" class="input" style="width:100%; padding:10px 12px; border-radius:10px; font-size:14px; border:1px solid var(--border, #e2e8f0);" aria-label="Producto">
           <option value="">— Seleccionar producto —</option>
         </select>
-        <p class="muted" style="margin:4px 0 0; font-size:12px;"><a href="/portal/products">+ Añadir producto</a></p>
+        <p class="muted" style="margin:6px 0 0; font-size:12px; display:flex; align-items:center; gap:10px;">
+          <button type="button" id="quickAddProductBtn" class="btn btn--sm btn--secondary">+ Añadir producto</button>
+          <a href="/portal/products" class="muted">Ver todos</a>
+        </p>
       </div>
       <div style="margin-top:6px;">
         <button type="button" id="quickInvoiceBtn" class="btn btn-primary" disabled>Generar factura</button>
@@ -226,6 +229,47 @@
       </div>
     </div>
   </div>
+
+  <!-- Modal: añadir producto desde Home -->
+  <div id="quickAddProductModal" class="quick-invoice-modal" role="dialog" aria-modal="true" aria-labelledby="quickAddProductTitle" hidden>
+    <div class="quick-invoice-modal__backdrop" id="quickAddProductBackdrop"></div>
+    <div class="quick-invoice-modal__panel" id="quickAddProductPanel" tabindex="-1">
+      <div class="quick-invoice-modal__header">
+        <h2 id="quickAddProductTitle" class="quick-invoice-modal__title">Añadir producto</h2>
+        <button type="button" class="quick-invoice-modal__close" id="quickAddProductClose" aria-label="Cerrar">&times;</button>
+      </div>
+      <div class="quick-invoice-modal__body">
+        <div class="quick-form-grid">
+          <div class="quick-form-field quick-form-field--full">
+            <label for="quickProductDesc" class="label">Descripción *</label>
+            <input id="quickProductDesc" class="input" autocomplete="off" placeholder="Servicio / producto" />
+          </div>
+          <div class="quick-form-field quick-form-field--full">
+            <label for="quickProductKey" class="label">Clave ProdServ *</label>
+            <input id="quickProductKey" class="input" autocomplete="off" placeholder="Ej: 84111500" />
+            <p class="muted" style="margin:4px 0 0; font-size:12px;">Tip: usa la misma clave que en “Generar tu factura”.</p>
+          </div>
+          <div class="quick-form-field">
+            <label for="quickProductUnitKey" class="label">Unidad</label>
+            <input id="quickProductUnitKey" class="input" autocomplete="off" value="E48" />
+          </div>
+          <div class="quick-form-field">
+            <label for="quickProductUnitPrice" class="label">Precio unitario *</label>
+            <input id="quickProductUnitPrice" class="input" type="number" min="0" step="0.01" placeholder="0.00" />
+          </div>
+          <div class="quick-form-field">
+            <label for="quickProductIvaRate" class="label">IVA rate</label>
+            <input id="quickProductIvaRate" class="input" type="number" min="0" max="1" step="0.01" value="0.16" />
+          </div>
+        </div>
+      </div>
+      <div id="quickAddProductError" class="quick-invoice-modal__error" hidden role="alert"></div>
+      <div class="quick-invoice-modal__footer">
+        <button type="button" id="quickAddProductCancel" class="btn btn-ghost">Cancelar</button>
+        <button type="button" id="quickAddProductSave" class="btn btn-primary">Guardar producto</button>
+      </div>
+    </div>
+  </div>
   <style>
     .quick-invoice-modal { position: fixed; inset: 0; z-index: 9000; display: flex; align-items: center; justify-content: center; padding: 16px; }
     .quick-invoice-modal[hidden] { display: none !important; }
@@ -319,6 +363,12 @@
           o.textContent = (p.description || p.product_key || 'Sin descripción').trim() || '—';
           productSelect.appendChild(o);
         });
+        if (window.__quickAfterProductId != null) {
+          var idToSelect = String(window.__quickAfterProductId);
+          var match = list.find(function(p) { return String(p.id) === idToSelect; });
+          if (match && match.id != null) productSelect.value = String(match.id);
+          window.__quickAfterProductId = null;
+        }
         setBtn();
       };
       if (p) {
@@ -544,6 +594,90 @@
         .catch(function(err) {
           addCustomerSave.disabled = false;
           if (addCustomerError) { addCustomerError.textContent = err.message || 'Error de conexión. Intenta de nuevo.'; addCustomerError.hidden = false; }
+        });
+    });
+
+    // Modal añadir producto
+    var addProductBtn = document.getElementById('quickAddProductBtn');
+    var addProductModal = document.getElementById('quickAddProductModal');
+    var addProductBackdrop = document.getElementById('quickAddProductBackdrop');
+    var addProductClose = document.getElementById('quickAddProductClose');
+    var addProductCancel = document.getElementById('quickAddProductCancel');
+    var addProductSave = document.getElementById('quickAddProductSave');
+    var addProductError = document.getElementById('quickAddProductError');
+    var addProductDesc = document.getElementById('quickProductDesc');
+    var addProductKey = document.getElementById('quickProductKey');
+    var addProductUnitKey = document.getElementById('quickProductUnitKey');
+    var addProductUnitPrice = document.getElementById('quickProductUnitPrice');
+    var addProductIvaRate = document.getElementById('quickProductIvaRate');
+
+    function openAddProduct() {
+      if (!addProductModal) return;
+      if (addProductError) { addProductError.hidden = true; addProductError.textContent = ''; }
+      if (addProductDesc) addProductDesc.value = '';
+      if (addProductKey) addProductKey.value = '';
+      if (addProductUnitKey) addProductUnitKey.value = 'E48';
+      if (addProductUnitPrice) addProductUnitPrice.value = '';
+      if (addProductIvaRate) addProductIvaRate.value = '0.16';
+      addProductModal.hidden = false;
+      addProductModal.removeAttribute('hidden');
+      document.body.classList.add('quick-invoice-modal-open');
+      setTimeout(function() { if (addProductDesc) addProductDesc.focus(); }, 100);
+    }
+    function closeAddProduct() {
+      if (!addProductModal) return;
+      addProductModal.hidden = true;
+      addProductModal.setAttribute('hidden', '');
+      document.body.classList.remove('quick-invoice-modal-open');
+      if (addProductBtn) addProductBtn.focus();
+    }
+
+    if (addProductBtn) addProductBtn.addEventListener('click', function(e) { e.preventDefault(); openAddProduct(); });
+    if (addProductBackdrop) addProductBackdrop.addEventListener('click', closeAddProduct);
+    if (addProductClose) addProductClose.addEventListener('click', closeAddProduct);
+    if (addProductCancel) addProductCancel.addEventListener('click', closeAddProduct);
+    if (addProductModal) addProductModal.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') { closeAddProduct(); e.preventDefault(); }
+    });
+
+    if (addProductSave) addProductSave.addEventListener('click', function() {
+      var desc = (addProductDesc && addProductDesc.value || '').trim();
+      var key = (addProductKey && addProductKey.value || '').trim();
+      var unitKey = (addProductUnitKey && addProductUnitKey.value || '').trim();
+      var unitPrice = (addProductUnitPrice && addProductUnitPrice.value || '').trim();
+      var ivaRate = (addProductIvaRate && addProductIvaRate.value || '').trim();
+      if (!desc || !key || unitPrice === '') {
+        if (addProductError) { addProductError.textContent = 'Descripción, clave y precio unitario son requeridos.'; addProductError.hidden = false; }
+        return;
+      }
+      if (addProductError) { addProductError.hidden = true; addProductError.textContent = ''; }
+      addProductSave.disabled = true;
+      var csrf = document.querySelector('meta[name="csrf-token"]') && document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+      var headers = { 'Content-Type': 'application/json' };
+      if (csrf) headers['X-CSRF-Token'] = csrf;
+      (window.portalFetchJSON ? window.portalFetchJSON('/api/products/create', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: headers,
+        body: JSON.stringify({ description: desc, product_key: key, unit_key: unitKey, unit_price: unitPrice, iva_rate: ivaRate })
+      }, { timeoutMs: 30000, retry: 0 }) : Promise.resolve({ ok: false, status: 0, detail: 'Helper no disponible' }))
+        .then(function(res) {
+          addProductSave.disabled = false;
+          if (res && res.status === 401) return;
+          if (res && res.ok && res.data && res.data.ok && res.data.data && res.data.data.id != null) {
+            window.__quickAfterProductId = res.data.data.id;
+            closeAddProduct();
+            if (window.portalToast) window.portalToast({ type: 'success', title: 'Producto guardado', message: desc });
+            window.__prefetchProductsPromise = null;
+            loadProducts();
+            return;
+          }
+          var detail = (res && res.data && res.data.detail) ? (typeof res.data.detail === 'string' ? res.data.detail : JSON.stringify(res.data.detail)) : '';
+          if (addProductError) { addProductError.textContent = detail || (res && res.detail) || 'No se pudo guardar el producto.'; addProductError.hidden = false; }
+        })
+        .catch(function(err) {
+          addProductSave.disabled = false;
+          if (addProductError) { addProductError.textContent = err.message || 'Error de conexión. Intenta de nuevo.'; addProductError.hidden = false; }
         });
     });
 
