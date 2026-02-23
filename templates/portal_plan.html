@@ -45,16 +45,16 @@
       btn.disabled = true;
       var errEl = document.getElementById('checkoutError');
       errEl.style.display = 'none';
-      (window.portalFetchWithTimeout ? window.portalFetchWithTimeout('/billing/checkout', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' } }, 30000) : fetch('/billing/checkout', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' } }))
-        .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
-        .then(function(o) {
-          if (o.ok && o.data && o.data.url) {
-            window.location.href = o.data.url;
-          } else {
-            btn.disabled = false;
-            errEl.textContent = o.data && o.data.detail ? o.data.detail : 'No se pudo iniciar el pago.';
-            errEl.style.display = 'block';
+      (window.portalFetchJSON ? window.portalFetchJSON('/billing/checkout', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' } }, { timeoutMs: 30000, retry: 0 }) : Promise.resolve({ ok: false, status: 0, data: null, detail: 'Helper no disponible' }))
+        .then(function(r) {
+          if (r && r.status === 401) return;
+          if (r && r.ok && r.data && r.data.url) {
+            window.location.href = r.data.url;
+            return;
           }
+          btn.disabled = false;
+          errEl.textContent = (r && r.data && r.data.detail) ? r.data.detail : ((r && r.detail) || 'No se pudo iniciar el pago.');
+          errEl.style.display = 'block';
         })
         .catch(function() {
           btn.disabled = false;

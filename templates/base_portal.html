@@ -878,8 +878,8 @@
     const chipSat = document.getElementById('topbarChipSat');
     const chipSync = document.getElementById('topbarChipSync');
     const chipPlan = document.getElementById('topbarChipPlan');
-    (window.portalFetchWithTimeout ? window.portalFetchWithTimeout('/api/account/status', { credentials: 'same-origin' }, 30000) : fetch('/api/account/status', { credentials: 'same-origin' }))
-      .then(function(r) { return r.ok ? r.json() : null; })
+    (window.portalFetchJSON ? window.portalFetchJSON('/api/account/status', { credentials: 'same-origin' }, { timeoutMs: 30000, retry: 1 }) : Promise.resolve({ ok: false, status: 0, data: null }))
+      .then(function(r) { return (r && r.ok) ? r.data : null; })
       .then(function(data) {
         if (!data || typeof data.completed !== 'number') {
           if (el) el.innerHTML = '<span class="muted" style="font-size:12px;">No pudimos cargar</span>';
@@ -1148,6 +1148,11 @@
 
     (window.portalFetchWithTimeout ? window.portalFetchWithTimeout(fullUrl, { credentials: 'same-origin' }, 45000) : fetch(fullUrl, { credentials: 'same-origin' }))
       .then(function(res) {
+        if (res && res.status === 401) {
+          if (typeof window.uiCloseAllOverlays === 'function') window.uiCloseAllOverlays();
+          if (typeof window.showSessionExpiredModal === 'function') window.showSessionExpiredModal();
+          throw new Error('Sesión expirada');
+        }
         if (!res.ok) throw new Error(res.status === 403 ? 'Sin permiso' : res.status === 404 ? 'No encontrado' : 'Error ' + res.status);
         return res.blob();
       })
@@ -1532,9 +1537,8 @@
     function stopPolling() { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } }
 
     function fetchStatus() {
-      (window.portalFetchWithTimeout ? window.portalFetchWithTimeout('/portal/sat/status', { credentials: 'same-origin', headers: { 'Accept': 'application/json' } }, 30000) : fetch('/portal/sat/status', { credentials: 'same-origin', headers: { 'Accept': 'application/json' } }))
-        .then(function (r) { return r.json(); })
-        .then(function (data) { if (data && data.ok) updateUI(data); })
+      (window.portalFetchJSON ? window.portalFetchJSON('/portal/sat/status', { credentials: 'same-origin', headers: { 'Accept': 'application/json' } }, { timeoutMs: 30000, retry: 1 }) : Promise.resolve({ ok: false, status: 0, data: null }))
+        .then(function (r) { if (r && r.ok && r.data && r.data.ok) updateUI(r.data); })
         .catch(function () {});
     }
 
@@ -1547,9 +1551,10 @@
       if (!loadingSpinner) { loadingSpinner = document.createElement('span'); loadingSpinner.className = 'spinner spinner--sm list-sync-bar__btn-spinner'; loadingSpinner.setAttribute('aria-hidden', 'true'); syncBtn.insertBefore(loadingSpinner, syncBtn.firstChild); }
       loadingSpinner.style.display = 'inline-block';
       if (label) label.textContent = loadingText;
-      (window.portalFetchWithTimeout ? window.portalFetchWithTimeout('/portal/sat/sync', { method: 'POST', credentials: 'same-origin', headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' } }, 30000) : fetch('/portal/sat/sync', { method: 'POST', credentials: 'same-origin', headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' } }))
-        .then(function (r) { return r.json(); })
-        .then(function (data) {
+      (window.portalFetchJSON ? window.portalFetchJSON('/portal/sat/sync', { method: 'POST', credentials: 'same-origin', headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' } }, { timeoutMs: 30000, retry: 0 }) : Promise.resolve({ ok: false, status: 0, data: null, detail: 'Helper no disponible' }))
+        .then(function (r) {
+          if (r && r.status === 401) return;
+          var data = (r && r.data) ? r.data : { ok: false, message: (r && r.detail) || 'No se pudo iniciar.' };
           if (data && data.ok) {
             fetchStatus();
             updateUI({ status: 'running', last_sync_at: null });

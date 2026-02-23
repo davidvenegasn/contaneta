@@ -376,17 +376,16 @@
       if (!confirmed) return;
       deleteBtn.disabled = true;
       try {
-        const res = await (window.portalFetchWithTimeout ? window.portalFetchWithTimeout('/api/customers/delete', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token, rfc }),
-        }, 30000) : fetch('/api/customers/delete', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token, rfc }),
-        }));
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(window.portalApiErrorMessage ? window.portalApiErrorMessage(data) : (data.detail || 'Error al eliminar'));
+        const r = window.portalFetchJSON
+          ? await window.portalFetchJSON('/api/customers/delete', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ token, rfc }),
+            }, { timeoutMs: 30000, retry: 0 })
+          : { ok: false, status: 0, data: null, detail: 'Helper no disponible' };
+        if (r.status === 401) return;
+        const data = r.data || {};
+        if (!r.ok) throw new Error(window.portalApiErrorMessage ? window.portalApiErrorMessage(data) : (data.detail || 'Error al eliminar'));
         /* P38: borrado irreversible — no inventar Undo; success overlay (patrón mutación importante) */
         if (window.uiSuccessOverlay) {
           window.uiSuccessOverlay({
@@ -537,17 +536,16 @@
     if (window.uiSetButtonLoading) window.uiSetButtonLoading(saveBtn, true, 'Guardando…');
 
     try{
-      const res = await (window.portalFetchWithTimeout ? window.portalFetchWithTimeout('/api/customers/create', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        }, 30000) : fetch('/api/customers/create', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        }));
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(window.portalApiErrorMessage ? window.portalApiErrorMessage(data) : (data.detail || `HTTP ${res.status}`));
+      const r = window.portalFetchJSON
+        ? await window.portalFetchJSON('/api/customers/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          }, { timeoutMs: 30000, retry: 0 })
+        : { ok: false, status: 0, data: null, detail: 'Helper no disponible' };
+      if (r.status === 401) return;
+      const data = r.data || {};
+      if (!r.ok) throw new Error(window.portalApiErrorMessage ? window.portalApiErrorMessage(data) : (data.detail || `HTTP ${r.status}`));
 
       closeModal();
       await load();

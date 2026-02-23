@@ -4,8 +4,13 @@
   const DEBOUNCE_CATALOG_MS = 250;
 
   const portalFetch = (url, opts = {}, timeoutMs = 30000) =>
-    typeof window.portalFetchWithTimeout === "function"
-      ? window.portalFetchWithTimeout(url, opts, timeoutMs)
+    typeof window.portalFetchJSON === "function"
+      ? window.portalFetchJSON(url, opts, { timeoutMs, retry: 1 }).then((r) => {
+          if (r && r.ok) return { ok: true, json: () => Promise.resolve(r.data) };
+          const err = new Error((r && r.detail) || "Error de conexión.");
+          err.isTimeout = r && r.error === "timeout";
+          throw err;
+        })
       : fetch(url, opts);
 
   const pick = (obj, keys) => {

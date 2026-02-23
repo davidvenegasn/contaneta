@@ -255,9 +255,13 @@
       }
       var statusResultEl = document.getElementById('fielStatusResult');
       var statusMetaEl = document.getElementById('fielStatusMeta');
-      (window.portalFetchWithTimeout ? window.portalFetchWithTimeout('/portal/config/sat/validate', { method: 'POST', credentials: 'same-origin', headers: { 'Accept': 'application/json' } }, 30000) : fetch('/portal/config/sat/validate', { method: 'POST', credentials: 'same-origin', headers: { 'Accept': 'application/json' } }))
-        .then(function(r){ return r.json(); })
-        .then(function(data){
+      (window.portalFetchJSON ? window.portalFetchJSON('/portal/config/sat/validate', { method: 'POST', credentials: 'same-origin', headers: { 'Accept': 'application/json' } }, { timeoutMs: 30000, retry: 0 }) : Promise.resolve({ ok: false, status: 0, data: null, detail: 'Helper no disponible' }))
+        .then(function(r){
+          if (r && r.status === 401) return { ok: false, data: { ok: false, message: 'Sesión expirada.' } };
+          return { ok: true, data: (r && r.data) ? r.data : { ok: false, message: (r && r.detail) || 'Error de conexión.' } };
+        })
+        .then(function(o){
+          var data = o.data || {};
           showResult(data.ok, data.ok ? (data.message || 'FIEL válida.') : (data.message || 'Error.'));
           if (data.ok && window.uiSuccessOverlay) {
             window.uiSuccessOverlay({ title: 'FIEL válida', message: data.message || 'Tus credenciales son correctas.', actions: [{ label: 'Entendido', onClick: function () { if (window.uiSuccessOverlayClose) window.uiSuccessOverlayClose(); window.location.reload(); } }] });

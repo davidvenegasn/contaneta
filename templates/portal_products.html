@@ -397,8 +397,8 @@
       var url = '/api/catalogs/prodserv?q=' + encodeURIComponent(term) + '&limit=15';
       var data = window.portalCatalogGetJson
         ? await window.portalCatalogGetJson(url, { signal: signal })
-        : await (window.portalFetchWithTimeout ? window.portalFetchWithTimeout(url, { signal: signal, credentials: 'same-origin' }, 30000) : fetch(url, { signal: signal, credentials: 'same-origin' }))
-            .then(function(r) { return r.ok ? r.json() : []; });
+        : await (window.portalFetchJSON ? window.portalFetchJSON(url, { signal: signal, credentials: 'same-origin' }, { timeoutMs: 30000, retry: 1 }) : Promise.resolve({ ok: false, status: 0, data: [] }))
+            .then(function(r) { return (r && r.ok) ? (r.data || []) : []; });
       var items = Array.isArray(data) ? data : [];
       keyResults.innerHTML = items.map(function(it) {
         var k = (it.key || it.clave || it.code || '').toString();
@@ -473,8 +473,8 @@
       var url = '/api/catalogs/prodserv?q=' + encodeURIComponent(term) + '&limit=20';
       var data = window.portalCatalogGetJson
         ? await window.portalCatalogGetJson(url, { signal: signal })
-        : await (window.portalFetchWithTimeout ? window.portalFetchWithTimeout(url, { signal: signal, credentials: 'same-origin' }, 30000) : fetch(url, { signal: signal, credentials: 'same-origin' }))
-            .then(function(r) { return r.ok ? r.json() : []; });
+        : await (window.portalFetchJSON ? window.portalFetchJSON(url, { signal: signal, credentials: 'same-origin' }, { timeoutMs: 30000, retry: 1 }) : Promise.resolve({ ok: false, status: 0, data: [] }))
+            .then(function(r) { return (r && r.ok) ? (r.data || []) : []; });
       var items = Array.isArray(data) ? data : [];
       prodservModalResults.innerHTML = items.map(function(it) {
         var k = (it.key || it.clave || it.code || '').toString();
@@ -583,17 +583,16 @@
     };
     if (window.uiSetButtonLoading) window.uiSetButtonLoading(saveBtn, true, 'Guardando…');
     try {
-      const res = await (window.portalFetchWithTimeout ? window.portalFetchWithTimeout('/api/products/create', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        }, 30000) : fetch('/api/products/create', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        }));
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(window.portalApiErrorMessage ? window.portalApiErrorMessage(data) : (data.detail || `HTTP ${res.status}`));
+      const r = window.portalFetchJSON
+        ? await window.portalFetchJSON('/api/products/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          }, { timeoutMs: 30000, retry: 0 })
+        : { ok: false, status: 0, data: null, detail: 'Helper no disponible' };
+      if (r.status === 401) return;
+      const data = r.data || {};
+      if (!r.ok) throw new Error(window.portalApiErrorMessage ? window.portalApiErrorMessage(data) : (data.detail || `HTTP ${r.status}`));
       if (window.uiToast) window.uiToast({ type: 'success', title: 'Guardado', message: 'Producto guardado correctamente.', timeout: 3200 });
       closeModal();
       await load();
@@ -625,19 +624,17 @@
       if (!confirmed) return;
       deleteBtn.disabled = true;
       try {
-        const res = await (window.portalFetchWithTimeout ? window.portalFetchWithTimeout('/api/products/delete', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'same-origin',
-          body: JSON.stringify({ id: id }),
-        }, 30000) : fetch('/api/products/delete', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'same-origin',
-          body: JSON.stringify({ id: id }),
-        }));
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.detail || 'Error al eliminar');
+        const r = window.portalFetchJSON
+          ? await window.portalFetchJSON('/api/products/delete', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'same-origin',
+              body: JSON.stringify({ id: id }),
+            }, { timeoutMs: 30000, retry: 0 })
+          : { ok: false, status: 0, data: null, detail: 'Helper no disponible' };
+        if (r.status === 401) return;
+        const data = r.data || {};
+        if (!r.ok) throw new Error((data && data.detail) || r.detail || 'Error al eliminar');
         /* P38: borrado irreversible — no inventar Undo; success overlay (patrón mutación importante) */
         if (window.uiSuccessOverlay) {
           window.uiSuccessOverlay({

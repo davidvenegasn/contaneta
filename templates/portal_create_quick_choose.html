@@ -60,8 +60,8 @@
   function loadCustomers() {
     var get = window.portalCatalogGetJson
       ? window.portalCatalogGetJson('/api/customers').then(function(r) { return Array.isArray(r) ? r : (r && r.customers) || (r && r.data) || []; })
-      : (window.portalFetchWithTimeout ? window.portalFetchWithTimeout('/api/customers', { credentials: 'same-origin' }, 30000) : fetch('/api/customers', { credentials: 'same-origin' }))
-          .then(function(r) { return r.ok ? r.json() : []; })
+      : (window.portalFetchJSON ? window.portalFetchJSON('/api/customers', { credentials: 'same-origin' }, { timeoutMs: 30000, retry: 1 }) : Promise.resolve({ ok: false, data: [] }))
+          .then(function(r) { return (r && r.ok) ? (r.data || []) : []; })
           .then(function(d) { return Array.isArray(d) ? d : (d && d.customers) || (d && d.data) || []; });
     get.then(function(list) {
       customerSelect.innerHTML = '<option value="">— Seleccionar cliente —</option>';
@@ -78,8 +78,8 @@
   function loadProducts() {
     var get = window.portalCatalogGetJson
       ? window.portalCatalogGetJson('/api/products').then(function(r) { return Array.isArray(r) ? r : (r && r.products) || (r && r.data) || []; })
-      : (window.portalFetchWithTimeout ? window.portalFetchWithTimeout('/api/products', { credentials: 'same-origin' }, 30000) : fetch('/api/products', { credentials: 'same-origin' }))
-          .then(function(r) { return r.ok ? r.json() : []; })
+      : (window.portalFetchJSON ? window.portalFetchJSON('/api/products', { credentials: 'same-origin' }, { timeoutMs: 30000, retry: 1 }) : Promise.resolve({ ok: false, data: [] }))
+          .then(function(r) { return (r && r.ok) ? (r.data || []) : []; })
           .then(function(d) { return Array.isArray(d) ? d : (d && d.products) || (d && d.data) || []; });
     get.then(function(list) {
       productSelect.innerHTML = '<option value="">— Seleccionar producto —</option>';

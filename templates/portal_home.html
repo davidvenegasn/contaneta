@@ -24,8 +24,14 @@
     window.__prefetchCustomersPromise = getJson('/api/customers', { signal: signal }).then(normCustomers).catch(function() { return []; });
     window.__prefetchProductsPromise = getJson('/api/products', { signal: signal }).then(normProducts).catch(function() { return []; });
   } else {
-    window.__prefetchCustomersPromise = (window.portalFetchWithTimeout ? window.portalFetchWithTimeout('/api/customers', { credentials: 'same-origin', signal: signal }, 30000) : fetch('/api/customers', { credentials: 'same-origin', signal: signal })).then(function(r) { return r.ok ? r.json() : []; }).then(normCustomers).catch(function() { return []; });
-    window.__prefetchProductsPromise = (window.portalFetchWithTimeout ? window.portalFetchWithTimeout('/api/products', { credentials: 'same-origin', signal: signal }, 30000) : fetch('/api/products', { credentials: 'same-origin', signal: signal })).then(function(r) { return r.ok ? r.json() : []; }).then(normProducts).catch(function() { return []; });
+    window.__prefetchCustomersPromise = (window.portalFetchJSON ? window.portalFetchJSON('/api/customers', { credentials: 'same-origin', signal: signal }, { timeoutMs: 30000, retry: 1 }) : Promise.resolve({ ok: false, data: [] }))
+      .then(function(r) { return (r && r.ok) ? (r.data || []) : []; })
+      .then(normCustomers)
+      .catch(function() { return []; });
+    window.__prefetchProductsPromise = (window.portalFetchJSON ? window.portalFetchJSON('/api/products', { credentials: 'same-origin', signal: signal }, { timeoutMs: 30000, retry: 1 }) : Promise.resolve({ ok: false, data: [] }))
+      .then(function(r) { return (r && r.ok) ? (r.data || []) : []; })
+      .then(normProducts)
+      .catch(function() { return []; });
   }
   window.addEventListener('pagehide', function() { try { prefetchAbort.abort(); } catch(e) {} });
 })();
@@ -241,7 +247,10 @@
         window.portalCatalogGetJson('/api/customers').then(function(r) { return Array.isArray(r) ? r : (r && r.customers) || (r && r.data) || []; }).then(done).catch(function() { setBtn(); });
         return;
       }
-      (window.portalFetchWithTimeout ? window.portalFetchWithTimeout('/api/customers', { credentials: 'same-origin' }, 30000) : fetch('/api/customers', { credentials: 'same-origin' })).then(function(r) { return r.ok ? r.json() : []; }).then(done).catch(function() { setBtn(); });
+      (window.portalFetchJSON ? window.portalFetchJSON('/api/customers', { credentials: 'same-origin' }, { timeoutMs: 30000, retry: 1 }) : Promise.resolve({ ok: false, data: [] }))
+        .then(function(r) { return (r && r.ok) ? (r.data || []) : []; })
+        .then(done)
+        .catch(function() { setBtn(); });
     }
     function loadProducts() {
       var p = window.__prefetchProductsPromise;
@@ -265,7 +274,10 @@
         window.portalCatalogGetJson('/api/products').then(function(r) { return Array.isArray(r) ? r : (r && r.products) || (r && r.data) || []; }).then(done).catch(function() { setBtn(); });
         return;
       }
-      (window.portalFetchWithTimeout ? window.portalFetchWithTimeout('/api/products', { credentials: 'same-origin' }, 30000) : fetch('/api/products', { credentials: 'same-origin' })).then(function(r) { return r.ok ? r.json() : []; }).then(done).catch(function() { setBtn(); });
+      (window.portalFetchJSON ? window.portalFetchJSON('/api/products', { credentials: 'same-origin' }, { timeoutMs: 30000, retry: 1 }) : Promise.resolve({ ok: false, data: [] }))
+        .then(function(r) { return (r && r.ok) ? (r.data || []) : []; })
+        .then(done)
+        .catch(function() { setBtn(); });
     }
 
     var modal = document.getElementById('quickInvoiceModal');
@@ -353,21 +365,16 @@
       var csrf = document.querySelector('meta[name="csrf-token"]') && document.querySelector('meta[name="csrf-token"]').getAttribute('content');
       var headers = { 'Content-Type': 'application/json' };
       if (csrf) headers['X-CSRF-Token'] = csrf;
-      (window.portalFetchWithTimeout ? window.portalFetchWithTimeout('/api/invoices/quick', {
+      (window.portalFetchJSON ? window.portalFetchJSON('/api/invoices/quick', {
         method: 'POST',
         credentials: 'same-origin',
         headers: headers,
         body: JSON.stringify({ customer_id: parseInt(customerId, 10), product_id: parseInt(productId, 10), quantity: qty, unit_price: unitPrice })
-      }, 30000) : fetch('/api/invoices/quick', {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: headers,
-        body: JSON.stringify({ customer_id: parseInt(customerId, 10), product_id: parseInt(productId, 10), quantity: qty, unit_price: unitPrice })
-      }))
-        .then(function(r) { return r.json().then(function(data) { return { ok: r.ok, status: r.status, data: data }; }); })
+      }, { timeoutMs: 30000, retry: 0 }) : Promise.resolve({ ok: false, status: 0, data: null, detail: 'Helper no disponible' }))
         .then(function(res) {
           modalSubmit.disabled = false;
-          if (res.ok && res.data && res.data.ok) {
+          if (res && res.status === 401) return;
+          if (res && res.ok && res.data && res.data.ok) {
             closeQuickModal();
             if (window.uiSuccessOverlay) {
               window.uiSuccessOverlay({
@@ -387,8 +394,8 @@
             loadProducts();
             return;
           }
-          var detail = (res.data && res.data.detail) ? (typeof res.data.detail === 'string' ? res.data.detail : JSON.stringify(res.data.detail)) : '';
-          modalError.textContent = detail || (res.status === 402 ? 'Actualiza tu plan para emitir facturas.' : 'No se pudo timbrar. Revisa tu plan o datos.');
+          var detail = (res && res.data && res.data.detail) ? (typeof res.data.detail === 'string' ? res.data.detail : JSON.stringify(res.data.detail)) : '';
+          modalError.textContent = detail || ((res && res.status === 402) ? 'Actualiza tu plan para emitir facturas.' : ((res && res.detail) || 'No se pudo timbrar. Revisa tu plan o datos.'));
           modalError.hidden = false;
         })
         .catch(function(err) {

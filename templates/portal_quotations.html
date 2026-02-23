@@ -444,8 +444,8 @@
     try {
       const data = window.portalCatalogGetJson
         ? await window.portalCatalogGetJson('/api/customers')
-        : await (window.portalFetchWithTimeout ? window.portalFetchWithTimeout('/api/customers', { credentials: 'same-origin' }, 30000) : fetch('/api/customers', { credentials: 'same-origin' }))
-            .then(r => r.ok ? r.json() : []);
+        : await (window.portalFetchJSON ? window.portalFetchJSON('/api/customers', { credentials: 'same-origin' }, { timeoutMs: 30000, retry: 1 }) : Promise.resolve({ ok: false, data: [] }))
+            .then(r => (r && r.ok) ? (r.data || []) : []);
       customers = Array.isArray(data) ? data : (data && data.customers) || (data && data.data) || [];
       quotCustomer.innerHTML = '<option value="">— Selecciona un cliente —</option><option value="__manual__">— Ingresar nombre manualmente —</option>' +
         customers.map(c => '<option value="' + esc(c.rfc) + '" data-name="' + esc(c.legal_name) + '" data-email="' + esc(c.email || '') + '">' + esc(c.legal_name || c.rfc) + (c.rfc ? ' (' + esc(c.rfc) + ')' : '') + '</option>').join('');
@@ -456,8 +456,8 @@
     try {
       const data = window.portalCatalogGetJson
         ? await window.portalCatalogGetJson('/api/products')
-        : await (window.portalFetchWithTimeout ? window.portalFetchWithTimeout('/api/products', { credentials: 'same-origin' }, 30000) : fetch('/api/products', { credentials: 'same-origin' }))
-            .then(r => r.ok ? r.json() : []);
+        : await (window.portalFetchJSON ? window.portalFetchJSON('/api/products', { credentials: 'same-origin' }, { timeoutMs: 30000, retry: 1 }) : Promise.resolve({ ok: false, data: [] }))
+            .then(r => (r && r.ok) ? (r.data || []) : []);
       products = Array.isArray(data) ? data : (data && data.products) || (data && data.data) || [];
       quotAddProduct.innerHTML = '<option value="">+ Agregar desde producto</option>' +
         products.map(p => '<option value="' + p.id + '" data-desc="' + esc(p.description) + '" data-price="' + (p.unit_price || 0) + '" data-iva="' + (p.iva_rate || 0.16) + '">' + esc(p.description) + '</option>').join('');
@@ -666,17 +666,16 @@
     else { btn.disabled = true; btn.textContent = sendAsSent ? 'Enviando…' : 'Guardando…'; }
 
     try {
-      const res = await (window.portalFetchWithTimeout ? window.portalFetchWithTimeout('/api/quotations/create', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        }, 30000) : fetch('/api/quotations/create', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        }));
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(window.portalApiErrorMessage ? window.portalApiErrorMessage(data) : (data.detail || 'Error al guardar'));
+      const r = window.portalFetchJSON
+        ? await window.portalFetchJSON('/api/quotations/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          }, { timeoutMs: 30000, retry: 0 })
+        : { ok: false, status: 0, data: null, detail: 'Helper no disponible' };
+      if (r.status === 401) return;
+      const data = r.data || {};
+      if (!r.ok) throw new Error(window.portalApiErrorMessage ? window.portalApiErrorMessage(data) : (data.detail || 'Error al guardar'));
 
       if (window.uiSuccessOverlay) {
         window.uiSuccessOverlay({
