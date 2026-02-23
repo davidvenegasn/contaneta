@@ -117,7 +117,10 @@
         <select id="quickCustomer" class="input" style="width:100%; padding:10px 12px; border-radius:10px; font-size:14px; border:1px solid var(--border, #e2e8f0);" aria-label="Cliente">
           <option value="">— Seleccionar cliente —</option>
         </select>
-        <p class="muted" style="margin:4px 0 0; font-size:12px;"><a href="/portal/clients">+ Añadir cliente</a></p>
+        <p class="muted" style="margin:6px 0 0; font-size:12px; display:flex; align-items:center; gap:10px;">
+          <button type="button" id="quickAddCustomerBtn" class="btn btn--sm btn--secondary">+ Añadir cliente</button>
+          <a href="/portal/clients" class="muted">Ver todos</a>
+        </p>
       </div>
       <div>
         <label class="label" for="quickProduct" style="display:block; margin-bottom:6px; font-weight:600;">Producto</label>
@@ -179,6 +182,50 @@
       </div>
     </div>
   </div>
+
+  <!-- Modal: añadir cliente desde Home -->
+  <div id="quickAddCustomerModal" class="quick-invoice-modal" role="dialog" aria-modal="true" aria-labelledby="quickAddCustomerTitle" hidden>
+    <div class="quick-invoice-modal__backdrop" id="quickAddCustomerBackdrop"></div>
+    <div class="quick-invoice-modal__panel" id="quickAddCustomerPanel" tabindex="-1">
+      <div class="quick-invoice-modal__header">
+        <h2 id="quickAddCustomerTitle" class="quick-invoice-modal__title">Añadir cliente</h2>
+        <button type="button" class="quick-invoice-modal__close" id="quickAddCustomerClose" aria-label="Cerrar">&times;</button>
+      </div>
+      <div class="quick-invoice-modal__body">
+        <div class="quick-form-grid">
+          <div class="quick-form-field">
+            <label for="quickCustomerRfc" class="label">RFC *</label>
+            <input id="quickCustomerRfc" class="input" autocomplete="off" placeholder="XAXX010101000" />
+          </div>
+          <div class="quick-form-field">
+            <label for="quickCustomerName" class="label">Razón social *</label>
+            <input id="quickCustomerName" class="input" autocomplete="off" placeholder="Cliente SA de CV" />
+          </div>
+          <div class="quick-form-field">
+            <label for="quickCustomerZip" class="label">CP</label>
+            <input id="quickCustomerZip" class="input" autocomplete="off" placeholder="64000" />
+          </div>
+          <div class="quick-form-field">
+            <label for="quickCustomerTaxSystem" class="label">Régimen (receptor)</label>
+            <input id="quickCustomerTaxSystem" class="input" autocomplete="off" placeholder="616" />
+          </div>
+          <div class="quick-form-field quick-form-field--full">
+            <label for="quickCustomerEmail" class="label">Email</label>
+            <input id="quickCustomerEmail" class="input" type="email" autocomplete="off" placeholder="cliente@dominio.com" />
+          </div>
+          <div class="quick-form-field quick-form-field--full">
+            <label for="quickCustomerAlias" class="label">Alias</label>
+            <input id="quickCustomerAlias" class="input" autocomplete="off" placeholder="(opcional) Ej: OXXO" />
+          </div>
+        </div>
+      </div>
+      <div id="quickAddCustomerError" class="quick-invoice-modal__error" hidden role="alert"></div>
+      <div class="quick-invoice-modal__footer">
+        <button type="button" id="quickAddCustomerCancel" class="btn btn-ghost">Cancelar</button>
+        <button type="button" id="quickAddCustomerSave" class="btn btn-primary">Guardar cliente</button>
+      </div>
+    </div>
+  </div>
   <style>
     .quick-invoice-modal { position: fixed; inset: 0; z-index: 9000; display: flex; align-items: center; justify-content: center; padding: 16px; }
     .quick-invoice-modal[hidden] { display: none !important; }
@@ -200,6 +247,8 @@
     .quick-invoice-modal__total-row--final { font-weight: 700; font-size: 16px; margin-top: 8px; }
     .quick-invoice-modal__error { padding: 10px 14px; margin: 0 20px 12px; background: rgba(220,38,38,.1); border-radius: 10px; font-size: 13px; color: var(--danger, #b91c1c); border: 1px solid rgba(220,38,38,.25); }
     .quick-invoice-modal__footer { display: flex; justify-content: flex-end; gap: 10px; padding: 16px 20px; border-top: 1px solid var(--border); }
+    .quick-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .quick-form-field--full { grid-column: 1 / -1; }
   </style>
 
   <script>
@@ -237,6 +286,12 @@
           o.textContent = (c.legal_name || c.rfc || 'Sin nombre').trim() || '—';
           customerSelect.appendChild(o);
         });
+        if (window.__quickAfterCustomerRfc) {
+          var rfcToSelect = String(window.__quickAfterCustomerRfc || '').toUpperCase();
+          var match = list.find(function(c) { return String((c.rfc || '')).toUpperCase() === rfcToSelect; });
+          if (match && match.id != null) customerSelect.value = String(match.id);
+          window.__quickAfterCustomerRfc = null;
+        }
         setBtn();
       };
       if (p) {
@@ -402,6 +457,93 @@
           modalSubmit.disabled = false;
           modalError.textContent = err.message || 'Error de conexión. Intenta de nuevo.';
           modalError.hidden = false;
+        });
+    });
+
+    // Modal añadir cliente
+    var addCustomerBtn = document.getElementById('quickAddCustomerBtn');
+    var addCustomerModal = document.getElementById('quickAddCustomerModal');
+    var addCustomerBackdrop = document.getElementById('quickAddCustomerBackdrop');
+    var addCustomerClose = document.getElementById('quickAddCustomerClose');
+    var addCustomerCancel = document.getElementById('quickAddCustomerCancel');
+    var addCustomerSave = document.getElementById('quickAddCustomerSave');
+    var addCustomerError = document.getElementById('quickAddCustomerError');
+    var addCustomerRfc = document.getElementById('quickCustomerRfc');
+    var addCustomerName = document.getElementById('quickCustomerName');
+    var addCustomerZip = document.getElementById('quickCustomerZip');
+    var addCustomerTaxSystem = document.getElementById('quickCustomerTaxSystem');
+    var addCustomerEmail = document.getElementById('quickCustomerEmail');
+    var addCustomerAlias = document.getElementById('quickCustomerAlias');
+
+    function openAddCustomer() {
+      if (!addCustomerModal) return;
+      if (addCustomerError) { addCustomerError.hidden = true; addCustomerError.textContent = ''; }
+      if (addCustomerRfc) addCustomerRfc.value = '';
+      if (addCustomerName) addCustomerName.value = '';
+      if (addCustomerZip) addCustomerZip.value = '';
+      if (addCustomerTaxSystem) addCustomerTaxSystem.value = '';
+      if (addCustomerEmail) addCustomerEmail.value = '';
+      if (addCustomerAlias) addCustomerAlias.value = '';
+      addCustomerModal.hidden = false;
+      addCustomerModal.removeAttribute('hidden');
+      document.body.classList.add('quick-invoice-modal-open');
+      setTimeout(function() { if (addCustomerRfc) addCustomerRfc.focus(); }, 100);
+    }
+    function closeAddCustomer() {
+      if (!addCustomerModal) return;
+      addCustomerModal.hidden = true;
+      addCustomerModal.setAttribute('hidden', '');
+      document.body.classList.remove('quick-invoice-modal-open');
+      if (addCustomerBtn) addCustomerBtn.focus();
+    }
+
+    if (addCustomerBtn) addCustomerBtn.addEventListener('click', function(e) { e.preventDefault(); openAddCustomer(); });
+    if (addCustomerBackdrop) addCustomerBackdrop.addEventListener('click', closeAddCustomer);
+    if (addCustomerClose) addCustomerClose.addEventListener('click', closeAddCustomer);
+    if (addCustomerCancel) addCustomerCancel.addEventListener('click', closeAddCustomer);
+    if (addCustomerModal) addCustomerModal.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') { closeAddCustomer(); e.preventDefault(); }
+    });
+
+    if (addCustomerSave) addCustomerSave.addEventListener('click', function() {
+      var rfc = (addCustomerRfc && addCustomerRfc.value || '').trim().toUpperCase();
+      var legalName = (addCustomerName && addCustomerName.value || '').trim();
+      var zip = (addCustomerZip && addCustomerZip.value || '').trim();
+      var taxSystem = (addCustomerTaxSystem && addCustomerTaxSystem.value || '').trim();
+      var email = (addCustomerEmail && addCustomerEmail.value || '').trim();
+      var alias = (addCustomerAlias && addCustomerAlias.value || '').trim();
+      if (!rfc || !legalName) {
+        if (addCustomerError) { addCustomerError.textContent = 'RFC y Razón social son requeridos.'; addCustomerError.hidden = false; }
+        return;
+      }
+      if (addCustomerError) { addCustomerError.hidden = true; addCustomerError.textContent = ''; }
+      addCustomerSave.disabled = true;
+      var csrf = document.querySelector('meta[name="csrf-token"]') && document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+      var headers = { 'Content-Type': 'application/json' };
+      if (csrf) headers['X-CSRF-Token'] = csrf;
+      (window.portalFetchJSON ? window.portalFetchJSON('/api/customers/create', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: headers,
+        body: JSON.stringify({ rfc: rfc, legal_name: legalName, zip: zip, tax_system: taxSystem, email: email, alias: alias })
+      }, { timeoutMs: 30000, retry: 0 }) : Promise.resolve({ ok: false, status: 0, detail: 'Helper no disponible' }))
+        .then(function(res) {
+          addCustomerSave.disabled = false;
+          if (res && res.status === 401) return;
+          if (res && res.ok && res.data && res.data.ok) {
+            window.__quickAfterCustomerRfc = rfc;
+            closeAddCustomer();
+            if (window.portalToast) window.portalToast({ type: 'success', title: 'Cliente guardado', message: rfc });
+            window.__prefetchCustomersPromise = null;
+            loadCustomers();
+            return;
+          }
+          var detail = (res && res.data && res.data.detail) ? (typeof res.data.detail === 'string' ? res.data.detail : JSON.stringify(res.data.detail)) : '';
+          if (addCustomerError) { addCustomerError.textContent = detail || (res && res.detail) || 'No se pudo guardar el cliente.'; addCustomerError.hidden = false; }
+        })
+        .catch(function(err) {
+          addCustomerSave.disabled = false;
+          if (addCustomerError) { addCustomerError.textContent = err.message || 'Error de conexión. Intenta de nuevo.'; addCustomerError.hidden = false; }
         });
     });
 
