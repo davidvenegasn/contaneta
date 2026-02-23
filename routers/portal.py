@@ -1,20 +1,23 @@
 # Portal HTML routes and helpers
+import hashlib
 import json
 import logging
 import os
+import secrets
 import stat
 import subprocess
 from datetime import datetime, date
 from typing import Optional
 
 from fastapi import APIRouter, Request, Depends, Query, HTTPException, File, UploadFile, Form
-from fastapi.responses import HTMLResponse, Response, RedirectResponse, JSONResponse
+from fastapi.responses import HTMLResponse, Response, RedirectResponse, JSONResponse, FileResponse
 
 from config import BASE_DIR, REGIMEN_LABEL_TO_CODE, COOKIE_DEMO_VIEW, DB_PATH, DEV_MODE
 from database import db, db_rows, has_column
 from routers.deps import get_portal_issuer
 from services import quotations as quotations_service, rate_limit as rate_limit_service, session as session_service, audit, subscription as subscription_service, csrf as csrf_service
 from services.action_log import log_action
+from services.pdf_to_excel import convert_pdf_to_xlsx, get_storage_root, safe_join, ensure_parent_dir
 
 logger = logging.getLogger(__name__)
 
@@ -1280,6 +1283,163 @@ def get_portal_router(templates):
             "status": status,
             "message": message,
         })
+
+    # ---------- Bank: PDF → Excel (estado de cuenta) ----------
+    MAX_BANK_PDF_SIZE = 15 * 1024 * 1024  # 15MB
+
+    def _ensure_bank_exports_table(conn) -> None:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS bank_pdf_exports (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              issuer_id INTEGER NOT NULL,
+              file_id TEXT NOT NULL,
+              pdf_path TEXT NOT NULL,
+              xlsx_path TEXT NOT NULL,
+              meta_json TEXT,
+              created_at TEXT NOT NULL DEFAULT (datetime('now')),
+              UNIQUE(issuer_id, file_id)
+            );
+            """
+        )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_bank_pdf_exports_issuer ON bank_pdf_exports(issuer_id, created_at);")
+
+    @router.get("/bank/pdf-to-excel", response_class=HTMLResponse)
+    def portal_bank_pdf_to_excel(request: Request, issuer: dict = Depends(get_portal_issuer)):
+        return _render_portal(
+            request,
+            issuer=issuer,
+            template_name="portal_bank_pdf_to_excel.html",
+            active_page="bank_pdf_to_excel",
+            title="Convertir Edo. de Cuenta",
+        )
+
+    @router.post("/bank/pdf-to-excel/upload", response_class=JSONResponse)
+    async def portal_bank_pdf_to_excel_upload(
+        request: Request,
+        issuer: dict = Depends(get_portal_issuer),
+        file: UploadFile = File(...),
+    ):
+        issuer_id = int(issuer.get("id") or 0)
+        if issuer_id <= 0:
+            raise HTTPException(status_code=401, detail="Sesión inválida")
+
+        # Validaciones básicas
+        filename = (file.filename or "").strip()
+        name_l = filename.lower()
+        if not name_l.endswith(".pdf"):
+            raise HTTPException(status_code=400, detail="El archivo debe ser .pdf")
+        content_type = (file.content_type or "").lower().strip()
+        if content_type and content_type not in ("application/pdf", "application/x-pdf"):
+            raise HTTPException(status_code=400, detail="El archivo debe ser un PDF válido (MIME application/pdf)")
+
+        storage_root = get_storage_root(BASE_DIR)
+        uploads_rel_dir = os.path.join("uploads", str(issuer_id), "bank_statements")
+        exports_rel_dir = os.path.join("exports", str(issuer_id), "bank_statements")
+
+        # Guardar PDF con nombre único (timestamp + hash)
+        sha = hashlib.sha256()
+        size = 0
+        chunks: list[bytes] = []
+        while True:
+            chunk = await file.read(1024 * 1024)
+            if not chunk:
+                break
+            size += len(chunk)
+            if size > MAX_BANK_PDF_SIZE:
+                raise HTTPException(status_code=400, detail="El PDF excede el máximo de 15MB.")
+            sha.update(chunk)
+            chunks.append(chunk)
+        if size <= 0:
+            raise HTTPException(status_code=400, detail="El PDF está vacío.")
+
+        digest = sha.hexdigest()
+        stamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        pdf_name = f"{stamp}_{digest[:12]}.pdf"
+        pdf_rel_path = os.path.join(uploads_rel_dir, pdf_name)
+        pdf_abs_path = safe_join(storage_root, pdf_rel_path)
+        ensure_parent_dir(pdf_abs_path)
+        with open(pdf_abs_path, "wb") as f:
+            for ch in chunks:
+                f.write(ch)
+
+        file_id = secrets.token_urlsafe(16)
+        xlsx_name = f"{stamp}_{file_id[:10]}.xlsx"
+        xlsx_rel_path = os.path.join(exports_rel_dir, xlsx_name)
+        xlsx_abs_path = safe_join(storage_root, xlsx_rel_path)
+
+        try:
+            meta = convert_pdf_to_xlsx(pdf_abs_path, xlsx_abs_path)
+        except Exception as e:
+            logger.exception("bank pdf-to-excel: error convirtiendo issuer=%s pdf=%s", issuer_id, pdf_rel_path)
+            raise HTTPException(status_code=500, detail="No se pudo convertir el PDF. Intenta con otro archivo o revisa que el PDF tenga texto.")
+
+        conn = db()
+        try:
+            _ensure_bank_exports_table(conn)
+            conn.execute(
+                """
+                INSERT INTO bank_pdf_exports (issuer_id, file_id, pdf_path, xlsx_path, meta_json)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (issuer_id, file_id, pdf_rel_path, xlsx_rel_path, json.dumps(meta, ensure_ascii=False)[:4000]),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        log_action(request, "bank_pdf_to_excel", issuer_id=issuer_id, entity_id=file_id[:32])
+        return JSONResponse(
+            {
+                "ok": True,
+                "file_id": file_id,
+                "meta": meta,
+                "download_url": f"/portal/bank/pdf-to-excel/download/{file_id}",
+            }
+        )
+
+    @router.get("/bank/pdf-to-excel/download/{file_id}")
+    def portal_bank_pdf_to_excel_download(
+        request: Request,
+        file_id: str,
+        issuer: dict = Depends(get_portal_issuer),
+    ):
+        issuer_id = int(issuer.get("id") or 0)
+        fid = (file_id or "").strip()
+        if issuer_id <= 0:
+            raise HTTPException(status_code=401, detail="Sesión inválida")
+        if not fid:
+            raise HTTPException(status_code=404, detail="Archivo no encontrado")
+
+        conn = db()
+        try:
+            _ensure_bank_exports_table(conn)
+            row = conn.execute(
+                "SELECT xlsx_path FROM bank_pdf_exports WHERE issuer_id = ? AND file_id = ? LIMIT 1",
+                (issuer_id, fid),
+            ).fetchone()
+        finally:
+            conn.close()
+        if not row:
+            raise HTTPException(status_code=404, detail="Archivo no encontrado")
+
+        storage_root = get_storage_root(BASE_DIR)
+        xlsx_rel_path = (row["xlsx_path"] or "").strip()
+        if not xlsx_rel_path:
+            raise HTTPException(status_code=404, detail="Archivo no encontrado")
+        try:
+            xlsx_abs_path = safe_join(storage_root, xlsx_rel_path)
+        except ValueError:
+            raise HTTPException(status_code=404, detail="Ruta inválida")
+        if not os.path.exists(xlsx_abs_path):
+            raise HTTPException(status_code=404, detail="El archivo ya no existe en disco")
+
+        filename = f"estado_cuenta_{fid[:8]}.xlsx"
+        return FileResponse(
+            path=xlsx_abs_path,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            filename=filename,
+        )
 
     # ---------- SAT credentials (FIEL) upload & validate ----------
     MAX_FIEL_SIZE = 2 * 1024 * 1024  # 2 MB
