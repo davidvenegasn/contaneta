@@ -304,6 +304,10 @@
                 <span class="nav-icon" aria-hidden="true">{{ icon_providers() }}</span>
                 <span class="nav-label">Proveedores</span>
               </a>
+              <a class="nav-item {{ 'active' if active_page=='product_suggestions' else '' }}" href="/portal/products/suggestions" data-tip="Productos sugeridos">
+                <span class="nav-icon" aria-hidden="true">{{ icon_products() }}</span>
+                <span class="nav-label">Productos sugeridos</span>
+              </a>
               <a class="nav-item {{ 'active' if active_page=='products' else '' }}" href="/portal/products" data-tip="Productos">
                 <span class="nav-icon" aria-hidden="true">{{ icon_products() }}</span>
                 <span class="nav-label">Productos</span>
@@ -392,6 +396,9 @@
             {% elif active_page == 'products' %}
               <span class="portal-topbar__breadcrumb-sep" aria-hidden="true">›</span>
               <span class="portal-topbar__breadcrumb-item portal-topbar__breadcrumb-item--current">Productos</span>
+            {% elif active_page == 'product_suggestions' %}
+              <span class="portal-topbar__breadcrumb-sep" aria-hidden="true">›</span>
+              <span class="portal-topbar__breadcrumb-item portal-topbar__breadcrumb-item--current">Productos sugeridos</span>
             {% elif active_page == 'summary' %}
               <span class="portal-topbar__breadcrumb-sep" aria-hidden="true">›</span>
               <span class="portal-topbar__breadcrumb-item portal-topbar__breadcrumb-item--current">Resumen</span>
@@ -424,6 +431,7 @@
               {% elif active_page=='clients' %}{% set _auto_icon = icon_clients() %}
               {% elif active_page=='providers' %}{% set _auto_icon = icon_providers() %}
               {% elif active_page=='products' %}{% set _auto_icon = icon_products() %}
+              {% elif active_page=='product_suggestions' %}{% set _auto_icon = icon_products() %}
               {% elif active_page=='quotations' %}{% set _auto_icon = icon_quotations() %}
               {% elif active_page=='summary' %}{% set _auto_icon = icon_summary() %}
               {% elif active_page=='bank_pdf_to_excel' %}{% set _auto_icon = icon_bank() %}
