@@ -32,14 +32,23 @@
   }
 
   window.portalCatalogGetJson = function (url, options) {
-    var fetcher = (typeof window.portalFetchWithTimeout === 'function')
-      ? window.portalFetchWithTimeout
-      : function (u, o) { return fetch(u, o); };
+    var fetcher = (typeof window.portalFetchJSON === 'function')
+      ? function (u, o) {
+        return window.portalFetchJSON(u, o, { timeoutMs: 30000, retry: 1 }).then(function (r) {
+          if (r && r.ok) return r.data;
+          var e = new Error((r && r.detail) || ('HTTP ' + ((r && r.status) || 0)));
+          if (r && r.error === 'timeout') e.isTimeout = true;
+          throw e;
+        });
+      }
+      : function (u, o) {
+        return fetch(u, o).then(function (r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.json();
+        });
+      };
     if (!isCachedApiUrl(url)) {
-      return fetcher(url, { credentials: 'same-origin', signal: options && options.signal }, 30000).then(function (r) {
-        if (!r.ok) throw new Error('HTTP ' + r.status);
-        return r.json();
-      });
+      return fetcher(url, { credentials: 'same-origin', signal: options && options.signal });
     }
     var key = url;
     var cached = get(key);
@@ -52,11 +61,7 @@
     var opts = { credentials: 'same-origin' };
     if (signal) opts.signal = signal;
 
-    var promise = fetcher(url, opts, 30000)
-      .then(function (r) {
-        if (!r.ok) throw new Error('HTTP ' + r.status);
-        return r.json();
-      })
+    var promise = fetcher(url, opts)
       .then(function (data) {
         inFlight.delete(key);
         set(key, data);

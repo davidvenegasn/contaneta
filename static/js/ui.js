@@ -129,6 +129,72 @@
     }
   };
 
+  /**
+   * Cierra overlays/drawers/modales y limpia estados loading para evitar UI rota.
+   * Usar antes de mostrar modal "Sesión expirada" (401).
+   */
+  window.uiCloseAllOverlays = function () {
+    try { document.body.classList.remove('no-scroll'); } catch (_) {}
+    try { document.body.classList.remove('sidebar-open'); } catch (_) {}
+    try { document.documentElement.classList.remove('sidebar-open'); } catch (_) {}
+
+    // Overlays/drawers
+    document.querySelectorAll('.ui-overlay.is-open, .cfdi-drawer-overlay.is-open, .provider-drawer-overlay.is-open').forEach(function (el) {
+      try {
+        el.classList.remove('is-open');
+        el.hidden = true;
+        el.setAttribute('aria-hidden', 'true');
+      } catch (_) {}
+    });
+
+    // Modales genéricos
+    document.querySelectorAll('.modal:not([hidden])').forEach(function (m) {
+      try {
+        m.hidden = true;
+        m.setAttribute('aria-hidden', 'true');
+        m.classList.remove('is-open');
+      } catch (_) {}
+    });
+
+    // Drawer de facturas por proveedor (si existe)
+    var providerPanel = document.getElementById('providerInvoicesPanel');
+    if (providerPanel) {
+      try {
+        providerPanel.hidden = true;
+        providerPanel.setAttribute('aria-hidden', 'true');
+        providerPanel.classList.remove('is-open');
+      } catch (_) {}
+    }
+
+    // PDF modal
+    var pdfModal = document.getElementById('pdfModal');
+    if (pdfModal && pdfModal.classList.contains('pdf-modal--open')) {
+      try {
+        pdfModal.classList.remove('pdf-modal--open');
+        pdfModal.setAttribute('aria-hidden', 'true');
+      } catch (_) {}
+    }
+
+    // User menu
+    var userMenu = document.getElementById('userMenu');
+    var userMenuBtn = document.getElementById('userMenuBtn');
+    if (userMenu) { try { userMenu.hidden = true; userMenu.setAttribute('aria-hidden', 'true'); } catch (_) {} }
+    if (userMenuBtn) { try { userMenuBtn.setAttribute('aria-expanded', 'false'); } catch (_) {} }
+
+    // Sidebar backdrop
+    var sidebarBackdrop = document.getElementById('sidebarBackdrop');
+    if (sidebarBackdrop) { try { sidebarBackdrop.hidden = true; sidebarBackdrop.setAttribute('aria-hidden', 'true'); } catch (_) {} }
+
+    // Limpiar botones en loading (evitar spinners colgados)
+    document.querySelectorAll('.btn--loading,[data-ui-original-content]').forEach(function (btn) {
+      if (typeof window.uiSetButtonLoading === 'function') {
+        try { window.uiSetButtonLoading(btn, false); } catch (_) {}
+      } else {
+        try { btn.classList.remove('btn--loading'); btn.disabled = false; } catch (_) {}
+      }
+    });
+  };
+
   /** P35: URLs que usan cache (Map TTL 10 min) para evitar duplicados */
   function isCachedApiUrl(url) {
     if (!url || typeof url !== 'string') return false;
@@ -171,12 +237,6 @@
     options.signal = controller.signal;
 
     return fetch(url, options)
-      .then(function (res) {
-        if (res && res.status === 401) {
-          if (typeof window.showSessionExpiredModal === 'function') window.showSessionExpiredModal();
-        }
-        return res;
-      })
       .catch(function (err) {
         if (err && err.name === 'AbortError' && timedOut) {
           var te = new Error('Timeout');
@@ -192,6 +252,94 @@
   };
 
   /**
+   * Helper JSON unificado para el portal (timeout + 401 + retry).
+   * @param {string} url
+   * @param {RequestInit} [opts]
+   * @param {{ timeoutMs?: number, retry?: number }} [cfg]
+   * @returns {Promise<{ ok: boolean, status: number, data?: any, error?: 'timeout'|'network'|'unauthorized'|'http'|'parse', detail?: string }>}
+   */
+  window.portalFetchJSON = async function (url, opts, cfg) {
+    var options = Object.assign({ credentials: 'same-origin' }, opts || {});
+    var timeoutMs = (cfg && Number.isFinite(cfg.timeoutMs)) ? cfg.timeoutMs : 30000;
+    var retry = (cfg && Number.isFinite(cfg.retry)) ? cfg.retry : 1;
+
+    var method = ((options.method || 'GET') + '').toUpperCase();
+    var canRetry = (method === 'GET' || method === 'HEAD');
+
+    // Headers defaults
+    var headers = Object.assign({}, options.headers || {});
+    if (!headers.Accept && !headers.accept) headers.Accept = 'application/json';
+    options.headers = headers;
+
+    // Cache layer para catálogos (solo GET)
+    if (method === 'GET' && isCachedApiUrl(url) && typeof window.portalCatalogGetJson === 'function') {
+      try {
+        var cachedData = await window.portalCatalogGetJson(url, options);
+        return { ok: true, status: 200, data: cachedData };
+      } catch (err) {
+        if (err && err.isTimeout) return { ok: false, status: 0, error: 'timeout', detail: 'La solicitud tardó demasiado. Revisa tu conexión e intenta de nuevo.' };
+        return { ok: false, status: 0, error: 'network', detail: 'No pudimos conectar. Revisa tu conexión e intenta de nuevo.' };
+      }
+    }
+
+    var attempts = Math.max(0, retry) + 1;
+    for (var i = 0; i < attempts; i++) {
+      try {
+        var res = await window.portalFetchWithTimeout(url, options, timeoutMs);
+
+        if (res && res.status === 401) {
+          if (typeof window.uiCloseAllOverlays === 'function') window.uiCloseAllOverlays();
+          if (typeof window.showSessionExpiredModal === 'function') window.showSessionExpiredModal();
+          return { ok: false, status: 401, error: 'unauthorized', detail: 'Sesión expirada. Inicia sesión para continuar.' };
+        }
+
+        var status = res ? res.status : 0;
+        var text = '';
+        try { text = await res.text(); } catch (_) { text = ''; }
+
+        var parsed = null;
+        if (text) {
+          try { parsed = JSON.parse(text); } catch (_) { parsed = null; }
+        }
+
+        if (!res.ok) {
+          var detail = (parsed && (parsed.detail || parsed.message)) || res.statusText || ('Error ' + status);
+          if (typeof detail !== 'string') detail = Array.isArray(detail) ? detail.join('; ') : ('Error ' + status);
+          return { ok: false, status: status, error: 'http', detail: detail };
+        }
+
+        // OK: si no es JSON válido, devolver parse error (pero sin stack)
+        if (text && parsed === null) {
+          return { ok: false, status: status, error: 'parse', detail: 'Respuesta inválida del servidor. Intenta de nuevo.' };
+        }
+        return { ok: true, status: status, data: (text ? parsed : null) };
+      } catch (err2) {
+        var isTimeout = !!(err2 && err2.isTimeout);
+        var isAbort = !!(err2 && err2.name === 'AbortError');
+        if (isAbort && !isTimeout) {
+          // abort externo (navegación/cancel)
+          return { ok: false, status: 0, error: 'network', detail: 'Solicitud cancelada.' };
+        }
+        if (isTimeout) {
+          if (canRetry && i < attempts - 1) {
+            await new Promise(function (r) { setTimeout(r, 250); });
+            continue;
+          }
+          return { ok: false, status: 0, error: 'timeout', detail: 'La solicitud tardó demasiado. Revisa tu conexión e intenta de nuevo.' };
+        }
+        // network / fetch failed
+        if (canRetry && i < attempts - 1) {
+          await new Promise(function (r) { setTimeout(r, 250); });
+          continue;
+        }
+        return { ok: false, status: 0, error: 'network', detail: 'No pudimos conectar. Revisa tu conexión e intenta de nuevo.' };
+      }
+    }
+
+    return { ok: false, status: 0, error: 'network', detail: 'No pudimos conectar. Intenta de nuevo.' };
+  };
+
+  /**
    * P24: Fetch JSON normalizado. Regla para cargas de listado: no usar toast.
    *   - response ok y data/lista vacía => renderEmptyState() ("Aún no hay …" + CTA)
    *   - status 401 => bloque "Sesión expirada" + enlace a /login
@@ -202,45 +350,10 @@
    * @returns {Promise<{ ok: boolean, status: number, data: any, error: string }>}
    */
   window.uiFetchJSON = function (url, opts) {
-    var options = Object.assign({ credentials: 'same-origin' }, opts || {});
-    var method = (options.method || 'GET').toUpperCase();
-    if (method === 'GET' && isCachedApiUrl(url) && typeof window.portalCatalogGetJson === 'function') {
-      return window.portalCatalogGetJson(url, options)
-        .then(function (data) { return { ok: true, status: 200, data: data, error: '' }; })
-        .catch(function (err) {
-          var msg = (err && (err.message || err.detail)) || 'Error de conexión.';
-          if (err && err.isTimeout) msg = 'La solicitud tardó demasiado. Revisa tu conexión e intenta de nuevo.';
-          return { ok: false, status: 0, data: null, error: msg };
-        });
-    }
-    var fetcher = (typeof window.portalFetchWithTimeout === 'function')
-      ? window.portalFetchWithTimeout
-      : function (u, o) { return fetch(u, o); };
-    return fetcher(url, options, 30000)
-      .then(function (res) {
-        return res.text().then(function (text) {
-          var data = null;
-          try {
-            data = text ? JSON.parse(text) : null;
-          } catch (_) {}
-          var ok = res.ok;
-          var status = res.status;
-          var error = '';
-          if (!ok) {
-            error = (data && (data.detail || data.message)) || (typeof data === 'object' && data !== null && data.error && data.error.message) || res.statusText || 'Error ' + status;
-            if (typeof error !== 'string') error = Array.isArray(error) ? error.join('; ') : 'Error ' + status;
-          }
-          if (status === 401) {
-            if (typeof window.showSessionExpiredModal === 'function') window.showSessionExpiredModal();
-            error = 'Sesión expirada. Inicia sesión para continuar.';
-          }
-          return { ok: ok, status: status, data: data, error: error };
-        });
-      })
-      .catch(function (err) {
-        var msg = (err && (err.message || err.detail)) || 'Error de conexión.';
-        if (err && err.isTimeout) msg = 'La solicitud tardó demasiado. Revisa tu conexión e intenta de nuevo.';
-        return { ok: false, status: 0, data: null, error: msg };
+    var options = Object.assign({}, opts || {});
+    return window.portalFetchJSON(url, options, { timeoutMs: 30000, retry: 1 })
+      .then(function (r) {
+        return { ok: !!r.ok, status: r.status || 0, data: r.data || null, error: r.detail || '' };
       });
   };
 
@@ -304,7 +417,7 @@
   window.uiSkeletonTableRows = function (cols, rows) {
     var r = '';
     for (var i = 0; i < rows; i++) {
-      r += '<tr><td colspan="' + cols + '"><div class="skeleton" style="height: 46px; border-radius: 14px;"></div></td></tr>';
+      r += '<tr><td colspan="' + cols + '"><div class="skeleton skeleton--row-46"></div></td></tr>';
     }
     return r;
   };
@@ -321,7 +434,9 @@
     var h = (o.height != null && o.height > 0) ? o.height : 72;
     var html = '';
     for (var i = 0; i < count; i++) {
-      html += '<div class="' + cardClass + '"><div class="skeleton" style="height:' + h + 'px;border-radius:12px;"></div></div>';
+      // default: 72px => usa clase; para alturas distintas cae en inline (caso raro)
+      if (h === 72) html += '<div class="' + cardClass + '"><div class="skeleton skeleton--card-72"></div></div>';
+      else html += '<div class="' + cardClass + '"><div class="skeleton" style="height:' + h + 'px;border-radius:12px;"></div></div>';
     }
     return html;
   };

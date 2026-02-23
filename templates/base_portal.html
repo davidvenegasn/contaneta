@@ -1372,27 +1372,7 @@
   // P45: Sesión expirada (401) — modal "Sesión expirada" + botón Iniciar sesión; cerrar drawers/overlays para no dejar UI rota
   window.showSessionExpiredModal = function () {
     var modal = document.getElementById('sessionExpiredModal');
-    document.body.classList.remove('no-scroll');
-    document.querySelectorAll('.ui-overlay.is-open, .cfdi-drawer-overlay.is-open, .provider-drawer-overlay.is-open').forEach(function (el) {
-      el.classList.remove('is-open');
-      el.hidden = true;
-      el.setAttribute('aria-hidden', 'true');
-    });
-    var pdfModal = document.getElementById('pdfModal');
-    if (pdfModal && pdfModal.classList.contains('pdf-modal--open')) {
-      pdfModal.classList.remove('pdf-modal--open');
-      pdfModal.setAttribute('aria-hidden', 'true');
-    }
-    var sidebar = document.getElementById('sidebar');
-    var sidebarBackdrop = document.getElementById('sidebarBackdrop');
-    document.body.classList.remove('sidebar-open');
-    document.documentElement.classList.remove('sidebar-open');
-    if (sidebar) sidebar.setAttribute('aria-hidden', 'true');
-    if (sidebarBackdrop) { sidebarBackdrop.hidden = true; sidebarBackdrop.setAttribute('aria-hidden', 'true'); }
-    var userMenu = document.getElementById('userMenu');
-    var userMenuBtn = document.getElementById('userMenuBtn');
-    if (userMenu) { userMenu.hidden = true; userMenu.setAttribute('aria-hidden', 'true'); }
-    if (userMenuBtn) userMenuBtn.setAttribute('aria-expanded', 'false');
+    if (typeof window.uiCloseAllOverlays === 'function') window.uiCloseAllOverlays();
     if (modal) {
       modal.hidden = false;
       modal.setAttribute('aria-hidden', 'false');
