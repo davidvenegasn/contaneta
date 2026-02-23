@@ -6,6 +6,8 @@ python-multipart
 requests>=2.28.0
 reportlab>=4.0.0
 openpyxl>=3.1.0
+pandas
+pdfplumber
 qrcode>=7.0.0
 Pillow>=9.0.0
 bcrypt>=4.0.0

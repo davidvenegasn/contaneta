@@ -10,7 +10,7 @@ El schema de la base de datos se gestiona **solo por migraciones**. Al arrancar 
 
 - **Crear/actualizar schema:** No hace falta ejecutar ningún script manual; las migraciones se aplican al iniciar la app.
 - **Documentación completa:** [MIGRATIONS.md](MIGRATIONS.md) — cómo funciona el runner, cómo crear una migración nueva, cómo probar con DB desde cero o DB vieja, y qué hacer si aparecen errores WAL/SHM (`invoicing.db-wal`, `invoicing.db-shm`).
-- **Operación:** [OPS_RUNBOOK.md](OPS_RUNBOOK.md) — deploy, backups, restore, health check, cron del worker SAT y logging.
+- **Operación:** [OPERATIONS.md](OPERATIONS.md) — un solo lugar para operar: checklist de producción, deploy, backups, restore, health, cron (worker SAT y backups) y logging. Pensado para que cualquier persona pueda seguir los pasos sin ser programador.
 
 ---
 
@@ -32,6 +32,7 @@ Configuración: ver sección **Variables de entorno** más abajo.
 |----------|-----|----------------|
 | `ENV` | `dev` (default) o `prod`. Define defaults de `DEV_MODE` y `COOKIE_SECURE`. | En producción: `ENV=prod`. |
 | `APP_DB_PATH` | Ruta al archivo SQLite (por defecto `invoicing.db` en la raíz). | Opcional en desarrollo. |
+| `APP_STORAGE_PATH` | Root de `storage/` (uploads, exports, XMLs, credenciales). Si no se define, usa `./storage` dentro del proyecto. | En producción: ruta absoluta (ej. `/var/app/storage`). |
 | `DEV_MODE` | Modo desarrollo (ej. log de emails en consola). Default según ENV. | En producción `0`. |
 | `ALLOW_DEMO_PORTAL` | `1` = sin cookie válida, rutas HTML pueden usar issuer demo. Default `0`: sin cookie → redirect `/login`. | Solo desarrollo local; en prod no definir (0). |
 | `DEV_TOKEN` | Token del issuer demo cuando `ALLOW_DEMO_PORTAL=1`. Debe existir en `issuer_tokens`. | Solo desarrollo; no exponer en producción. |
@@ -58,6 +59,19 @@ El portal **no depende de `?token=` en la URL**. El token se usa solo para inici
 4. **Compatibilidad:** Si alguien entra con `?token=...` en una URL del portal, se inicia sesión y se redirige a la misma ruta sin el token.
 
 **Seguridad mínima:** Cookie con `HttpOnly`, `SameSite=Lax`, `Secure` según entorno (`COOKIE_SECURE=1` en producción). TTL configurable con `SESSION_TTL_DAYS` (por defecto 7). Se recomienda definir `SESSION_SECRET` en producción.
+
+**Guía self-serve SAT (flujo completo):** Para que cualquier usuario siga el flujo desde registro hasta factura rápida — Conectar SAT (FIEL), validar, sincronizar, ver emitidas/recibidas y descargar XML/PDF — ver **[SELF_SERVE_SAT.md](SELF_SERVE_SAT.md)**.
+
+---
+
+## Convertir Edo. de Cuenta (PDF → Excel)
+
+En el portal: **Sidebar → “Convertir Edo. de Cuenta”** (`/portal/bank/pdf-to-excel`).
+
+- Sube un PDF (estado de cuenta) y descarga un **.xlsx**.
+- Si el PDF no trae tablas detectables, se genera un Excel con hoja **RAW** (texto línea por línea).
+
+**Dependencias:** `pdfplumber`, `pandas`, `openpyxl` (en `requirements.txt`).
 
 ### Registro público
 
