@@ -14,18 +14,47 @@ logger = logging.getLogger(__name__)
 from database import db, db_rows, table_exists, has_column, list_catalog, search_catalog, safe_update
 from validators import validate_customer, validate_product
 from routers.deps import get_portal_issuer
-from config import BASE_DIR
+from config import BASE_DIR, DEV_FIXTURES
 from facturapi_client import create_invoice, download_invoice, FacturapiError
-from services import subscription as subscription_service
+try:
+    from cfdi_pdf import (
+        USO_CFDI,
+        REGIMEN_FISCAL,
+        FORMA_PAGO,
+        MONEDA,
+        CLAVE_UNIDAD,
+    )
+except Exception:
+    # Fallback si cfdi_pdf no carga (p. ej. reportlab no instalado)
+    USO_CFDI = {"G03": "Gastos en general", "G01": "Adquisición de mercancías", "CN01": "Nómina"}
+    REGIMEN_FISCAL = {"601": "General de Ley Personas Morales", "612": "Personas Físicas con Actividades Empresariales", "616": "Sin obligaciones fiscales", "626": "Régimen Simplificado de Confianza"}
+    FORMA_PAGO = {"03": "Transferencia electrónica", "01": "Efectivo", "99": "Por definir"}
+    MONEDA = {"MXN": "Peso Mexicano", "USD": "Dólar Americano"}
+    CLAVE_UNIDAD = {"E48": "Unidad de servicio", "EA": "Cada uno", "H87": "Pieza"}
+from services import subscription as subscription_service, csrf as csrf_service
 from services.action_log import log_action
 
 router = APIRouter(prefix="/api")
 
 QUOTATION_STATUSES = ("draft", "sent", "accepted", "rejected", "converted", "expired")
 
-# Paginación: límite por defecto para evitar devolver miles de filas
+# Paginación: nunca devolver miles de filas; siempre limit/offset con tope
 DEFAULT_LIST_LIMIT = 200
-MAX_LIST_LIMIT = 500
+MAX_LIST_LIMIT = 500  # tope duro: ningún listado devuelve más de 500 registros por petición
+
+# Fixtures para DEV_FIXTURES=1 (tests/manual_fixtures/*.json)
+def _load_fixture(name: str):
+    """Si DEV_FIXTURES está activo, carga JSON desde tests/manual_fixtures/{name}.json. Si no existe o falla, devuelve None."""
+    if not DEV_FIXTURES:
+        return None
+    path = os.path.join(BASE_DIR, "tests", "manual_fixtures", f"{name}.json")
+    try:
+        if os.path.isfile(path):
+            with open(path, "r", encoding="utf-8") as f:
+                return json.load(f)
+    except Exception as e:
+        logger.debug("Fixture %s: %s", name, e)
+    return None
 
 
 # ----- Account status (checklist activación + P36 chips topbar) -----
@@ -244,8 +273,16 @@ def api_customers(
     limit: int = Query(DEFAULT_LIST_LIMIT, ge=1, le=MAX_LIST_LIMIT, description="Máximo de registros"),
     offset: int = Query(0, ge=0, description="Registros a saltar"),
 ):
+    fixture = _load_fixture("clients")
+    if fixture is not None:
+        return fixture
     try:
         conn = db()
+        total_row = conn.execute(
+            "SELECT COUNT(*) AS c FROM customer_profiles WHERE issuer_id = ?",
+            (issuer["id"],),
+        ).fetchone()
+        total = total_row[0] if total_row else 0
         rows = conn.execute(
             """
             SELECT id, rfc, legal_name, zip, tax_system, email, alias
@@ -255,15 +292,17 @@ def api_customers(
             (issuer["id"], limit, offset),
         ).fetchall()
         conn.close()
-        return [{"id": r["id"], "rfc": r["rfc"], "legal_name": r["legal_name"], "zip": r["zip"],
-                 "tax_system": r["tax_system"], "email": r["email"], "alias": r["alias"]} for r in rows]
+        items = [{"id": r["id"], "rfc": r["rfc"], "legal_name": r["legal_name"], "zip": r["zip"],
+                  "tax_system": r["tax_system"], "email": r["email"], "alias": r["alias"]} for r in rows]
+        return {"items": items, "total": total}
     except Exception as e:
         logger.warning("api_customers: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail="Error al cargar la lista de clientes.")
 
 
 @router.post("/customers/create")
-def api_customers_create(payload: dict = Body(...), issuer: dict = Depends(get_portal_issuer)):
+def api_customers_create(request: Request, payload: dict = Body(...), issuer: dict = Depends(get_portal_issuer)):
+    csrf_service.verify_api_csrf(request)
     try:
         rfc = (payload.get("rfc") or "").strip().upper()
         legal_name = (payload.get("legal_name") or "").strip()
@@ -290,12 +329,17 @@ def api_customers_create(payload: dict = Body(...), issuer: dict = Depends(get_p
         return {"ok": True, "data": {"rfc": rfc}}
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        logger.exception("api customers create: issuer_id=%s", issuer.get("id"))
+        raise HTTPException(
+            status_code=500,
+            detail="No pudimos guardar el cliente. Intenta de nuevo.",
+        )
 
 
 @router.post("/customers/delete")
-def api_customers_delete(payload: dict = Body(...), issuer: dict = Depends(get_portal_issuer)):
+def api_customers_delete(request: Request, payload: dict = Body(...), issuer: dict = Depends(get_portal_issuer)):
+    csrf_service.verify_api_csrf(request)
     try:
         rfc = (payload.get("rfc") or "").strip().upper()
         if not rfc:
@@ -309,8 +353,12 @@ def api_customers_delete(payload: dict = Body(...), issuer: dict = Depends(get_p
         return {"ok": True, "data": {"rfc": rfc}}
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        logger.exception("api customers delete: issuer_id=%s", issuer.get("id"))
+        raise HTTPException(
+            status_code=500,
+            detail="No pudimos completar la acción. Intenta de nuevo.",
+        )
 
 
 # ----- Products -----
@@ -320,8 +368,16 @@ def api_products(
     limit: int = Query(DEFAULT_LIST_LIMIT, ge=1, le=MAX_LIST_LIMIT, description="Máximo de registros"),
     offset: int = Query(0, ge=0, description="Registros a saltar"),
 ):
+    fixture = _load_fixture("products")
+    if fixture is not None:
+        return fixture
     try:
         conn = db()
+        total_row = conn.execute(
+            "SELECT COUNT(*) AS c FROM issuer_products WHERE issuer_id = ?",
+            (issuer["id"],),
+        ).fetchone()
+        total = total_row[0] if total_row else 0
         rows = conn.execute(
             """
             SELECT id, description, product_key, unit_key, unit_price, iva_rate, created_at
@@ -331,16 +387,18 @@ def api_products(
             (issuer["id"], limit, offset),
         ).fetchall()
         conn.close()
-        return [{"id": r["id"], "description": r["description"], "product_key": r["product_key"],
-                 "unit_key": r["unit_key"], "unit_price": float(r["unit_price"] or 0),
-                 "iva_rate": float(r["iva_rate"] or 0.16), "created_at": r["created_at"]} for r in rows]
+        items = [{"id": r["id"], "description": r["description"], "product_key": r["product_key"],
+                  "unit_key": r["unit_key"], "unit_price": float(r["unit_price"] or 0),
+                  "iva_rate": float(r["iva_rate"] or 0.16), "created_at": r["created_at"]} for r in rows]
+        return {"items": items, "total": total}
     except Exception as e:
         logger.warning("api_products: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail="Error al cargar la lista de productos.")
 
 
 @router.post("/products/create")
-def api_products_create(payload: dict = Body(...), issuer: dict = Depends(get_portal_issuer)):
+def api_products_create(request: Request, payload: dict = Body(...), issuer: dict = Depends(get_portal_issuer)):
+    csrf_service.verify_api_csrf(request)
     try:
         description = (payload.get("description") or "").strip()
         product_key_raw = (payload.get("product_key") or "").strip()
@@ -370,13 +428,18 @@ def api_products_create(payload: dict = Body(...), issuer: dict = Depends(get_po
         return {"ok": True, "data": {"id": rid}}
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        logger.exception("api products create: issuer_id=%s", issuer.get("id"))
+        raise HTTPException(
+            status_code=500,
+            detail="No pudimos guardar el producto. Intenta de nuevo.",
+        )
 
 
 @router.post("/products/delete")
-def api_products_delete(payload: dict = Body(...), issuer: dict = Depends(get_portal_issuer)):
+def api_products_delete(request: Request, payload: dict = Body(...), issuer: dict = Depends(get_portal_issuer)):
     """Elimina un producto del emisor. P37: uso con modal de confirmación en el portal."""
+    csrf_service.verify_api_csrf(request)
     product_id = payload.get("id") or payload.get("product_id")
     if product_id is None:
         raise HTTPException(status_code=400, detail="id o product_id es requerido.")
@@ -408,6 +471,7 @@ def api_invoices_quick(
 
     Permite overrides mínimos (receptor, concepto, IVA/retenciones) para el precálculo editable en Home.
     """
+    csrf_service.verify_api_csrf(request)
     user_id = getattr(request.state, "user_id", 0) or 0
     if not subscription_service.can_issuer_use_sync_and_timbrado(issuer.get("id"), user_id):
         raise HTTPException(status_code=402, detail="Actualiza tu plan para emitir facturas.")
@@ -594,7 +658,11 @@ def api_invoices_quick(
         invoice = create_invoice(issuer["facturapi_org_id"], payload_fact)
     except FacturapiError as fe:
         conn.close()
-        raise HTTPException(status_code=400, detail=str(fe))
+        logger.warning("api invoices quick FacturapiError: issuer_id=%s %s", issuer.get("id"), fe, exc_info=True)
+        raise HTTPException(
+            status_code=400,
+            detail="No se pudo timbrar la factura. Revisa los datos e intenta de nuevo.",
+        )
     fact_id = invoice.get("id")
     uuid = invoice.get("uuid")
     total = invoice.get("total")
@@ -699,10 +767,16 @@ def api_quotations_list(
 ):
     try:
         issuer_id = issuer["id"]
-    except ValueError as e:
-        raise HTTPException(status_code=401, detail=str(e))
+    except (ValueError, KeyError, TypeError):
+        logger.exception("api quotations list: issuer inválido")
+        raise HTTPException(status_code=401, detail="Sesión inválida")
     try:
         conn = db()
+        total_row = conn.execute(
+            "SELECT COUNT(*) AS c FROM quotations WHERE issuer_id = ?",
+            (issuer_id,),
+        ).fetchone()
+        total = total_row[0] if total_row else 0
         rows = conn.execute(
             """
             SELECT q.id, q.folio, q.customer_rfc, q.customer_legal_name, q.customer_email,
@@ -715,18 +789,20 @@ def api_quotations_list(
             (issuer_id, limit, offset),
         ).fetchall()
         conn.close()
-        return [{"id": r["id"], "folio": r.get("folio"), "customer_rfc": r["customer_rfc"],
-                 "customer_legal_name": r["customer_legal_name"], "customer_email": r["customer_email"],
-                 "status": r["status"], "public_token": r["public_token"], "valid_until": r["valid_until"],
-                 "notes": r["notes"], "responded_at": r["responded_at"], "created_at": r["created_at"],
-                 "updated_at": r["updated_at"], "total": float(r["total"] or 0)} for r in rows]
+        items = [{"id": r["id"], "folio": r.get("folio"), "customer_rfc": r["customer_rfc"],
+                  "customer_legal_name": r["customer_legal_name"], "customer_email": r["customer_email"],
+                  "status": r["status"], "public_token": r["public_token"], "valid_until": r["valid_until"],
+                  "notes": r["notes"], "responded_at": r["responded_at"], "created_at": r["created_at"],
+                  "updated_at": r["updated_at"], "total": float(r["total"] or 0)} for r in rows]
+        return {"items": items, "total": total}
     except Exception as e:
         logger.warning("api_quotations_list: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail="Error al cargar la lista de cotizaciones.")
 
 
 @router.post("/quotations/create")
-def api_quotations_create(payload: dict = Body(...), issuer: dict = Depends(get_portal_issuer)):
+def api_quotations_create(request: Request, payload: dict = Body(...), issuer: dict = Depends(get_portal_issuer)):
+    csrf_service.verify_api_csrf(request)
     try:
         issuer_id = issuer["id"]
         customer_rfc = (payload.get("customer_rfc") or "").strip().upper()
@@ -832,8 +908,12 @@ def api_quotations_create(payload: dict = Body(...), issuer: dict = Depends(get_
         return {"ok": True, "data": {"id": qid, "public_token": public_token}}
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        logger.exception("api quotations create: issuer_id=%s", issuer.get("id"))
+        raise HTTPException(
+            status_code=500,
+            detail="No pudimos crear la cotización. Intenta de nuevo.",
+        )
 
 
 @router.get("/quotations/{qid}")
@@ -869,7 +949,8 @@ def api_quotations_get(qid: int, issuer: dict = Depends(get_portal_issuer)):
 
 
 @router.post("/quotations/update-status")
-def api_quotations_update_status(payload: dict = Body(...), issuer: dict = Depends(get_portal_issuer)):
+def api_quotations_update_status(request: Request, payload: dict = Body(...), issuer: dict = Depends(get_portal_issuer)):
+    csrf_service.verify_api_csrf(request)
     try:
         qid = payload.get("id")
         status = (payload.get("status") or "").strip().lower()
@@ -893,8 +974,12 @@ def api_quotations_update_status(payload: dict = Body(...), issuer: dict = Depen
         return {"ok": True, "data": {"id": qid, "status": status}}
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        logger.exception("api quotations status: qid=%s issuer_id=%s", qid, issuer.get("id"))
+        raise HTTPException(
+            status_code=500,
+            detail="No pudimos obtener el estado. Intenta de nuevo.",
+        )
 
 
 @router.post("/quotations/respond")
@@ -949,28 +1034,42 @@ def api_provider_invoices(
         iid = issuer["id"]
         rfc_norm = (rfc or "").strip().upper()
         if not rfc_norm:
-            return []
-    except ValueError as e:
-        raise HTTPException(status_code=401, detail=str(e))
+            return {"items": [], "total": 0}
+    except (ValueError, KeyError, TypeError):
+        logger.exception("api cfdi issued list: issuer inválido")
+        raise HTTPException(status_code=401, detail="Sesión inválida")
     try:
+        base_where = """
+            issuer_id = ? AND direction = 'received'
+            AND UPPER(TRIM(COALESCE(rfc_emisor,''))) = ?
+            AND (tipo_comprobante IS NULL OR UPPER(TRIM(COALESCE(tipo_comprobante,''))) != 'N')
+            AND total IS NOT NULL AND total >= 0.01
+        """
+        total_row = db_rows(
+            f"SELECT COUNT(*) AS c FROM sat_cfdi WHERE {base_where}",
+            (iid, rfc_norm),
+        )
+        total = total_row[0]["c"] if total_row else 0
         rows = db_rows(
-            """
+            f"""
             SELECT uuid, fecha_emision, total, moneda, status, xml_path, concepto
             FROM sat_cfdi
-            WHERE issuer_id = ? AND direction = 'received'
-              AND UPPER(TRIM(COALESCE(rfc_emisor,''))) = ?
-              AND (tipo_comprobante IS NULL OR UPPER(TRIM(COALESCE(tipo_comprobante,''))) != 'N')
-              AND total IS NOT NULL AND total >= 0.01
+            WHERE {base_where}
             ORDER BY fecha_emision DESC LIMIT ? OFFSET ?
             """,
             (iid, rfc_norm, limit, offset),
         )
-        return [{"uuid": r.get("uuid"), "fecha_emision": r.get("fecha_emision"),
-                 "concepto": (r.get("concepto") or "")[:80] + ("…" if len(r.get("concepto") or "") > 80 else ""),
-                 "total": float(r.get("total") or 0), "moneda": r.get("moneda") or "MXN",
-                 "status": r.get("status"), "has_pdf": bool(r.get("xml_path"))} for r in rows]
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        items = [{"uuid": r.get("uuid"), "fecha_emision": r.get("fecha_emision"),
+                  "concepto": (r.get("concepto") or "")[:80] + ("…" if len(r.get("concepto") or "") > 80 else ""),
+                  "total": float(r.get("total") or 0), "moneda": r.get("moneda") or "MXN",
+                  "status": r.get("status"), "has_pdf": bool(r.get("xml_path"))} for r in rows]
+        return {"items": items, "total": total}
+    except Exception:
+        logger.exception("api cfdi issued list: issuer_id=%s", issuer.get("id"))
+        raise HTTPException(
+            status_code=500,
+            detail="No pudimos cargar la lista. Intenta de nuevo.",
+        )
 
 
 @router.get("/provider-invoices/report")
@@ -1005,10 +1104,15 @@ def api_provider_invoices_report(
         )
     except HTTPException:
         raise
-    except ValueError as e:
-        raise HTTPException(status_code=401, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except (ValueError, KeyError, TypeError):
+        logger.exception("api provider report: issuer inválido")
+        raise HTTPException(status_code=401, detail="Sesión inválida")
+    except Exception:
+        logger.exception("api provider report: issuer_id=%s", issuer.get("id"))
+        raise HTTPException(
+            status_code=500,
+            detail="No pudimos generar el reporte. Intenta de nuevo.",
+        )
 
 
 @router.get("/providers")
@@ -1054,14 +1158,17 @@ def api_providers(
                 saved[rfc] = {"rfc": rfc, "legal_name": r["legal_name"] or "", "email": None, "alias": None,
                               "facturas_count": r["facturas_count"], "total_recibido": float(r["total_recibido"] or 0), "source": "sat"}
         out = sorted(saved.values(), key=lambda x: (-x["facturas_count"], -x["total_recibido"], (x.get("alias") or x["rfc"]).lower()))
-        return out[offset : offset + limit]
+        total = len(out)
+        items = out[offset : offset + limit]
+        return {"items": items, "total": total}
     except Exception as e:
         logger.warning("api_providers: %s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail="Error al cargar la lista de proveedores.")
+        return {"items": [], "total": 0}
 
 
 @router.post("/providers/create")
-def api_providers_create(payload: dict = Body(...), issuer: dict = Depends(get_portal_issuer)):
+def api_providers_create(request: Request, payload: dict = Body(...), issuer: dict = Depends(get_portal_issuer)):
+    csrf_service.verify_api_csrf(request)
     try:
         rfc = (payload.get("rfc") or "").strip().upper()
         legal_name = (payload.get("legal_name") or "").strip()
@@ -1086,8 +1193,12 @@ def api_providers_create(payload: dict = Body(...), issuer: dict = Depends(get_p
         return {"ok": True, "data": {"rfc": rfc}}
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        logger.exception("api providers create: issuer_id=%s", issuer.get("id"))
+        raise HTTPException(
+            status_code=500,
+            detail="No pudimos guardar el proveedor. Intenta de nuevo.",
+        )
 
 
 @router.get("/invoices/issued")
@@ -1103,6 +1214,9 @@ def api_invoices_issued(
     per_page: int = Query(DEFAULT_LIST_LIMIT, ge=1, le=MAX_LIST_LIMIT, description="Items per page"),
 ):
     """API endpoint para facturas emitidas con filtros y paginación."""
+    fixture = _load_fixture("issued")
+    if fixture is not None:
+        return fixture
     issuer_id = issuer["id"]
     if not ym:
         from datetime import datetime
@@ -1168,14 +1282,14 @@ def api_invoices_issued(
     
     where_clause = " AND ".join(where_parts)
     
-    # Count total
+    # Count total (row_factory devuelve dict; la clave es el nombre de columna, no el índice)
     try:
         conn = db()
         count_row = conn.execute(
-            f"SELECT COUNT(*) FROM sat_cfdi WHERE {where_clause}",
+            f"SELECT COUNT(*) AS c FROM sat_cfdi WHERE {where_clause}",
             tuple(params)
         ).fetchone()
-        total_count = count_row[0] if count_row else 0
+        total_count = int(count_row.get("c", 0)) if count_row else 0
         conn.close()
     except Exception as e:
         logger.exception("Error counting invoices")
@@ -1232,6 +1346,9 @@ def api_invoices_received(
     per_page: int = Query(DEFAULT_LIST_LIMIT, ge=1, le=MAX_LIST_LIMIT, description="Items per page"),
 ):
     """API endpoint para facturas recibidas con filtros y paginación."""
+    fixture = _load_fixture("received")
+    if fixture is not None:
+        return fixture
     issuer_id = issuer["id"]
     if not ym:
         from datetime import datetime
@@ -1299,14 +1416,14 @@ def api_invoices_received(
     
     where_clause = " AND ".join(where_parts)
     
-    # Count total
+    # Count total (row_factory devuelve dict)
     try:
         conn = db()
         count_row = conn.execute(
-            f"SELECT COUNT(*) FROM sat_cfdi WHERE {where_clause}",
+            f"SELECT COUNT(*) AS c FROM sat_cfdi WHERE {where_clause}",
             tuple(params)
         ).fetchone()
-        total_count = count_row[0] if count_row else 0
+        total_count = int(count_row.get("c", 0)) if count_row else 0
         conn.close()
     except Exception as e:
         logger.exception("Error counting invoices")
@@ -1366,6 +1483,11 @@ def api_pending_invoices(
         if "cancelled" in cols:
             where.append("COALESCE(cancelled,0) = 0")
         where_sql = " AND ".join(where)
+        count_row = conn.execute(
+            f"SELECT COUNT(*) AS c FROM invoices WHERE {where_sql}",
+            tuple(params),
+        ).fetchone()
+        total = int(count_row.get("c", 0)) if count_row else 0
         rows = conn.execute(
             f"""SELECT id, uuid, total, customer_legal_name, customer_rfc, issue_date, created_at
                 FROM invoices WHERE {where_sql}
@@ -1373,25 +1495,142 @@ def api_pending_invoices(
             tuple(params) + (limit, offset),
         ).fetchall()
         conn.close()
-        return [{"id": r["id"], "uuid": r["uuid"], "total": r["total"], "customer_legal_name": r["customer_legal_name"],
-                "customer_rfc": r["customer_rfc"], "date": r["issue_date"] or r["created_at"]} for r in rows]
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        items = [{"id": r["id"], "uuid": r["uuid"], "total": r["total"], "customer_legal_name": r["customer_legal_name"],
+                  "customer_rfc": r["customer_rfc"], "date": r["issue_date"] or r["created_at"]} for r in rows]
+        return {"items": items, "total": total}
+    except Exception:
+        logger.exception("api invoices list: issuer_id=%s", issuer.get("id"))
+        raise HTTPException(
+            status_code=500,
+            detail="No pudimos cargar la lista. Intenta de nuevo.",
+        )
 
 
 # ----- SAT catalogs -----
+# Los catálogos se leen de catalogs/catalogs.db (SAT). Si no existe el archivo (p. ej. no se
+# añadió el DB de un repo comunitario), se usan listas estáticas para que el formulario funcione.
+
+def _catalog_list(d):
+    """Convierte dict {clave: etiqueta} a lista [{key, label}] para los selects."""
+    return [{"key": str(k), "label": str(v)} for k, v in sorted(d.items())]
+
+
+# Fallbacks ampliados cuando no hay catalogs.db (lista completa para moneda/unidad y búsqueda ProdServ)
+MONEDA_FALLBACK = {
+    "MXN": "Peso Mexicano",
+    "USD": "Dólar Americano",
+    "EUR": "Euro",
+    "MXV": "México Unidad de Inversión (UDI)",
+    "GBP": "Libra Esterlina",
+    "CAD": "Dólar Canadiense",
+    "CHF": "Franco Suizo",
+    "JPY": "Yen Japonés",
+    "CNY": "Yuan Chino",
+    "AUD": "Dólar Australiano",
+    "BRL": "Real Brasileño",
+    "COP": "Peso Colombiano",
+    "ARS": "Peso Argentino",
+    "CLP": "Peso Chileno",
+    "PEN": "Sol Peruano",
+    "XXX": "Los códigos asignados para transacciones en que intervenga ninguna moneda",
+}
+UNIDAD_FALLBACK = {
+    "E48": "Unidad de servicio",
+    "EA": "Cada uno",
+    "H87": "Pieza",
+    "ACT": "Actividad",
+    "LTR": "Litro",
+    "MTR": "Metro",
+    "KGM": "Kilogramo",
+    "GRM": "Gramo",
+    "MTK": "Metro cuadrado",
+    "MTQ": "Metro cúbico",
+    "DAY": "Día",
+    "HUR": "Hora",
+    "MIN": "Minuto",
+    "C62": "Unidad",
+    "XBX": "Caja",
+    "PA": "Paquete",
+    "PK": "Paquete",
+    "SET": "Conjunto",
+    "PR": "Par",
+    "NIU": "Número de artículos",
+    "DZN": "Docena",
+    "XPK": "Paquete",
+    "XRO": "Rollo",
+    "XCT": "Ciento",
+    "XPL": "Pliego",
+    "XNA": "Artículo",
+    "XNE": "Kilo neto",
+    "XBR": "Barra",
+    "XBO": "Botella",
+    "XBE": "Lata",
+    "XBG": "Bolsa",
+}
+# Lista (clave, descripción) para búsqueda ProdServ por palabra; descripción en minúsculas para matchear.
+PRODSERV_FALLBACK = [
+    ("81112100", "Servicios de asesoría en negocios y comercio"),
+    ("81112101", "Asesoría en negocios"),
+    ("84111500", "Servicios contables (honorarios contables)"),
+    ("84111501", "Servicios de contabilidad"),
+    ("84111502", "Servicios de auditoría"),
+    ("84111503", "Servicios de teneduría de libros"),
+    ("84111600", "Servicios de impuestos"),
+    ("84111800", "Servicios de consultoría en gestión"),
+    ("53111500", "Servicios de alquiler o arrendamiento de equipo"),
+    ("53111501", "Renta de equipo"),
+    ("53111502", "Arrendamiento de maquinaria"),
+    ("53131600", "Servicios de mantenimiento de equipo"),
+    ("80101600", "Servicios de consultoría en negocios"),
+    ("80101601", "Consultoría administrativa"),
+    ("80101602", "Consultoría en gestión"),
+    ("80101800", "Servicios de consultoría en tecnología"),
+    ("80101801", "Consultoría en sistemas"),
+    ("81101500", "Servicios de diseño"),
+    ("81101501", "Diseño gráfico"),
+    ("81101502", "Diseño de software"),
+    ("81102200", "Servicios de desarrollo de software"),
+    ("81102201", "Desarrollo de aplicaciones"),
+    ("81111800", "Servicios de soporte técnico"),
+    ("81112200", "Servicios de consultoría en ingeniería"),
+    ("90101500", "Servicios de limpieza"),
+    ("90101600", "Servicios de limpieza de edificios"),
+    ("92111500", "Servicios de capacitación"),
+    ("92111501", "Capacitación empresarial"),
+    ("92111502", "Cursos de capacitación"),
+    ("93101600", "Servicios de publicidad"),
+    ("93101601", "Publicidad y promoción"),
+    ("84111801", "Servicios de consultoría en recursos humanos"),
+    ("84111802", "Outsourcing o subcontratación de servicios"),
+    ("81112102", "Asesoría en comercio"),
+    ("43211500", "Equipo de cómputo"),
+    ("43211501", "Computadoras personales"),
+    ("43222600", "Software"),
+    ("43222601", "Software de aplicación"),
+    ("44111500", "Mobiliario de oficina"),
+    ("44111501", "Escritorios y mesas"),
+    ("50192100", "Servicios de mensajería"),
+    ("50192101", "Mensajería y paquetería"),
+]
+
+
 @router.get("/catalogs/forma_pago")
 def api_forma_pago():
     try:
         return list_catalog("cfdi_40_formas_pago")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid catalog table")
+    except Exception:
+        logger.warning("api catalogs forma_pago: usando fallback (catalogs.db no disponible)")
+        return _catalog_list(FORMA_PAGO)
 
 
 @router.get("/catalogs/metodo_pago")
 def api_metodo_pago():
     try:
         return list_catalog("cfdi_40_metodos_pago")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid catalog table")
     except Exception:
         return [{"key": "PUE", "label": "Pago en una sola exhibición"}, {"key": "PPD", "label": "Pago en parcialidades o diferido"}]
 
@@ -1400,37 +1639,67 @@ def api_metodo_pago():
 def api_uso_cfdi():
     try:
         return list_catalog("cfdi_40_usos_cfdi")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid catalog table")
+    except Exception:
+        logger.warning("api catalogs uso_cfdi: usando fallback (catalogs.db no disponible)")
+        return _catalog_list(USO_CFDI)
 
 
 @router.get("/catalogs/regimen_fiscal")
 def api_regimen_fiscal():
     try:
         return list_catalog("cfdi_40_regimenes_fiscales")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid catalog table")
+    except Exception:
+        logger.warning("api catalogs regimen_fiscal: usando fallback (catalogs.db no disponible)")
+        reg = dict(REGIMEN_FISCAL)
+        reg["616"] = "Sin obligaciones fiscales"
+        return _catalog_list(reg)
 
 
 @router.get("/catalogs/moneda")
 def api_moneda():
     try:
         return list_catalog("cfdi_40_monedas")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid catalog table")
+    except Exception:
+        logger.warning("api catalogs moneda: usando fallback (catalogs.db no disponible)")
+        return _catalog_list(MONEDA_FALLBACK)
 
 
 @router.get("/catalogs/prodserv")
 def api_prodserv(q: str = Query(..., min_length=1), limit: int = Query(20, ge=1, le=50)):
     try:
         return search_catalog("cfdi_40_productos_servicios", q=q, limit=limit)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid catalog table")
+    except Exception:
+        logger.warning("api catalogs prodserv: usando fallback estático (catalogs.db no disponible)")
+        q_lower = q.strip().lower()
+        out = []
+        for clave, desc in PRODSERV_FALLBACK:
+            if q_lower in clave or q_lower in desc.lower():
+                out.append({"key": clave, "label": desc})
+                if len(out) >= limit:
+                    break
+        return out
 
 
 @router.get("/catalogs/unidad")
 def api_unidad(q: str = Query(..., min_length=1), limit: int = Query(20, ge=1, le=50)):
     try:
         return search_catalog("cfdi_40_claves_unidades", q=q, limit=limit)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid catalog table")
+    except Exception:
+        logger.warning("api catalogs unidad: usando fallback (catalogs.db no disponible)")
+        q_lower = q.strip().lower()
+        items = [
+            {"key": k, "label": v}
+            for k, v in UNIDAD_FALLBACK.items()
+            if q_lower in v.lower() or q_lower in k.lower()
+        ]
+        return items[: int(limit)]

@@ -130,6 +130,79 @@
   };
 
   /**
+   * Atrapa el foco dentro de un modal/drawer (Tab no sale del contenedor).
+   * @param {HTMLElement} modalEl - contenedor del modal (role="dialog" o .ui-overlay con panel)
+   */
+  var _focusTrapRef = { remove: null };
+  window.uiTrapFocus = function (modalEl) {
+    if (!modalEl) return;
+    var focusables = modalEl.querySelectorAll('button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])');
+    var arr = [];
+    for (var i = 0; i < focusables.length; i++) {
+      var el = focusables[i];
+      if (el.offsetParent != null && !el.disabled && (el.getAttribute('aria-hidden') !== 'true')) arr.push(el);
+    }
+    if (arr.length === 0) return;
+    var first = arr[0];
+    var last = arr[arr.length - 1];
+    var handler = function (e) {
+      if (e.key !== 'Tab') return;
+      if (e.shiftKey) {
+        if (document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else {
+        if (document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+    modalEl.addEventListener('keydown', handler);
+    _focusTrapRef.remove = function () {
+      modalEl.removeEventListener('keydown', handler);
+      _focusTrapRef.remove = null;
+    };
+    try { first.focus(); } catch (_) {}
+  };
+
+  /**
+   * Libera el atrapamiento de foco (llamar al cerrar modal).
+   */
+  window.uiReleaseFocusTrap = function () {
+    if (_focusTrapRef.remove) {
+      _focusTrapRef.remove();
+      _focusTrapRef.remove = null;
+    }
+  };
+
+  /**
+   * Cierra el modal al pulsar Escape. Devuelve una función que elimina el listener (llamar al cerrar por cualquier medio).
+   * @param {HTMLElement} modalEl
+   * @param {function} closeFn - función que cierra el modal (debe llamar a uiReleaseFocusTrap y a la función devuelta)
+   * @returns {function} removeEscape - llamar al cerrar para quitar el listener
+   */
+  window.uiCloseOnEscape = function (modalEl, closeFn) {
+    if (!modalEl || typeof closeFn !== 'function') return function () {};
+    function isModalOpen() {
+      if (!modalEl) return false;
+      if (modalEl.id === 'pdfModal') return modalEl.classList && modalEl.classList.contains('pdf-modal--open');
+      if (modalEl.classList && (modalEl.classList.contains('ui-overlay') || modalEl.classList.contains('cfdi-drawer-overlay') || modalEl.classList.contains('provider-drawer-overlay'))) return modalEl.classList.contains('is-open');
+      return !modalEl.hidden;
+    }
+    var handler = function (e) {
+      if (e.key !== 'Escape') return;
+      if (!isModalOpen()) return;
+      closeFn();
+    };
+    document.addEventListener('keydown', handler, true);
+    return function () {
+      document.removeEventListener('keydown', handler, true);
+    };
+  };
+
+  /**
    * Cierra overlays/drawers/modales y limpia estados loading para evitar UI rota.
    * Usar antes de mostrar modal "Sesión expirada" (401).
    */
@@ -147,9 +220,10 @@
       } catch (_) {}
     });
 
-    // Modales genéricos
+    // Modales genéricos (no cerrar el de sesión expirada para no dejar UI rota)
     document.querySelectorAll('.modal:not([hidden])').forEach(function (m) {
       try {
+        if (m.id === 'sessionExpiredModal') return;
         m.hidden = true;
         m.setAttribute('aria-hidden', 'true');
         m.classList.remove('is-open');
@@ -203,18 +277,26 @@
   }
 
   /**
-   * Helper único: fetch con timeout y manejo base de 401.
-   * - Timeout por defecto: 30s (abort)
-   * - En 401: dispara modal "Sesión expirada" y limpia UI (si existe showSessionExpiredModal)
+   * Helper único: fetch con timeout, AbortController, 401 y errores unificados.
+   * - Timeout por defecto: 30s (abort) → lanza error { type: 'timeout' }
+   * - 401 → showSessionExpiredModal() y lanza error { type: 'unauthorized' }
+   * - Red → lanza error { type: 'network' }
    * @param {string} url
    * @param {RequestInit} [opts]
-   * @param {number} [timeoutMs]
-   * @returns {Promise<Response>}
+   * @param {number} [timeoutMs] - default 30000
+   * @returns {Promise<Response>} - en éxito; en error lanza { type, message }
    */
   window.portalFetchWithTimeout = function (url, opts, timeoutMs) {
     var options = Object.assign({ credentials: 'same-origin' }, opts || {});
     var ms = Number.isFinite(timeoutMs) ? timeoutMs : 30000;
-
+    var method = ((options.method || 'GET') + '').toUpperCase();
+    if ((method === 'POST' || method === 'PUT' || method === 'PATCH' || method === 'DELETE') && String(url).indexOf('/api/') !== -1) {
+      options.headers = options.headers || {};
+      if (!options.headers['X-CSRF-Token'] && !options.headers['x-csrf-token']) {
+        var meta = document.querySelector('meta[name="csrf-token"]');
+        if (meta && meta.getAttribute('content')) options.headers['X-CSRF-Token'] = meta.getAttribute('content');
+      }
+    }
     var controller = new AbortController();
     var timedOut = false;
     var t = setTimeout(function () {
@@ -222,7 +304,6 @@
       try { controller.abort(); } catch (_) {}
     }, ms);
 
-    // Si ya venía un signal (p. ej. navegación), encadenarlo al nuestro
     var externalSignal = options.signal;
     if (externalSignal && typeof externalSignal.addEventListener === 'function') {
       if (externalSignal.aborted) {
@@ -237,14 +318,32 @@
     options.signal = controller.signal;
 
     return fetch(url, options)
+      .then(function (res) {
+        if (res && res.status === 401) {
+          if (typeof window.uiCloseAllOverlays === 'function') window.uiCloseAllOverlays();
+          if (typeof window.showSessionExpiredModal === 'function') window.showSessionExpiredModal();
+          var e = new Error('Sesión expirada');
+          e.type = 'unauthorized';
+          throw e;
+        }
+        return res;
+      })
       .catch(function (err) {
+        if (err && err.type === 'unauthorized') throw err;
         if (err && err.name === 'AbortError' && timedOut) {
-          var te = new Error('Timeout');
-          te.name = 'TimeoutError';
+          var te = new Error('La solicitud tardó demasiado. Revisa tu conexión e intenta de nuevo.');
+          te.type = 'timeout';
           te.isTimeout = true;
           throw te;
         }
-        throw err;
+        if (err && (err.name === 'AbortError' || err.name === 'TypeError' || (err.message && err.message.indexOf('fetch') !== -1))) {
+          var ne = new Error('No pudimos conectar. Revisa tu conexión e intenta de nuevo.');
+          ne.type = 'network';
+          throw ne;
+        }
+        var ne2 = new Error(err && (err.message || String(err)) || 'Error de red');
+        ne2.type = 'network';
+        throw ne2;
       })
       .finally(function () {
         clearTimeout(t);
@@ -269,29 +368,22 @@
     // Headers defaults
     var headers = Object.assign({}, options.headers || {});
     if (!headers.Accept && !headers.accept) headers.Accept = 'application/json';
-    options.headers = headers;
-
-    // Cache layer para catálogos (solo GET)
-    if (method === 'GET' && isCachedApiUrl(url) && typeof window.portalCatalogGetJson === 'function') {
-      try {
-        var cachedData = await window.portalCatalogGetJson(url, options);
-        return { ok: true, status: 200, data: cachedData };
-      } catch (err) {
-        if (err && err.isTimeout) return { ok: false, status: 0, error: 'timeout', detail: 'La solicitud tardó demasiado. Revisa tu conexión e intenta de nuevo.' };
-        return { ok: false, status: 0, error: 'network', detail: 'No pudimos conectar. Revisa tu conexión e intenta de nuevo.' };
+    if ((method === 'POST' || method === 'PUT' || method === 'PATCH' || method === 'DELETE') && String(url).indexOf('/api/') !== -1) {
+      if (!headers['X-CSRF-Token'] && !headers['x-csrf-token']) {
+        var csrfMeta = document.querySelector('meta[name="csrf-token"]');
+        if (csrfMeta && csrfMeta.getAttribute('content')) headers['X-CSRF-Token'] = csrfMeta.getAttribute('content');
       }
     }
+    options.headers = headers;
+
+    // No delegar aquí a portalCatalogGetJson: ese helper ya usa portalFetchJSON como fetcher
+    // y delegar crearía recursión (portalCatalogGetJson -> portalFetchJSON -> portalCatalogGetJson).
+    // El cache de catálogos se gestiona solo dentro de portalCatalogGetJson.
 
     var attempts = Math.max(0, retry) + 1;
     for (var i = 0; i < attempts; i++) {
       try {
         var res = await window.portalFetchWithTimeout(url, options, timeoutMs);
-
-        if (res && res.status === 401) {
-          if (typeof window.uiCloseAllOverlays === 'function') window.uiCloseAllOverlays();
-          if (typeof window.showSessionExpiredModal === 'function') window.showSessionExpiredModal();
-          return { ok: false, status: 401, error: 'unauthorized', detail: 'Sesión expirada. Inicia sesión para continuar.' };
-        }
 
         var status = res ? res.status : 0;
         var text = '';
@@ -314,10 +406,12 @@
         }
         return { ok: true, status: status, data: (text ? parsed : null) };
       } catch (err2) {
-        var isTimeout = !!(err2 && err2.isTimeout);
+        if (err2 && err2.type === 'unauthorized') {
+          return { ok: false, status: 401, error: 'unauthorized', detail: 'Sesión expirada. Inicia sesión para continuar.' };
+        }
+        var isTimeout = !!(err2 && (err2.isTimeout || err2.type === 'timeout'));
         var isAbort = !!(err2 && err2.name === 'AbortError');
         if (isAbort && !isTimeout) {
-          // abort externo (navegación/cancel)
           return { ok: false, status: 0, error: 'network', detail: 'Solicitud cancelada.' };
         }
         if (isTimeout) {
@@ -325,18 +419,44 @@
             await new Promise(function (r) { setTimeout(r, 250); });
             continue;
           }
-          return { ok: false, status: 0, error: 'timeout', detail: 'La solicitud tardó demasiado. Revisa tu conexión e intenta de nuevo.' };
+          return { ok: false, status: 0, error: 'timeout', detail: err2 && err2.message ? err2.message : 'La solicitud tardó demasiado. Revisa tu conexión e intenta de nuevo.' };
         }
-        // network / fetch failed
         if (canRetry && i < attempts - 1) {
           await new Promise(function (r) { setTimeout(r, 250); });
           continue;
         }
-        return { ok: false, status: 0, error: 'network', detail: 'No pudimos conectar. Revisa tu conexión e intenta de nuevo.' };
+        return { ok: false, status: 0, error: 'network', detail: err2 && err2.message ? err2.message : 'No pudimos conectar. Revisa tu conexión e intenta de nuevo.' };
       }
     }
 
     return { ok: false, status: 0, error: 'network', detail: 'No pudimos conectar. Intenta de nuevo.' };
+  };
+
+  /**
+   * Muestra el bloque de error de carga (evitar pantalla blanca). Debe existir en el DOM:
+   * id=idPrefix, id=idPrefix+"Msg", id=idPrefix+"Retry".
+   * @param {string} idPrefix - ej. 'loadErrorState'
+   * @param {string} message - texto del error
+   * @param {function} [onRetry] - callback al pulsar Reintentar (opcional)
+   */
+  window.portalShowLoadError = function (idPrefix, message, onRetry) {
+    var el = document.getElementById(idPrefix);
+    var msgEl = document.getElementById(idPrefix + 'Msg');
+    var retryBtn = document.getElementById(idPrefix + 'Retry');
+    if (msgEl) msgEl.textContent = message || 'Puedes intentar de nuevo.';
+    if (el) el.hidden = false;
+    if (retryBtn && typeof onRetry === 'function') {
+      retryBtn.onclick = function () { retryBtn.onclick = null; onRetry(); };
+    }
+  };
+
+  /**
+   * Oculta el bloque de error de carga.
+   * @param {string} idPrefix - ej. 'loadErrorState'
+   */
+  window.portalHideLoadError = function (idPrefix) {
+    var el = document.getElementById(idPrefix);
+    if (el) el.hidden = true;
   };
 
   /**
@@ -371,18 +491,58 @@
   };
 
   /**
+   * Renderiza bloque de error de carga unificado: título + mensaje + botón Reintentar.
+   * @param {HTMLElement} container - contenedor donde insertar el bloque (se vacía). Si es string, se usa getElementById.
+   * @param {string} message - texto del detalle (ej. "La solicitud tardó demasiado. Revisa tu conexión e intenta de nuevo.")
+   * @param {function} onRetry - callback al pulsar Reintentar (ej. loadData)
+   * @returns {HTMLElement} el bloque creado (empty-state--error)
+   */
+  window.renderLoadError = function (container, message, onRetry) {
+    var el = typeof container === 'string' ? document.getElementById(container) : container;
+    if (!el) return null;
+    el.innerHTML = '';
+    el.className = 'empty-state empty-state--error';
+    el.setAttribute('aria-live', 'polite');
+    el.hidden = false;
+    var title = document.createElement('div');
+    title.className = 'empty-state__title';
+    title.textContent = 'No pudimos cargar esto ahora.';
+    var desc = document.createElement('p');
+    desc.className = 'empty-state__desc';
+    desc.textContent = message || 'Puedes intentar de nuevo.';
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn btn--secondary';
+    btn.textContent = 'Reintentar';
+    if (typeof onRetry === 'function') {
+      btn.addEventListener('click', function () { onRetry(); });
+    }
+    el.appendChild(title);
+    el.appendChild(desc);
+    el.appendChild(btn);
+    return el;
+  };
+
+  /**
    * P24: Extrae lista de la respuesta (array directo, data.data, data.customers, etc).
    * @param {*} data - respuesta de API
    * @returns {Array}
    */
   window.uiGetListFromResponse = function (data) {
     if (Array.isArray(data)) return data;
+    if (data && Array.isArray(data.items)) return data.items;
     if (data && Array.isArray(data.data)) return data.data;
     if (data && Array.isArray(data.customers)) return data.customers;
     if (data && Array.isArray(data.providers)) return data.providers;
     if (data && Array.isArray(data.products)) return data.products;
     if (data && Array.isArray(data.quotations)) return data.quotations;
     return [];
+  };
+
+  /** Total de registros si la API devuelve { items, total }. */
+  window.uiGetTotalFromResponse = function (data) {
+    if (data != null && typeof data.total === 'number') return data.total;
+    return undefined;
   };
 
   /**

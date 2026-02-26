@@ -1,26 +1,76 @@
 # Portal HTML routes and helpers
 import hashlib
+import io
 import json
 import logging
 import os
+import re
 import secrets
 import stat
 import subprocess
-from datetime import datetime, date
-from typing import Optional
+from services.subprocess_safe import run_php
+from datetime import datetime, date, timezone
+from typing import Optional, Any
 
 from fastapi import APIRouter, Request, Depends, Query, HTTPException, File, UploadFile, Form, Body
 from fastapi.responses import HTMLResponse, Response, RedirectResponse, JSONResponse, FileResponse
 
-from config import BASE_DIR, REGIMEN_LABEL_TO_CODE, COOKIE_DEMO_VIEW, DB_PATH, DEV_MODE
-from database import db, db_rows, has_column
+from config import BASE_DIR, REGIMEN_LABEL_TO_CODE, COOKIE_DEMO_VIEW, DB_PATH, DEV_MODE, PORTAL_SHELL_V2
+from database import db, db_rows, has_column, table_exists
 from routers.deps import get_portal_issuer
 from services import quotations as quotations_service, rate_limit as rate_limit_service, session as session_service, audit, subscription as subscription_service, csrf as csrf_service
 from services.action_log import log_action
+from services.portal_errors import portal_error_type
 from services.pdf_to_excel import convert_pdf_to_xlsx, get_storage_root, safe_join, ensure_parent_dir
+from services.bank_parse_preview import parse_bank_pdf_to_movements_preview, reclassify_movements
+from services.bank_preview_pipeline import parse_bank_statement_preview
+from services.bank_preview_models import compute_dedupe_fingerprint
 from services.catalog_from_cfdi import backfill_catalog_from_existing_cfdi
+from services.bank_accounts import list_active_accounts as bank_list_accounts, get_account as bank_get_account, create_account as bank_create_account, update_account as bank_update_account, delete_account as bank_delete_account
+from services.bank_own_accounts import detect_own_account_transfer
+from services.bank_statement_ingest import ingest_bank_statement, extract_statement_metadata, validate_statement_ownership, commit_preview_to_db
+from services.bank_cfdi_matching import find_cfdi_candidates, save_suggested_matches, confirm_match as match_confirm, reject_match as match_reject
 
 logger = logging.getLogger(__name__)
+
+
+def _db_row_to_dict(row: Any) -> dict:
+    """Convierte sqlite3.Row (o cualquier fila) a dict para que .get() funcione."""
+    if row is None:
+        return {}
+    if isinstance(row, dict):
+        return row
+    # sqlite3.Row no es un Mapping estándar; dict(row) puede dar claves numéricas
+    if hasattr(row, "keys"):
+        try:
+            return dict(zip(row.keys(), row))
+        except Exception:
+            pass
+    try:
+        return dict(row)
+    except Exception:
+        return {}
+
+
+def _strip_date_from_description(desc: Optional[str]) -> str:
+    """Quita prefijo de fecha de la descripción para mostrar como concepto (ej. 31-ENE-26 o 2026-01-31)."""
+    if not desc or not isinstance(desc, str):
+        return desc or ""
+    s = desc.strip()
+    # DD-MMM-YY (ej. 31-ENE-26)
+    m = re.match(r"^\d{1,2}-[A-Za-z]{3}-\d{2,4}\s*", s)
+    if m:
+        return s[m.end() :].strip() or s
+    # YYYY-MM-DD
+    m = re.match(r"^\d{4}-\d{2}-\d{2}\s*", s)
+    if m:
+        return s[m.end() :].strip() or s
+    # DD/MM/YYYY o DD/MM/YY
+    m = re.match(r"^\d{1,2}/\d{1,2}/\d{2,4}\s*", s)
+    if m:
+        return s[m.end() :].strip() or s
+    return s
+
 
 # ----------------------------
 # Helpers
@@ -58,21 +108,17 @@ def _run_fiel_validation(issuer_id: int) -> tuple[bool, str]:
     env = os.environ.copy()
     env["APP_DB_PATH"] = str(DB_PATH)
     try:
-        proc = subprocess.run(
-            ["php", php_script, str(issuer_id)],
-            cwd=BASE_DIR,
-            capture_output=True,
-            text=True,
+        stdout, stderr, returncode = run_php(
+            [php_script, str(issuer_id)],
             timeout=30,
+            cwd=BASE_DIR,
             env=env,
         )
     except subprocess.TimeoutExpired:
         return False, "Validación tardó demasiado."
     except FileNotFoundError:
         return False, "PHP no está instalado o no está en el PATH."
-    stderr = (proc.stderr or "").strip()
-    stdout = (proc.stdout or "").strip()
-    ok = proc.returncode == 0
+    ok = returncode == 0
     message = stdout if ok else (stderr or "Error al validar la FIEL.")
     conn = db()
     try:
@@ -149,9 +195,16 @@ def _get_month_totals(issuer_id: int, ym: str, direction: str) -> dict:
                 """,
                 params,
             ).fetchone()
-        total_base = float(row[0] or 0) if row else 0.0
-        total_iva = float(row[1] or 0) if row else 0.0
-        total_retenciones = float(row[2] or 0) if (has_retenciones and row and len(row) >= 3) else 0.0
+        if not row:
+            total_base = total_iva = total_retenciones = 0.0
+        elif isinstance(row, dict):
+            total_base = float(row.get("total_base") or 0)
+            total_iva = float(row.get("total_iva") or 0)
+            total_retenciones = float(row.get("total_retenciones") or 0) if has_retenciones else 0.0
+        else:
+            total_base = float(row[0] or 0)
+            total_iva = float(row[1] or 0)
+            total_retenciones = float(row[2] or 0) if (has_retenciones and len(row) >= 3) else 0.0
         return {
             "total_base": total_base,
             "total_iva": total_iva,
@@ -247,16 +300,36 @@ def get_portal_router(templates):
         active_page: str,
         title: str,
         extra: Optional[dict] = None,
+        extra_context: Optional[dict] = None,
         error: Optional[str] = None,
         status_code: int = 200,
+        **template_vars: Any,
     ):
+        def _db_row_to_dict(row: Any) -> dict:
+            if row is None:
+                return {}
+            if isinstance(row, dict):
+                return row
+            if hasattr(row, "keys"):
+                try:
+                    return dict(zip(row.keys(), row))
+                except Exception:
+                    pass
+            try:
+                return dict(row)
+            except Exception:
+                return {}
+
         has_nomina = False
         if issuer.get("id", 0) > 0:
-            r = db_rows(
-                "SELECT 1 FROM sat_cfdi WHERE issuer_id = ? AND direction = 'received' AND UPPER(TRIM(COALESCE(tipo_comprobante,''))) = 'N' LIMIT 1",
-                (issuer["id"],),
-            )
-            has_nomina = bool(r)
+            try:
+                r = db_rows(
+                    "SELECT 1 FROM sat_cfdi WHERE issuer_id = ? AND direction = 'received' AND UPPER(TRIM(COALESCE(tipo_comprobante,''))) = 'N' LIMIT 1",
+                    (issuer["id"],),
+                )
+                has_nomina = bool(r)
+            except Exception:
+                pass
         regimen_label = issuer.get("regimen_fiscal") or ""
         issuer_tax_code = REGIMEN_LABEL_TO_CODE.get(regimen_label) if regimen_label else ""
         show_welcome_popup = getattr(request.state, "issuer_is_placeholder", False) and not getattr(
@@ -268,20 +341,31 @@ def get_portal_router(templates):
         menu_sat_configured = False
         menu_catalog_ok = False
         if issuer_id > 0:
-            menu_sat_configured = bool(
-                db_rows("SELECT 1 FROM sat_credentials WHERE issuer_id = ? AND validation_ok = 1 LIMIT 1", (issuer_id,))
-            )
-            cust = db_rows("SELECT COUNT(*) AS n FROM customer_profiles WHERE issuer_id = ?", (issuer_id,))
-            prod = db_rows("SELECT COUNT(*) AS n FROM issuer_products WHERE issuer_id = ?", (issuer_id,))
-            menu_catalog_ok = (cust[0]["n"] if cust else 0) > 0 and (prod[0]["n"] if prod else 0) > 0
-        payload = {
+            try:
+                menu_sat_configured = bool(
+                    db_rows("SELECT 1 FROM sat_credentials WHERE issuer_id = ? AND validation_ok = 1 LIMIT 1", (issuer_id,))
+                )
+                cust = db_rows("SELECT COUNT(*) AS n FROM customer_profiles WHERE issuer_id = ?", (issuer_id,))
+                prod = db_rows("SELECT COUNT(*) AS n FROM issuer_products WHERE issuer_id = ?", (issuer_id,))
+                menu_catalog_ok = (cust[0]["n"] if cust else 0) > 0 and (prod[0]["n"] if prod else 0) > 0
+            except Exception:
+                pass
+        path = request.url.path
+
+        def _nav_is_active(prefix_or_list):  # Helper para estado activo en rail/drawer por ruta
+            if isinstance(prefix_or_list, str):
+                return path.startswith(prefix_or_list)
+            return any(path.startswith(p) for p in prefix_or_list)
+
+        payload: dict[str, Any] = {
             "request": request,
             "token": "",
-            "issuer_alias": issuer["alias"],
-            "issuer_rfc": issuer["rfc"],
+            "issuer_alias": issuer.get("alias", ""),
+            "issuer_rfc": issuer.get("rfc", ""),
             "issuer_tax_system": issuer_tax_code,
             "issuer_regimen_label": regimen_label or "",
             "active_page": active_page,
+            "nav_is_active": _nav_is_active,
             "title": title,
             "error": error,
             "has_nomina": has_nomina,
@@ -291,9 +375,14 @@ def get_portal_router(templates):
             "menu_sat_configured": menu_sat_configured,
             "menu_catalog_ok": menu_catalog_ok,
             "dev_debug_panel": DEV_MODE,
+            "portal_shell_v2": PORTAL_SHELL_V2,
         }
         if extra:
             payload.update(extra)
+        if extra_context:
+            payload.update(extra_context)
+        if template_vars:
+            payload.update(template_vars)
         payload.setdefault("csrf_token", csrf_service.generate_csrf_token())
         return templates.TemplateResponse(template_name, payload, status_code=status_code)
 
@@ -545,6 +634,53 @@ def get_portal_router(templates):
         except Exception:
             logger.exception("portal: error renderizando home")
             raise
+
+    @router.get("/qa", response_class=HTMLResponse)
+    def portal_qa(request: Request, issuer: dict = Depends(get_portal_issuer)):
+        """Página interna de QA: checks básicos y enlaces rápidos. Solo visible con DEV_MODE=1 o ENV=dev."""
+        if not DEV_MODE:
+            raise HTTPException(status_code=404, detail="Not Found")
+        try:
+            issuer_id = issuer["id"]
+            ym = ym_now()
+            count_issued = db_rows(
+                """
+                SELECT COUNT(*) AS n FROM sat_cfdi
+                WHERE issuer_id = ? AND direction = 'issued' AND fecha_emision IS NOT NULL
+                  AND substr(fecha_emision,1,7) = ? AND (total IS NULL OR total >= 0.01)
+                """,
+                (issuer_id, ym),
+            )
+            count_received = db_rows(
+                """
+                SELECT COUNT(*) AS n FROM sat_cfdi
+                WHERE issuer_id = ? AND direction = 'received' AND fecha_emision IS NOT NULL
+                  AND substr(fecha_emision,1,7) = ? AND total IS NOT NULL AND total >= 0.01
+                  AND (tipo_comprobante IS NULL OR UPPER(TRIM(tipo_comprobante)) != 'N')
+                """,
+                (issuer_id, ym),
+            )
+            sat_sync_status = _get_sat_sync_status(issuer_id)
+            return _render_portal(
+                request,
+                issuer=issuer,
+                template_name="portal_qa.html",
+                active_page="home",
+                title="QA (solo dev)",
+                extra={
+                    "ym": ym,
+                    "ym_label": ym_to_label(ym),
+                    "count_issued": count_issued[0]["n"] if count_issued else 0,
+                    "count_received": count_received[0]["n"] if count_received else 0,
+                    "sat_last_sync": sat_sync_status.get("last_sync_at"),
+                    "sat_status": sat_sync_status.get("status"),
+                },
+            )
+        except HTTPException:
+            raise
+        except Exception:
+            logger.exception("portal: error renderizando /portal/qa")
+            raise HTTPException(status_code=500, detail="Error al cargar QA")
 
     @router.get("/create", response_class=HTMLResponse)
     def portal_create(
@@ -850,6 +986,243 @@ def get_portal_router(templates):
             logger.exception("portal: error renderizando /portal/invoices/received ym=%s", ym)
             raise
 
+    # ---------- Hubs (navegación agrupada con tabs) ----------
+    @router.get("/facturas", response_class=HTMLResponse)
+    def portal_facturas_hub(
+        request: Request,
+        issuer: dict = Depends(get_portal_issuer),
+        tab: str = Query("issued", description="issued|received|ppd"),
+        ym: str = None,
+    ):
+        """Hub Facturas: tabs Emitidas / Recibidas / PPD. Reutiliza misma lógica y datos que rutas legacy."""
+        try:
+            if tab not in ("issued", "received", "ppd"):
+                tab = "issued"
+            issuer_id = issuer["id"]
+            if not ym:
+                ym = ym_now()
+            month_picker_base_url = f"/portal/facturas?tab={tab}"
+            sat_sync_status = _get_sat_sync_status(issuer_id)
+            has_fiel_validated = bool(db_rows("SELECT 1 FROM sat_credentials WHERE issuer_id = ? AND validation_ok = 1 LIMIT 1", (issuer_id,)))
+            base_extra = {
+                "ym": ym,
+                "ym_label": ym_to_label(ym),
+                "prev_ym": shift_ym(ym, -1),
+                "next_ym": shift_ym(ym, +1),
+                "sat_sync_status": sat_sync_status,
+                "has_fiel_validated": has_fiel_validated,
+                "month_picker_base_url": month_picker_base_url,
+            }
+            if tab == "issued":
+                rows = db_rows("""
+                    SELECT uuid, fecha_emision, rfc_receptor, nombre_receptor, concepto, total, moneda,
+                           COALESCE(impuestos, 0) AS impuestos, COALESCE(retenciones, 0) AS retenciones,
+                           metodo_pago, status, xml_path
+                    FROM sat_cfdi
+                    WHERE issuer_id = ? AND direction = 'issued' AND fecha_emision IS NOT NULL
+                      AND substr(fecha_emision,1,7) = ? AND (total IS NULL OR total >= 0.01)
+                      AND xml_path IS NOT NULL AND TRIM(COALESCE(xml_path,'')) != ''
+                      AND id IN (
+                        SELECT id FROM (
+                          SELECT id, ROW_NUMBER() OVER (
+                            PARTITION BY issuer_id, direction, LOWER(TRIM(uuid))
+                            ORDER BY (CASE WHEN COALESCE(total,0) >= 0.01 THEN 0 ELSE 1 END), id
+                          ) AS rn
+                          FROM sat_cfdi
+                          WHERE issuer_id = ? AND direction = 'issued' AND fecha_emision IS NOT NULL AND substr(fecha_emision,1,7) = ? AND (total IS NULL OR total >= 0.01)
+                            AND xml_path IS NOT NULL AND TRIM(COALESCE(xml_path,'')) != ''
+                        ) WHERE rn = 1
+                      )
+                    ORDER BY fecha_emision DESC LIMIT 300;
+                """, (issuer_id, ym, issuer_id, ym))
+                months = db_rows("""
+                    SELECT substr(fecha_emision,1,7) AS ym, count(*) AS n
+                    FROM sat_cfdi
+                    WHERE issuer_id = ? AND direction = 'issued' AND fecha_emision IS NOT NULL
+                      AND (total IS NULL OR total >= 0.01)
+                      AND xml_path IS NOT NULL AND TRIM(COALESCE(xml_path,'')) != ''
+                    GROUP BY ym ORDER BY ym DESC;
+                """, (issuer_id,))
+                for m in months:
+                    m["label"] = ym_to_label(m["ym"])
+                month_totals = _get_month_totals(issuer_id, ym, "issued")
+                base_extra.update({
+                    "rows": rows,
+                    "months": months,
+                    "month_totals": month_totals,
+                })
+            else:
+                # received y ppd usan los mismos datos (recibidas); PPD se filtra en front con metodo_pago
+                rows = db_rows("""
+                    SELECT uuid, fecha_emision, rfc_emisor, nombre_emisor, concepto, total, moneda,
+                           COALESCE(impuestos, 0) AS impuestos, COALESCE(retenciones, 0) AS retenciones,
+                           metodo_pago, status, xml_path
+                    FROM sat_cfdi
+                    WHERE issuer_id = ? AND direction = 'received' AND fecha_emision IS NOT NULL
+                      AND substr(fecha_emision,1,7) = ? AND total IS NOT NULL AND total >= 0.01
+                      AND (tipo_comprobante IS NULL OR UPPER(TRIM(tipo_comprobante)) != 'N')
+                      AND xml_path IS NOT NULL AND TRIM(COALESCE(xml_path,'')) != ''
+                      AND id IN (
+                        SELECT id FROM (
+                          SELECT id, ROW_NUMBER() OVER (
+                            PARTITION BY issuer_id, direction, LOWER(TRIM(uuid))
+                            ORDER BY id
+                          ) AS rn
+                          FROM sat_cfdi
+                          WHERE issuer_id = ? AND direction = 'received' AND fecha_emision IS NOT NULL AND substr(fecha_emision,1,7) = ? AND total IS NOT NULL AND total >= 0.01 AND (tipo_comprobante IS NULL OR UPPER(TRIM(tipo_comprobante)) != 'N')
+                            AND xml_path IS NOT NULL AND TRIM(COALESCE(xml_path,'')) != ''
+                        ) WHERE rn = 1
+                      )
+                    ORDER BY fecha_emision DESC LIMIT 300;
+                """, (issuer_id, ym, issuer_id, ym))
+                months = db_rows("""
+                    SELECT substr(fecha_emision,1,7) AS ym, count(*) AS n
+                    FROM sat_cfdi
+                    WHERE issuer_id = ? AND direction = 'received' AND fecha_emision IS NOT NULL
+                      AND total IS NOT NULL AND total >= 0.01
+                      AND (tipo_comprobante IS NULL OR UPPER(TRIM(tipo_comprobante)) != 'N')
+                      AND xml_path IS NOT NULL AND TRIM(COALESCE(xml_path,'')) != ''
+                    GROUP BY ym ORDER BY ym DESC;
+                """, (issuer_id,))
+                for m in months:
+                    m["label"] = ym_to_label(m["ym"])
+                month_totals = _get_month_totals(issuer_id, ym, "received")
+                base_extra.update({
+                    "rows": rows,
+                    "months": months,
+                    "month_totals": month_totals,
+                    "default_metodo_pago": "PPD" if tab == "ppd" else None,
+                    "list_title": "Facturas recibidas (PPD)" if tab == "ppd" else "Facturas recibidas",
+                })
+            return _render_portal(
+                request,
+                issuer=issuer,
+                template_name="portal_facturas.html",
+                active_page="facturas_hub",
+                title="Facturas",
+                extra={
+                    **base_extra,
+                    "active_tab": tab,
+                },
+            )
+        except Exception:
+            logger.exception("portal: error renderizando /portal/facturas tab=%s", tab)
+            raise
+
+    @router.get("/contactos", response_class=HTMLResponse)
+    def portal_contactos_hub(
+        request: Request,
+        issuer: dict = Depends(get_portal_issuer),
+        tab: str = Query("clientes", description="clientes|proveedores"),
+        q: str = Query(""),
+        page: int = Query(1, ge=1),
+        per_page: int = Query(200, ge=1, le=500),
+    ):
+        """Hub Contactos: tabs Clientes / Proveedores."""
+        try:
+            if tab not in ("clientes", "proveedores"):
+                tab = "clientes"
+            issuer_id = int(issuer.get("id") or 0)
+            rows = []
+            total = 0
+            pages = 0
+            query = (q or "").strip()
+            if tab == "clientes" and issuer_id > 0:
+                conn = db()
+                try:
+                    if table_exists(conn, "clients"):
+                        if query:
+                            like = f"%{query}%"
+                            total_row = conn.execute(
+                                "SELECT COUNT(*) AS c FROM clients WHERE issuer_id = ? AND (rfc LIKE ? OR COALESCE(name,'') LIKE ?)",
+                                (issuer_id, like, like),
+                            ).fetchone()
+                            total = int(total_row.get("c") or total_row.get("n") or 0) if isinstance(total_row, dict) else (int(total_row[0]) if total_row else 0)
+                            offset = (page - 1) * per_page
+                            rows = conn.execute(
+                                """
+                                SELECT id, rfc, name, cp, regimen_fiscal, uso_cfdi_default, email, phone, last_seen_at
+                                FROM clients
+                                WHERE issuer_id = ? AND (rfc LIKE ? OR COALESCE(name,'') LIKE ?)
+                                ORDER BY COALESCE(last_seen_at, created_at) DESC
+                                LIMIT ? OFFSET ?
+                                """,
+                                (issuer_id, like, like, per_page, offset),
+                            ).fetchall()
+                        else:
+                            total_row = conn.execute(
+                                "SELECT COUNT(*) AS c FROM clients WHERE issuer_id = ?", (issuer_id,)
+                            ).fetchone()
+                            total = int(total_row.get("c") or total_row.get("n") or 0) if isinstance(total_row, dict) else (int(total_row[0]) if total_row else 0)
+                            offset = (page - 1) * per_page
+                            rows = conn.execute(
+                                """
+                                SELECT id, rfc, name, cp, regimen_fiscal, uso_cfdi_default, email, phone, last_seen_at
+                                FROM clients
+                                WHERE issuer_id = ?
+                                ORDER BY COALESCE(last_seen_at, created_at) DESC
+                                LIMIT ? OFFSET ?
+                                """,
+                                (issuer_id, per_page, offset),
+                            ).fetchall()
+                        rows = [_db_row_to_dict(r) for r in rows]
+                        pages = (total + per_page - 1) // per_page if total > 0 else 0
+                finally:
+                    conn.close()
+            return _render_portal(
+                request,
+                issuer=issuer,
+                template_name="portal_contactos.html",
+                active_page="contactos_hub",
+                title="Contactos",
+                extra={
+                    "active_tab": tab,
+                    "rows": rows,
+                    "q": query,
+                    "total": total,
+                    "page": page,
+                    "per_page": per_page,
+                    "pages": pages,
+                    "hub_base": "/portal/contactos",
+                },
+            )
+        except Exception:
+            logger.exception("portal: error renderizando /portal/contactos")
+            raise
+
+    @router.get("/bancos", response_class=RedirectResponse)
+    def portal_bancos_redirect():
+        """Redirigir a la página de convertir estado de cuenta."""
+        return RedirectResponse(url="/portal/convertir-edo-cuenta", status_code=302)
+
+    @router.get("/convertir-edo-cuenta", response_class=HTMLResponse)
+    def portal_convertir_edo_cuenta(request: Request, issuer: dict = Depends(get_portal_issuer)):
+        """Página única: arrastrar PDF, convertir a Excel y ver movimientos (sin pestañas ni hub)."""
+        try:
+            return _render_portal(
+                request,
+                issuer=issuer,
+                template_name="portal_bank_pdf_to_excel.html",
+                active_page="convertir_edo_cuenta",
+                title="Convertir Edo. de Cuenta",
+            )
+        except Exception as e:
+            logger.exception("convertir-edo-cuenta: error en render completo (%s), usando página mínima", e)
+            try:
+                return templates.TemplateResponse(
+                    "portal_convertir_edo_cuenta_minimal.html",
+                    {
+                        "request": request,
+                        "csrf_token": csrf_service.generate_csrf_token(),
+                        "preview_movements": [],
+                        "preview_summary": {},
+                    },
+                    status_code=200,
+                )
+            except Exception as e2:
+                logger.exception("convertir-edo-cuenta: fallback mínima también falló: %s", e2)
+                raise
+
     @router.get("/invoices/nomina", response_class=HTMLResponse)
     def portal_invoices_nomina(request: Request, issuer: dict = Depends(get_portal_issuer), ym: str = None):
         try:
@@ -922,7 +1295,7 @@ def get_portal_router(templates):
         except ValueError:
             raise HTTPException(status_code=404, detail="Ruta XML inválida")
         if not os.path.exists(abs_path):
-            raise HTTPException(status_code=404, detail="Archivo XML no existe en disco")
+            portal_error_type("file_missing", log_context={"issuer_id": issuer["id"], "uuid": u[:36]})
         uid, iid = _audit_user_issuer(request)
         if not subscription_service.can_issuer_use_sync_and_timbrado(issuer["id"], uid or 0):
             raise HTTPException(status_code=402, detail="Actualiza tu plan para descargar XML. Ve a /pricing.")
@@ -962,7 +1335,7 @@ def get_portal_router(templates):
         except ValueError:
             raise HTTPException(status_code=404, detail="Ruta XML inválida")
         if not os.path.exists(abs_path):
-            raise HTTPException(status_code=404, detail="Archivo XML no existe en disco")
+            portal_error_type("file_missing", log_context={"issuer_id": issuer["id"], "uuid": uuid_clean[:36]})
         uid, _ = _audit_user_issuer(request)
         if not subscription_service.can_issuer_use_sync_and_timbrado(issuer["id"], uid or 0):
             raise HTTPException(status_code=402, detail="Actualiza tu plan para descargar PDF. Ve a /pricing.")
@@ -980,20 +1353,17 @@ def get_portal_router(templates):
             from cfdi_pdf import parse_cfdi_xml, build_pdf
             data = parse_cfdi_xml(abs_path)
             pdf_bytes = build_pdf(data)
-        except Exception as e:
-            err_msg = str(e or "")
-            hint = "Instala dependencias: pip install -r requirements.txt" if "reportlab" in err_msg.lower() else ""
-            logger.exception("portal: error generando PDF uuid=%s", uuid_clean[:36])
-            return HTMLResponse(
-                "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>Error PDF</title></head>"
-                "<body id=\"pdf-error\" style=\"margin:1rem;font-family:system-ui,sans-serif;\">"
-                "<p id=\"pdf-error-msg\">No se pudo generar el PDF. Intenta de nuevo más tarde.</p>"
-                + (f"<p class=\"pdf-error-hint\" style=\"color:#666;\">{hint}</p>" if hint else "")
-                + "</body></html>",
-                status_code=500,
+        except ImportError:
+            portal_error_type("reportlab_missing", log_context={"issuer_id": issuer["id"], "uuid": uuid_clean[:36]})
+        except Exception:
+            logger.exception(
+                "portal: error generando PDF issuer_id=%s uuid=%s",
+                issuer["id"],
+                uuid_clean[:36],
             )
+            portal_error_type("server_error", log_context={"issuer_id": issuer["id"], "uuid": uuid_clean[:36]}, override_message="No se pudo generar el PDF. Intenta de nuevo.")
         if not pdf_bytes:
-            raise HTTPException(status_code=500, detail="La generación del PDF devolvió vacío")
+            portal_error_type("server_error", log_context={"issuer_id": issuer["id"]}, override_message="La generación del PDF devolvió vacío.")
         filename = f"cfdi-{uuid_clean[:8]}.pdf"
         disposition = "attachment" if dl else "inline"
         return Response(
@@ -1070,46 +1440,77 @@ def get_portal_router(templates):
         )
 
     @router.get("/clients", response_class=HTMLResponse)
-    def portal_clients(request: Request, issuer: dict = Depends(get_portal_issuer), q: str = Query("")):
+    def portal_clients(
+        request: Request,
+        issuer: dict = Depends(get_portal_issuer),
+        q: str = Query(""),
+        page: int = Query(1, ge=1),
+        per_page: int = Query(200, ge=1, le=500),
+    ):
         try:
             issuer_id = int(issuer.get("id") or 0)
             query = (q or "").strip()
             rows = []
+            total = 0
             if issuer_id > 0:
                 conn = db()
                 try:
-                    if query:
-                        like = f"%{query}%"
-                        rows = conn.execute(
-                            """
-                            SELECT id, rfc, name, cp, regimen_fiscal, uso_cfdi_default, email, phone, last_seen_at
-                            FROM clients
-                            WHERE issuer_id = ? AND (rfc LIKE ? OR COALESCE(name,'') LIKE ?)
-                            ORDER BY COALESCE(last_seen_at, created_at) DESC
-                            LIMIT 500
-                            """,
-                            (issuer_id, like, like),
-                        ).fetchall()
+                    if not table_exists(conn, "clients"):
+                        pages = 0
                     else:
-                        rows = conn.execute(
-                            """
-                            SELECT id, rfc, name, cp, regimen_fiscal, uso_cfdi_default, email, phone, last_seen_at
-                            FROM clients
-                            WHERE issuer_id = ?
-                            ORDER BY COALESCE(last_seen_at, created_at) DESC
-                            LIMIT 500
-                            """,
-                            (issuer_id,),
-                        ).fetchall()
+                        if query:
+                            like = f"%{query}%"
+                            total_row = conn.execute(
+                                "SELECT COUNT(*) AS c FROM clients WHERE issuer_id = ? AND (rfc LIKE ? OR COALESCE(name,'') LIKE ?)",
+                                (issuer_id, like, like),
+                            ).fetchone()
+                            total = int(total_row.get("c") or total_row.get("n") or 0) if isinstance(total_row, dict) else (int(total_row[0]) if total_row else 0)
+                            offset = (page - 1) * per_page
+                            rows = conn.execute(
+                                """
+                                SELECT id, rfc, name, cp, regimen_fiscal, uso_cfdi_default, email, phone, last_seen_at
+                                FROM clients
+                                WHERE issuer_id = ? AND (rfc LIKE ? OR COALESCE(name,'') LIKE ?)
+                                ORDER BY COALESCE(last_seen_at, created_at) DESC
+                                LIMIT ? OFFSET ?
+                                """,
+                                (issuer_id, like, like, per_page, offset),
+                            ).fetchall()
+                        else:
+                            total_row = conn.execute(
+                                "SELECT COUNT(*) AS c FROM clients WHERE issuer_id = ?", (issuer_id,)
+                            ).fetchone()
+                            total = int(total_row.get("c") or total_row.get("n") or 0) if isinstance(total_row, dict) else (int(total_row[0]) if total_row else 0)
+                            offset = (page - 1) * per_page
+                            rows = conn.execute(
+                                """
+                                SELECT id, rfc, name, cp, regimen_fiscal, uso_cfdi_default, email, phone, last_seen_at
+                                FROM clients
+                                WHERE issuer_id = ?
+                                ORDER BY COALESCE(last_seen_at, created_at) DESC
+                                LIMIT ? OFFSET ?
+                                """,
+                                (issuer_id, per_page, offset),
+                            ).fetchall()
+                        pages = (total + per_page - 1) // per_page if total > 0 else 0
                 finally:
                     conn.close()
+            else:
+                pages = 0
             return _render_portal(
                 request,
                 issuer=issuer,
                 template_name="portal_clients.html",
                 active_page="clients",
                 title="Clientes",
-                extra={"rows": [dict(r) for r in rows] if rows else [], "q": query},
+                extra={
+                    "rows": [dict(r) for r in rows] if rows else [],
+                    "q": query,
+                    "total": total,
+                    "page": page,
+                    "per_page": per_page,
+                    "pages": pages,
+                },
             )
         except Exception:
             logger.exception("portal: error renderizando /portal/clients")
@@ -1126,16 +1527,29 @@ def get_portal_router(templates):
             raise
 
     @router.get("/products", response_class=HTMLResponse)
-    def portal_products(request: Request, issuer: dict = Depends(get_portal_issuer), q: str = Query("")):
+    def portal_products(
+        request: Request,
+        issuer: dict = Depends(get_portal_issuer),
+        q: str = Query(""),
+        page: int = Query(1, ge=1),
+        per_page: int = Query(200, ge=1, le=500),
+    ):
         try:
             issuer_id = int(issuer.get("id") or 0)
             query = (q or "").strip()
             rows = []
+            total = 0
             if issuer_id > 0:
                 conn = db()
                 try:
                     if query:
                         like = f"%{query}%"
+                        total_row = conn.execute(
+                            "SELECT COUNT(*) AS c FROM products WHERE issuer_id = ? AND (COALESCE(name,'') LIKE ? OR COALESCE(clave_prod_serv,'') LIKE ?)",
+                            (issuer_id, like, like),
+                        ).fetchone()
+                        total = int(total_row.get("c") or total_row.get("n") or 0) if isinstance(total_row, dict) else (int(total_row[0]) if total_row else 0)
+                        offset = (page - 1) * per_page
                         rows = conn.execute(
                             """
                             SELECT id, name, clave_prod_serv, clave_unidad, unidad,
@@ -1144,11 +1558,16 @@ def get_portal_router(templates):
                             WHERE issuer_id = ?
                               AND (COALESCE(name,'') LIKE ? OR COALESCE(clave_prod_serv,'') LIKE ?)
                             ORDER BY active DESC, updated_at DESC
-                            LIMIT 500
+                            LIMIT ? OFFSET ?
                             """,
-                            (issuer_id, like, like),
+                            (issuer_id, like, like, per_page, offset),
                         ).fetchall()
                     else:
+                        total_row = conn.execute(
+                            "SELECT COUNT(*) AS c FROM products WHERE issuer_id = ?", (issuer_id,)
+                        ).fetchone()
+                        total = int(total_row.get("c") or total_row.get("n") or 0) if isinstance(total_row, dict) else (int(total_row[0]) if total_row else 0)
+                        offset = (page - 1) * per_page
                         rows = conn.execute(
                             """
                             SELECT id, name, clave_prod_serv, clave_unidad, unidad,
@@ -1156,19 +1575,27 @@ def get_portal_router(templates):
                             FROM products
                             WHERE issuer_id = ?
                             ORDER BY active DESC, updated_at DESC
-                            LIMIT 500
+                            LIMIT ? OFFSET ?
                             """,
-                            (issuer_id,),
+                            (issuer_id, per_page, offset),
                         ).fetchall()
                 finally:
                     conn.close()
+            pages = (total + per_page - 1) // per_page if total > 0 else 0
             return _render_portal(
                 request,
                 issuer=issuer,
                 template_name="portal_products.html",
                 active_page="products",
                 title="Productos",
-                extra={"rows": [dict(r) for r in rows] if rows else [], "q": query},
+                extra={
+                    "rows": [dict(r) for r in rows] if rows else [],
+                    "q": query,
+                    "total": total,
+                    "page": page,
+                    "per_page": per_page,
+                    "pages": pages,
+                },
             )
         except Exception:
             logger.exception("portal: error renderizando /portal/products")
@@ -1673,6 +2100,8 @@ def get_portal_router(templates):
 
     # ---------- Bank: PDF → Excel (estado de cuenta) ----------
     MAX_BANK_PDF_SIZE = 15 * 1024 * 1024  # 15MB
+    MAX_BANK_PDF_FILES = 10
+    MAX_BANK_PDF_TOTAL_SIZE = 50 * 1024 * 1024  # 50MB total multi-upload
 
     def _ensure_bank_exports_table(conn) -> None:
         conn.execute(
@@ -1691,21 +2120,466 @@ def get_portal_router(templates):
         )
         conn.execute("CREATE INDEX IF NOT EXISTS idx_bank_pdf_exports_issuer ON bank_pdf_exports(issuer_id, created_at);")
 
-    @router.get("/bank/pdf-to-excel", response_class=HTMLResponse)
-    def portal_bank_pdf_to_excel(request: Request, issuer: dict = Depends(get_portal_issuer)):
-        return _render_portal(
-            request,
-            issuer=issuer,
-            template_name="portal_bank_pdf_to_excel.html",
-            active_page="bank_pdf_to_excel",
-            title="Convertir Edo. de Cuenta",
+    def _ensure_bank_statements_table(conn) -> None:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS bank_statements (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              issuer_id INTEGER NOT NULL,
+              bank_name TEXT,
+              account_last4 TEXT,
+              period_start TEXT,
+              period_end TEXT,
+              source_pdf_path TEXT NOT NULL,
+              source_pdf_sha256 TEXT NOT NULL,
+              created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            """
         )
+        conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_bank_statements_issuer_sha ON bank_statements(issuer_id, source_pdf_sha256);")
 
-    @router.post("/bank/pdf-to-excel/upload", response_class=JSONResponse)
+    def _movement_dedup_hash(issuer_id: int, fecha: str, descripcion: str, deposito: Optional[float], retiro: Optional[float]) -> str:
+        """Hash para deduplicar movimientos: mismo issuer + fecha + concepto + montos = mismo movimiento."""
+        dep = "" if deposito is None else f"{float(deposito):.2f}"
+        ret = "" if retiro is None else f"{float(retiro):.2f}"
+        desc = (descripcion or "").strip()[:500].replace("\r", " ").replace("\n", " ")
+        payload = f"{issuer_id}|{fecha or ''}|{desc}|{dep}|{ret}"
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+    def _ensure_bank_movements_table(conn) -> None:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS bank_movements (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              issuer_id INTEGER NOT NULL,
+              statement_file_id TEXT NOT NULL,
+              fecha TEXT,
+              descripcion TEXT,
+              deposito REAL,
+              retiro REAL,
+              saldo REAL,
+              tipo TEXT,
+              categoria TEXT,
+              metodo_hint TEXT,
+              contraparte_hint TEXT,
+              rfc_encontrado TEXT,
+              confidence_score INTEGER,
+              source_page_first INTEGER,
+              created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            """
+        )
+        if not has_column(conn, "bank_movements", "movement_hash"):
+            try:
+                conn.execute("ALTER TABLE bank_movements ADD COLUMN movement_hash TEXT;")
+            except Exception:
+                pass
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_bank_movements_issuer_statement ON bank_movements(issuer_id, statement_file_id);")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_bank_movements_issuer_tipo ON bank_movements(issuer_id, tipo);")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_bank_movements_issuer_categoria ON bank_movements(issuer_id, categoria);")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_bank_movements_issuer_fecha ON bank_movements(issuer_id, fecha);")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_bank_movements_issuer_confidence ON bank_movements(issuer_id, confidence_score);")
+        conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_bank_movements_issuer_hash ON bank_movements(issuer_id, movement_hash) WHERE movement_hash IS NOT NULL;")
+
+    @router.get("/bank/pdf-to-excel", response_class=RedirectResponse)
+    def portal_bank_pdf_to_excel_redirect():
+        """Redirigir al nombre canónico de la página."""
+        return RedirectResponse(url="/portal/convertir-edo-cuenta", status_code=302)
+
+    @router.post("/bank/pdf-to-excel/preview-json", response_class=JSONResponse)
+    async def portal_bank_pdf_preview_json(
+        request: Request,
+        issuer: dict = Depends(get_portal_issuer),
+        file: UploadFile = File(...),
+    ):
+        """Parsea PDF Banorte y devuelve movimientos en JSON. Sin DB, sin guardar. Para mostrar listado en la misma página."""
+        if int(issuer.get("id") or 0) <= 0:
+            raise HTTPException(status_code=401, detail="Sesión inválida")
+        filename = (file.filename or "").strip().lower()
+        if not filename.endswith(".pdf"):
+            raise HTTPException(status_code=400, detail="El archivo debe ser .pdf")
+        size = 0
+        chunks: list[bytes] = []
+        while True:
+            chunk = await file.read(1024 * 1024)
+            if not chunk:
+                break
+            size += len(chunk)
+            if size > MAX_BANK_PDF_SIZE:
+                raise HTTPException(status_code=400, detail="El PDF excede el máximo de 15MB.")
+            chunks.append(chunk)
+        if size <= 0:
+            raise HTTPException(status_code=400, detail="El PDF está vacío.")
+        import tempfile
+        tmp_path = None
+        try:
+            with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+                for ch in chunks:
+                    tmp.write(ch)
+                tmp_path = tmp.name
+            result = parse_bank_pdf_to_movements_preview(tmp_path, preset="conservative")
+        finally:
+            if tmp_path and os.path.exists(tmp_path):
+                try:
+                    os.unlink(tmp_path)
+                except Exception:
+                    pass
+        movements = result.get("movements") or []
+        summary = result.get("summary") or {}
+        if summary.get("error"):
+            return JSONResponse(
+                {"ok": False, "detail": summary.get("error"), "movements": [], "summary": summary},
+                status_code=400,
+            )
+        return JSONResponse({"ok": True, "movements": movements, "summary": summary})
+
+    @router.post("/bank/pdf-to-excel/preview-multi", response_class=JSONResponse)
+    async def portal_bank_pdf_preview_multi(
+        request: Request,
+        issuer: dict = Depends(get_portal_issuer),
+        files: list[UploadFile] = File(..., description="PDFs de estados de cuenta"),
+    ):
+        """Multi-PDF preview: procesa varios PDFs, consolidado en memoria. Sin DB."""
+        if int(issuer.get("id") or 0) <= 0:
+            raise HTTPException(status_code=401, detail="Sesión inválida")
+        if not files or len(files) > MAX_BANK_PDF_FILES:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Envía entre 1 y {MAX_BANK_PDF_FILES} archivos PDF.",
+            )
+        all_movements: list[dict] = []
+        files_summary: list[dict] = []
+        file_errors: list[dict] = []
+        file_warnings: list[dict] = []
+        total_size = 0
+        for idx, uf in enumerate(files):
+            fn = (uf.filename or "").strip()
+            if not fn.lower().endswith(".pdf"):
+                file_errors.append({"file_name": fn or f"archivo_{idx + 1}", "error": "El archivo debe ser .pdf"})
+                continue
+            chunks = []
+            size = 0
+            while True:
+                chunk = await uf.read(1024 * 1024)
+                if not chunk:
+                    break
+                size += len(chunk)
+                if size > MAX_BANK_PDF_SIZE:
+                    file_errors.append({"file_name": fn, "error": "El PDF excede el máximo de 15MB."})
+                    break
+                chunks.append(chunk)
+            if size > MAX_BANK_PDF_SIZE:
+                continue
+            total_size += size
+            if total_size > MAX_BANK_PDF_TOTAL_SIZE:
+                file_errors.append({"file_name": fn, "error": "Se superó el tamaño total permitido (50MB)."})
+                continue
+            if size <= 0:
+                file_errors.append({"file_name": fn, "error": "El PDF está vacío."})
+                continue
+            pdf_bytes = b"".join(chunks)
+            result = parse_bank_statement_preview(pdf_bytes, file_name=fn, file_index=idx)
+            movs = result.get("movements") or []
+            fs = result.get("file_summary") or {}
+            err = result.get("file_error")
+            warns = result.get("file_warnings") or []
+            if err:
+                file_errors.append({"file_name": fn, "error": err})
+            if warns:
+                file_warnings.append({"file_name": fn, "warnings": warns})
+            files_summary.append(fs)
+            base_idx = len(all_movements)
+            for i, m in enumerate(movs):
+                m["_global_idx"] = base_idx + i + 1
+            all_movements.extend(movs)
+        # Marcar duplicados por fingerprint (misma fecha+monto+concepto+archivo)
+        fp_counts: dict[str, int] = {}
+        for m in all_movements:
+            fp = m.get("dedupe_fingerprint") or compute_dedupe_fingerprint(m)
+            m["dedupe_fingerprint"] = fp
+            fp_counts[fp] = fp_counts.get(fp, 0) + 1
+        for m in all_movements:
+            if fp_counts.get(m["dedupe_fingerprint"], 0) > 1:
+                m["posible_duplicado"] = True
+                w = m.get("warnings") or []
+                if "Posible duplicado en esta carga" not in w:
+                    w.append("Posible duplicado en esta carga")
+                m["warnings"] = w
+        issuer_id = int(issuer.get("id") or 0)
+        user_accounts = bank_list_accounts(issuer_id) if issuer_id > 0 else []
+        statement_owner_name = None
+        statement_owner_rfc = None
+        if files_summary:
+            fs = next((f for f in files_summary if f.get("account_holder_name")), None)
+            if fs:
+                statement_owner_name = fs.get("account_holder_name")
+                statement_owner_rfc = fs.get("account_holder_rfc")
+        for m in all_movements:
+            detect_own_account_transfer(m, user_accounts, statement_owner_name, statement_owner_rfc)
+        total_ing = sum(m.get("monto_deposito") or 0 for m in all_movements)
+        total_gas = sum(m.get("monto_retiro") or 0 for m in all_movements)
+        total_ing_impactan = sum(
+            (m.get("monto_deposito") or 0) for m in all_movements
+            if m.get("impacta_contabilidad", True) and (m.get("tipo_movimiento") or "").upper() == "INGRESO"
+        )
+        total_gas_impactan = sum(
+            (m.get("monto_retiro") or 0) for m in all_movements
+            if m.get("impacta_contabilidad", True) and (m.get("tipo_movimiento") or "").upper() == "GASTO"
+        )
+        count_in = sum(1 for m in all_movements if (m.get("tipo_movimiento") or "").upper() == "INGRESO")
+        count_out = sum(1 for m in all_movements if (m.get("tipo_movimiento") or "").upper() == "GASTO")
+        count_info = sum(1 for m in all_movements if (m.get("tipo_movimiento") or "").upper() == "INFO")
+        count_fin = sum(1 for m in all_movements if m.get("es_movimiento_financiero"))
+        low_conf = sum(1 for m in all_movements if int(m.get("confianza_clasificacion") or 0) < 60)
+        count_revisar = sum(1 for m in all_movements if m.get("requiere_revision"))
+        count_duplicados = sum(1 for m in all_movements if m.get("posible_duplicado"))
+        global_summary = {
+            "files_processed": len(files_summary),
+            "files_with_errors": len(file_errors),
+            "total_movements": len(all_movements),
+            "total_ingresos": round(total_ing, 2),
+            "total_gastos": round(total_gas, 2),
+            "total_ingresos_que_impactan": round(total_ing_impactan, 2),
+            "total_gastos_que_impactan": round(total_gas_impactan, 2),
+            "count_ingreso": count_in,
+            "count_gasto": count_out,
+            "count_info": count_info,
+            "count_financiero": count_fin,
+            "count_low_confidence": low_conf,
+            "count_requiere_revision": count_revisar,
+            "count_duplicados": count_duplicados,
+        }
+        return JSONResponse({
+            "ok": True,
+            "movements": all_movements,
+            "global_summary": global_summary,
+            "files_summary": files_summary,
+            "file_errors": file_errors,
+            "file_warnings": file_warnings,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+        })
+
+    @router.get("/bank/accounts", response_class=JSONResponse)
+    def portal_bank_accounts_list(issuer: dict = Depends(get_portal_issuer)):
+        """Lista cuentas bancarias del usuario (para detectar cuentas propias)."""
+        if int(issuer.get("id") or 0) <= 0:
+            raise HTTPException(status_code=401, detail="Sesión inválida")
+        accounts = bank_list_accounts(int(issuer["id"]))
+        return JSONResponse({"ok": True, "accounts": accounts})
+
+    @router.post("/bank/accounts", response_class=JSONResponse)
+    def portal_bank_accounts_create(
+        issuer: dict = Depends(get_portal_issuer),
+        alias: str = Body(..., embed=True),
+        bank_name: str = Body(..., embed=True),
+        clabe: Optional[str] = Body(None, embed=True),
+        account_last4: Optional[str] = Body(None, embed=True),
+        holder_name: Optional[str] = Body(None, embed=True),
+        rfc_titular: Optional[str] = Body(None, embed=True),
+        is_active: bool = Body(True, embed=True),
+    ):
+        if int(issuer.get("id") or 0) <= 0:
+            raise HTTPException(status_code=401, detail="Sesión inválida")
+        created = bank_create_account(
+            int(issuer["id"]), alias=alias, bank_name=bank_name,
+            clabe=clabe, account_last4=account_last4, holder_name=holder_name,
+            rfc_titular=rfc_titular, is_active=is_active,
+        )
+        if created.get("error"):
+            raise HTTPException(status_code=500, detail=created["error"])
+        return JSONResponse({"ok": True, "account": created})
+
+    @router.put("/bank/accounts/{account_id}", response_class=JSONResponse)
+    def portal_bank_accounts_update(
+        account_id: int,
+        issuer: dict = Depends(get_portal_issuer),
+        payload: dict = Body(...),
+    ):
+        if int(issuer.get("id") or 0) <= 0:
+            raise HTTPException(status_code=401, detail="Sesión inválida")
+        allowed = {"alias", "bank_name", "clabe", "account_last4", "holder_name", "rfc_titular", "is_active"}
+        kwargs = {k: v for k, v in payload.items() if k in allowed}
+        if "account_last4" in kwargs and kwargs["account_last4"]:
+            kwargs["account_last4"] = str(kwargs["account_last4"]).strip()[:4]
+        updated = bank_update_account(account_id, int(issuer["id"]), **kwargs)
+        if not updated:
+            raise HTTPException(status_code=404, detail="Cuenta no encontrada")
+        return JSONResponse({"ok": True, "account": updated})
+
+    @router.delete("/bank/accounts/{account_id}", response_class=JSONResponse)
+    def portal_bank_accounts_delete(account_id: int, issuer: dict = Depends(get_portal_issuer)):
+        if int(issuer.get("id") or 0) <= 0:
+            raise HTTPException(status_code=401, detail="Sesión inválida")
+        deleted = bank_delete_account(account_id, int(issuer["id"]))
+        if not deleted:
+            raise HTTPException(status_code=404, detail="Cuenta no encontrada")
+        return JSONResponse({"ok": True})
+
+    @router.post("/bank/statements/ingest", response_class=JSONResponse)
+    async def portal_bank_statements_ingest(
+        request: Request,
+        issuer: dict = Depends(get_portal_issuer),
+        file: UploadFile = File(...),
+        bank_account_id: int = Form(..., description="ID de cuenta bancaria del issuer"),
+    ):
+        """Ingesta estado de cuenta con validación RFC/cuenta. Fases 2+3."""
+        issuer_id = int(issuer.get("id") or 0)
+        if issuer_id <= 0:
+            raise HTTPException(status_code=401, detail="Sesión inválida")
+        fn = (file.filename or "").strip()
+        if not fn.lower().endswith(".pdf"):
+            raise HTTPException(status_code=400, detail="El archivo debe ser .pdf")
+        size = 0
+        chunks = []
+        while True:
+            chunk = await file.read(1024 * 1024)
+            if not chunk:
+                break
+            size += len(chunk)
+            if size > MAX_BANK_PDF_SIZE:
+                raise HTTPException(status_code=400, detail="El PDF excede el máximo de 15MB.")
+            chunks.append(chunk)
+        if size <= 0:
+            raise HTTPException(status_code=400, detail="El PDF está vacío.")
+        pdf_bytes = b"".join(chunks)
+        sha = hashlib.sha256(pdf_bytes).hexdigest()
+        result = parse_bank_statement_preview(pdf_bytes, file_name=fn, file_index=0)
+        if result.get("file_error"):
+            return JSONResponse(
+                {"ok": False, "rejection_reason": result["file_error"], "status": "parse_error"},
+                status_code=400,
+            )
+        storage_root = get_storage_root(BASE_DIR)
+        uploads_rel = os.path.join("uploads", str(issuer_id), "bank")
+        stamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        pdf_name = f"{stamp}_{sha[:12]}.pdf"
+        pdf_rel_path = os.path.join(uploads_rel, pdf_name)
+        pdf_abs_path = safe_join(storage_root, pdf_rel_path)
+        ensure_parent_dir(pdf_abs_path)
+        with open(pdf_abs_path, "wb") as f:
+            f.write(pdf_bytes)
+        expected_rfc = (issuer.get("rfc") or "").strip()
+        ingest_result = ingest_bank_statement(
+            issuer_id=issuer_id,
+            bank_account_id=bank_account_id,
+            pdf_path=pdf_rel_path,
+            pdf_sha256=sha,
+            source_file_name=fn,
+            preview_result=result,
+            expected_issuer_rfc=expected_rfc,
+        )
+        if not ingest_result.get("ok"):
+            return JSONResponse(
+                {
+                    "ok": False,
+                    "rejection_reason": ingest_result.get("rejection_reason", "Error desconocido"),
+                    "status": ingest_result.get("status", "error"),
+                },
+                status_code=400,
+            )
+        statement_id = ingest_result.get("statement_id")
+        movements_count = ingest_result.get("movements_count", 0)
+        if statement_id and movements_count > 0 and table_exists(db(), "bank_invoice_matches"):
+            try:
+                conn = db()
+                rows = conn.execute(
+                    "SELECT id, deposito, retiro, amount, fecha, descripcion, rfc_encontrado, counterparty_rfc_detected, requires_cfdi FROM bank_movements WHERE issuer_id = ? AND bank_statement_id = ?",
+                    (issuer_id, statement_id),
+                ).fetchall()
+                conn.close()
+                for r in rows:
+                    r = _db_row_to_dict(r)
+                    if int(r.get("requires_cfdi") or 0):
+                        mov = r
+                        candidates = find_cfdi_candidates(issuer_id, mov, direction="received", limit=5)
+                        if candidates:
+                            save_suggested_matches(issuer_id, int(r["id"]), candidates, "payment")
+            except Exception as e:
+                logger.exception("bank ingest: matching post-insert failed: %s", e)
+        log_action(request, "bank_statement_ingest", issuer_id=issuer_id, entity_id=statement_id)
+        return JSONResponse({
+            "ok": True,
+            "statement_id": statement_id,
+            "movements_count": movements_count,
+            "inserted_count": ingest_result.get("inserted_count", movements_count),
+            "duplicate_movements_count": ingest_result.get("duplicate_movements_count", 0),
+            "duplicate": ingest_result.get("duplicate", False),
+        })
+
+    @router.post("/bank/matches/{match_id}/confirm", response_class=JSONResponse)
+    def portal_bank_match_confirm(match_id: int, issuer: dict = Depends(get_portal_issuer)):
+        if int(issuer.get("id") or 0) <= 0:
+            raise HTTPException(status_code=401, detail="Sesión inválida")
+        ok = match_confirm(match_id, int(issuer["id"]))
+        if not ok:
+            raise HTTPException(status_code=404, detail="Match no encontrado")
+        return JSONResponse({"ok": True, "status": "confirmed"})
+
+    @router.post("/bank/matches/{match_id}/reject", response_class=JSONResponse)
+    def portal_bank_match_reject(match_id: int, issuer: dict = Depends(get_portal_issuer)):
+        if int(issuer.get("id") or 0) <= 0:
+            raise HTTPException(status_code=401, detail="Sesión inválida")
+        ok = match_reject(match_id, int(issuer["id"]))
+        if not ok:
+            raise HTTPException(status_code=404, detail="Match no encontrado")
+        return JSONResponse({"ok": True, "status": "rejected"})
+
+    @router.patch("/bank/movements/{movement_id}", response_class=JSONResponse)
+    async def portal_bank_movement_update(
+        movement_id: int,
+        request: Request,
+        issuer: dict = Depends(get_portal_issuer),
+    ):
+        """Actualiza descripción y/o categoría de un movimiento (mismo comportamiento que en convertir edo. de cuenta)."""
+        issuer_id = int(issuer.get("id") or 0)
+        if issuer_id <= 0:
+            raise HTTPException(status_code=401, detail="Sesión inválida")
+        try:
+            body = await request.json() if request.headers.get("content-type", "").strip().startswith("application/json") else {}
+        except Exception:
+            body = {}
+        descripcion = body.get("descripcion")
+        categoria = body.get("categoria")
+        if descripcion is None and categoria is None:
+            return JSONResponse({"ok": True, "updated": False})
+        conn = db()
+        try:
+            row = conn.execute(
+                "SELECT id FROM bank_movements WHERE id = ? AND issuer_id = ?",
+                (movement_id, issuer_id),
+            ).fetchone()
+            if not row:
+                raise HTTPException(status_code=404, detail="Movimiento no encontrado")
+            updates = []
+            params: list = []
+            if descripcion is not None:
+                updates.append("descripcion = ?")
+                params.append(str(descripcion).strip() if descripcion else "")
+            if categoria is not None:
+                updates.append("categoria = ?")
+                params.append(str(categoria).strip() if categoria else "")
+            if not updates:
+                return JSONResponse({"ok": True, "updated": False})
+            params.extend([movement_id, issuer_id])
+            conn.execute(
+                "UPDATE bank_movements SET " + ", ".join(updates) + " WHERE id = ? AND issuer_id = ?",
+                params,
+            )
+            conn.commit()
+            return JSONResponse({"ok": True, "updated": True})
+        finally:
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+
+    @router.post("/bank/pdf-to-excel/upload")
     async def portal_bank_pdf_to_excel_upload(
         request: Request,
         issuer: dict = Depends(get_portal_issuer),
         file: UploadFile = File(...),
+        preview: Optional[str] = Form(None),
     ):
         issuer_id = int(issuer.get("id") or 0)
         if issuer_id <= 0:
@@ -1720,11 +2594,7 @@ def get_portal_router(templates):
         if content_type and content_type not in ("application/pdf", "application/x-pdf"):
             raise HTTPException(status_code=400, detail="El archivo debe ser un PDF válido (MIME application/pdf)")
 
-        storage_root = get_storage_root(BASE_DIR)
-        uploads_rel_dir = os.path.join("uploads", str(issuer_id), "bank_statements")
-        exports_rel_dir = os.path.join("exports", str(issuer_id), "bank_statements")
-
-        # Guardar PDF con nombre único (timestamp + hash)
+        # Leer PDF en memoria
         sha = hashlib.sha256()
         size = 0
         chunks: list[bytes] = []
@@ -1740,9 +2610,41 @@ def get_portal_router(templates):
         if size <= 0:
             raise HTTPException(status_code=400, detail="El PDF está vacío.")
 
-        digest = sha.hexdigest()
+        # Vista previa Banorte: solo parsear y devolver HTML (no DB, no XLSX)
+        if preview and str(preview).strip().lower() in ("1", "true", "yes"):
+            import tempfile
+            tmp_path = None
+            try:
+                with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+                    for ch in chunks:
+                        tmp.write(ch)
+                    tmp_path = tmp.name
+                result = parse_bank_pdf_to_movements_preview(tmp_path)
+            finally:
+                if tmp_path and os.path.exists(tmp_path):
+                    try:
+                        os.unlink(tmp_path)
+                    except Exception:
+                        pass
+            return _render_portal(
+                request,
+                issuer=issuer,
+                template_name="portal_bank_pdf_to_excel.html",
+                active_page="bank_pdf_to_excel",
+                title="Convertir Edo. de Cuenta",
+                extra={
+                    "preview_movements": result.get("movements") or [],
+                    "preview_summary": result.get("summary") or {},
+                },
+            )
+
+        storage_root = get_storage_root(BASE_DIR)
+        uploads_rel_dir = os.path.join("uploads", str(issuer_id), "bank")
+        exports_rel_dir = os.path.join("exports", str(issuer_id), "bank_statements")
+
+        pdf_sha256 = sha.hexdigest()
         stamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-        pdf_name = f"{stamp}_{digest[:12]}.pdf"
+        pdf_name = f"{stamp}_{pdf_sha256[:12]}.pdf"
         pdf_rel_path = os.path.join(uploads_rel_dir, pdf_name)
         pdf_abs_path = safe_join(storage_root, pdf_rel_path)
         ensure_parent_dir(pdf_abs_path)
@@ -1750,40 +2652,424 @@ def get_portal_router(templates):
             for ch in chunks:
                 f.write(ch)
 
+        pdf_bytes = b"".join(chunks)
+        # Get or create bank_statement (dedupe por mismo PDF). Validar RFC antes de guardar.
+        conn = db()
+        upload_metadata = {}
+        result_preview = parse_bank_statement_preview(pdf_bytes, file_name=filename or "documento.pdf", file_index=0)
+        if not result_preview.get("file_error"):
+            upload_metadata = extract_statement_metadata(result_preview)
+            detected_rfc = (upload_metadata.get("detected_holder_rfc") or "").strip().upper().replace(" ", "")
+            expected_rfc = (issuer.get("rfc") or "").strip().upper().replace(" ", "")
+            if expected_rfc and detected_rfc and expected_rfc != detected_rfc:
+                raise HTTPException(
+                    status_code=400,
+                    detail="El RFC del estado de cuenta no coincide con el RFC de tu cuenta. No se puede procesar este PDF.",
+                )
+        try:
+            _ensure_bank_statements_table(conn)
+            row = conn.execute(
+                "SELECT id FROM bank_statements WHERE issuer_id = ? AND source_pdf_sha256 = ? LIMIT 1",
+                (issuer_id, pdf_sha256),
+            ).fetchone()
+            if row:
+                statement_id = int(row["id"])
+            else:
+                conn.execute(
+                    """
+                    INSERT INTO bank_statements (issuer_id, source_pdf_path, source_pdf_sha256, created_at)
+                    VALUES (?, ?, ?, datetime('now'))
+                    """,
+                    (issuer_id, pdf_rel_path, pdf_sha256),
+                )
+                statement_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+                conn.commit()
+            period_month = (upload_metadata.get("period_month") or "")[:7]
+            if period_month and has_column(conn, "bank_statements", "period_month"):
+                conn.execute(
+                    "UPDATE bank_statements SET period_month = ?, bank_name = ?, account_last4 = ? WHERE id = ?",
+                    (period_month, upload_metadata.get("bank_name"), upload_metadata.get("account_last4"), statement_id),
+                )
+                conn.commit()
+        finally:
+            conn.close()
+
         file_id = secrets.token_urlsafe(16)
         xlsx_name = f"{stamp}_{file_id[:10]}.xlsx"
         xlsx_rel_path = os.path.join(exports_rel_dir, xlsx_name)
         xlsx_abs_path = safe_join(storage_root, xlsx_rel_path)
 
         try:
-            meta = convert_pdf_to_xlsx(pdf_abs_path, xlsx_abs_path, issuer_id=issuer_id)
+            meta = convert_pdf_to_xlsx(
+                pdf_abs_path,
+                xlsx_abs_path,
+                issuer_id=issuer_id,
+                statement_id=statement_id,
+            )
         except Exception as e:
             logger.exception("bank pdf-to-excel: error convirtiendo issuer=%s pdf=%s", issuer_id, pdf_rel_path)
-            raise HTTPException(status_code=500, detail="No se pudo convertir el PDF. Intenta con otro archivo o revisa que el PDF tenga texto.")
+            portal_error_type("parse_fail", log_context={"issuer_id": issuer_id, "pdf": pdf_rel_path})
+
+        meta_for_storage = {k: v for k, v in (meta or {}).items() if k != "transactions"}
+        meta_json_str = json.dumps(meta_for_storage, ensure_ascii=False)[:4000]
 
         conn = db()
         try:
             _ensure_bank_exports_table(conn)
+            _ensure_bank_movements_table(conn)
             conn.execute(
                 """
                 INSERT INTO bank_pdf_exports (issuer_id, file_id, pdf_path, xlsx_path, meta_json)
                 VALUES (?, ?, ?, ?, ?)
                 """,
-                (issuer_id, file_id, pdf_rel_path, xlsx_rel_path, json.dumps(meta, ensure_ascii=False)[:4000]),
+                (issuer_id, file_id, pdf_rel_path, xlsx_rel_path, meta_json_str),
             )
+            default_period = (upload_metadata.get("period_month") or (meta or {}).get("period_start") or "")[:7]
+            mov_has_period = has_column(conn, "bank_movements", "period_month")
+            mov_has_hash = has_column(conn, "bank_movements", "movement_hash")
+            for t in (meta or {}).get("transactions") or []:
+                fecha = (t.get("fecha") or "")[:32]
+                descripcion = (t.get("descripcion") or "")[:2000]
+                deposito = t.get("deposito")
+                retiro = t.get("retiro")
+                if mov_has_hash:
+                    m_hash = _movement_dedup_hash(issuer_id, fecha, descripcion, deposito, retiro)
+                    existing = conn.execute(
+                        "SELECT 1 FROM bank_movements WHERE issuer_id = ? AND movement_hash = ? LIMIT 1",
+                        (issuer_id, m_hash),
+                    ).fetchone()
+                    if existing:
+                        continue
+                # Mes por movimiento = fecha del movimiento (cada fila a su mes), no solo periodo del estado
+                row_ym = (fecha[:7] if (fecha and len(fecha) >= 7 and fecha[4] == "-" and fecha[:4].isdigit() and fecha[5:7].isdigit()) else None) or default_period
+                if mov_has_period and row_ym:
+                    if mov_has_hash:
+                        conn.execute(
+                            """
+                            INSERT INTO bank_movements (issuer_id, statement_file_id, period_month, fecha, descripcion, deposito, retiro, saldo, tipo, categoria, metodo_hint, contraparte_hint, rfc_encontrado, confidence_score, source_page_first, movement_hash)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            """,
+                            (
+                                issuer_id,
+                                file_id,
+                                row_ym,
+                                fecha,
+                                descripcion,
+                                deposito,
+                                retiro,
+                                t.get("saldo"),
+                                (t.get("tipo") or "DESCONOCIDO")[:32],
+                                (t.get("categoria") or "")[:200],
+                                (t.get("metodo_hint") or "")[:64],
+                                (t.get("contraparte_hint") or "")[:200],
+                                (t.get("rfc_encontrado") or "")[:20],
+                                int(t.get("confidence_score") or 0),
+                                int(t.get("source_page_first") or 0),
+                                m_hash if mov_has_hash else None,
+                            ),
+                        )
+                    else:
+                        conn.execute(
+                            """
+                            INSERT INTO bank_movements (issuer_id, statement_file_id, period_month, fecha, descripcion, deposito, retiro, saldo, tipo, categoria, metodo_hint, contraparte_hint, rfc_encontrado, confidence_score, source_page_first)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            """,
+                            (
+                                issuer_id,
+                                file_id,
+                                row_ym,
+                                fecha,
+                                descripcion,
+                                deposito,
+                                retiro,
+                                t.get("saldo"),
+                                (t.get("tipo") or "DESCONOCIDO")[:32],
+                                (t.get("categoria") or "")[:200],
+                                (t.get("metodo_hint") or "")[:64],
+                                (t.get("contraparte_hint") or "")[:200],
+                                (t.get("rfc_encontrado") or "")[:20],
+                                int(t.get("confidence_score") or 0),
+                                int(t.get("source_page_first") or 0),
+                            ),
+                        )
+                else:
+                    if mov_has_hash:
+                        conn.execute(
+                            """
+                            INSERT INTO bank_movements (issuer_id, statement_file_id, fecha, descripcion, deposito, retiro, saldo, tipo, categoria, metodo_hint, contraparte_hint, rfc_encontrado, confidence_score, source_page_first, movement_hash)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            """,
+                            (
+                                issuer_id,
+                                file_id,
+                                fecha,
+                                descripcion,
+                                deposito,
+                                retiro,
+                                t.get("saldo"),
+                                (t.get("tipo") or "DESCONOCIDO")[:32],
+                                (t.get("categoria") or "")[:200],
+                                (t.get("metodo_hint") or "")[:64],
+                                (t.get("contraparte_hint") or "")[:200],
+                                (t.get("rfc_encontrado") or "")[:20],
+                                int(t.get("confidence_score") or 0),
+                                int(t.get("source_page_first") or 0),
+                                m_hash if mov_has_hash else None,
+                            ),
+                        )
+                    else:
+                        conn.execute(
+                            """
+                            INSERT INTO bank_movements (issuer_id, statement_file_id, fecha, descripcion, deposito, retiro, saldo, tipo, categoria, metodo_hint, contraparte_hint, rfc_encontrado, confidence_score, source_page_first)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            """,
+                            (
+                                issuer_id,
+                                file_id,
+                                fecha,
+                                descripcion,
+                                deposito,
+                                retiro,
+                                t.get("saldo"),
+                                (t.get("tipo") or "DESCONOCIDO")[:32],
+                                (t.get("categoria") or "")[:200],
+                                (t.get("metodo_hint") or "")[:64],
+                                (t.get("contraparte_hint") or "")[:200],
+                                (t.get("rfc_encontrado") or "")[:20],
+                                int(t.get("confidence_score") or 0),
+                                int(t.get("source_page_first") or 0),
+                            ),
+                        )
             conn.commit()
         finally:
             conn.close()
 
         log_action(request, "bank_pdf_to_excel", issuer_id=issuer_id, entity_id=file_id[:32])
+        # Campos resumidos para UI (además de meta completo)
+        try:
+            processed_count = int((meta or {}).get("processed_count") or 0)
+        except Exception:
+            processed_count = 0
+        try:
+            total_ingresos = float((meta or {}).get("total_ingresos") or 0)
+        except Exception:
+            total_ingresos = 0.0
+        try:
+            total_gastos = float((meta or {}).get("total_gastos") or 0)
+        except Exception:
+            total_gastos = 0.0
+        try:
+            sin_factura_count = int((meta or {}).get("sin_factura_count") or 0)
+        except Exception:
+            sin_factura_count = 0
+        try:
+            movements_count = int((meta or {}).get("movements_count") or 0)
+        except Exception:
+            movements_count = 0
+        try:
+            ingresos_total = float((meta or {}).get("ingresos_total") or 0)
+        except Exception:
+            ingresos_total = 0.0
+        try:
+            gastos_total = float((meta or {}).get("gastos_total") or 0)
+        except Exception:
+            gastos_total = 0.0
+        try:
+            sin_parse_count = int((meta or {}).get("sin_parse_count") or 0)
+        except Exception:
+            sin_parse_count = 0
+        quality = (meta or {}).get("quality") if isinstance((meta or {}).get("quality"), dict) else None
+        try:
+            low_confidence_count = int((meta or {}).get("low_confidence_count") or 0)
+        except Exception:
+            low_confidence_count = 0
         return JSONResponse(
             {
                 "ok": True,
                 "file_id": file_id,
+                "statement_id": statement_id,
                 "meta": meta,
+                "processed_count": processed_count,
+                "total_ingresos": total_ingresos,
+                "total_gastos": total_gastos,
+                "sin_factura_count": sin_factura_count,
+                "movements_count": movements_count,
+                "ingresos_total": ingresos_total,
+                "gastos_total": gastos_total,
+                "sin_parse_count": sin_parse_count,
+                "low_confidence_count": low_confidence_count,
+                "quality": quality,
                 "download_url": f"/portal/bank/pdf-to-excel/download/{file_id}",
             }
         )
+
+    def _build_preview_export_xlsx(movements: list[dict[str, Any]]) -> bytes:
+        """Genera XLSX en memoria desde lista de movimientos (preview editados). Sin DB."""
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, Alignment
+        from openpyxl.utils import get_column_letter
+
+        wb = Workbook()
+        wb.remove(wb.active)
+        headers = ["idx", "fecha", "concepto", "descripcion_raw", "deposito", "retiro", "saldo", "direction", "method", "category", "bucket", "deductible_hint", "needs_review", "confidence", "notes"]
+        ws_mov = wb.create_sheet("Movimientos", 0)
+        for col, h in enumerate(headers, 1):
+            cell = ws_mov.cell(row=1, column=col, value=h)
+            cell.font = Font(bold=True)
+        for i, m in enumerate(movements, start=2):
+            concept = (m.get("concept") or m.get("description_short") or "")[:500]
+            raw = (m.get("description_raw") or "")[:2000]
+            notes = (m.get("notes") or "")[:1000]
+            ws_mov.append([
+                m.get("idx"),
+                m.get("date"),
+                concept,
+                raw,
+                m.get("deposit"),
+                m.get("withdraw"),
+                m.get("balance"),
+                m.get("direction"),
+                m.get("method"),
+                m.get("category"),
+                m.get("bucket"),
+                m.get("deductible_hint"),
+                m.get("needs_review"),
+                m.get("confidence"),
+                notes,
+            ])
+        gastos = [m for m in movements if (m.get("withdraw") or 0) > 0]
+        ingresos = [m for m in movements if (m.get("deposit") or 0) > 0]
+        ws_g = wb.create_sheet("Gastos")
+        ws_g.append(headers)
+        for m in gastos:
+            concept = (m.get("concept") or m.get("description_short") or "")[:500]
+            ws_g.append([m.get("idx"), m.get("date"), concept, m.get("description_raw"), m.get("deposit"), m.get("withdraw"), m.get("balance"), m.get("direction"), m.get("method"), m.get("category"), m.get("bucket"), m.get("deductible_hint"), m.get("needs_review"), m.get("confidence"), m.get("notes")])
+        ws_i = wb.create_sheet("Ingresos")
+        ws_i.append(headers)
+        for m in ingresos:
+            concept = (m.get("concept") or m.get("description_short") or "")[:500]
+            ws_i.append([m.get("idx"), m.get("date"), concept, m.get("description_raw"), m.get("deposit"), m.get("withdraw"), m.get("balance"), m.get("direction"), m.get("method"), m.get("category"), m.get("bucket"), m.get("deductible_hint"), m.get("needs_review"), m.get("confidence"), m.get("notes")])
+        total_dep = sum(float(m.get("deposit") or 0) for m in movements)
+        total_wd = sum(float(m.get("withdraw") or 0) for m in movements)
+        ws_r = wb.create_sheet("Resumen")
+        ws_r.append(["campo", "valor"])
+        ws_r.append(["total_depositos", total_dep])
+        ws_r.append(["total_retiros", total_wd])
+        ws_r.append(["neto", total_dep - total_wd])
+        ws_r.append(["count_movimientos", len(movements)])
+        buf = io.BytesIO()
+        wb.save(buf)
+        return buf.getvalue()
+
+    @router.post("/bank/preview/export")
+    def portal_bank_preview_export(
+        request: Request,
+        issuer: dict = Depends(get_portal_issuer),
+        body: dict = Body(...),
+    ):
+        """Recibe JSON con movimientos editados, devuelve XLSX. Sin DB."""
+        if int(issuer.get("id") or 0) <= 0:
+            raise HTTPException(status_code=401, detail="Sesión inválida")
+        movements = body.get("movements") if isinstance(body.get("movements"), list) else []
+        if not movements:
+            raise HTTPException(status_code=400, detail="No hay movimientos para exportar.")
+        try:
+            xlsx_bytes = _build_preview_export_xlsx(movements)
+        except Exception as e:
+            logger.exception("bank preview export: %s", e)
+            raise HTTPException(status_code=500, detail="Error al generar el Excel.")
+        return Response(
+            content=xlsx_bytes,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": 'attachment; filename="movimientos_preview.xlsx"'},
+        )
+
+    @router.post("/bank/preview/reclassify")
+    def portal_bank_preview_reclassify(
+        request: Request,
+        issuer: dict = Depends(get_portal_issuer),
+        body: dict = Body(...),
+    ):
+        """Re-clasifica movimientos con preset (conservative | aggressive). Sin DB."""
+        if int(issuer.get("id") or 0) <= 0:
+            raise HTTPException(status_code=401, detail="Sesión inválida")
+        movements = body.get("movements") if isinstance(body.get("movements"), list) else []
+        preset = (body.get("preset") or "conservative").strip().lower()
+        if preset not in ("conservative", "aggressive"):
+            preset = "conservative"
+        if not movements:
+            return JSONResponse({"movements": [], "preset": preset})
+        try:
+            out = reclassify_movements(movements, preset=preset)
+        except Exception as e:
+            logger.exception("bank preview reclassify: %s", e)
+            raise HTTPException(status_code=500, detail="Error al re-clasificar.")
+        return JSONResponse({"movements": out, "preset": preset})
+
+    @router.post("/bank/preview/commit", response_class=JSONResponse)
+    def portal_bank_preview_commit(
+        request: Request,
+        issuer: dict = Depends(get_portal_issuer),
+        body: dict = Body(...),
+    ):
+        """Persiste movimientos del preview (editados en frontend) sin re-subir PDF."""
+        issuer_id = int(issuer.get("id") or 0)
+        if issuer_id <= 0:
+            raise HTTPException(status_code=401, detail="Sesión inválida")
+        bank_account_id = body.get("bank_account_id")
+        if bank_account_id is None:
+            raise HTTPException(status_code=400, detail="Falta bank_account_id")
+        try:
+            bank_account_id = int(bank_account_id)
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=400, detail="bank_account_id debe ser un número")
+        files = body.get("files") if isinstance(body.get("files"), list) else []
+        if not files:
+            raise HTTPException(status_code=400, detail="Falta lista de archivos (files) con file_summary y movements.")
+        expected_rfc = (issuer.get("rfc") or "").strip()
+        results = []
+        total_inserted = 0
+        total_duplicate_movements = 0
+        last_statement_id = None
+        period_month = None
+        for item in files:
+            file_summary = item.get("file_summary") if isinstance(item.get("file_summary"), dict) else {}
+            movements = item.get("movements") if isinstance(item.get("movements"), list) else []
+            if not movements:
+                continue
+            out = commit_preview_to_db(
+                issuer_id=issuer_id,
+                bank_account_id=bank_account_id,
+                file_summary=file_summary,
+                movements=movements,
+                expected_issuer_rfc=expected_rfc,
+            )
+            if not out.get("ok"):
+                return JSONResponse(
+                    {"ok": False, "rejection_reason": out.get("rejection_reason", "Error al guardar"), "status": out.get("status", "error")},
+                    status_code=400,
+                )
+            results.append({
+                "statement_id": out.get("statement_id"),
+                "inserted_count": out.get("inserted_count", 0),
+                "duplicate_statement": out.get("duplicate_statement", False),
+                "duplicate_movements_count": out.get("duplicate_movements_count", 0),
+            })
+            total_inserted += out.get("inserted_count", 0)
+            total_duplicate_movements += out.get("duplicate_movements_count", 0)
+            if out.get("statement_id"):
+                last_statement_id = out["statement_id"]
+            if out.get("period_month"):
+                period_month = out["period_month"]
+        log_action(request, "bank_preview_commit", issuer_id=issuer_id, entity_id=last_statement_id)
+        return JSONResponse({
+            "ok": True,
+            "statement_id": last_statement_id,
+            "inserted_count": total_inserted,
+            "duplicate_movements_count": total_duplicate_movements,
+            "results": results,
+            "period_month": period_month,
+        })
 
     @router.get("/bank/pdf-to-excel/download/{file_id}")
     def portal_bank_pdf_to_excel_download(
@@ -1827,6 +3113,362 @@ def get_portal_router(templates):
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             filename=filename,
         )
+
+    @router.get("/bank/statements", response_class=HTMLResponse)
+    def portal_bank_statements(request: Request, issuer: dict = Depends(get_portal_issuer)):
+        issuer_id = int(issuer.get("id") or 0)
+        if issuer_id <= 0:
+            raise HTTPException(status_code=401, detail="Sesión inválida")
+        statements: list = []
+        conn = None
+        try:
+            conn = db()
+            conn.row_factory = lambda cursor, row: dict(zip([c[0] for c in cursor.description], row))
+            _ensure_bank_exports_table(conn)
+            _ensure_bank_movements_table(conn)
+            rows = conn.execute(
+                "SELECT file_id, pdf_path, xlsx_path, meta_json, created_at FROM bank_pdf_exports WHERE issuer_id = ? ORDER BY created_at DESC",
+                (issuer_id,),
+            ).fetchall()
+            statements = []
+            for r in rows:
+                r = _db_row_to_dict(r)
+                meta = {}
+                if r.get("meta_json"):
+                    try:
+                        meta = json.loads(r["meta_json"] or "{}")
+                    except Exception:
+                        pass
+                period_start = meta.get("period_start") or ""
+                period_end = meta.get("period_end") or ""
+                bank_name = meta.get("bank_name") or "—"
+                account_last4 = meta.get("account_last4") or "—"
+                movements_count = int(meta.get("movements_count") or 0)
+                total_gastos = float(meta.get("gastos_total") or meta.get("total_gastos") or 0)
+                total_ingresos = float(meta.get("ingresos_total") or meta.get("total_ingresos") or 0)
+                period_label = f"{period_start} – {period_end}" if (period_start or period_end) else "—"
+                statements.append({
+                    "file_id": r["file_id"],
+                    "statement_key": r["file_id"],
+                    "created_at": r["created_at"] or "",
+                    "period_label": period_label,
+                    "bank_name": bank_name,
+                    "account_last4": account_last4,
+                    "movements_count": movements_count,
+                    "total_gastos": total_gastos,
+                    "total_ingresos": total_ingresos,
+                    "source": "export",
+                })
+            if table_exists(conn, "bank_statements"):
+                has_pm = has_column(conn, "bank_statements", "period_month")
+                has_tm = has_column(conn, "bank_statements", "total_movements")
+                if has_pm and has_tm:
+                    st_rows = conn.execute(
+                        "SELECT id, period_month, bank_name, account_last4, total_movements, status, created_at FROM bank_statements WHERE issuer_id = ? ORDER BY created_at DESC",
+                        (issuer_id,),
+                    ).fetchall()
+                else:
+                    st_rows = conn.execute(
+                        "SELECT id, bank_name, account_last4, period_start, period_end, created_at FROM bank_statements WHERE issuer_id = ? ORDER BY created_at DESC",
+                        (issuer_id,),
+                    ).fetchall()
+                for r in st_rows:
+                    r = _db_row_to_dict(r)
+                    if has_pm:
+                        pm = r.get("period_month") or ""
+                    else:
+                        pm = (r.get("period_start") or "")[:7]
+                    period_label = pm if pm else ((r.get("created_at") or "")[:7] or "—")
+                    statements.append({
+                        "file_id": None,
+                        "statement_key": f"stmt_{r['id']}",
+                        "statement_id": r["id"],
+                        "created_at": r.get("created_at") or "",
+                        "period_label": period_label,
+                        "bank_name": r.get("bank_name") or "—",
+                        "account_last4": r.get("account_last4") or "—",
+                        "movements_count": int(r.get("total_movements") or 0) if has_tm else 0,
+                        "total_gastos": 0,
+                        "total_ingresos": 0,
+                        "source": "ingest",
+                    })
+            statements.sort(key=lambda x: (x.get("created_at") or ""), reverse=True)
+        except Exception as e:
+            logger.warning("portal bank/statements: error cargando lista (%s), mostrando vacío", e)
+            statements = []
+        finally:
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+        return _render_portal(
+            request,
+            issuer=issuer,
+            template_name="portal_bank_statements.html",
+            active_page="bank_statements",
+            title="Estados de cuenta",
+            statements=statements,
+        )
+
+    @router.get("/movimientos", response_class=HTMLResponse)
+    @router.get("/bank/movements", response_class=HTMLResponse)
+    def portal_bank_movements(
+        request: Request,
+        issuer: dict = Depends(get_portal_issuer),
+        ym: Optional[str] = Query(None, description="Mes YYYY-MM (selector como emitidas/recibidas)"),
+        statement_id: Optional[str] = Query(None, description="Filtrar por estado de cuenta (file_id o stmt_N)"),
+        period_month: Optional[str] = Query(None, description="YYYY-MM (legacy, usa ym si no viene)"),
+        tipo: Optional[str] = Query(None, description="INGRESO, GASTO, INFO"),
+        categoria: Optional[str] = Query(None),
+        cfdi_match_status: Optional[str] = Query(None, description="pending, suggested, confirmed, rejected"),
+        min_confidence: Optional[int] = Query(None, ge=0, le=100),
+        search: Optional[str] = Query(None),
+        limit: int = Query(200, ge=1, le=500),
+        offset: int = Query(0, ge=0),
+    ):
+        issuer_id = int(issuer.get("id") or 0)
+        if issuer_id <= 0:
+            raise HTTPException(status_code=401, detail="Sesión inválida")
+        # Mes: prioridad ym (selector) > period_month (legacy) > mes actual
+        period_month = (ym or period_month or ym_now()).strip()[:7] or ym_now()
+        movements: list = []
+        total_count = 0
+        sum_ingresos = 0.0
+        sum_gastos = 0.0
+        statements_opt: list = []
+        months_with_movements: list[dict] = []
+        conn = None
+        try:
+            conn = db()
+            conn.row_factory = lambda cursor, row: dict(zip([c[0] for c in cursor.description], row))
+            _ensure_bank_movements_table(conn)
+            _ensure_bank_exports_table(conn)
+
+            params: list = [issuer_id]
+            where_clauses = ["issuer_id = ?"]
+
+            if statement_id:
+                sid = statement_id.strip()
+                if sid.startswith("stmt_"):
+                    try:
+                        bid = int(sid.replace("stmt_", ""))
+                        if has_column(conn, "bank_movements", "bank_statement_id"):
+                            where_clauses.append("bank_statement_id = ?")
+                            params.append(bid)
+                        else:
+                            where_clauses.append("statement_file_id = ?")
+                            params.append(sid)
+                    except ValueError:
+                        where_clauses.append("statement_file_id = ?")
+                        params.append(sid)
+                else:
+                    if has_column(conn, "bank_movements", "statement_file_id"):
+                        where_clauses.append("statement_file_id = ?")
+                        params.append(sid)
+            if has_column(conn, "bank_movements", "period_month"):
+                where_clauses.append("period_month = ?")
+                params.append(period_month)
+            if tipo:
+                where_clauses.append("tipo = ?")
+                params.append(tipo.strip().upper())
+            if categoria:
+                where_clauses.append("categoria = ?")
+                params.append(categoria.strip())
+            if cfdi_match_status and has_column(conn, "bank_movements", "cfdi_match_status"):
+                where_clauses.append("cfdi_match_status = ?")
+                params.append(cfdi_match_status.strip().lower())
+            if min_confidence is not None:
+                where_clauses.append("confidence_score >= ?")
+                params.append(min_confidence)
+            if search and search.strip():
+                q = f"%{search.strip()}%"
+                if has_column(conn, "bank_movements", "raw_description"):
+                    where_clauses.append("(descripcion LIKE ? OR contraparte_hint LIKE ? OR raw_description LIKE ?)")
+                    params.extend([q, q, q])
+                else:
+                    where_clauses.append("(descripcion LIKE ? OR contraparte_hint LIKE ?)")
+                    params.extend([q, q])
+
+            where_sql = " AND ".join(where_clauses)
+
+            total_count_row = conn.execute(
+                f"SELECT COUNT(*) AS c FROM bank_movements WHERE {where_sql}",
+                params,
+            ).fetchone()
+            total_count = int(_db_row_to_dict(total_count_row).get("c", 0) or 0)
+
+            sum_row = conn.execute(
+                f"SELECT COALESCE(SUM(deposito), 0) AS ing, COALESCE(SUM(retiro), 0) AS gas FROM bank_movements WHERE {where_sql}",
+                params,
+            ).fetchone()
+            sum_row_d = _db_row_to_dict(sum_row)
+            sum_ingresos = float(sum_row_d.get("ing", 0) or 0)
+            sum_gastos = float(sum_row_d.get("gas", 0) or 0)
+
+            # Construir SELECT solo con columnas que existan (compatibilidad con distintos esquemas)
+            sel = ["id"]
+            if has_column(conn, "bank_movements", "statement_file_id"):
+                sel.append("statement_file_id")
+            elif has_column(conn, "bank_movements", "statement_id"):
+                sel.append("statement_id AS statement_file_id")
+            sel.append("fecha")
+            if has_column(conn, "bank_movements", "descripcion"):
+                sel.append("descripcion")
+            elif has_column(conn, "bank_movements", "descripcion_norm"):
+                sel.append("descripcion_norm AS descripcion")
+            else:
+                sel.append("descripcion_raw AS descripcion")
+            sel.extend(["deposito", "retiro", "saldo", "tipo", "categoria", "metodo_hint", "contraparte_hint"])
+            if has_column(conn, "bank_movements", "rfc_encontrado"):
+                sel.append("rfc_encontrado")
+            elif has_column(conn, "bank_movements", "rfc_detectado"):
+                sel.append("rfc_detectado AS rfc_encontrado")
+            sel.append("confidence_score")
+            if has_column(conn, "bank_movements", "bank_statement_id"):
+                sel.append("bank_statement_id")
+            if has_column(conn, "bank_movements", "cfdi_match_status"):
+                sel.append("cfdi_match_status")
+            select_cols = ", ".join(sel)
+            params_ext = params + [limit, offset]
+            movements = conn.execute(
+                f"SELECT {select_cols} FROM bank_movements WHERE {where_sql} ORDER BY fecha DESC, id DESC LIMIT ? OFFSET ?",
+                params_ext,
+            ).fetchall()
+            movements = [_db_row_to_dict(r) for r in movements]
+            for row in movements:
+                row.setdefault("fecha", None)
+                row.setdefault("descripcion", None)
+                row.setdefault("deposito", None)
+                row.setdefault("retiro", None)
+                row.setdefault("saldo", None)
+                row.setdefault("tipo", None)
+                row.setdefault("categoria", None)
+                row.setdefault("metodo_hint", None)
+                row.setdefault("contraparte_hint", None)
+                row.setdefault("rfc_encontrado", None)
+                row.setdefault("confidence_score", None)
+                row.setdefault("cfdi_match_status", None)
+                row.setdefault("bank_statement_id", None)
+                # Asegurar que montos sean numéricos para el formato en plantilla
+                for key in ("deposito", "retiro", "saldo", "confidence_score"):
+                    if row.get(key) is not None and row[key] != "":
+                        try:
+                            if key == "confidence_score":
+                                row[key] = int(float(row[key]))
+                            else:
+                                row[key] = float(row[key])
+                        except (TypeError, ValueError):
+                            row[key] = None if key != "confidence_score" else 0
+                # Concepto = descripción sin prefijo de fecha (igual que en convertir edo. de cuenta)
+                row["concepto"] = _strip_date_from_description(row.get("descripcion")) or (row.get("descripcion") or "").strip()
+
+            statements_opt = []
+            for r in conn.execute(
+                "SELECT file_id, meta_json, created_at FROM bank_pdf_exports WHERE issuer_id = ? ORDER BY created_at DESC",
+                (issuer_id,),
+            ).fetchall():
+                r = _db_row_to_dict(r)
+                meta = {}
+                if r.get("meta_json"):
+                    try:
+                        meta = json.loads(r["meta_json"] or "{}")
+                    except Exception:
+                        pass
+                p_start = meta.get("period_start") or ""
+                p_end = meta.get("period_end") or ""
+                if p_start or p_end:
+                    label = f"{p_start} – {p_end}"
+                else:
+                    label = (r.get("created_at") or "")[:16] or (r["file_id"][:12] + "…")
+                statements_opt.append({"statement_id": r["file_id"], "label": label})
+            if table_exists(conn, "bank_statements"):
+                has_pm = has_column(conn, "bank_statements", "period_month")
+                if has_pm:
+                    st_opt_rows = conn.execute(
+                        "SELECT id, period_month, total_movements FROM bank_statements WHERE issuer_id = ? ORDER BY created_at DESC",
+                        (issuer_id,),
+                    ).fetchall()
+                else:
+                    st_opt_rows = conn.execute(
+                        "SELECT id, period_start FROM bank_statements WHERE issuer_id = ? ORDER BY created_at DESC",
+                        (issuer_id,),
+                    ).fetchall()
+                for r in st_opt_rows:
+                    r = _db_row_to_dict(r)
+                    if has_pm:
+                        pm = r.get("period_month") or ""
+                    else:
+                        pm = (r.get("period_start") or "")[:7]
+                    label = pm if pm else f"Estado #{r['id']}"
+                    statements_opt.append({"statement_id": f"stmt_{r['id']}", "label": label})
+            # Meses con movimientos (para el selector como emitidas/recibidas)
+            if has_column(conn, "bank_movements", "period_month"):
+                months_rows = conn.execute(
+                    """SELECT period_month AS ym, COUNT(*) AS n FROM bank_movements
+                       WHERE issuer_id = ? AND period_month IS NOT NULL AND TRIM(period_month) != ''
+                       GROUP BY period_month ORDER BY period_month DESC""",
+                    (issuer_id,),
+                ).fetchall()
+                for r in months_rows:
+                    r = _db_row_to_dict(r)
+                    ym_val = r.get("ym") or ""
+                    if ym_val:
+                        months_with_movements.append({"ym": ym_val, "n": int(r.get("n") or 0), "label": ym_to_label(ym_val)})
+            else:
+                # Sin columna period_month: usar meses de bank_statements si existen
+                if table_exists(conn, "bank_statements") and has_column(conn, "bank_statements", "period_month"):
+                    months_rows = conn.execute(
+                        """SELECT period_month AS ym, COALESCE(SUM(total_movements), 0) AS n FROM bank_statements
+                           WHERE issuer_id = ? AND period_month IS NOT NULL AND TRIM(period_month) != ''
+                           GROUP BY period_month ORDER BY period_month DESC""",
+                        (issuer_id,),
+                    ).fetchall()
+                    for r in months_rows:
+                        r = _db_row_to_dict(r)
+                        ym_val = r.get("ym") or ""
+                        if ym_val:
+                            months_with_movements.append({"ym": ym_val, "n": int(r.get("n") or 0), "label": ym_to_label(ym_val)})
+        except Exception as e:
+            logger.warning("portal movimientos: error cargando datos (%s), mostrando lista vacía", e)
+        finally:
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+
+        ym_safe = (period_month or ym_now()).strip()[:7] or ym_now()
+        try:
+            return _render_portal(
+                request,
+                issuer=issuer,
+                template_name="portal_bank_movements.html",
+                active_page="bank_movements",
+                title="Movimientos",
+                movements=movements,
+                total_count=total_count,
+                sum_ingresos=sum_ingresos,
+                sum_gastos=sum_gastos,
+                limit=limit,
+                offset=offset,
+                statement_id=statement_id or "",
+                period_month=ym_safe,
+                ym=ym_safe,
+                ym_label=ym_to_label(ym_safe),
+                prev_ym=shift_ym(ym_safe, -1),
+                next_ym=shift_ym(ym_safe, +1),
+                months=months_with_movements,
+                tipo=tipo or "",
+                categoria=categoria or "",
+                cfdi_match_status=cfdi_match_status or "",
+                min_confidence=min_confidence,
+                search=search or "",
+                statements_opt=statements_opt,
+            )
+        except Exception as e:
+            logger.exception("portal movimientos (render): %s", e)
+            raise HTTPException(status_code=500, detail=f"Error al mostrar la página: {e!s}")
 
     # ---------- SAT credentials (FIEL) upload & validate ----------
     MAX_FIEL_SIZE = 2 * 1024 * 1024  # 2 MB
@@ -1901,7 +3543,8 @@ def get_portal_router(templates):
         # Permisos 0600: solo el propietario puede leer/escribir (sin prometer cifrado)
         os.chmod(cer_path, 0o600)
         os.chmod(key_path, 0o600)
-        password = fiel_password.strip()
+        # Guardar contraseña tal cual (sin strip) para evitar que espacios válidos rompan el descifrado
+        password = fiel_password if fiel_password is not None else ""
         conn = db()
         try:
             _ensure_sat_credentials_validation_columns(conn)

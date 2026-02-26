@@ -1,0 +1,7 @@
+{# Estado de error de carga unificado: "No se pudo cargar" + Reintentar. Incluir con: {% include 'components/error_state.html' %} (opcional: id_prefix, extra_class). #}
+{% set _pid = id_prefix|default('loadErrorState') %}
+<div class="empty-state empty-state--error load-error {{ extra_class|default('') }}" id="{{ _pid }}" hidden aria-live="polite">
+  <div class="empty-state__title">No pudimos cargar esto ahora.</div>
+  <p class="empty-state__desc" id="{{ _pid }}Msg">Puedes intentar de nuevo.</p>
+  <button type="button" class="btn btn--secondary" id="{{ _pid }}Retry" aria-label="Reintentar carga">Reintentar</button>
+</div>
