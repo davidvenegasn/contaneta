@@ -19,6 +19,7 @@ from config import BASE_DIR, REGIMEN_LABEL_TO_CODE, COOKIE_DEMO_VIEW, DB_PATH, D
 from database import db, db_rows, has_column, table_exists
 from routers.deps import get_portal_issuer
 from services import quotations as quotations_service, rate_limit as rate_limit_service, session as session_service, audit, subscription as subscription_service, csrf as csrf_service
+from services import file_access_log
 from services.action_log import log_action
 from services.portal_errors import portal_error_type
 from services.pdf_to_excel import convert_pdf_to_xlsx, get_storage_root, safe_join, ensure_parent_dir
@@ -1324,6 +1325,15 @@ def get_portal_router(templates):
             entity_id=u,
         )
         log_action(request, "download_xml", issuer_id=issuer["id"], entity_id=u[:36])
+        file_access_log.log_file_access(
+            request=request,
+            action="download_xml",
+            issuer_id=issuer["id"],
+            user_id=uid,
+            file_path=row.get("xml_path") if isinstance(row, dict) else None,
+            entity="cfdi",
+            entity_id=u[:36],
+        )
         with open(abs_path, "rb") as f:
             xml_bytes = f.read()
         return Response(
@@ -1364,6 +1374,15 @@ def get_portal_router(templates):
             entity_id=uuid_clean,
         )
         log_action(request, "download_pdf", issuer_id=issuer["id"], entity_id=uuid_clean[:36])
+        file_access_log.log_file_access(
+            request=request,
+            action="download_pdf",
+            issuer_id=issuer["id"],
+            user_id=uid,
+            file_path=row.get("xml_path") if isinstance(row, dict) else None,
+            entity="cfdi",
+            entity_id=uuid_clean[:36],
+        )
         try:
             from cfdi_pdf import parse_cfdi_xml, build_pdf
             data = parse_cfdi_xml(abs_path)
@@ -2257,6 +2276,9 @@ def get_portal_router(templates):
         filename = (file.filename or "").strip().lower()
         if not filename.endswith(".pdf"):
             raise HTTPException(status_code=400, detail="El archivo debe ser .pdf")
+        content_type = (file.content_type or "").lower().strip()
+        if content_type and content_type not in ("application/pdf", "application/x-pdf"):
+            raise HTTPException(status_code=400, detail="Tipo de archivo inválido (solo PDF).")
         size = 0
         chunks: list[bytes] = []
         while True:
@@ -2269,6 +2291,9 @@ def get_portal_router(templates):
             chunks.append(chunk)
         if size <= 0:
             raise HTTPException(status_code=400, detail="El PDF está vacío.")
+        # Magic bytes mínimo: evita 500 en el parser legacy por archivo no-PDF
+        if chunks and not chunks[0].startswith(b"%PDF-"):
+            raise HTTPException(status_code=400, detail="El archivo no parece ser un PDF válido.")
         import tempfile
         tmp_path = None
         try:
@@ -2276,7 +2301,10 @@ def get_portal_router(templates):
                 for ch in chunks:
                     tmp.write(ch)
                 tmp_path = tmp.name
-            result = parse_bank_pdf_to_movements_preview(tmp_path, preset="conservative")
+            try:
+                result = parse_bank_pdf_to_movements_preview(tmp_path, preset="conservative")
+            except Exception:
+                raise HTTPException(status_code=400, detail="No pudimos leer el PDF. Verifica que sea un estado de cuenta válido.")
         finally:
             if tmp_path and os.path.exists(tmp_path):
                 try:
@@ -3186,6 +3214,15 @@ def get_portal_router(templates):
             raise HTTPException(status_code=404, detail="El archivo ya no existe en disco")
 
         filename = f"estado_cuenta_{fid[:8]}.xlsx"
+        file_access_log.log_file_access(
+            request=request,
+            action="download_bank_xlsx",
+            issuer_id=issuer_id,
+            user_id=getattr(request.state, "user_id", None),
+            file_path=xlsx_rel_path,
+            entity="bank_pdf_exports",
+            entity_id=fid[:64],
+        )
         return FileResponse(
             path=xlsx_abs_path,
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

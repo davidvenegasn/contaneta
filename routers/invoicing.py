@@ -18,6 +18,7 @@ from services.form_parse import parse_items_from_form, parse_payments_from_form
 from services import csrf as csrf_service, audit, subscription as subscription_service
 from services.action_log import log_action
 from services import invoices_service
+from services import file_access_log
 from routers.deps import get_portal_issuer
 
 
@@ -33,6 +34,15 @@ def _safe_abs_path(path_like: str) -> str:
     base = os.path.abspath(BASE_DIR)
     if not abs_p.startswith(base + os.sep):
         raise ValueError("Ruta XML inválida")
+    # Guardrail: nunca servir llaves/certs ni credenciales aunque alguien logre inyectar un path.
+    blocked = [
+        os.path.join(base, "keys"),
+        os.path.join(base, "storage", "credentials"),
+    ]
+    for b in blocked:
+        b_abs = os.path.normpath(os.path.abspath(b))
+        if abs_p == b_abs or abs_p.startswith(b_abs + os.sep):
+            raise ValueError("Ruta XML inválida")
     return abs_p
 
 
@@ -105,6 +115,15 @@ def get_invoicing_router(templates):
                 entity_id=uuid_clean,
             )
             log_action(request, "download_xml", issuer_id=issuer["id"], entity_id=uuid_clean[:36])
+            file_access_log.log_file_access(
+                request=request,
+                action="download_xml",
+                issuer_id=issuer["id"],
+                user_id=getattr(request.state, "user_id", None),
+                file_path=(row.get("xml_path") if isinstance(row, dict) else None),
+                entity="cfdi",
+                entity_id=uuid_clean[:36],
+            )
             with open(abs_path, "rb") as f:
                 xml_bytes = f.read()
             return Response(
@@ -145,6 +164,15 @@ def get_invoicing_router(templates):
                 entity_id=uuid_clean,
             )
             log_action(request, "download_pdf", issuer_id=issuer["id"], entity_id=uuid_clean[:36])
+            file_access_log.log_file_access(
+                request=request,
+                action="download_pdf",
+                issuer_id=issuer["id"],
+                user_id=getattr(request.state, "user_id", None),
+                file_path=(row.get("xml_path") if isinstance(row, dict) else None),
+                entity="cfdi",
+                entity_id=uuid_clean[:36],
+            )
             from cfdi_pdf import parse_cfdi_xml, build_pdf
             data = parse_cfdi_xml(abs_path)
             pdf_bytes = build_pdf(data)
@@ -200,6 +228,15 @@ def get_invoicing_router(templates):
                 )
                 raise HTTPException(status_code=404, detail="Factura no encontrada")
             blob = download_invoice(issuer["facturapi_org_id"], invoice_id_clean, fmt)
+            file_access_log.log_file_access(
+                request=request,
+                action=f"download_facturapi_{fmt}",
+                issuer_id=issuer["id"],
+                user_id=getattr(request.state, "user_id", None),
+                file_path=None,
+                entity="invoices",
+                entity_id=invoice_id_clean[:64],
+            )
             media = {"pdf": "application/pdf", "xml": "application/xml", "zip": "application/zip"}[fmt]
             filename = f"invoice_{invoice_id_clean}.{fmt}"
             return Response(
