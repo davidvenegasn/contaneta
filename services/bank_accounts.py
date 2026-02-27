@@ -75,7 +75,10 @@ def create_account(
         )
         conn.commit()
         rid = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
-        row = db_rows("SELECT id, issuer_id, alias, bank_name, clabe, account_last4, holder_name, rfc_titular, is_active, created_at, updated_at FROM issuer_bank_accounts WHERE id = ?", (rid,))
+        row = db_rows(
+            "SELECT id, issuer_id, alias, bank_name, clabe, account_last4, holder_name, rfc_titular, is_active, created_at, updated_at FROM issuer_bank_accounts WHERE id = ? AND issuer_id = ?",
+            (rid, issuer_id),
+        )
         return dict(row[0]) if row else {"id": rid}
     finally:
         conn.close()

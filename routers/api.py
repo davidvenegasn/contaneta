@@ -923,8 +923,8 @@ def api_invoices_quick(
     uuid = invoice.get("uuid")
     total = invoice.get("total")
     conn.execute(
-        "UPDATE invoices SET facturapi_invoice_id = ?, uuid = ?, total = ? WHERE id = ?",
-        (fact_id, uuid, total, invoice_local_id),
+        "UPDATE invoices SET facturapi_invoice_id = ?, uuid = ?, total = ? WHERE id = ? AND issuer_id = ?",
+        (fact_id, uuid, total, invoice_local_id, issuer_id),
     )
     conn.commit()
     conn.close()
@@ -1281,7 +1281,10 @@ def api_quotations_create(request: Request, payload: dict = Body(...), issuer: d
             "created_at": created_at,
         }
         if has_column(conn, "quotations", "metadata_json"):
-            conn.execute("UPDATE quotations SET metadata_json = ? WHERE id = ?", (json.dumps(snapshot), qid))
+            conn.execute(
+                "UPDATE quotations SET metadata_json = ? WHERE id = ? AND issuer_id = ?",
+                (json.dumps(snapshot), qid, issuer_id),
+            )
         conn.commit()
         conn.close()
         return {"ok": True, "data": {"id": qid, "public_token": public_token}}

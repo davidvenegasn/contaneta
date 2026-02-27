@@ -24,6 +24,12 @@ Abre: `http://127.0.0.1:8000/`
 bash scripts/smoke_api.sh || true
 ```
 
+### Tests (tenant isolation)
+
+```bash
+.venv/bin/pytest -q
+```
+
 ### Reset de DB local (dev)
 
 ```bash

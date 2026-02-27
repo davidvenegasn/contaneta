@@ -188,8 +188,8 @@ def confirm_match(match_id: int, issuer_id: int) -> bool:
         if not row:
             return False
         conn.execute(
-            "UPDATE bank_invoice_matches SET status = ?, updated_at = datetime('now') WHERE id = ?",
-            (STATUS_CONFIRMED, match_id),
+            "UPDATE bank_invoice_matches SET status = ?, updated_at = datetime('now') WHERE id = ? AND issuer_id = ?",
+            (STATUS_CONFIRMED, match_id, issuer_id),
         )
         conn.commit()
         return True
@@ -208,8 +208,8 @@ def reject_match(match_id: int, issuer_id: int) -> bool:
         if not row:
             return False
         conn.execute(
-            "UPDATE bank_invoice_matches SET status = ?, updated_at = datetime('now') WHERE id = ?",
-            (STATUS_REJECTED, match_id),
+            "UPDATE bank_invoice_matches SET status = ?, updated_at = datetime('now') WHERE id = ? AND issuer_id = ?",
+            (STATUS_REJECTED, match_id, issuer_id),
         )
         conn.commit()
         return True

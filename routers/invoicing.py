@@ -409,8 +409,8 @@ def _submit_impl(templates, request: Request, issuer: dict, form):
     total = invoice.get("total")
 
     conn.execute(
-        "UPDATE invoices SET facturapi_invoice_id = ?, uuid = ?, total = ? WHERE id = ?",
-        (fact_id, uuid, total, invoice_local_id),
+        "UPDATE invoices SET facturapi_invoice_id = ?, uuid = ?, total = ? WHERE id = ? AND issuer_id = ?",
+        (fact_id, uuid, total, invoice_local_id, issuer["id"]),
     )
     if tipo_comprobante == "P" and payments_payload and table_exists(conn, "payment_relations"):
         try:

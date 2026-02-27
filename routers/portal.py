@@ -2743,8 +2743,8 @@ def get_portal_router(templates):
             period_month = (upload_metadata.get("period_month") or "")[:7]
             if period_month and has_column(conn, "bank_statements", "period_month"):
                 conn.execute(
-                    "UPDATE bank_statements SET period_month = ?, bank_name = ?, account_last4 = ? WHERE id = ?",
-                    (period_month, upload_metadata.get("bank_name"), upload_metadata.get("account_last4"), statement_id),
+                    "UPDATE bank_statements SET period_month = ?, bank_name = ?, account_last4 = ? WHERE id = ? AND issuer_id = ?",
+                    (period_month, upload_metadata.get("bank_name"), upload_metadata.get("account_last4"), statement_id, issuer_id),
                 )
                 conn.commit()
         finally:

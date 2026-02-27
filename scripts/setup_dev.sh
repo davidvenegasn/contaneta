@@ -15,6 +15,10 @@ fi
 echo "==> Instalando dependencias"
 .venv/bin/python -m pip install --upgrade pip
 .venv/bin/pip install -r requirements.txt
+if [ -f "requirements-dev.txt" ]; then
+  echo "==> Instalando dependencias dev (requirements-dev.txt)"
+  .venv/bin/pip install -r requirements-dev.txt
+fi
 
 if [ ! -f ".env" ]; then
   if [ -f ".env.example" ]; then
