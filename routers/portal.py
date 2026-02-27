@@ -33,6 +33,9 @@ from services.bank_cfdi_matching import find_cfdi_candidates, save_suggested_mat
 
 logger = logging.getLogger(__name__)
 
+# Paginación: evitar OFFSET enorme (degrada SQLite)
+MAX_LIST_OFFSET = 50_000
+
 
 def _db_row_to_dict(row: Any) -> dict:
     """Convierte sqlite3.Row (o cualquier fila) a dict para que .get() funcione."""
@@ -1135,6 +1138,10 @@ def get_portal_router(templates):
             total = 0
             pages = 0
             query = (q or "").strip()
+            # Guardrail: no permitir offsets enormes por page muy alta
+            max_page = (MAX_LIST_OFFSET // max(1, int(per_page))) + 1
+            if page > max_page:
+                page = max_page
             if tab == "clientes" and issuer_id > 0:
                 conn = db()
                 try:
@@ -1458,6 +1465,9 @@ def get_portal_router(templates):
         try:
             issuer_id = int(issuer.get("id") or 0)
             query = (q or "").strip()
+            max_page = (MAX_LIST_OFFSET // max(1, int(per_page))) + 1
+            if page > max_page:
+                page = max_page
             rows = []
             total = 0
             if issuer_id > 0:
@@ -1545,6 +1555,9 @@ def get_portal_router(templates):
         try:
             issuer_id = int(issuer.get("id") or 0)
             query = (q or "").strip()
+            max_page = (MAX_LIST_OFFSET // max(1, int(per_page))) + 1
+            if page > max_page:
+                page = max_page
             rows = []
             total = 0
             if issuer_id > 0:
@@ -3290,7 +3303,7 @@ def get_portal_router(templates):
         min_confidence: Optional[int] = Query(None, ge=0, le=100),
         search: Optional[str] = Query(None),
         limit: int = Query(200, ge=1, le=500),
-        offset: int = Query(0, ge=0),
+        offset: int = Query(0, ge=0, le=MAX_LIST_OFFSET),
     ):
         issuer_id = int(issuer.get("id") or 0)
         if issuer_id <= 0:

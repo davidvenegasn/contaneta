@@ -46,6 +46,7 @@ QUOTATION_STATUSES = ("draft", "sent", "accepted", "rejected", "converted", "exp
 # Paginación: nunca devolver miles de filas; siempre limit/offset con tope
 DEFAULT_LIST_LIMIT = 200
 MAX_LIST_LIMIT = 500  # tope duro: ningún listado devuelve más de 500 registros por petición
+MAX_LIST_OFFSET = 50_000  # tope duro para evitar scans enormes en SQLite
 
 # Fixtures para DEV_FIXTURES=1 (tests/manual_fixtures/*.json)
 def _load_fixture(name: str):
@@ -307,7 +308,7 @@ def api_job_get(job_id: int, issuer: dict = Depends(get_portal_issuer)):
 def api_customers(
     issuer: dict = Depends(get_portal_issuer),
     limit: int = Query(DEFAULT_LIST_LIMIT, ge=1, le=MAX_LIST_LIMIT, description="Máximo de registros"),
-    offset: int = Query(0, ge=0, description="Registros a saltar"),
+    offset: int = Query(0, ge=0, le=MAX_LIST_OFFSET, description="Registros a saltar"),
 ):
     fixture = _load_fixture("clients")
     if fixture is not None:
@@ -401,7 +402,7 @@ def api_customers_delete(request: Request, payload: dict = Body(...), issuer: di
 def api_products(
     issuer: dict = Depends(get_portal_issuer),
     limit: int = Query(DEFAULT_LIST_LIMIT, ge=1, le=MAX_LIST_LIMIT, description="Máximo de registros"),
-    offset: int = Query(0, ge=0, description="Registros a saltar"),
+    offset: int = Query(0, ge=0, le=MAX_LIST_OFFSET, description="Registros a saltar"),
 ):
     fixture = _load_fixture("products")
     if fixture is not None:
@@ -1144,7 +1145,7 @@ def api_invoices_bulk_issue(
 def api_quotations_list(
     issuer: dict = Depends(get_portal_issuer),
     limit: int = Query(DEFAULT_LIST_LIMIT, ge=1, le=MAX_LIST_LIMIT, description="Máximo de registros"),
-    offset: int = Query(0, ge=0, description="Registros a saltar"),
+    offset: int = Query(0, ge=0, le=MAX_LIST_OFFSET, description="Registros a saltar"),
 ):
     try:
         issuer_id = issuer["id"]
