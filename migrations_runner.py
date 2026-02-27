@@ -3,10 +3,14 @@ Sistema simple de migraciones SQLite.
 Aplica archivos migrations/*.sql ordenados por prefijo numérico (001_, 002_, ...).
 Conexiones con timeout y pragmas para reducir disk I/O y locks (WAL, busy_timeout, foreign_keys).
 """
+import hashlib
 import logging
 import os
 import re
 import sqlite3
+import time
+
+from services.errors import AppError
 
 logger = logging.getLogger(__name__)
 
@@ -218,6 +222,91 @@ def _apply_014_sat_credentials_validation(conn: sqlite3.Connection) -> None:
         _safe_add_column(conn, "sat_credentials", col, col_type)
 
 
+def _apply_021_bank_movements_module(conn: sqlite3.Connection) -> None:
+    """
+    Módulo Movimientos: columnas para validación RFC/periodo, conciliación con CFDI.
+    Extiende bank_statements y bank_movements; crea bank_invoice_matches.
+    Idempotente (_safe_add_column + CREATE TABLE IF NOT EXISTS).
+    """
+    # bank_statements: columnas para validación y periodo
+    if _table_exists(conn, "bank_statements"):
+        for col, col_type in [
+            ("source_file_name", "TEXT"),
+            ("parser_name", "TEXT"),
+            ("parser_version", "TEXT"),
+            ("detected_holder_name", "TEXT"),
+            ("detected_holder_rfc", "TEXT"),
+            ("detected_account_last4", "TEXT"),
+            ("period_month", "TEXT"),
+            ("statement_year", "INTEGER"),
+            ("statement_month", "INTEGER"),
+            ("opening_balance", "REAL"),
+            ("closing_balance", "REAL"),
+            ("currency", "TEXT"),
+            ("status", "TEXT"),
+            ("rejection_reason", "TEXT"),
+            ("total_movements", "INTEGER"),
+            ("bank_account_id", "INTEGER"),
+            ("updated_at", "TEXT"),
+        ]:
+            _safe_add_column(conn, "bank_statements", col, col_type)
+    # bank_movements: columnas para conciliación y clasificación
+    if _table_exists(conn, "bank_movements"):
+        for col, col_type in [
+            ("bank_statement_id", "INTEGER"),
+            ("bank_account_id", "INTEGER"),
+            ("period_month", "TEXT"),
+            ("movement_index", "INTEGER"),
+            ("raw_description", "TEXT"),
+            ("normalized_description", "TEXT"),
+            ("amount", "REAL"),
+            ("direction", "TEXT"),
+            ("reference_text", "TEXT"),
+            ("counterparty_name_detected", "TEXT"),
+            ("counterparty_rfc_detected", "TEXT"),
+            ("movement_type", "TEXT"),
+            ("business_effect", "TEXT"),
+            ("tax_effect", "TEXT"),
+            ("requires_cfdi", "INTEGER"),
+            ("cfdi_match_status", "TEXT"),
+            ("review_status", "TEXT"),
+            ("duplicate_hash", "TEXT"),
+            ("is_possible_duplicate", "INTEGER"),
+            ("updated_at", "TEXT"),
+        ]:
+            _safe_add_column(conn, "bank_movements", col, col_type)
+    # Tabla sugerencias/confirmaciones movimiento ↔ CFDI
+    if not _table_exists(conn, "bank_invoice_matches"):
+        conn.execute("""
+            CREATE TABLE bank_invoice_matches (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                issuer_id INTEGER NOT NULL,
+                bank_movement_id INTEGER NOT NULL,
+                cfdi_id INTEGER NOT NULL,
+                match_role TEXT NOT NULL,
+                score INTEGER NOT NULL,
+                score_breakdown_json TEXT,
+                matched_amount REAL,
+                status TEXT NOT NULL DEFAULT 'suggested',
+                is_partial INTEGER DEFAULT 0,
+                created_by TEXT DEFAULT 'system',
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+                FOREIGN KEY (issuer_id) REFERENCES issuers(id) ON DELETE CASCADE,
+                FOREIGN KEY (bank_movement_id) REFERENCES bank_movements(id) ON DELETE CASCADE,
+                FOREIGN KEY (cfdi_id) REFERENCES sat_cfdi(id) ON DELETE CASCADE
+            )
+        """)
+        for idx_sql in [
+            "CREATE INDEX IF NOT EXISTS idx_bim_movement ON bank_invoice_matches(bank_movement_id)",
+            "CREATE INDEX IF NOT EXISTS idx_bim_cfdi ON bank_invoice_matches(cfdi_id)",
+            "CREATE INDEX IF NOT EXISTS idx_bim_status ON bank_invoice_matches(status)",
+            "CREATE INDEX IF NOT EXISTS idx_bim_issuer ON bank_invoice_matches(issuer_id)",
+        ]:
+            conn.execute(idx_sql)
+        logger.info("  Created table bank_invoice_matches")
+
+
 def _apply_011_audit_log_columns(conn: sqlite3.Connection) -> None:
     """Aplica 011: columnas entity, entity_id, meta_json, ip, user_agent en audit_log."""
     if not _table_exists(conn, "audit_log"):
@@ -251,6 +340,59 @@ def _list_migration_files(migrations_dir: str) -> list[tuple[str, str]]:
     return out
 
 
+def _movement_dedup_hash(issuer_id: int, fecha: str, descripcion: str, deposito, retiro) -> str:
+    """Misma fórmula que portal/ingest para dedupe de movimientos."""
+    dep = "" if deposito is None else f"{float(deposito):.2f}"
+    ret = "" if retiro is None else f"{float(retiro):.2f}"
+    desc = (descripcion or "").strip()[:500].replace("\r", " ").replace("\n", " ")
+    payload = f"{issuer_id}|{fecha or ''}|{desc}|{dep}|{ret}"
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _apply_023_bank_movements_dedup(conn: sqlite3.Connection) -> None:
+    """
+    Añade movement_hash a bank_movements, rellena hashes en filas existentes,
+    elimina duplicados (conserva uno por issuer_id + movement_hash) y crea índice único.
+    """
+    if not _table_exists(conn, "bank_movements"):
+        logger.debug("bank_movements no existe, omitiendo 023")
+        return
+    _safe_add_column(conn, "bank_movements", "movement_hash", "TEXT")
+    cur = conn.execute(
+        "SELECT id, issuer_id, fecha, descripcion, deposito, retiro FROM bank_movements WHERE movement_hash IS NULL"
+    )
+    rows = cur.fetchall()
+    for row in rows:
+        row_id = row["id"]
+        issuer_id = row["issuer_id"]
+        fecha = row["fecha"] or ""
+        descripcion = row["descripcion"] or ""
+        deposito = row["deposito"]
+        retiro = row["retiro"]
+        m_hash = _movement_dedup_hash(issuer_id, fecha, descripcion, deposito, retiro)
+        conn.execute("UPDATE bank_movements SET movement_hash = ? WHERE id = ?", (m_hash, row_id))
+    if rows:
+        logger.info("023: backfill movement_hash en %d filas", len(rows))
+    # Borrar duplicados: conservar el de menor id por (issuer_id, movement_hash)
+    cur = conn.execute(
+        """
+        DELETE FROM bank_movements WHERE movement_hash IS NOT NULL AND id NOT IN (
+            SELECT MIN(id) FROM bank_movements WHERE movement_hash IS NOT NULL GROUP BY issuer_id, movement_hash
+        )
+        """
+    )
+    deleted = cur.rowcount
+    if deleted:
+        logger.info("023: eliminados %d movimientos duplicados", deleted)
+    try:
+        conn.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_bank_movements_issuer_hash ON bank_movements(issuer_id, movement_hash) WHERE movement_hash IS NOT NULL"
+        )
+    except sqlite3.OperationalError as e:
+        if "already exists" not in str(e).lower():
+            logger.warning("023: índice único movement_hash: %s", e)
+
+
 def apply_migrations(
     db_path: str,
     migrations_dir: str | None = None,
@@ -267,55 +409,99 @@ def apply_migrations(
     # Crear directorio de migraciones si no existe (no crea la DB; la DB se crea al conectar)
     os.makedirs(migrations_dir, exist_ok=True)
 
-    conn = sqlite3.connect(db_path, timeout=SQLITE_TIMEOUT)
-    conn.row_factory = sqlite3.Row
-    _apply_sqlite_pragmas(conn)
-    try:
-        _ensure_migrations_table(conn)
-        applied = _get_applied_versions(conn)
-        candidates = _list_migration_files(migrations_dir)
+    # Reintentos ante locks (dos procesos arrancando a la vez).
+    # Nota: usamos una transacción global (BEGIN IMMEDIATE) para evitar carreras:
+    # si 2 procesos arrancan, el segundo espera/reintenta y al entrar ya ve versiones aplicadas.
+    last_exc: Exception | None = None
+    for attempt in range(3):
+        conn = sqlite3.connect(db_path, timeout=SQLITE_TIMEOUT)
+        conn.row_factory = sqlite3.Row
+        _apply_sqlite_pragmas(conn)
+        try:
+            _ensure_migrations_table(conn)
+            candidates = _list_migration_files(migrations_dir)
 
-        for version_key, filepath in candidates:
-            # version_key es el prefijo numérico (001, 002, ...); lo usamos como version en schema_migrations
-            version = version_key
-            if version in applied:
-                logger.info("Skipping %s (already applied).", version)
-                continue
-
-            with open(filepath, "r", encoding="utf-8") as f:
-                sql = f.read()
-
-            logger.info("Applying %s…", version)
             try:
-                # BEGIN IMMEDIATE adquiere lock de escritura de inmediato, evita carreras con otras conexiones
                 conn.execute("BEGIN IMMEDIATE")
-                
-                # Migraciones con lógica Python (idempotente)
-                if version == "003":
-                    _apply_003_safe_add_columns(conn)
-                elif version == "004":
-                    _apply_004_optional_columns_and_constraints(conn)
-                elif version == "006":
-                    _safe_add_column(conn, "users", "name", "TEXT")
-                elif version == "008":
-                    _apply_008_users_active(conn)
-                elif version == "011":
-                    _apply_011_audit_log_columns(conn)
-                elif version == "014":
-                    _apply_014_sat_credentials_validation(conn)
-                else:
-                    # Migraciones normales: ejecutar SQL directamente
-                    conn.executescript(sql)
-                
-                conn.execute(
-                    "INSERT INTO schema_migrations (version, applied_at) VALUES (?, datetime('now'))",
-                    (version,),
+            except sqlite3.OperationalError as e:
+                # "database is locked" / "database schema is locked"
+                msg = str(e).lower()
+                if "locked" in msg and attempt < 2:
+                    conn.close()
+                    time.sleep(1 + attempt)  # 1s, 2s
+                    last_exc = e
+                    continue
+                raise AppError(
+                    code="MIGRATION_LOCKED",
+                    public_message="La base de datos está ocupada. Intenta de nuevo en unos segundos.",
+                    internal_message=f"BEGIN IMMEDIATE failed: {e}",
+                    status_code=500,
                 )
-                conn.commit()
-                logger.info("Applying %s… done.", version)
-            except Exception as e:
-                conn.rollback()
-                logger.exception("Applying %s failed: %s", version, e)
-                raise
-    finally:
-        conn.close()
+
+            applied = _get_applied_versions(conn)
+            for version_key, filepath in candidates:
+                version = version_key
+                filename = os.path.basename(filepath)
+                if version in applied:
+                    logger.info("Skipping migration %s (already applied).", filename)
+                    continue
+
+                start = time.time()
+                logger.info("Applying migration %s", filename)
+                try:
+                    # Migraciones con lógica Python (idempotente)
+                    if version == "003":
+                        _apply_003_safe_add_columns(conn)
+                    elif version == "004":
+                        _apply_004_optional_columns_and_constraints(conn)
+                    elif version == "006":
+                        _safe_add_column(conn, "users", "name", "TEXT")
+                    elif version == "008":
+                        _apply_008_users_active(conn)
+                    elif version == "011":
+                        _apply_011_audit_log_columns(conn)
+                    elif version == "014":
+                        _apply_014_sat_credentials_validation(conn)
+                    elif version == "016":
+                        _safe_add_column(conn, "issuers", "trial_expires_at", "TEXT")
+                    elif version == "021":
+                        _apply_021_bank_movements_module(conn)
+                    elif version == "023":
+                        _apply_023_bank_movements_dedup(conn)
+                    else:
+                        with open(filepath, "r", encoding="utf-8") as f:
+                            sql = f.read()
+                        conn.executescript(sql)
+
+                    conn.execute(
+                        "INSERT INTO schema_migrations (version, applied_at) VALUES (?, datetime('now'))",
+                        (version,),
+                    )
+                    applied.add(version)
+                    ms = int((time.time() - start) * 1000)
+                    logger.info("Applied %s in %dms", filename, ms)
+                except Exception as e:
+                    conn.rollback()
+                    logger.exception("Migration failed (%s): %s", filename, e)
+                    raise AppError(
+                        code="MIGRATION_FAILED",
+                        public_message="Error actualizando base de datos",
+                        internal_message=f"Migration {filename} failed: {e}",
+                        status_code=500,
+                    )
+
+            conn.commit()
+            return
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+    # Fallback (no debería llegar aquí)
+    raise AppError(
+        code="MIGRATION_LOCKED",
+        public_message="La base de datos está ocupada. Intenta de nuevo en unos segundos.",
+        internal_message=f"Migration retries exhausted: {last_exc}",
+        status_code=500,
+    )
