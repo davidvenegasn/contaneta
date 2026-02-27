@@ -8,7 +8,8 @@ import re
 import secrets
 import stat
 import subprocess
-from services.subprocess_safe import run_php
+from services.errors import ExternalServiceError
+from services.subprocess_utils import run_php
 from datetime import datetime, date, timezone
 from typing import Optional, Any
 
@@ -108,18 +109,17 @@ def _run_fiel_validation(issuer_id: int) -> tuple[bool, str]:
     env = os.environ.copy()
     env["APP_DB_PATH"] = str(DB_PATH)
     try:
-        stdout, stderr, returncode = run_php(
+        stdout, stderr = run_php(
             [php_script, str(issuer_id)],
             timeout=30,
             cwd=BASE_DIR,
             env=env,
         )
-    except subprocess.TimeoutExpired:
-        return False, "Validación tardó demasiado."
-    except FileNotFoundError:
-        return False, "PHP no está instalado o no está en el PATH."
-    ok = returncode == 0
-    message = stdout if ok else (stderr or "Error al validar la FIEL.")
+        ok = True
+        message = (stdout or "").strip() or "FIEL validada correctamente."
+    except ExternalServiceError as e:
+        ok = False
+        message = (e.internal_message or e.public_message or "Error al validar la FIEL.").strip()
     conn = db()
     try:
         _ensure_sat_credentials_validation_columns(conn)
@@ -2567,6 +2567,25 @@ def get_portal_router(templates):
             )
             conn.commit()
             return JSONResponse({"ok": True, "updated": True})
+        finally:
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+
+    @router.post("/bank/movements/delete-all", response_class=JSONResponse)
+    def portal_bank_movements_delete_all(issuer: dict = Depends(get_portal_issuer)):
+        """Borra todos los movimientos bancarios del emisor actual. Requiere confirmación en el cliente."""
+        issuer_id = int(issuer.get("id") or 0)
+        if issuer_id <= 0:
+            raise HTTPException(status_code=401, detail="Sesión inválida")
+        conn = db()
+        try:
+            cur = conn.execute("DELETE FROM bank_movements WHERE issuer_id = ?", (issuer_id,))
+            deleted = cur.rowcount
+            conn.commit()
+            return JSONResponse({"ok": True, "deleted": deleted})
         finally:
             if conn is not None:
                 try:
