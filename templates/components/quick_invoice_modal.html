@@ -1,12 +1,12 @@
 {# Reusable Quick Invoice modals + pickers (shared across pages). #}
 
 <!-- Modal factura rápida: precálculo editable + Timbrar -->
-<div id="quickInvoiceModal" class="quick-invoice-modal" role="dialog" aria-modal="true" aria-labelledby="quickInvoiceModalTitle" aria-describedby="quickInvoiceModalDesc" aria-label="Factura rápida" hidden>
-  <div class="quick-invoice-modal__backdrop" id="quickInvoiceModalBackdrop"></div>
+<div id="quickInvoiceModal" class="modal quick-invoice-modal" role="dialog" aria-modal="true" aria-labelledby="quickInvoiceModalTitle" aria-describedby="quickInvoiceModalDesc" aria-label="Factura rápida" hidden>
+  <div class="modal__backdrop quick-invoice-modal__backdrop" id="quickInvoiceModalBackdrop" data-close="true"></div>
   <div class="quick-invoice-modal__panel quick-invoice-modal__panel--precalc" id="quickInvoiceModalPanel" tabindex="-1">
     <div class="quick-invoice-modal__header">
       <h2 id="quickInvoiceModalTitle" class="quick-invoice-modal__title">Factura rápida</h2>
-      <button type="button" class="quick-invoice-modal__close" id="quickInvoiceModalClose" aria-label="Cerrar">&times;</button>
+      <button type="button" class="quick-invoice-modal__close" id="quickInvoiceModalClose" aria-label="Cerrar" data-close="true">&times;</button>
     </div>
     <p id="quickInvoiceModalDesc" class="quick-invoice-modal__desc muted">Precálculo editable. Puedes ajustar receptor, concepto e impuestos antes de timbrar.</p>
     <div class="quick-invoice-modal__body">
@@ -136,19 +136,19 @@
     </div>
     <div id="quickInvoiceModalError" class="quick-invoice-modal__error" hidden role="alert"></div>
     <div class="quick-invoice-modal__footer">
-      <button type="button" id="quickInvoiceModalCancel" class="btn btn-ghost">Cancelar</button>
+      <button type="button" id="quickInvoiceModalCancel" class="btn btn-ghost" data-close="true">Cancelar</button>
       <button type="button" id="quickInvoiceModalSubmit" class="btn btn-primary">Timbrar factura</button>
     </div>
   </div>
 </div>
 
 <!-- Modal: añadir cliente -->
-<div id="quickAddCustomerModal" class="quick-invoice-modal" role="dialog" aria-modal="true" aria-labelledby="quickAddCustomerTitle" aria-label="Añadir cliente" hidden>
-  <div class="quick-invoice-modal__backdrop" id="quickAddCustomerBackdrop"></div>
+<div id="quickAddCustomerModal" class="modal quick-invoice-modal" role="dialog" aria-modal="true" aria-labelledby="quickAddCustomerTitle" aria-label="Añadir cliente" hidden>
+  <div class="modal__backdrop quick-invoice-modal__backdrop" id="quickAddCustomerBackdrop" data-close="true"></div>
   <div class="quick-invoice-modal__panel" id="quickAddCustomerPanel" tabindex="-1">
     <div class="quick-invoice-modal__header">
       <h2 id="quickAddCustomerTitle" class="quick-invoice-modal__title">Añadir cliente</h2>
-      <button type="button" class="quick-invoice-modal__close" id="quickAddCustomerClose" aria-label="Cerrar">&times;</button>
+      <button type="button" class="quick-invoice-modal__close" id="quickAddCustomerClose" aria-label="Cerrar" data-close="true">&times;</button>
     </div>
     <div class="quick-invoice-modal__body">
       <div class="quick-form-grid">
@@ -188,19 +188,19 @@
     </div>
     <div id="quickAddCustomerError" class="quick-invoice-modal__error" hidden role="alert"></div>
     <div class="quick-invoice-modal__footer">
-      <button type="button" id="quickAddCustomerCancel" class="btn btn-ghost">Cancelar</button>
+      <button type="button" id="quickAddCustomerCancel" class="btn btn-ghost" data-close="true">Cancelar</button>
       <button type="button" id="quickAddCustomerSave" class="btn btn-primary">Guardar cliente</button>
     </div>
   </div>
 </div>
 
 <!-- Modal: añadir producto -->
-<div id="quickAddProductModal" class="quick-invoice-modal" role="dialog" aria-modal="true" aria-labelledby="quickAddProductTitle" aria-label="Añadir producto" hidden>
-  <div class="quick-invoice-modal__backdrop" id="quickAddProductBackdrop"></div>
+<div id="quickAddProductModal" class="modal quick-invoice-modal" role="dialog" aria-modal="true" aria-labelledby="quickAddProductTitle" aria-label="Añadir producto" hidden>
+  <div class="modal__backdrop quick-invoice-modal__backdrop" id="quickAddProductBackdrop" data-close="true"></div>
   <div class="quick-invoice-modal__panel" id="quickAddProductPanel" tabindex="-1">
     <div class="quick-invoice-modal__header">
       <h2 id="quickAddProductTitle" class="quick-invoice-modal__title">Añadir producto</h2>
-      <button type="button" class="quick-invoice-modal__close" id="quickAddProductClose" aria-label="Cerrar">&times;</button>
+      <button type="button" class="quick-invoice-modal__close" id="quickAddProductClose" aria-label="Cerrar" data-close="true">&times;</button>
     </div>
     <div class="quick-invoice-modal__body">
       <div class="quick-form-grid">
@@ -240,7 +240,7 @@
     </div>
     <div id="quickAddProductError" class="quick-invoice-modal__error" hidden role="alert"></div>
     <div class="quick-invoice-modal__footer">
-      <button type="button" id="quickAddProductCancel" class="btn btn-ghost">Cancelar</button>
+      <button type="button" id="quickAddProductCancel" class="btn btn-ghost" data-close="true">Cancelar</button>
       <button type="button" id="quickAddProductSave" class="btn btn-primary">Guardar producto</button>
     </div>
   </div>
@@ -270,12 +270,12 @@
 </div>
 
 <!-- Modal picker: seleccionar cliente (lupita) -->
-<div id="qiClientPickerModal" class="quick-invoice-modal" role="dialog" aria-modal="true" aria-labelledby="qiClientPickerTitle" aria-label="Seleccionar cliente" hidden>
-  <div class="quick-invoice-modal__backdrop" id="qiClientPickerBackdrop"></div>
+<div id="qiClientPickerModal" class="modal quick-invoice-modal" role="dialog" aria-modal="true" aria-labelledby="qiClientPickerTitle" aria-label="Seleccionar cliente" hidden>
+  <div class="modal__backdrop quick-invoice-modal__backdrop" id="qiClientPickerBackdrop" data-close="true"></div>
   <div class="quick-invoice-modal__panel qi-picker-modal__panel" id="qiClientPickerPanel" tabindex="-1">
     <div class="quick-invoice-modal__header">
       <h2 id="qiClientPickerTitle" class="quick-invoice-modal__title">Seleccionar cliente</h2>
-      <button type="button" class="quick-invoice-modal__close" id="qiClientPickerClose" aria-label="Cerrar">&times;</button>
+      <button type="button" class="quick-invoice-modal__close" id="qiClientPickerClose" aria-label="Cerrar" data-close="true">&times;</button>
     </div>
     <div class="quick-invoice-modal__body">
       <input id="qiClientPickerSearch" class="input" placeholder="Buscar por razón social o RFC…" autocomplete="off" />
@@ -286,12 +286,12 @@
 </div>
 
 <!-- Modal picker: seleccionar producto (lupita) -->
-<div id="qiProductPickerModal" class="quick-invoice-modal" role="dialog" aria-modal="true" aria-labelledby="qiProductPickerTitle" aria-label="Seleccionar producto" hidden>
-  <div class="quick-invoice-modal__backdrop" id="qiProductPickerBackdrop"></div>
+<div id="qiProductPickerModal" class="modal quick-invoice-modal" role="dialog" aria-modal="true" aria-labelledby="qiProductPickerTitle" aria-label="Seleccionar producto" hidden>
+  <div class="modal__backdrop quick-invoice-modal__backdrop" id="qiProductPickerBackdrop" data-close="true"></div>
   <div class="quick-invoice-modal__panel qi-picker-modal__panel" id="qiProductPickerPanel" tabindex="-1">
     <div class="quick-invoice-modal__header">
       <h2 id="qiProductPickerTitle" class="quick-invoice-modal__title">Seleccionar producto</h2>
-      <button type="button" class="quick-invoice-modal__close" id="qiProductPickerClose" aria-label="Cerrar">&times;</button>
+      <button type="button" class="quick-invoice-modal__close" id="qiProductPickerClose" aria-label="Cerrar" data-close="true">&times;</button>
     </div>
     <div class="quick-invoice-modal__body">
       <input id="qiProductPickerSearch" class="input" placeholder="Buscar producto…" autocomplete="off" />

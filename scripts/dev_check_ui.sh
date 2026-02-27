@@ -93,4 +93,15 @@ else
 fi
 
 echo
+echo "-- Guardrail: wrappers con 100vw (warning) --"
+VW_FILES="$(grep -R -n '100vw' "$TEMPL_DIR" "$CSS_DIR" 2>/dev/null || true)"
+VW_COUNT="$(printf "%s" "$VW_FILES" | sed '/^$/d' | wc -l | tr -d ' ')"
+if [[ "$VW_COUNT" -gt 0 ]]; then
+  warn "Encontré $VW_COUNT ocurrencia(s) de 100vw. Esto suele causar overflow horizontal o gaps raros."
+  echo "$VW_FILES" | head -n 30
+else
+  echo "OK: no hay 100vw"
+fi
+
+echo
 echo "== OK (sin fallas críticas) =="

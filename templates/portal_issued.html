@@ -632,36 +632,4 @@
   loadData();
 })();
 </script>
-
-<style>
-.card__header--row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); }
-.card__header-actions { display: flex; align-items: center; gap: var(--space-2); }
-.filters-toggle { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 6px 12px; font-size: 13px; }
-.filters-toggle .icon { flex-shrink: 0; }
-.filters-toggle__badge { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 5px; font-size: 11px; font-weight: 700; line-height: 1; color: var(--text-inverse, #fff); background: var(--primary, #0d9488); border-radius: 9px; }
-.filters-toggle__badge[hidden] { display: none !important; }
-.filters-panel { border-top: 1px solid var(--border); background: var(--surface-hover, rgba(0,0,0,.02)); overflow: hidden; }
-.filters-panel[hidden] { display: none !important; }
-.filters-panel__inner { padding: var(--space-3); display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
-.filters-panel__search { position: relative; flex: 1; min-width: 140px; }
-.filters-panel__search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; opacity: 0.6; pointer-events: none; }
-.filters-panel__search .input { padding-left: 32px; }
-.filters-panel__row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
-.filters-panel__actions { margin-left: auto; }
-.input--compact, .select--compact { font-size: 13px; padding: 6px 10px; min-height: 34px; border-radius: 8px; }
-.input--compact { width: 100%; min-width: 0; }
-.select--compact { min-width: 90px; }
-.filters-panel__row .input--compact { width: 80px; min-width: 80px; }
-.pagination { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-2); }
-@media (max-width: 640px) {
-  .card__header--row { flex-direction: column; align-items: stretch; }
-  .card__header-actions { justify-content: flex-end; }
-  .filters-toggle { align-self: flex-end; }
-  .filters-panel__inner { flex-direction: column; align-items: stretch; padding: var(--space-2); }
-  .filters-panel__search { min-width: 0; }
-  .filters-panel__row { flex-direction: column; width: 100%; }
-  .filters-panel__row .select--compact, .filters-panel__row .input--compact { width: 100%; min-width: 0; }
-  .filters-panel__actions { margin-left: 0; justify-content: flex-end; }
-}
-</style>
 {% endblock %}

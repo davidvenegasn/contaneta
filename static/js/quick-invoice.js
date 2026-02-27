@@ -106,6 +106,32 @@
     _pendingOpenAfterPick: null,
   };
 
+  function openPortal(modalEl, opts) {
+    if (!modalEl) return;
+    if (typeof window.openPortalModal === 'function') return window.openPortalModal(modalEl, opts || {});
+    // fallback legacy
+    try {
+      modalEl.hidden = false;
+      modalEl.classList.add('is-open');
+      modalEl.setAttribute('aria-hidden', 'false');
+      document.body.classList.add('no-scroll');
+      if (typeof window.uiTrapFocus === 'function') window.uiTrapFocus(modalEl);
+    } catch (_) {}
+  }
+
+  function closePortal(modalEl) {
+    if (!modalEl) return;
+    if (typeof window.closePortalModal === 'function') return window.closePortalModal(modalEl);
+    // fallback legacy
+    try {
+      if (typeof window.uiReleaseFocusTrap === 'function') window.uiReleaseFocusTrap();
+      modalEl.hidden = true;
+      modalEl.classList.remove('is-open');
+      modalEl.setAttribute('aria-hidden', 'true');
+      document.body.classList.remove('no-scroll');
+    } catch (_) {}
+  }
+
   function toast(payload) {
     if (window.uiToast) return window.uiToast(payload);
     if (window.portalToast) return window.portalToast(payload);
@@ -368,8 +394,6 @@
   function openPicker(kind, onPick) {
     var isCustomer = kind === 'customer';
     var pickerModal = document.getElementById(isCustomer ? 'qiClientPickerModal' : 'qiProductPickerModal');
-    var backdrop = document.getElementById(isCustomer ? 'qiClientPickerBackdrop' : 'qiProductPickerBackdrop');
-    var closeBtn = document.getElementById(isCustomer ? 'qiClientPickerClose' : 'qiProductPickerClose');
     var panel = document.getElementById(isCustomer ? 'qiClientPickerPanel' : 'qiProductPickerPanel');
     var search = document.getElementById(isCustomer ? 'qiClientPickerSearch' : 'qiProductPickerSearch');
     var listEl = document.getElementById(isCustomer ? 'qiClientPickerList' : 'qiProductPickerList');
@@ -433,23 +457,11 @@
       });
     }
 
-    var removeEsc = null;
     function close() {
-      if (typeof window.uiReleaseFocusTrap === 'function') window.uiReleaseFocusTrap();
-      if (removeEsc) { removeEsc(); removeEsc = null; }
-      pickerModal.hidden = true;
-      pickerModal.setAttribute('hidden', '');
-      document.body.classList.remove('quick-invoice-modal-open');
-      if (opener) opener.focus();
+      closePortal(pickerModal);
     }
 
-    pickerModal.hidden = false;
-    pickerModal.removeAttribute('hidden');
-    document.body.classList.add('quick-invoice-modal-open');
-    removeEsc = (typeof window.uiCloseOnEscape === 'function') ? window.uiCloseOnEscape(pickerModal, close) : null;
-    if (typeof window.uiTrapFocus === 'function') window.uiTrapFocus(pickerModal);
-    if (backdrop) backdrop.onclick = close;
-    if (closeBtn) closeBtn.onclick = close;
+    openPortal(pickerModal, { returnFocusEl: opener || null });
     render('');
     search.value = '';
     search.oninput = function () { render(search.value); };
@@ -669,25 +681,20 @@
     }
     updateModalTotals();
 
-    modal.hidden = false;
-    modal.removeAttribute('hidden');
-    document.body.classList.add('quick-invoice-modal-open');
-    if (typeof window.uiCloseOnEscape === 'function') window._quickRemoveEscape = window.uiCloseOnEscape(modal, closeQuickModal);
-    if (typeof window.uiTrapFocus === 'function') window.uiTrapFocus(modal);
-    else setTimeout(function () { try { (modalQty || document.getElementById('quickInvoiceModalPanel')).focus(); } catch (_) {} }, 80);
+    openPortal(modal, {
+      returnFocusEl: homeBtn || null,
+      onClose: function () {
+        state.presetLines = null;
+        if (modalItemsSummary) { modalItemsSummary.hidden = true; modalItemsSummary.innerHTML = ''; }
+        if (modalSingleConcept) modalSingleConcept.hidden = false;
+      }
+    });
+    setTimeout(function () { try { (modalQty || document.getElementById('quickInvoiceModalPanel')).focus(); } catch (_) {} }, 80);
   }
 
   function closeQuickModal() {
     if (!modal) return;
-    if (typeof window.uiReleaseFocusTrap === 'function') window.uiReleaseFocusTrap();
-    if (window._quickRemoveEscape) { window._quickRemoveEscape(); window._quickRemoveEscape = null; }
-    modal.hidden = true;
-    modal.setAttribute('hidden', '');
-    document.body.classList.remove('quick-invoice-modal-open');
-    state.presetLines = null;
-    if (modalItemsSummary) { modalItemsSummary.hidden = true; modalItemsSummary.innerHTML = ''; }
-    if (modalSingleConcept) modalSingleConcept.hidden = false;
-    if (homeBtn) homeBtn.focus();
+    closePortal(modal);
   }
 
   function open(options) {
@@ -926,9 +933,6 @@
 
   function openAddCustomerModal() {
     if (!addCustomerModal) return;
-    addCustomerModal.hidden = false;
-    addCustomerModal.removeAttribute('hidden');
-    document.body.classList.add('quick-invoice-modal-open');
     if (addCustomerError) { addCustomerError.hidden = true; addCustomerError.textContent = ''; }
     if (addCustomerRfc) addCustomerRfc.value = '';
     if (addCustomerName) addCustomerName.value = '';
@@ -937,41 +941,40 @@
     if (addCustomerAlias) addCustomerAlias.value = '';
     if (addCustomerTaxSystem) addCustomerTaxSystem.value = '';
     if (addCustomerUsoCfdi) addCustomerUsoCfdi.value = (state.defaults && state.defaults.uso_cfdi) ? String(state.defaults.uso_cfdi) : 'G03';
-    if (typeof window.uiTrapFocus === 'function') window.uiTrapFocus(addCustomerModal);
-    setTimeout(function () { try { if (addCustomerRfc) addCustomerRfc.focus(); } catch (_) {} }, 50);
+    openPortal(addCustomerModal, {
+      returnFocusEl: addCustomerBtn || null,
+      onClose: function () {
+        if (addCustomerError) { addCustomerError.hidden = true; addCustomerError.textContent = ''; }
+      }
+    });
+    setTimeout(function () { try { if (addCustomerRfc) addCustomerRfc.focus(); } catch (_) {} }, 80);
   }
 
   function closeAddCustomerModal() {
     if (!addCustomerModal) return;
-    if (typeof window.uiReleaseFocusTrap === 'function') window.uiReleaseFocusTrap();
-    addCustomerModal.hidden = true;
-    addCustomerModal.setAttribute('hidden', '');
-    document.body.classList.remove('quick-invoice-modal-open');
-    if (addCustomerBtn) addCustomerBtn.focus();
+    closePortal(addCustomerModal);
   }
 
   function openAddProductModal() {
     if (!addProductModal) return;
-    addProductModal.hidden = false;
-    addProductModal.removeAttribute('hidden');
-    document.body.classList.add('quick-invoice-modal-open');
     if (addProductError) { addProductError.hidden = true; addProductError.textContent = ''; }
     if (addProductDesc) addProductDesc.value = '';
     if (addProductKey) addProductKey.value = '';
     if (addProductUnitKey) addProductUnitKey.value = 'E48';
     if (addProductUnitPrice) addProductUnitPrice.value = '';
     if (addProductIvaRate) addProductIvaRate.value = '0.16';
-    if (typeof window.uiTrapFocus === 'function') window.uiTrapFocus(addProductModal);
-    setTimeout(function () { try { if (addProductDesc) addProductDesc.focus(); } catch (_) {} }, 50);
+    openPortal(addProductModal, {
+      returnFocusEl: addProductBtn || null,
+      onClose: function () {
+        if (addProductError) { addProductError.hidden = true; addProductError.textContent = ''; }
+      }
+    });
+    setTimeout(function () { try { if (addProductDesc) addProductDesc.focus(); } catch (_) {} }, 80);
   }
 
   function closeAddProductModal() {
     if (!addProductModal) return;
-    if (typeof window.uiReleaseFocusTrap === 'function') window.uiReleaseFocusTrap();
-    addProductModal.hidden = true;
-    addProductModal.setAttribute('hidden', '');
-    document.body.classList.remove('quick-invoice-modal-open');
-    if (addProductBtn) addProductBtn.focus();
+    closePortal(addProductModal);
   }
 
   function bindGlobalEvents() {
@@ -993,11 +996,6 @@
 
     if (customerHidden) customerHidden.addEventListener('change', setHomeBtnState);
     if (productHidden) productHidden.addEventListener('change', setHomeBtnState);
-
-    // Quick modal close
-    if (modalBackdrop) modalBackdrop.addEventListener('click', closeQuickModal);
-    if (modalClose) modalClose.addEventListener('click', closeQuickModal);
-    if (modalCancel) modalCancel.addEventListener('click', closeQuickModal);
 
     [modalQty, modalUnitPrice, modalIvaRate, modalIsrRetRate, modalIvaRetRate].forEach(function (el) {
       if (el) el.addEventListener('input', updateModalTotals);
@@ -1021,16 +1019,9 @@
     }
     if (prodservModalInput) prodservModalInput.addEventListener('input', debounce(function () { searchQuickProdserv(prodservModalInput.value); }, 250));
 
-    // Add customer/product open/close
+    // Add customer/product open
     if (addCustomerBtn) addCustomerBtn.addEventListener('click', function (e) { e.preventDefault(); openAddCustomerModal(); });
-    if (addCustomerBackdrop) addCustomerBackdrop.addEventListener('click', closeAddCustomerModal);
-    if (addCustomerClose) addCustomerClose.addEventListener('click', closeAddCustomerModal);
-    if (addCustomerCancel) addCustomerCancel.addEventListener('click', closeAddCustomerModal);
-
     if (addProductBtn) addProductBtn.addEventListener('click', function (e) { e.preventDefault(); openAddProductModal(); });
-    if (addProductBackdrop) addProductBackdrop.addEventListener('click', closeAddProductModal);
-    if (addProductClose) addProductClose.addEventListener('click', closeAddProductModal);
-    if (addProductCancel) addProductCancel.addEventListener('click', closeAddProductModal);
     if (addProductProdservBtn) addProductProdservBtn.addEventListener('click', function () { openQuickProdservModal('quickProductKey'); });
 
     // Save customer
