@@ -10,7 +10,7 @@ from fastapi.responses import RedirectResponse, HTMLResponse
 from config import DB_PATH
 from database import db, db_rows
 from migrations_runner import apply_migrations
-from services import session, issuers, users, audit, csrf as csrf_service
+from services import session, issuers, users, audit, csrf as csrf_service, error_events as error_events_service
 
 
 def _get_session_user_and_issuer(request: Request) -> tuple[int, int, int | None]:
@@ -47,6 +47,35 @@ def get_admin_router(templates):
 
     def _ym_now():
         return datetime.now().strftime("%Y-%m")
+
+    def _ops_observability_context() -> dict:
+        try:
+            error_events = error_events_service.list_error_events(limit=50)
+        except Exception:
+            error_events = []
+        try:
+            jobs_recent = db_rows(
+                """
+                SELECT id, issuer_id, name, status, progress, message, created_at, updated_at
+                FROM jobs
+                ORDER BY id DESC
+                LIMIT 50
+                """
+            )
+        except Exception:
+            jobs_recent = []
+        try:
+            sat_recent = db_rows(
+                """
+                SELECT id, issuer_id, status, started_at, finished_at, last_error
+                FROM sat_jobs
+                ORDER BY id DESC
+                LIMIT 20
+                """
+            )
+        except Exception:
+            sat_recent = []
+        return {"error_events": error_events, "jobs_recent": jobs_recent, "sat_recent": sat_recent}
 
     # ---------- GET: Dashboard ----------
     @router.get("", response_class=HTMLResponse)
@@ -239,7 +268,14 @@ def get_admin_router(templates):
     ):
         return templates.TemplateResponse(
             "admin_ops.html",
-            {"request": request, "active_page": "ops", "message": None, "result": None, "csrf_token": csrf_service.generate_csrf_token()},
+            {
+                "request": request,
+                "active_page": "ops",
+                "message": None,
+                "result": None,
+                "csrf_token": csrf_service.generate_csrf_token(),
+                **_ops_observability_context(),
+            },
         )
 
     @router.post("/ops", response_class=HTMLResponse)
@@ -375,6 +411,8 @@ def get_admin_router(templates):
                 "message": "Listo." if message_ok else "Error (ver resultado).",
                 "message_ok": message_ok,
                 "result": result_text,
+                "csrf_token": csrf_service.generate_csrf_token(),
+                **_ops_observability_context(),
             },
         )
 

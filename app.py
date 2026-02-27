@@ -174,6 +174,17 @@ async def not_found_handler(request: Request, _exc):
 async def server_error_handler(request: Request, exc: Exception):
     """Errores no controlados: log completo, respuesta genérica al cliente (sin stack ni rutas internas)."""
     logging.exception("Unhandled error: %s", exc)
+    try:
+        from services import error_events as error_events_service
+
+        error_events_service.log_error_event(
+            request=request,
+            status_code=500,
+            error_code="INTERNAL_ERROR",
+            message=f"Unhandled {type(exc).__name__}",
+        )
+    except Exception:
+        pass
     accept = (request.headers.get("accept") or "").lower()
     if "text/html" in accept:
         rid = getattr(request.state, "request_id", request_id_ctx.get())
@@ -194,6 +205,17 @@ async def app_error_handler(request: Request, exc: AppError):
     # Log interno (sin filtrar) para debug. No exponer internal_message al usuario.
     if exc.status_code >= 500:
         logging.error("AppError %s (%s): %s", exc.code, exc.status_code, exc.internal_message or exc.public_message, exc_info=True)
+        try:
+            from services import error_events as error_events_service
+
+            error_events_service.log_error_event(
+                request=request,
+                status_code=exc.status_code,
+                error_code=exc.code,
+                message=exc.public_message,
+            )
+        except Exception:
+            pass
     else:
         logging.info("AppError %s (%s): %s", exc.code, exc.status_code, exc.internal_message or exc.public_message)
 
@@ -213,6 +235,17 @@ async def app_error_handler(request: Request, exc: AppError):
 async def sqlite_error_handler(request: Request, exc: sqlite3.Error):
     # DB failures son 500 (no 400)
     logging.exception("SQLite error: %s", exc)
+    try:
+        from services import error_events as error_events_service
+
+        error_events_service.log_error_event(
+            request=request,
+            status_code=500,
+            error_code="DB_ERROR",
+            message="SQLite error",
+        )
+    except Exception:
+        pass
     accept = (request.headers.get("accept") or "").lower()
     path = (request.url.path or "")
     is_api = path.startswith("/api/") or path.startswith("/download/")
@@ -231,6 +264,17 @@ async def sqlite_error_handler(request: Request, exc: sqlite3.Error):
 @app.exception_handler(subprocess.CalledProcessError)
 async def subprocess_error_handler(request: Request, exc: subprocess.CalledProcessError):
     logging.exception("Subprocess error: %s", exc)
+    try:
+        from services import error_events as error_events_service
+
+        error_events_service.log_error_event(
+            request=request,
+            status_code=500,
+            error_code="SUBPROCESS_ERROR",
+            message="Subprocess error",
+        )
+    except Exception:
+        pass
     path = (request.url.path or "")
     is_api = path.startswith("/api/") or path.startswith("/download/")
     if is_api:

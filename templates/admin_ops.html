@@ -27,6 +27,108 @@
     </form>
   </div>
 
+  <div class="card">
+    <h2>Observabilidad</h2>
+
+    <h3 style="margin-top: 10px;">Últimos errores (5xx)</h3>
+    {% if error_events and error_events|length > 0 %}
+      <div style="overflow:auto;">
+        <table class="table" style="min-width: 820px;">
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Status</th>
+              <th>Código</th>
+              <th>Ruta</th>
+              <th>Issuer</th>
+              <th>Req ID</th>
+              <th>Mensaje</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for e in error_events %}
+              <tr>
+                <td class="muted">{{ e.created_at or '' }}</td>
+                <td>{{ e.status_code or '' }}</td>
+                <td><span class="badge badge--neutral badge--xs">{{ e.error_code or '' }}</span></td>
+                <td><code>{{ e.method or '' }} {{ e.path or '' }}</code></td>
+                <td class="muted">{{ e.issuer_id or '' }}</td>
+                <td><code>{{ e.request_id or '' }}</code></td>
+                <td class="muted">{{ (e.message or '')[:160] }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="muted">Sin eventos aún.</p>
+    {% endif %}
+
+    <h3 style="margin-top: 16px;">Jobs recientes</h3>
+    {% if jobs_recent and jobs_recent|length > 0 %}
+      <div style="overflow:auto;">
+        <table class="table" style="min-width: 760px;">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Issuer</th>
+              <th>Nombre</th>
+              <th>Status</th>
+              <th>Progreso</th>
+              <th>Actualizado</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for j in jobs_recent %}
+              <tr>
+                <td>{{ j.id }}</td>
+                <td class="muted">{{ j.issuer_id }}</td>
+                <td>{{ j.name }}</td>
+                <td><span class="badge badge--neutral badge--xs">{{ j.status }}</span></td>
+                <td class="muted">{{ j.progress }}%</td>
+                <td class="muted">{{ j.updated_at or j.created_at or '' }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="muted">Sin jobs.</p>
+    {% endif %}
+
+    <h3 style="margin-top: 16px;">SAT sync reciente</h3>
+    {% if sat_recent and sat_recent|length > 0 %}
+      <div style="overflow:auto;">
+        <table class="table" style="min-width: 840px;">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Issuer</th>
+              <th>Status</th>
+              <th>Inicio</th>
+              <th>Fin</th>
+              <th>Error</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for s in sat_recent %}
+              <tr>
+                <td>{{ s.id }}</td>
+                <td class="muted">{{ s.issuer_id }}</td>
+                <td><span class="badge badge--neutral badge--xs">{{ s.status }}</span></td>
+                <td class="muted">{{ s.started_at or '' }}</td>
+                <td class="muted">{{ s.finished_at or '' }}</td>
+                <td class="muted">{{ (s.last_error or '')[:160] }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="muted">Sin registros (sat_jobs no disponible o vacío).</p>
+    {% endif %}
+  </div>
+
   {% if result %}
   <div class="card">
     <h2>Resultado</h2>
