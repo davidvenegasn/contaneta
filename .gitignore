@@ -1,15 +1,37 @@
-.venv/
-__pycache__/
-*.pyc
 .DS_Store
 
-# data local
+# --- Python / venv / caches ---
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# --- Logs / backups / residuos ---
+*.log
+*.bak
+*.bad
+
+# --- SQLite local (NO versionar) ---
 invoicing.db
 invoicing.db-*
-storage/
+invoicing.db.*
+sqlite_aux_backup/
+
+# --- Storage local (NO versionar) ---
+storage/**
+!storage/
+!storage/.gitkeep
+!storage/README.md
+
+# --- Keys/certs (NUNCA versionar) ---
+keys/**
+!keys/
+!keys/README.md
+
+# --- Backups locales (NO versionar) ---
 backup/
 
-# secrets
+# --- Secrets ---
 .env
 
 # Snapshot de respaldo: no editar ni commitear (ver docs/GUARDRAILS.md)
