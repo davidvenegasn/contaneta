@@ -1,0 +1,249 @@
+{% extends "base_portal.html" %}
+{% set title = title|default('Mis cuentas bancarias') %}
+
+{% block content %}
+  <div class="card ui-card">
+    <div class="card__header card__header--row ui-card__header">
+      <h3 class="card__title section-title">Mis cuentas bancarias</h3>
+      <div class="u-flex u-gap-2 u-items-center">
+        <a href="/portal/movimientos" class="btn btn--sm btn--secondary">Ver movimientos</a>
+        <button type="button" class="btn btn--sm btn-primary" id="bankAccAddBtn">Agregar cuenta</button>
+      </div>
+    </div>
+    <div class="card__body ui-card__body">
+      <p class="muted u-text-sm">
+        Estas cuentas se usan para detectar <strong>traspasos propios</strong> y evitar confundirlos como ingreso/gasto.
+      </p>
+
+      {% if accounts and accounts|length > 0 %}
+      <div class="table-wrap">
+        <table class="table ui-table ui-table--zebra">
+          <thead>
+            <tr>
+              <th>Alias</th>
+              <th>Banco</th>
+              <th>CLABE</th>
+              <th>Últimos 4</th>
+              <th>Titular</th>
+              <th>RFC</th>
+              <th>Activa</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for a in accounts %}
+            <tr>
+              <td class="u-fw-650">{{ a.alias or '—' }}</td>
+              <td class="muted">{{ a.bank_name or '—' }}</td>
+              <td class="muted font-mono">
+                {% if a.clabe %}••••••••••••••{{ (a.clabe|string)[-4:] }}{% else %}—{% endif %}
+              </td>
+              <td class="muted font-mono">{{ a.account_last4 or '—' }}</td>
+              <td class="muted">{{ a.holder_name or '—' }}</td>
+              <td class="muted font-mono">{{ a.rfc_titular or '—' }}</td>
+              <td>{{ 'Sí' if a.is_active else 'No' }}</td>
+              <td>
+                <div class="u-flex u-gap-2 u-items-center">
+                  <button
+                    type="button"
+                    class="btn btn--sm btn--secondary js-edit"
+                    data-id="{{ a.id }}"
+                    data-alias="{{ (a.alias or '')|e }}"
+                    data-bank="{{ (a.bank_name or '')|e }}"
+                    data-clabe="{{ (a.clabe or '')|e }}"
+                    data-last4="{{ (a.account_last4 or '')|e }}"
+                    data-holder="{{ (a.holder_name or '')|e }}"
+                    data-rfc="{{ (a.rfc_titular or '')|e }}"
+                    data-active="{{ 1 if a.is_active else 0 }}"
+                  >Editar</button>
+                  <button type="button" class="btn btn--sm btn--danger js-delete" data-id="{{ a.id }}" data-alias="{{ (a.alias or '')|e }}">Borrar</button>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="empty-state">
+        <h4>Sin cuentas registradas</h4>
+        <p class="muted">Agrega al menos una cuenta para poder detectar traspasos propios.</p>
+        <button type="button" class="btn btn-primary" id="bankAccAddBtnEmpty">Agregar cuenta</button>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="modal" id="bankAccModal" role="dialog" aria-modal="true" aria-label="Cuenta bancaria" hidden>
+    <div class="modal__backdrop" data-close="true"></div>
+    <div class="modal__panel" tabindex="-1">
+      <div class="modal__header">
+        <h2 class="modal__title" id="bankAccModalTitle">Cuenta bancaria</h2>
+        <button type="button" class="icon-btn" data-close="true" aria-label="Cerrar">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
+      </div>
+      <div class="modal__body">
+        <input type="hidden" id="bankAccId" value="" />
+        <div class="form-grid">
+          <div class="form-row">
+            <label class="label" for="bankAccAlias">Alias</label>
+            <input class="input" id="bankAccAlias" type="text" placeholder="Ej. BBVA Negocio" />
+          </div>
+          <div class="form-row">
+            <label class="label" for="bankAccBank">Banco</label>
+            <input class="input" id="bankAccBank" type="text" placeholder="Ej. BBVA" />
+          </div>
+          <div class="form-row">
+            <label class="label" for="bankAccClabe">CLABE (opcional)</label>
+            <input class="input" id="bankAccClabe" type="text" inputmode="numeric" placeholder="18 dígitos" />
+          </div>
+          <div class="form-row">
+            <label class="label" for="bankAccLast4">Últimos 4 (opcional)</label>
+            <input class="input" id="bankAccLast4" type="text" inputmode="numeric" placeholder="1234" maxlength="4" />
+          </div>
+          <div class="form-row">
+            <label class="label" for="bankAccHolder">Titular (opcional)</label>
+            <input class="input" id="bankAccHolder" type="text" placeholder="Nombre del titular" />
+          </div>
+          <div class="form-row">
+            <label class="label" for="bankAccRfc">RFC titular (opcional)</label>
+            <input class="input" id="bankAccRfc" type="text" placeholder="RFC" />
+          </div>
+          <div class="form-row">
+            <label class="u-flex u-gap-2 u-items-center muted">
+              <input type="checkbox" id="bankAccActive" checked />
+              Cuenta activa
+            </label>
+          </div>
+        </div>
+      </div>
+      <div class="modal__footer">
+        <button type="button" class="btn btn--secondary" data-close="true">Cancelar</button>
+        <button type="button" class="btn btn-primary" id="bankAccSaveBtn">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  (function () {
+    var addBtn = document.getElementById('bankAccAddBtn');
+    var addBtnEmpty = document.getElementById('bankAccAddBtnEmpty');
+    var modal = document.getElementById('bankAccModal');
+    var saveBtn = document.getElementById('bankAccSaveBtn');
+    var titleEl = document.getElementById('bankAccModalTitle');
+
+    function csrfToken() {
+      var m = document.querySelector('meta[name="csrf-token"]');
+      return m ? (m.getAttribute('content') || '') : '';
+    }
+
+    function openModal(mode, data) {
+      var d = data || {};
+      document.getElementById('bankAccId').value = d.id || '';
+      document.getElementById('bankAccAlias').value = d.alias || '';
+      document.getElementById('bankAccBank').value = d.bank_name || '';
+      document.getElementById('bankAccClabe').value = d.clabe || '';
+      document.getElementById('bankAccLast4').value = d.account_last4 || '';
+      document.getElementById('bankAccHolder').value = d.holder_name || '';
+      document.getElementById('bankAccRfc').value = d.rfc_titular || '';
+      document.getElementById('bankAccActive').checked = (d.is_active !== 0 && d.is_active !== false);
+      titleEl.textContent = mode === 'edit' ? 'Editar cuenta' : 'Agregar cuenta';
+      if (window.openPortalModal) window.openPortalModal(modal);
+      else modal.hidden = false;
+    }
+
+    function closeModal() {
+      if (window.closePortalModal) window.closePortalModal(modal);
+      else modal.hidden = true;
+    }
+
+    function reload() { window.location.reload(); }
+
+    function jsonHeaders() {
+      var h = { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' };
+      var csrf = csrfToken();
+      if (csrf) h['X-CSRF-Token'] = csrf;
+      return h;
+    }
+
+    function getFormPayload() {
+      return {
+        alias: document.getElementById('bankAccAlias').value.trim(),
+        bank_name: document.getElementById('bankAccBank').value.trim(),
+        clabe: document.getElementById('bankAccClabe').value.trim() || null,
+        account_last4: document.getElementById('bankAccLast4').value.trim() || null,
+        holder_name: document.getElementById('bankAccHolder').value.trim() || null,
+        rfc_titular: document.getElementById('bankAccRfc').value.trim() || null,
+        is_active: !!document.getElementById('bankAccActive').checked
+      };
+    }
+
+    if (addBtn) addBtn.addEventListener('click', function () { openModal('create'); });
+    if (addBtnEmpty) addBtnEmpty.addEventListener('click', function () { openModal('create'); });
+
+    document.querySelectorAll('.js-edit').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        openModal('edit', {
+          id: btn.getAttribute('data-id'),
+          alias: btn.getAttribute('data-alias'),
+          bank_name: btn.getAttribute('data-bank'),
+          clabe: btn.getAttribute('data-clabe'),
+          account_last4: btn.getAttribute('data-last4'),
+          holder_name: btn.getAttribute('data-holder'),
+          rfc_titular: btn.getAttribute('data-rfc'),
+          is_active: parseInt(btn.getAttribute('data-active') || '1', 10)
+        });
+      });
+    });
+
+    document.querySelectorAll('.js-delete').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var id = btn.getAttribute('data-id');
+        var alias = btn.getAttribute('data-alias') || 'esta cuenta';
+        var confirmFn = window.portalConfirm || window.uiConfirm;
+        (confirmFn ? confirmFn({ title: '¿Borrar cuenta?', message: 'Se borrará ' + alias + '.', confirmLabel: 'Borrar', cancelLabel: 'Cancelar' }) : Promise.resolve(confirm('¿Borrar cuenta?')))
+          .then(function (ok) {
+            if (!ok) return;
+            fetch('/portal/bank/accounts/' + encodeURIComponent(id), { method: 'DELETE', headers: jsonHeaders() })
+              .then(function (r) { if (!r.ok) throw new Error('Error'); return r.json(); })
+              .then(function (data) { if (data && data.ok) { if (window.toast) window.toast.success('Cuenta borrada'); reload(); } })
+              .catch(function () { if (window.toast) window.toast.error('No se pudo borrar'); });
+          });
+      });
+    });
+
+    if (saveBtn) saveBtn.addEventListener('click', function () {
+      var id = (document.getElementById('bankAccId').value || '').trim();
+      var payload = getFormPayload();
+      if (!payload.alias || !payload.bank_name) {
+        if (window.toast) window.toast.error('Alias y banco son obligatorios');
+        return;
+      }
+      saveBtn.disabled = true;
+      var url = id ? ('/portal/bank/accounts/' + encodeURIComponent(id)) : '/portal/bank/accounts';
+      var method = id ? 'PUT' : 'POST';
+      var body = id ? payload : {
+        alias: payload.alias,
+        bank_name: payload.bank_name,
+        clabe: payload.clabe,
+        account_last4: payload.account_last4,
+        holder_name: payload.holder_name,
+        rfc_titular: payload.rfc_titular,
+        is_active: payload.is_active
+      };
+      fetch(url, { method: method, headers: jsonHeaders(), body: JSON.stringify(body) })
+        .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, data: j }; }); })
+        .then(function (res) {
+          if (!res.ok || !res.data || !res.data.ok) throw new Error('Error');
+          if (window.toast) window.toast.success('Guardado');
+          closeModal();
+          reload();
+        })
+        .catch(function () { if (window.toast) window.toast.error('No se pudo guardar'); })
+        .finally(function () { saveBtn.disabled = false; });
+    });
+  })();
+  </script>
+{% endblock %}
+

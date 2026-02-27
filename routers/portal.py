@@ -27,7 +27,7 @@ from services.bank_parse_preview import parse_bank_pdf_to_movements_preview, rec
 from services.bank_preview_pipeline import parse_bank_statement_preview
 from services.bank_preview_models import compute_dedupe_fingerprint
 from services.catalog_from_cfdi import backfill_catalog_from_existing_cfdi
-from services.bank_accounts import list_active_accounts as bank_list_accounts, get_account as bank_get_account, create_account as bank_create_account, update_account as bank_update_account, delete_account as bank_delete_account
+from services.bank_accounts import list_active_accounts as bank_list_accounts, list_all_accounts as bank_list_all_accounts, get_account as bank_get_account, create_account as bank_create_account, update_account as bank_update_account, delete_account as bank_delete_account
 from services.bank_own_accounts import detect_own_account_transfer
 from services.bank_statement_ingest import ingest_bank_statement, extract_statement_metadata, validate_statement_ownership, commit_preview_to_db
 from services.bank_cfdi_matching import find_cfdi_candidates, save_suggested_matches, confirm_match as match_confirm, reject_match as match_reject
@@ -2454,6 +2454,22 @@ def get_portal_router(templates):
         accounts = bank_list_accounts(int(issuer["id"]))
         return JSONResponse({"ok": True, "accounts": accounts})
 
+    @router.get("/bank/accounts/manage", response_class=HTMLResponse)
+    def portal_bank_accounts_manage(request: Request, issuer: dict = Depends(get_portal_issuer)):
+        """Pantalla simple: Mis cuentas bancarias (config para detectar traspasos propios)."""
+        issuer_id = int(issuer.get("id") or 0)
+        if issuer_id <= 0:
+            raise HTTPException(status_code=401, detail="Sesión inválida")
+        accounts = bank_list_all_accounts(issuer_id)
+        return _render_portal(
+            request,
+            issuer=issuer,
+            template_name="portal_bank_accounts.html",
+            active_page="bank_accounts",
+            title="Mis cuentas bancarias",
+            extra={"accounts": accounts or []},
+        )
+
     @router.post("/bank/accounts", response_class=JSONResponse)
     def portal_bank_accounts_create(
         issuer: dict = Depends(get_portal_issuer),
@@ -3339,6 +3355,7 @@ def get_portal_router(templates):
         cfdi_match_status: Optional[str] = Query(None, description="pending, suggested, confirmed, rejected"),
         min_confidence: Optional[int] = Query(None, ge=0, le=100),
         search: Optional[str] = Query(None),
+        hide_own_transfers: Optional[int] = Query(None, description="1 para ocultar traspasos propios"),
         limit: int = Query(200, ge=1, le=500),
         offset: int = Query(0, ge=0, le=MAX_LIST_OFFSET),
     ):
@@ -3390,6 +3407,8 @@ def get_portal_router(templates):
             if categoria:
                 where_clauses.append("categoria = ?")
                 params.append(categoria.strip())
+            if hide_own_transfers:
+                where_clauses.append("COALESCE(categoria,'') != 'CUENTA_PROPIA'")
             if cfdi_match_status and has_column(conn, "bank_movements", "cfdi_match_status"):
                 where_clauses.append("cfdi_match_status = ?")
                 params.append(cfdi_match_status.strip().lower())
@@ -3579,6 +3598,7 @@ def get_portal_router(templates):
                 cfdi_match_status=cfdi_match_status or "",
                 min_confidence=min_confidence,
                 search=search or "",
+                hide_own_transfers=1 if hide_own_transfers else 0,
                 statements_opt=statements_opt,
             )
         except Exception as e:
