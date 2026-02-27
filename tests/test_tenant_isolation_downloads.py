@@ -36,6 +36,11 @@ UUID_A = "aaaaaaaa-bbbb-4ccc-d000-000000000001"
 UUID_B = "bbbbbbbb-cccc-4ddd-d000-000000000002"
 XML_FIXTURE_REL = "scripts/fixtures/minimal.xml"
 
+ISSUER_A = 201
+ISSUER_B = 202
+USER_A = 201
+USER_B = 202
+
 
 def _ensure_fixture():
     path = os.path.join(BASE_DIR, XML_FIXTURE_REL)
@@ -49,31 +54,41 @@ def _insert_tenant_fixtures():
     _ensure_fixture()
     conn = db()
     try:
-        conn.execute("DELETE FROM sat_cfdi WHERE issuer_id IN (1, 2)")
-        conn.execute("DELETE FROM memberships WHERE issuer_id IN (1, 2)")
-        conn.execute("DELETE FROM users WHERE id IN (1, 2)")
-        conn.execute("DELETE FROM issuers WHERE id IN (1, 2)")
+        # Limpiar solo nuestras fixtures (IDs altos para evitar colisiones con otros tests)
+        conn.execute("DELETE FROM sat_cfdi WHERE issuer_id IN (?, ?)", (ISSUER_A, ISSUER_B))
+        conn.execute("DELETE FROM memberships WHERE user_id IN (?, ?) OR issuer_id IN (?, ?)", (USER_A, USER_B, ISSUER_A, ISSUER_B))
+
         conn.execute(
-            "INSERT INTO issuers (id, rfc, razon_social, active, created_at, updated_at) VALUES (1, 'TENANTA001', 'A', 1, datetime('now'), datetime('now'))"
+            "INSERT OR IGNORE INTO issuers (id, rfc, razon_social, active, created_at, updated_at) VALUES (?, 'TENANTA201', 'A', 1, datetime('now'), datetime('now'))",
+            (ISSUER_A,),
         )
         conn.execute(
-            "INSERT INTO issuers (id, rfc, razon_social, active, created_at, updated_at) VALUES (2, 'TENANTB002', 'B', 1, datetime('now'), datetime('now'))"
+            "INSERT OR IGNORE INTO issuers (id, rfc, razon_social, active, created_at, updated_at) VALUES (?, 'TENANTB202', 'B', 1, datetime('now'), datetime('now'))",
+            (ISSUER_B,),
         )
         conn.execute(
-            "INSERT INTO users (id, email, password_hash, created_at) VALUES (1, 'a@test.local', '$2b$12$x', datetime('now'))"
+            "INSERT OR IGNORE INTO users (id, email, password_hash, created_at) VALUES (?, 'a201@test.local', '$2b$12$x', datetime('now'))",
+            (USER_A,),
         )
         conn.execute(
-            "INSERT INTO users (id, email, password_hash, created_at) VALUES (2, 'b@test.local', '$2b$12$x', datetime('now'))"
-        )
-        conn.execute("INSERT INTO memberships (user_id, issuer_id, role, created_at) VALUES (1, 1, 'owner', datetime('now'))")
-        conn.execute("INSERT INTO memberships (user_id, issuer_id, role, created_at) VALUES (2, 2, 'owner', datetime('now'))")
-        conn.execute(
-            "INSERT INTO sat_cfdi (issuer_id, direction, uuid, xml_path, status, created_at, updated_at) VALUES (1, 'issued', ?, ?, 'Vigente', datetime('now'), datetime('now'))",
-            (UUID_A, XML_FIXTURE_REL),
+            "INSERT OR IGNORE INTO users (id, email, password_hash, created_at) VALUES (?, 'b202@test.local', '$2b$12$x', datetime('now'))",
+            (USER_B,),
         )
         conn.execute(
-            "INSERT INTO sat_cfdi (issuer_id, direction, uuid, xml_path, status, created_at, updated_at) VALUES (2, 'issued', ?, ?, 'Vigente', datetime('now'), datetime('now'))",
-            (UUID_B, XML_FIXTURE_REL),
+            "INSERT INTO memberships (user_id, issuer_id, role, created_at) VALUES (?, ?, 'owner', datetime('now'))",
+            (USER_A, ISSUER_A),
+        )
+        conn.execute(
+            "INSERT INTO memberships (user_id, issuer_id, role, created_at) VALUES (?, ?, 'owner', datetime('now'))",
+            (USER_B, ISSUER_B),
+        )
+        conn.execute(
+            "INSERT INTO sat_cfdi (issuer_id, direction, uuid, xml_path, status, created_at, updated_at) VALUES (?, 'issued', ?, ?, 'Vigente', datetime('now'), datetime('now'))",
+            (ISSUER_A, UUID_A, XML_FIXTURE_REL),
+        )
+        conn.execute(
+            "INSERT INTO sat_cfdi (issuer_id, direction, uuid, xml_path, status, created_at, updated_at) VALUES (?, 'issued', ?, ?, 'Vigente', datetime('now'), datetime('now'))",
+            (ISSUER_B, UUID_B, XML_FIXTURE_REL),
         )
         conn.commit()
     finally:
@@ -88,27 +103,27 @@ def tenant_client():
 
 def test_tenant_a_cannot_download_tenant_b_xml(tenant_client):
     """A (issuer 1) no puede descargar XML del UUID de B (issuer 2)."""
-    cookie_a = make_session_cookie(issuer_id=1, user_id=1)
+    cookie_a = make_session_cookie(issuer_id=ISSUER_A, user_id=USER_A)
     r = tenant_client.get(f"/portal/sat/xml/{UUID_B}", cookies=cookie_a)
     assert r.status_code == 404, f"Esperado 404, obtuvo {r.status_code}"
 
 
 def test_tenant_a_can_download_own_xml(tenant_client):
     """A puede descargar su propio XML."""
-    cookie_a = make_session_cookie(issuer_id=1, user_id=1)
+    cookie_a = make_session_cookie(issuer_id=ISSUER_A, user_id=USER_A)
     r = tenant_client.get(f"/portal/sat/xml/{UUID_A}", cookies=cookie_a)
     assert r.status_code == 200, f"Esperado 200, obtuvo {r.status_code}"
 
 
 def test_tenant_b_cannot_download_tenant_a_xml(tenant_client):
     """B (issuer 2) no puede descargar XML del UUID de A (issuer 1)."""
-    cookie_b = make_session_cookie(issuer_id=2, user_id=2)
+    cookie_b = make_session_cookie(issuer_id=ISSUER_B, user_id=USER_B)
     r = tenant_client.get(f"/portal/sat/xml/{UUID_A}", cookies=cookie_b)
     assert r.status_code == 404, f"Esperado 404, obtuvo {r.status_code}"
 
 
 def test_tenant_b_can_download_own_xml(tenant_client):
     """B puede descargar su propio XML."""
-    cookie_b = make_session_cookie(issuer_id=2, user_id=2)
+    cookie_b = make_session_cookie(issuer_id=ISSUER_B, user_id=USER_B)
     r = tenant_client.get(f"/portal/sat/xml/{UUID_B}", cookies=cookie_b)
     assert r.status_code == 200, f"Esperado 200, obtuvo {r.status_code}"
