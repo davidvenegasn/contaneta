@@ -33,6 +33,10 @@ except Exception:
     CLAVE_UNIDAD = {"E48": "Unidad de servicio", "EA": "Cada uno", "H87": "Pieza"}
 from services import subscription as subscription_service, csrf as csrf_service
 from services.action_log import log_action
+from services.http import ok, ok_list
+from services.schemas import ClientCreate, ProductCreate
+from services import clients_service, products_service
+from services import jobs as jobs_service
 
 router = APIRouter(prefix="/api")
 
@@ -267,6 +271,37 @@ def _build_provider_report_xlsx(issuer: dict, provider_name: str, rows: list) ->
 
 # ----- Customers -----
 # List endpoints: return 200 + [] when no data; only 4xx/5xx on real errors.
+
+
+# ----- Jobs (genérico) -----
+@router.get("/jobs")
+def api_jobs(
+    issuer: dict = Depends(get_portal_issuer),
+    limit: int = Query(20, ge=1, le=200, description="Máximo de registros"),
+):
+    items = jobs_service.list_jobs(issuer["id"], limit=limit)
+    total = jobs_service.count_jobs(issuer["id"])
+    return ok_list(items, total=total)
+
+
+@router.get("/jobs/{job_id}")
+def api_job_get(job_id: int, issuer: dict = Depends(get_portal_issuer)):
+    job = jobs_service.get_job_for_issuer(job_id, issuer["id"])
+    if not job:
+        raise HTTPException(status_code=404, detail="Job no encontrado.")
+    payload = {
+        "id": job.get("id"),
+        "issuer_id": job.get("issuer_id"),
+        "name": job.get("name"),
+        "status": job.get("status"),
+        "progress": job.get("progress"),
+        "message": job.get("message"),
+        "payload": job.get("payload"),
+        "result": job.get("result"),
+        "created_at": job.get("created_at"),
+        "updated_at": job.get("updated_at"),
+    }
+    return ok(payload)
 @router.get("/customers")
 def api_customers(
     issuer: dict = Depends(get_portal_issuer),
@@ -278,38 +313,37 @@ def api_customers(
         return fixture
     try:
         conn = db()
-        total_row = conn.execute(
-            "SELECT COUNT(*) AS c FROM customer_profiles WHERE issuer_id = ?",
-            (issuer["id"],),
-        ).fetchone()
-        total = total_row[0] if total_row else 0
-        rows = conn.execute(
-            """
-            SELECT id, rfc, legal_name, zip, tax_system, email, alias
-            FROM customer_profiles WHERE issuer_id = ? ORDER BY COALESCE(alias, ''), rfc
-            LIMIT ? OFFSET ?
-            """,
-            (issuer["id"], limit, offset),
-        ).fetchall()
+        issuer_id = issuer["id"]
+        # Incluir clientes que están en la tabla "clients" (p. ej. backfill desde facturas emitidas)
+        # para que el dropdown de factura rápida muestre los mismos que la página Contactos > Clientes.
+        if table_exists(conn, "clients"):
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO customer_profiles (issuer_id, rfc, legal_name, zip, tax_system, email, alias, updated_at)
+                SELECT issuer_id, rfc, COALESCE(name, ''), COALESCE(cp, ''), COALESCE(regimen_fiscal, ''), email, NULL, datetime('now')
+                FROM clients WHERE issuer_id = ?
+                """,
+                (issuer_id,),
+            )
+            conn.commit()
         conn.close()
-        items = [{"id": r["id"], "rfc": r["rfc"], "legal_name": r["legal_name"], "zip": r["zip"],
-                  "tax_system": r["tax_system"], "email": r["email"], "alias": r["alias"]} for r in rows]
-        return {"items": items, "total": total}
+        items, total = clients_service.list_clients(issuer_id, limit=limit, offset=offset)
+        return ok_list(items, total=total)
     except Exception as e:
         logger.warning("api_customers: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail="Error al cargar la lista de clientes.")
 
 
 @router.post("/customers/create")
-def api_customers_create(request: Request, payload: dict = Body(...), issuer: dict = Depends(get_portal_issuer)):
+def api_customers_create(request: Request, payload: ClientCreate = Body(...), issuer: dict = Depends(get_portal_issuer)):
     csrf_service.verify_api_csrf(request)
     try:
-        rfc = (payload.get("rfc") or "").strip().upper()
-        legal_name = (payload.get("legal_name") or "").strip()
-        zip_val = (payload.get("zip") or "").strip() or ""
-        tax_val = (payload.get("tax_system") or "").strip() or ""
-        email = (payload.get("email") or "").strip() or None
-        alias = (payload.get("alias") or "").strip() or None
+        rfc = payload.rfc
+        legal_name = payload.legal_name
+        zip_val = payload.zip or ""
+        tax_val = payload.tax_system or ""
+        email = payload.email or None
+        alias = payload.alias or None
         errors = validate_customer(rfc, legal_name, zip_val, tax_val, email)
         if errors:
             raise HTTPException(status_code=400, detail="; ".join(errors))
@@ -372,47 +406,25 @@ def api_products(
     if fixture is not None:
         return fixture
     try:
-        conn = db()
-        total_row = conn.execute(
-            "SELECT COUNT(*) AS c FROM issuer_products WHERE issuer_id = ?",
-            (issuer["id"],),
-        ).fetchone()
-        total = total_row[0] if total_row else 0
-        rows = conn.execute(
-            """
-            SELECT id, description, product_key, unit_key, unit_price, iva_rate, created_at
-            FROM issuer_products WHERE issuer_id = ? ORDER BY description
-            LIMIT ? OFFSET ?
-            """,
-            (issuer["id"], limit, offset),
-        ).fetchall()
-        conn.close()
-        items = [{"id": r["id"], "description": r["description"], "product_key": r["product_key"],
-                  "unit_key": r["unit_key"], "unit_price": float(r["unit_price"] or 0),
-                  "iva_rate": float(r["iva_rate"] or 0.16), "created_at": r["created_at"]} for r in rows]
-        return {"items": items, "total": total}
+        issuer_id = issuer["id"]
+        items, total = products_service.list_products(issuer_id, limit=limit, offset=offset)
+        return ok_list(items, total=total)
     except Exception as e:
         logger.warning("api_products: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail="Error al cargar la lista de productos.")
 
 
 @router.post("/products/create")
-def api_products_create(request: Request, payload: dict = Body(...), issuer: dict = Depends(get_portal_issuer)):
+def api_products_create(request: Request, payload: ProductCreate = Body(...), issuer: dict = Depends(get_portal_issuer)):
     csrf_service.verify_api_csrf(request)
     try:
-        description = (payload.get("description") or "").strip()
-        product_key_raw = (payload.get("product_key") or "").strip()
-        product_key = product_key_raw.split("—")[0].strip() if "—" in product_key_raw else product_key_raw
-        unit_key = (payload.get("unit_key") or "").strip() or "E48"
-        try:
-            unit_price = float(payload.get("unit_price"))
-        except (TypeError, ValueError):
-            raise HTTPException(status_code=400, detail="Precio unitario inválido")
-        try:
-            iva_rate = float(payload.get("iva_rate", 0.16))
-        except (TypeError, ValueError):
-            iva_rate = 0.16
-        iva_rate = max(0, min(1, iva_rate))
+        description = payload.description
+        product_key_raw = payload.product_key
+        # product_key ya viene normalizado en el schema (split '—'), pero conservamos el raw para validar/error.
+        product_key = payload.product_key
+        unit_key = payload.unit_key or "E48"
+        unit_price = float(payload.unit_price)
+        iva_rate = float(payload.iva_rate)
         errors = validate_product(description, product_key_raw, unit_key, unit_price)
         if errors:
             raise HTTPException(status_code=400, detail="; ".join(errors))
@@ -461,6 +473,122 @@ def api_products_delete(request: Request, payload: dict = Body(...), issuer: dic
 
 
 # ----- Quick invoice (Home: cliente + producto → timbrar sin salir) -----
+@router.get("/quick-invoice/bootstrap")
+def api_quick_invoice_bootstrap(issuer: dict = Depends(get_portal_issuer)):
+    """Devuelve clientes, productos, defaults y catálogos para el widget Factura rápida en Inicio."""
+    try:
+        conn = db()
+        issuer_id = issuer["id"]
+        # Clientes (misma fuente que /api/customers y Contactos)
+        if table_exists(conn, "clients"):
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO customer_profiles (issuer_id, rfc, legal_name, zip, tax_system, email, alias, updated_at)
+                SELECT issuer_id, rfc, COALESCE(name, ''), COALESCE(cp, ''), COALESCE(regimen_fiscal, ''), email, NULL, datetime('now')
+                FROM clients WHERE issuer_id = ?
+                """,
+                (issuer_id,),
+            )
+            conn.commit()
+        rows_c = conn.execute(
+            """
+            SELECT id, rfc, legal_name, zip, tax_system, email, alias
+            FROM customer_profiles WHERE issuer_id = ? ORDER BY COALESCE(alias, ''), rfc
+            LIMIT 500
+            """,
+            (issuer_id,),
+        ).fetchall()
+        clients = [
+            {
+                "id": r["id"],
+                "rfc": r["rfc"],
+                "name": r["legal_name"],
+                "legal_name": r["legal_name"],
+                "zip": r["zip"],
+                "regimen": r["tax_system"],
+                "tax_system": r["tax_system"],
+                "email": r["email"],
+            }
+            for r in rows_c
+        ]
+        # Productos (misma fuente que /api/products y Productos)
+        if table_exists(conn, "products"):
+            rows_p = conn.execute(
+                """
+                SELECT id, name, clave_prod_serv, clave_unidad, unidad, default_unit_price, default_currency
+                FROM products WHERE issuer_id = ? AND COALESCE(active, 1) = 1 ORDER BY name LIMIT 500
+                """,
+                (issuer_id,),
+            ).fetchall()
+            products = [
+                {
+                    "id": r["id"],
+                    "name": r["name"] or "",
+                    "description": r["name"] or "",
+                    "price": float(r["default_unit_price"] or 0),
+                    "unit_price": float(r["default_unit_price"] or 0),
+                    "currency": (r["default_currency"] or "MXN").strip() or "MXN",
+                    "prodserv": r["clave_prod_serv"] or "",
+                    "product_key": r["clave_prod_serv"] or "",
+                    "unit_key": r["clave_unidad"] or "E48",
+                    "unit_name": r["unidad"] or "",
+                    "iva_default": 0.16,
+                }
+                for r in rows_p
+            ]
+        else:
+            rows_p = conn.execute(
+                """
+                SELECT id, description, product_key, unit_key, unit_price, iva_rate
+                FROM issuer_products WHERE issuer_id = ? ORDER BY description LIMIT 500
+                """,
+                (issuer_id,),
+            ).fetchall()
+            products = [
+                {
+                    "id": r["id"],
+                    "name": r["description"] or "",
+                    "description": r["description"] or "",
+                    "price": float(r["unit_price"] or 0),
+                    "unit_price": float(r["unit_price"] or 0),
+                    "currency": "MXN",
+                    "prodserv": r["product_key"] or "",
+                    "product_key": r["product_key"] or "",
+                    "unit_key": r["unit_key"] or "E48",
+                    "unit_name": "",
+                    "iva_default": float(r["iva_rate"] or 0.16),
+                }
+                for r in rows_p
+            ]
+        conn.close()
+        payload = {
+            "clients": clients,
+            "products": products,
+            "defaults": {
+                "currency": "MXN",
+                "payment_form": "03",
+                "payment_method": "PUE",
+                "uso_cfdi": "G03",
+                "series": None,
+                "folio": None,
+            },
+            "tax_presets": {
+                "ivas": [
+                    {"rate": 0.16, "label": "IVA 16%"},
+                    {"rate": 0.0, "label": "IVA 0%"},
+                ],
+                "retenciones": [
+                    {"type": "ISR", "rate": 0.10, "label": "Ret ISR 10%"},
+                    {"type": "IVA", "rate": 0.1067, "label": "Ret IVA 10.67%"},
+                ],
+            },
+        }
+        return ok(payload)
+    except Exception as e:
+        logger.warning("quick-invoice bootstrap: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="Error al cargar datos para factura rápida.")
+
+
 @router.post("/invoices/quick")
 def api_invoices_quick(
     request: Request,
@@ -505,6 +633,27 @@ def api_invoices_quick(
         "SELECT id, description, product_key, unit_key, unit_price, iva_rate FROM issuer_products WHERE issuer_id = ? AND id = ? LIMIT 1",
         (issuer_id, product_id),
     )
+    # Si el producto viene de la tabla "products" (página Productos), resolver desde ahí
+    if not prod:
+        _conn = db()
+        try:
+            if table_exists(_conn, "products"):
+                row = _conn.execute(
+                    "SELECT id, name, clave_prod_serv, clave_unidad, default_unit_price FROM products WHERE issuer_id = ? AND id = ? LIMIT 1",
+                    (issuer_id, product_id),
+                ).fetchone()
+                if row:
+                    row = dict(row)
+                    prod = [{
+                        "id": row["id"],
+                        "description": row.get("name") or "",
+                        "product_key": row.get("clave_prod_serv") or "",
+                        "unit_key": row.get("clave_unidad") or "E48",
+                        "unit_price": float(row.get("default_unit_price") or 0),
+                        "iva_rate": 0.16,
+                    }]
+        finally:
+            _conn.close()
     if not cust or not prod:
         raise HTTPException(status_code=404, detail="Cliente o producto no encontrado.")
     c = cust[0]
@@ -532,6 +681,9 @@ def api_invoices_quick(
     else:
         iva_rate = float(p.get("iva_rate") or 0.16)
     iva_rate = max(0.0, min(1.0, iva_rate))
+    iva_exempt = bool(payload.get("iva_exempt")) is True
+    if iva_exempt:
+        iva_rate = 0.0
 
     def _parse_rate(name: str, default: float = 0.0) -> float:
         v = payload.get(name)
@@ -561,6 +713,13 @@ def api_invoices_quick(
 
     # Facturapi espera price con impuestos incluidos si tax_included=True
     price_to_send = unit_price * (1.0 + iva_rate) if iva_rate else unit_price
+    taxes = []
+    if not iva_exempt:
+        taxes.append({"type": "IVA", "rate": iva_rate})
+    if isr_ret_rate > 0:
+        taxes.append({"type": "ISR", "rate": isr_ret_rate, "withholding": True})
+    if iva_ret_rate > 0:
+        taxes.append({"type": "IVA", "rate": iva_ret_rate, "withholding": True})
     item = {
         "quantity": quantity,
         "discount": 0.0,
@@ -569,11 +728,7 @@ def api_invoices_quick(
             "product_key": product_key,
             "price": round(price_to_send, 2),
             "tax_included": True,
-            "taxes": (
-                [{"type": "IVA", "rate": iva_rate}]
-                + ([{"type": "ISR", "rate": isr_ret_rate, "withholding": True}] if isr_ret_rate > 0 else [])
-                + ([{"type": "IVA", "rate": iva_ret_rate, "withholding": True}] if iva_ret_rate > 0 else [])
-            ),
+            "taxes": taxes,
             "unit_key": unit_key,
         },
     }
@@ -1617,63 +1772,63 @@ PRODSERV_FALLBACK = [
 @router.get("/catalogs/forma_pago")
 def api_forma_pago():
     try:
-        return list_catalog("cfdi_40_formas_pago")
+        return ok(list_catalog("cfdi_40_formas_pago"))
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid catalog table")
     except Exception:
         logger.warning("api catalogs forma_pago: usando fallback (catalogs.db no disponible)")
-        return _catalog_list(FORMA_PAGO)
+        return ok(_catalog_list(FORMA_PAGO))
 
 
 @router.get("/catalogs/metodo_pago")
 def api_metodo_pago():
     try:
-        return list_catalog("cfdi_40_metodos_pago")
+        return ok(list_catalog("cfdi_40_metodos_pago"))
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid catalog table")
     except Exception:
-        return [{"key": "PUE", "label": "Pago en una sola exhibición"}, {"key": "PPD", "label": "Pago en parcialidades o diferido"}]
+        return ok([{"key": "PUE", "label": "Pago en una sola exhibición"}, {"key": "PPD", "label": "Pago en parcialidades o diferido"}])
 
 
 @router.get("/catalogs/uso_cfdi")
 def api_uso_cfdi():
     try:
-        return list_catalog("cfdi_40_usos_cfdi")
+        return ok(list_catalog("cfdi_40_usos_cfdi"))
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid catalog table")
     except Exception:
         logger.warning("api catalogs uso_cfdi: usando fallback (catalogs.db no disponible)")
-        return _catalog_list(USO_CFDI)
+        return ok(_catalog_list(USO_CFDI))
 
 
 @router.get("/catalogs/regimen_fiscal")
 def api_regimen_fiscal():
     try:
-        return list_catalog("cfdi_40_regimenes_fiscales")
+        return ok(list_catalog("cfdi_40_regimenes_fiscales"))
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid catalog table")
     except Exception:
         logger.warning("api catalogs regimen_fiscal: usando fallback (catalogs.db no disponible)")
         reg = dict(REGIMEN_FISCAL)
         reg["616"] = "Sin obligaciones fiscales"
-        return _catalog_list(reg)
+        return ok(_catalog_list(reg))
 
 
 @router.get("/catalogs/moneda")
 def api_moneda():
     try:
-        return list_catalog("cfdi_40_monedas")
+        return ok(list_catalog("cfdi_40_monedas"))
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid catalog table")
     except Exception:
         logger.warning("api catalogs moneda: usando fallback (catalogs.db no disponible)")
-        return _catalog_list(MONEDA_FALLBACK)
+        return ok(_catalog_list(MONEDA_FALLBACK))
 
 
 @router.get("/catalogs/prodserv")
 def api_prodserv(q: str = Query(..., min_length=1), limit: int = Query(20, ge=1, le=50)):
     try:
-        return search_catalog("cfdi_40_productos_servicios", q=q, limit=limit)
+        return ok(search_catalog("cfdi_40_productos_servicios", q=q, limit=limit))
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid catalog table")
     except Exception:
@@ -1685,13 +1840,13 @@ def api_prodserv(q: str = Query(..., min_length=1), limit: int = Query(20, ge=1,
                 out.append({"key": clave, "label": desc})
                 if len(out) >= limit:
                     break
-        return out
+        return ok(out)
 
 
 @router.get("/catalogs/unidad")
 def api_unidad(q: str = Query(..., min_length=1), limit: int = Query(20, ge=1, le=50)):
     try:
-        return search_catalog("cfdi_40_claves_unidades", q=q, limit=limit)
+        return ok(search_catalog("cfdi_40_claves_unidades", q=q, limit=limit))
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid catalog table")
     except Exception:
@@ -1702,4 +1857,4 @@ def api_unidad(q: str = Query(..., min_length=1), limit: int = Query(20, ge=1, l
             for k, v in UNIDAD_FALLBACK.items()
             if q_lower in v.lower() or q_lower in k.lower()
         ]
-        return items[: int(limit)]
+        return ok(items[: int(limit)])
