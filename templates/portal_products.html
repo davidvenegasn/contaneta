@@ -76,7 +76,7 @@
               <td class="muted">{{ '16%' }}</td>
               <td>
                 <div class="u-flex u-gap-2 u-items-center">
-                  <button type="button" class="icon-btn js-edit" title="Editar"
+                  <button type="button" class="icon-btn js-edit" title="Editar" aria-label="Editar {{ (r.name or 'producto')|e }}"
                     data-id="{{ r.id }}"
                     data-name="{{ (r.name or '')|e }}"
                     data-prodserv="{{ (r.clave_prod_serv or '')|e }}"
@@ -91,14 +91,14 @@
                       <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4 11.5-11.5Z" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
                     </svg>
                   </button>
-                  <button type="button" class="icon-btn js-invoice" title="Usar para factura" data-id="{{ r.id }}" data-name="{{ (r.name or '')|e }}">
+                  <button type="button" class="icon-btn js-invoice" title="Usar para factura" aria-label="Usar {{ (r.name or 'producto')|e }} para factura" data-id="{{ r.id }}" data-name="{{ (r.name or '')|e }}">
                     <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                       <rect x="3" y="3" width="18" height="18" rx="5" fill="currentColor"/>
                       <path d="M12 7.25v9.5" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/>
                       <path d="M7.25 12h9.5" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/>
                     </svg>
                   </button>
-                  <button type="button" class="icon-btn js-delete" title="Borrar" data-id="{{ r.id }}" data-name="{{ (r.name or '')|e }}">
+                  <button type="button" class="icon-btn js-delete" title="Borrar" aria-label="Borrar {{ (r.name or 'producto')|e }}" data-id="{{ r.id }}" data-name="{{ (r.name or '')|e }}">
                     <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                       <path d="M3 6h18" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
                       <path d="M8 6V4h8v2" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
