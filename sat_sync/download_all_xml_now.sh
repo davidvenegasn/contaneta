@@ -14,12 +14,12 @@ log() { echo "[$(date '+%H:%M:%S')] $*"; }
 
 log "=== Descarga de XML - Inicio ==="
 
-# 0) Metadata primero (lista rápida)
+# 0) Metadata primero (desde noviembre 2025: ~120 días, ventanas de 7 días => ~18 ventanas)
 ISSUERS=$(sqlite3 -noheader "$PROJECT_DIR/invoicing.db" "SELECT issuer_id FROM sat_credentials GROUP BY issuer_id" 2>/dev/null || true)
 for IID in $ISSUERS; do
   log "Metadata issuer=$IID"
-  $PHP sat_sync/sync.php "$IID" issued   --backfill=60 --window=168 --max-windows=10 2>/dev/null || true
-  $PHP sat_sync/sync.php "$IID" received --backfill=60 --window=168 --max-windows=10 2>/dev/null || true
+  $PHP sat_sync/sync.php "$IID" issued   --backfill=120 --window=168 --max-windows=20 --loop 2>/dev/null || true
+  $PHP sat_sync/sync.php "$IID" received --backfill=120 --window=168 --max-windows=20 --loop 2>/dev/null || true
 done
 
 # 1) Resetear requests "verifying" a "queued" (para reintentar)
@@ -52,5 +52,7 @@ done
 # 3) Parsear XML descargados
 log "Parseando XML..."
 $PHP sat_sync/parse_xml.php --limit=500 || true
+
+# 4) (Opcional, una vez) Si tenías duplicados por UUID en distinto caso: php sat_sync/merge_duplicate_cfdis.php
 
 log "=== Fin ==="

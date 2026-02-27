@@ -1,0 +1,249 @@
+/* ----- Utilidades (reemplazo de inline; usan tokens) ----- */
+.u-m0 { margin: 0 !important; }
+.u-mb-3 { margin-bottom: var(--space-3) !important; }
+.u-mb-4 { margin-bottom: var(--space-4) !important; }
+.u-mb-6 { margin-bottom: var(--space-6) !important; }
+.u-mb-14 { margin-bottom: 14px !important; }
+.u-mb-10 { margin-bottom: 10px !important; }
+.u-mb-8 { margin-bottom: 8px !important; }
+.u-mt-1 { margin-top: var(--space-1) !important; }
+.u-mt-2 { margin-top: var(--space-2) !important; }
+.u-mt-6 { margin-top: var(--space-6) !important; }
+.u-mt-6px { margin-top: 6px !important; }
+.u-ml-2 { margin-left: var(--space-2) !important; }
+.u-text-xs { font-size: var(--text-xs) !important; }
+.u-text-12 { font-size: 0.75rem !important; }
+.u-fw-semibold { font-weight: var(--fw-semibold) !important; }
+.u-fw-650 { font-weight: 650 !important; }
+.u-block { display: block !important; }
+.u-flex { display: flex !important; }
+.u-flex-col { display: flex !important; flex-direction: column !important; }
+.u-flex-wrap { flex-wrap: wrap !important; }
+.u-flex-1 { flex: 1 !important; }
+.u-gap-1 { gap: var(--space-1) !important; }
+.u-gap-2 { gap: var(--space-2) !important; }
+.u-gap-14 { gap: 14px !important; }
+.u-items-center { align-items: center !important; }
+.u-justify-end { justify-content: flex-end !important; }
+.overflow-auto { overflow: auto !important; }
+.w-100 { width: 100% !important; }
+.link-none { text-decoration: none !important; }
+.u-hidden { display: none !important; }
+.text-right { text-align: right !important; }
+.font-mono { font-family: ui-monospace, monospace !important; }
+.u-nowrap { white-space: nowrap !important; }
+.card--success-bg { background: var(--success-bg) !important; border-color: var(--success-border) !important; }
+.card--warn-bg { background: var(--warn-bg) !important; border-color: var(--warn-border) !important; }
+.u-text-base { font-size: 1rem !important; }
+/* Tablas: anchos mínimos */
+.table-wrap--overflow { overflow: auto !important; }
+.table--min-w-900 { min-width: 900px !important; }
+.table--min-w-1000 { min-width: 1000px !important; }
+.th--w-100 { min-width: 100px !important; }
+.th--w-110 { min-width: 110px !important; }
+.th--w-140 { min-width: 140px !important; }
+.th--w-180 { min-width: 180px !important; }
+.th--w-200 { min-width: 200px !important; }
+.th--w-260 { min-width: 260px !important; }
+/* Skeleton de fila (evita inline en listados) */
+.skeleton-line { height: 46px !important; border-radius: var(--radius) !important; }
+.skeleton-card { height: 72px !important; border-radius: var(--radius-sm) !important; }
+/* Pills de estado (cotizaciones) — tokens/semánticos */
+.pill--draft { border-color: var(--neutral-border) !important; background: var(--neutral-bg) !important; }
+.pill--sent { border-color: #c9daf8 !important; background: #eef4fc !important; }
+.pill--accepted { border-color: var(--success-border) !important; background: var(--success-bg) !important; }
+.pill--rejected { border-color: var(--danger-border) !important; background: var(--danger-bg) !important; }
+.pill--invoiced { border-color: #d4c9f2 !important; background: #f4f0fc !important; }
+.pill--expired { border-color: var(--neutral-border) !important; background: var(--neutral-bg) !important; color: var(--neutral) !important; }
+/* Formulario factura rápida (portal_home) */
+.quick-invoice-form { display: flex !important; flex-direction: column !important; gap: 14px !important; }
+.quick-invoice-form .label--block,
+.label--block { display: block !important; margin-bottom: 6px !important; font-weight: var(--fw-semibold) !important; }
+.quick-invoice-form .input--full { width: 100% !important; padding: 10px 12px !important; border-radius: 10px !important; font-size: var(--text-sm) !important; border: 1px solid var(--border) !important; }
+.quick-invoice-form .muted-row,
+.quick-invoice-form__muted-row { margin: var(--space-1) 0 0 !important; font-size: 0.75rem !important; display: flex !important; align-items: center !important; gap: 10px !important; }
+.quick-invoice-form .form-actions,
+.quick-invoice-form__actions { margin-top: 6px !important; }
+/* Card con ancho máximo */
+.card--max-w-560 { max-width: 560px !important; }
+.quick-choose-form { display: flex !important; flex-direction: column !important; gap: var(--space-5) !important; }
+.quick-choose-form--gap-20 { gap: 20px !important; }
+.quick-choose-form .input--full { width: 100% !important; padding: 12px 14px !important; border-radius: var(--radius-sm) !important; font-size: var(--text-sm) !important; border: 1px solid var(--border) !important; }
+.btn--disabled-state { pointer-events: none !important; opacity: 0.7 !important; }
+/* App header margin */
+.app-header--mb-14 { margin-bottom: 14px !important; }
+.u-d-inline { display: inline !important; }
+.form-reset { margin: 0 !important; padding: 0 !important; }
+/* Badge pequeño (método pago, etc.) */
+.badge--xs { font-size: var(--text-2xs) !important; }
+.bank-pdf-list { padding-left: 18px !important; line-height: 1.55 !important; }
+
+/* ==============================
+   Factura rápida (Inicio): modales
+   Mover desde portal_home.html (sin CSS inline).
+   ============================== */
+.quick-invoice-modal { position: fixed; inset: 0; z-index: 9000; display: flex; align-items: center; justify-content: center; padding: 16px; }
+.quick-invoice-modal[hidden] { display: none !important; }
+.quick-invoice-modal__backdrop { position: absolute; inset: 0; background: rgba(0,0,0,.4); }
+.quick-invoice-modal__panel { position: relative; background: var(--surface, #fff); border-radius: 16px; box-shadow: 0 20px 50px rgba(0,0,0,.15); max-width: 420px; width: 100%; max-height: 90vh; overflow-y: auto; outline: none; }
+.quick-invoice-modal__panel--precalc { max-width: clamp(520px, 60vw, 720px); }
+body.quick-invoice-modal-open { overflow: hidden; }
+.quick-invoice-modal__header { display: flex; align-items: center; justify-content: space-between; padding: 18px 20px; border-bottom: 1px solid var(--border, #e2e8f0); }
+.quick-invoice-modal__title { margin: 0; font-size: 1.2rem; font-weight: 700; }
+.quick-invoice-modal__close { background: none; border: none; font-size: 24px; line-height: 1; cursor: pointer; color: var(--text-muted, #64748b); padding: 4px; }
+.quick-invoice-modal__close:hover { color: var(--text, #111); }
+.quick-invoice-modal__desc { margin: 0 20px 14px; font-size: 13px; }
+.quick-invoice-modal__body { padding: 0 20px 20px; }
+.quick-invoice-modal__row { margin-bottom: 10px; }
+.quick-invoice-modal__label { font-weight: 600; font-size: 12px; color: var(--text-muted); display: block; margin-bottom: 2px; }
+.quick-invoice-modal__value { font-size: 14px; }
+.quick-invoice-modal__edits { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 14px 0; }
+.quick-invoice-modal__section { padding: 0; border-bottom: none; margin: 14px 0; }
+.quick-invoice-modal__section .quick-form-grid { padding: 14px; border: 1px solid var(--border, #e2e8f0); border-radius: 14px; background: rgba(255,255,255,.75); }
+.quick-invoice-modal__section .quick-invoice-modal__row { padding: 0 14px; }
+.quick-invoice-modal__section-title { font-weight: 800; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted, #64748b); margin-bottom: 10px; }
+.quick-invoice-modal__totals { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
+.quick-invoice-modal__total-row { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 6px; }
+.quick-invoice-modal__total-row--final { font-weight: 700; font-size: 16px; margin-top: 8px; }
+.quick-invoice-modal__error { padding: 10px 14px; margin: 0 20px 12px; background: rgba(220,38,38,.1); border-radius: 10px; font-size: 13px; color: var(--danger, #b91c1c); border: 1px solid rgba(220,38,38,.25); }
+.quick-invoice-modal__footer { display: flex; justify-content: flex-end; gap: 10px; padding: 16px 20px; border-top: 1px solid var(--border); }
+.quick-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.quick-form-field--full { grid-column: 1 / -1; }
+@media (max-width: 520px) {
+  .quick-form-grid { grid-template-columns: 1fr; }
+}
+
+/* Headings — escala tipográfica unificada (más legible) */
+.app-title{
+  font-size: var(--text-xl);
+  font-weight: var(--fw-bold);
+  letter-spacing: -0.02em;
+  line-height: var(--leading-snug);
+}
+
+.app-subtitle{
+  font-size: var(--text-base);
+  font-weight: var(--fw-semibold);
+  margin-top: 6px;
+  color: var(--label-color, var(--text-muted));
+  line-height: var(--leading-relaxed);
+}
+
+.section-title{
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: var(--fw-bold);
+  letter-spacing: -0.015em;
+  line-height: var(--leading-snug);
+  color: var(--text);
+}
+
+.portal h2 { font-size: var(--text-2xl); font-weight: var(--fw-bold); line-height: var(--leading-snug); letter-spacing: -0.02em; }
+.portal h3 { font-size: var(--text-xl); font-weight: var(--fw-bold); line-height: var(--leading-snug); letter-spacing: -0.015em; }
+
+.portal label,
+.portal .label {
+  font-size: var(--text-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--label-color, var(--text));
+}
+
+/* Simple table styles for portal pages */
+.table{ width:100%; border-collapse:separate; border-spacing:0; }
+.table th, .table td{ text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: var(--text-sm); font-family: var(--font-family); }
+.table th{ font-size: var(--text-sm); font-weight: var(--fw-bold); text-transform: uppercase; letter-spacing: .04em; color: var(--label-color, var(--text)); }
+.table td{ font-weight: var(--fw-normal); }
+.table tbody tr:hover td{ background: var(--surface-hover); }
+@media (prefers-reduced-motion: no-preference) {
+  .table tbody tr td { transition: background-color 150ms ease; }
+}
+
+/* P39: resaltado de búsqueda en listados */
+.search-highlight {
+  background: color-mix(in srgb, var(--accent) 28%, transparent);
+  color: inherit;
+  padding: 0 2px;
+  border-radius: 3px;
+  font-weight: var(--fw-semibold, 600);
+}
+
+/* Table wrapper: único contenedor con scroll horizontal (P30); body/resumen sin overflow-x */
+.table-wrap{
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  overflow-y: visible;
+  contain: layout paint;
+}
+
+/* Lista de facturas emitidas/recibidas: card y tabla al tamaño del contenido (sin espacio sobrante) */
+.main-inner:has(.card--invoice-list){
+  display: flex;
+  flex-direction: column;
+}
+.card--invoice-list{
+  display: flex;
+  flex-direction: column;
+}
+.card--invoice-list .card__body{
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding-top: 0;
+}
+.card--invoice-list .table-wrap{
+  overflow-x: auto;
+  overflow-y: visible;
+  -webkit-overflow-scrolling: touch;
+  contain: layout paint;
+}
+
+/* Evitar inline styles: anchos mínimos de tablas */
+#invoicesTable { min-width: 1200px; }
+#invoicesTable thead th:nth-child(1) { min-width: 100px; }
+#invoicesTable thead th:nth-child(2) { min-width: 200px; }
+#invoicesTable thead th:nth-child(3) { min-width: 220px; }
+#invoicesTable thead th:nth-child(4) { min-width: 140px; }
+#invoicesTable thead th:nth-child(5) { min-width: 110px; }
+#invoicesTable thead th:nth-child(6) { min-width: 100px; }
+#invoicesTable thead th:nth-child(7) { min-width: 80px; }
+#invoicesTable thead th:nth-child(8) { min-width: 100px; }
+#invoicesTable thead th:nth-child(9) { min-width: 200px; text-align: right; }
+
+#custTable { min-width: 1000px; }
+#custTable thead th:nth-child(1) { min-width: 140px; }
+#custTable thead th:nth-child(2) { min-width: 240px; }
+#custTable thead th:nth-child(3) { min-width: 120px; }
+#custTable thead th:nth-child(4) { min-width: 80px; }
+#custTable thead th:nth-child(5) { min-width: 90px; }
+#custTable thead th:nth-child(6) { min-width: 200px; }
+#custTable thead th:nth-child(7) { min-width: 180px; }
+
+#prodTable { min-width: 1000px; }
+#prodTable thead th:nth-child(1) { min-width: 220px; }
+#prodTable thead th:nth-child(2) { min-width: 160px; }
+#prodTable thead th:nth-child(3) { min-width: 120px; }
+#prodTable thead th:nth-child(4) { min-width: 120px; }
+#prodTable thead th:nth-child(5) { min-width: 90px; }
+#prodTable thead th:nth-child(6) { min-width: 200px; }
+
+/* Cards con tablas grandes: sombra más ligera para menos repaint al hacer scroll */
+.card:has(.table-wrap),
+.card--invoice-list{
+  box-shadow: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+}
+.card:has(.table-wrap):hover,
+.card--invoice-list:hover{
+  box-shadow: 0 2px 8px rgba(0,0,0,.07), 0 1px 3px rgba(0,0,0,.05);
+}
+
+/* Paginación client-side (200 filas por página) */
+.table-pagination{
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--text-sm);
+  border-top: 1px solid var(--border);
+}
+

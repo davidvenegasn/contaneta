@@ -1,0 +1,27 @@
+{% extends "base_admin.html" %}
+{% block title %}Memberships{% endblock %}
+{% block content %}
+  <h1>Memberships</h1>
+  <div class="card">
+    <p style="margin:0 0 12px;color:#64748b;">Quién tiene acceso a qué issuer y con qué rol.</p>
+    {% if memberships %}
+    <table>
+      <thead><tr><th>user_id</th><th>email</th><th>issuer_id</th><th>issuer (RFC)</th><th>Rol</th><th>Creado</th></tr></thead>
+      <tbody>
+      {% for m in memberships %}
+      <tr>
+        <td>{{ m.user_id }}</td>
+        <td>{{ m.user_email or '-' }}</td>
+        <td>{{ m.issuer_id }}</td>
+        <td>{{ m.issuer_rfc or '-' }}</td>
+        <td>{{ m.role }}</td>
+        <td>{{ m.created_at or '-' }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p style="margin:0;color:#64748b;">No hay memberships.</p>
+    {% endif %}
+  </div>
+{% endblock %}

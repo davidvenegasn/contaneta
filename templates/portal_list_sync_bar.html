@@ -1,0 +1,23 @@
+{% if has_fiel_validated and sat_sync_status is defined %}
+{# P29: Sync sutil en header del listado — chip (Último sync: hace X min / En proceso / Error) + botón pequeño con loading #}
+<div class="list-sync-bar list-sync-bar--sutil" id="listSyncBar" data-status="{{ sat_sync_status.status|default('ok') }}">
+  <span class="list-sync-bar__chip" id="satSyncChip" aria-live="polite">
+    {% if sat_sync_status.status == 'running' %}
+      En proceso
+    {% elif sat_sync_status.status == 'error' %}
+      Error
+    {% elif sat_sync_status.last_sync_at %}
+      Último sync: {{ sat_sync_status.last_sync_at[:19] }}
+    {% else %}
+      Aún no se ha sincronizado
+    {% endif %}
+  </span>
+  <span class="list-sync-bar__meta muted" id="satSyncMeta" aria-hidden="true"></span>
+  <span class="list-sync-bar__status" id="satSyncStatus" data-status="{{ sat_sync_status.status|default('ok') }}" data-display="inline" aria-hidden="true"></span>
+  <p class="list-sync-bar__hint muted u-m0 u-mt-1 u-text-xs">La sincronización puede tardar unos minutos. Si no ves datos, vuelve a intentar más tarde o revisa tu configuración SAT.</p>
+  <button type="button" class="btn btn--sm btn--ghost list-sync-bar__btn" id="satSyncBtn" title="Sincronizar con SAT" aria-label="Sincronizar con SAT" data-loading-text="En proceso…">
+    <svg class="icon list-sync-bar__btn-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/><path d="M21 3v5h-5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 21v-5h5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <span class="list-sync-bar__btn-label">Sync</span>
+  </button>
+</div>
+{% endif %}

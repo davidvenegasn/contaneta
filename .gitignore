@@ -11,3 +11,6 @@ backup/
 
 # secrets
 .env
+
+# Snapshot de respaldo: no editar ni commitear (ver docs/GUARDRAILS.md)
+_snapshot_before_mindtrip/

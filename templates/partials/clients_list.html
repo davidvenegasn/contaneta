@@ -1,0 +1,650 @@
+{# Lista de clientes. Usar en /portal/clients o en hub /portal/contactos?tab=clientes. #}
+{% set _form_action = (hub_base ~ '?tab=clientes') if hub_base else '/portal/clients' %}
+<div class="card ui-card">
+  <div class="card-header card-header--with-tools ui-card__header">
+    <div class="card-header__left">
+      <div class="table-tools table-tools--inline">
+        <form class="table-tools__search" method="get" action="{{ _form_action }}">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M16.2 16.2 21 21" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+          </svg>
+          <input class="input ui-input" type="search" name="q" value="{{ q|default('')|e }}" placeholder="Buscar por RFC o nombre" autocomplete="off" />
+        </form>
+        <button type="button" class="btn btn-primary" id="addClientBtn">+ Añadir cliente</button>
+        <button id="bulkToggleBtn" type="button" class="btn btn--secondary" aria-pressed="false">Escoger varios</button>
+      </div>
+    </div>
+    <div class="card-header__right">
+      <h3 class="section-title">Clientes</h3>
+      <p class="muted u-m0" id="clientsCount">
+        {% if total is defined %}
+          {% if total > 0 %}
+            {% set from = (page - 1) * per_page + 1 %}
+            {% set to = min(page * per_page, total) %}
+            {% if page == 1 and to == min(per_page, total) %}Mostrando los primeros {{ to }} de {{ total }}{% else %}Mostrando {{ from }}-{{ to }} de {{ total }}{% endif %}
+          {% else %}Sin datos{% endif %}
+        {% else %}
+          {% if rows and rows|length %}Mostrando los primeros {{ rows|length }}{% else %}Sin datos{% endif %}
+        {% endif %}
+      </p>
+    </div>
+  </div>
+
+  <p class="card-legend muted">
+    Lista sugerida (auto-captura) desde tus CFDI emitidos. Puedes editar campos para dejarlos "limpios".
+  </p>
+
+  <div class="card-list-sep">
+    {% if not rows or rows|length == 0 %}
+      {% from 'portal/_ui_components.html' import portal_empty_state %}
+      {% call portal_empty_state('Aún no tienes clientes', 'Añade un cliente o crea una factura para que aparezcan aquí automáticamente.') %}
+        <button type="button" class="btn btn-primary" id="addClientBtnEmpty">Añadir cliente</button>
+      {% endcall %}
+    {% else %}
+    <div id="clientsBulkBar" class="u-flex u-items-center u-gap-2 u-mb-2" hidden>
+      <button type="button" class="btn btn--secondary" id="bulkOpenIssueBtn">Emitir a seleccionados</button>
+      <button type="button" class="btn btn-ghost" id="bulkCancelBtn">Cancelar</button>
+      <span class="muted u-text-12" id="bulkCountText"></span>
+    </div>
+    <div class="table-wrap">
+      <table class="table ui-table ui-table--zebra">
+        <thead>
+          <tr>
+            <th id="bulkTh" hidden style="width:40px;">
+              <input type="checkbox" id="bulkSelectAll" aria-label="Seleccionar todos" />
+            </th>
+            <th>Nombre</th>
+            <th>RFC</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in rows %}
+          <tr>
+            <td class="bulkTd" hidden>
+              <input type="checkbox" class="js-bulk-item" data-id="{{ r.id }}" data-rfc="{{ (r.rfc or '')|e }}" data-name="{{ (r.name or '')|e }}" aria-label="Seleccionar {{ (r.name or r.rfc)|e }}" />
+            </td>
+            <td class="u-fw-650">{{ r.name or '—' }}</td>
+            <td class="muted"><code>{{ r.rfc }}</code></td>
+            <td>
+              <div class="u-flex u-gap-2 u-items-center">
+                <button
+                  type="button"
+                  class="icon-btn js-edit"
+                  title="Editar"
+                  data-id="{{ r.id }}"
+                  data-name="{{ (r.name or '')|e }}"
+                  data-cp="{{ (r.cp or '')|e }}"
+                  data-regimen="{{ (r.regimen_fiscal or '')|e }}"
+                  data-uso="{{ (r.uso_cfdi_default or '')|e }}"
+                  data-email="{{ (r.email or '')|e }}"
+                  data-phone="{{ (r.phone or '')|e }}"
+                >
+                  <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M12 20h9" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+                    <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4 11.5-11.5Z" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  class="icon-btn js-invoice"
+                  title="Usar para factura"
+                  data-id="{{ r.id }}"
+                  data-rfc="{{ (r.rfc or '')|e }}"
+                  data-name="{{ (r.name or '')|e }}"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <rect x="3" y="3" width="18" height="18" rx="5" fill="currentColor"/>
+                    <path d="M12 7.25v9.5" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/>
+                    <path d="M7.25 12h9.5" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/>
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  class="icon-btn js-delete"
+                  title="Borrar"
+                  data-id="{{ r.id }}"
+                  data-rfc="{{ (r.rfc or '')|e }}"
+                  data-name="{{ (r.name or '')|e }}"
+                >
+                  <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M3 6h18" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+                    <path d="M8 6V4h8v2" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M6.5 6l1 15h9l1-15" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M10 11v6M14 11v6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+                  </svg>
+                </button>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if pages is defined and pages > 1 %}
+    <nav class="table-pagination u-mt-3" aria-label="Paginación de clientes">
+      <span class="pagination__page">
+        {% if total > 0 %}
+          {% set from = (page - 1) * per_page + 1 %}
+          {% set to = min(page * per_page, total) %}
+          {% if page == 1 %}Mostrando los primeros {{ to }} de {{ total }}{% else %}Mostrando {{ from }}-{{ to }} de {{ total }}{% endif %}
+        {% endif %}
+      </span>
+      <div class="pagination__btns">
+        {% set _q = '&q=' ~ (q|default('')|urlencode) if q|default('') else '' %}
+        {% if hub_base %}
+          {% if page > 1 %}<a href="{{ hub_base }}?tab=clientes&page={{ page - 1 }}{{ _q }}" class="btn btn--sm btn--secondary">Anterior</a>{% else %}<span class="btn btn--sm btn--secondary" aria-disabled="true" style="pointer-events:none; opacity:0.6">Anterior</span>{% endif %}
+          {% if page < pages %}<a href="{{ hub_base }}?tab=clientes&page={{ page + 1 }}{{ _q }}" class="btn btn--sm btn--secondary">Siguiente</a>{% else %}<span class="btn btn--sm btn--secondary" aria-disabled="true" style="pointer-events:none; opacity:0.6">Siguiente</span>{% endif %}
+        {% else %}
+          {% if page > 1 %}<a href="?page={{ page - 1 }}{{ _q }}" class="btn btn--sm btn--secondary">Anterior</a>{% else %}<span class="btn btn--sm btn--secondary" aria-disabled="true" style="pointer-events:none; opacity:0.6">Anterior</span>{% endif %}
+          {% if page < pages %}<a href="?page={{ page + 1 }}{{ _q }}" class="btn btn--sm btn--secondary">Siguiente</a>{% else %}<span class="btn btn--sm btn--secondary" aria-disabled="true" style="pointer-events:none; opacity:0.6">Siguiente</span>{% endif %}
+        {% endif %}
+      </div>
+    </nav>
+    {% endif %}
+    {% endif %}
+  </div>
+</div>
+
+<!-- Modal: Añadir cliente (mismo estilo que en Inicio) -->
+<div id="addClientModal" class="quick-invoice-modal" role="dialog" aria-modal="true" aria-labelledby="addClientModalTitle" aria-label="Añadir cliente" hidden>
+  <div class="quick-invoice-modal__backdrop" id="addClientModalBackdrop"></div>
+  <div class="quick-invoice-modal__panel" id="addClientModalPanel" tabindex="-1">
+    <div class="quick-invoice-modal__header">
+      <h2 id="addClientModalTitle" class="quick-invoice-modal__title">Añadir cliente</h2>
+      <button type="button" class="quick-invoice-modal__close" id="addClientModalClose" aria-label="Cerrar">&times;</button>
+    </div>
+    <div class="quick-invoice-modal__body">
+      <div class="quick-form-grid">
+        <div class="quick-form-field">
+          <label for="addClientRfc" class="label">RFC *</label>
+          <input id="addClientRfc" class="input" autocomplete="off" placeholder="XAXX010101000" />
+        </div>
+        <div class="quick-form-field">
+          <label for="addClientName" class="label">Razón social *</label>
+          <input id="addClientName" class="input" autocomplete="off" placeholder="Cliente SA de CV" />
+        </div>
+        <div class="quick-form-field">
+          <label for="addClientZip" class="label">CP</label>
+          <input id="addClientZip" class="input" autocomplete="off" placeholder="64000" />
+        </div>
+        <div class="quick-form-field">
+          <label for="addClientTaxSystem" class="label">Régimen (receptor)</label>
+          <input id="addClientTaxSystem" class="input" autocomplete="off" placeholder="616" />
+        </div>
+        <div class="quick-form-field quick-form-field--full">
+          <label for="addClientEmail" class="label">Email</label>
+          <input id="addClientEmail" class="input" type="email" autocomplete="off" placeholder="cliente@dominio.com" />
+        </div>
+        <div class="quick-form-field quick-form-field--full">
+          <label for="addClientAlias" class="label">Alias (opcional) Ej: OXXO</label>
+          <input id="addClientAlias" class="input" autocomplete="off" placeholder="" />
+        </div>
+      </div>
+    </div>
+    <div id="addClientError" class="quick-invoice-modal__error" hidden role="alert"></div>
+    <div class="quick-invoice-modal__footer">
+      <button type="button" id="addClientCancel" class="btn btn-ghost">Cancelar</button>
+      <button type="button" id="addClientSave" class="btn btn-primary">Guardar cliente</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="editModal" role="dialog" aria-modal="true" aria-labelledby="editModalTitle" aria-label="Editar cliente" hidden aria-hidden="true">
+  <div class="modal__backdrop" data-close="true"></div>
+  <div class="modal__panel">
+    <div class="modal__head">
+      <div>
+        <div class="modal__title" id="editModalTitle">Editar cliente</div>
+        <div class="modal__subtitle">Campos opcionales para normalizar la información detectada.</div>
+      </div>
+      <button type="button" class="icon-btn" data-close="true" aria-label="Cerrar">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M6 6l12 12" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+          <path d="M18 6 6 18" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+        </svg>
+      </button>
+    </div>
+    <div class="modal__body">
+      <input type="hidden" id="cId" />
+      <div class="field">
+        <label class="label">Nombre</label>
+        <input id="cName" class="input" type="text" autocomplete="off" />
+      </div>
+      <div class="grid-3">
+        <div class="field">
+          <label class="label">CP</label>
+          <input id="cCp" class="input" type="text" autocomplete="off" maxlength="5" />
+        </div>
+        <div class="field">
+          <label class="label">Régimen</label>
+          <input id="cRegimen" class="input" type="text" autocomplete="off" placeholder="601, 612, etc" />
+        </div>
+        <div class="field">
+          <label class="label">Uso CFDI default</label>
+          <input id="cUso" class="input" type="text" autocomplete="off" placeholder="G03" />
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="field">
+          <label class="label">Email</label>
+          <input id="cEmail" class="input" type="email" autocomplete="off" />
+        </div>
+        <div class="field">
+          <label class="label">Teléfono</label>
+          <input id="cPhone" class="input" type="text" autocomplete="off" />
+        </div>
+      </div>
+    </div>
+    <div class="modal__foot">
+      <button type="button" class="btn btn-ghost" data-close="true">Cancelar</button>
+      <button type="button" class="btn btn-primary" id="saveBtn">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="bulkIssueModal" role="dialog" aria-modal="true" aria-labelledby="bulkIssueModalTitle" aria-label="Factura masiva" hidden aria-hidden="true">
+  <div class="modal__backdrop" data-close="true"></div>
+  <div class="modal__panel">
+    <div class="modal__head">
+      <div>
+        <div class="modal__title" id="bulkIssueModalTitle">Factura masiva</div>
+        <div class="modal__subtitle">Emitir 1 factura por cliente (Fase 1).</div>
+      </div>
+      <button type="button" class="icon-btn" data-close="true" aria-label="Cerrar">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M6 6l12 12" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+          <path d="M18 6 6 18" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+        </svg>
+      </button>
+    </div>
+    <div class="modal__body">
+      <div class="u-flex u-items-center u-gap-2 u-mb-2">
+        <span class="muted u-text-12" id="bulkIssueSummary"></span>
+      </div>
+      <div class="muted u-text-12 u-mb-3" id="bulkIssueClientsPreview"></div>
+      <div class="field">
+        <label class="label">Producto</label>
+        <div class="u-flex u-items-center u-gap-2">
+          <button type="button" class="btn btn--secondary" id="bulkPickProductBtn">Elegir producto</button>
+          <div class="muted u-text-12" id="bulkPickedProductText"></div>
+        </div>
+      </div>
+      <div class="field">
+        <label class="label">Cantidad</label>
+        <input type="number" class="input" id="bulkQty" value="1" min="1" step="1" />
+      </div>
+      <div id="bulkIssueError" class="modal__note modal__note--danger" hidden role="alert"></div>
+    </div>
+    <div class="modal__foot">
+      <button type="button" class="btn btn-ghost" data-close="true">Cancelar</button>
+      <button type="button" class="btn btn-primary" id="bulkIssueSubmitBtn">Emitir</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  function $(id){ return document.getElementById(id); }
+  var modal = $('editModal');
+  var saveBtn = $('saveBtn');
+  var _editModalRemoveEscape = null;
+
+  // Bulk mode (factura masiva fase 1)
+  var bulkToggleBtn = $('bulkToggleBtn');
+  var bulkBar = $('clientsBulkBar');
+  var bulkTh = $('bulkTh');
+  var bulkSelectAll = $('bulkSelectAll');
+  var bulkCancelBtn = $('bulkCancelBtn');
+  var bulkCountText = $('bulkCountText');
+  var bulkOpenIssueBtn = $('bulkOpenIssueBtn');
+  var bulkMode = false;
+  var selected = new Set();
+
+  var bulkIssueModal = $('bulkIssueModal');
+  var bulkIssueSummary = $('bulkIssueSummary');
+  var bulkIssueClientsPreview = $('bulkIssueClientsPreview');
+  var bulkPickProductBtn = $('bulkPickProductBtn');
+  var bulkPickedProductText = $('bulkPickedProductText');
+  var bulkQty = $('bulkQty');
+  var bulkIssueError = $('bulkIssueError');
+  var bulkIssueSubmitBtn = $('bulkIssueSubmitBtn');
+  var _bulkRemoveEscape = null;
+  var bulkProductId = null;
+
+  // Modal Añadir cliente
+  var addClientBtn = $('addClientBtn');
+  var addClientBtnEmpty = $('addClientBtnEmpty');
+  var addClientModal = $('addClientModal');
+  var addClientBackdrop = $('addClientModalBackdrop');
+  var addClientClose = $('addClientModalClose');
+  var addClientCancel = $('addClientCancel');
+  var addClientSave = $('addClientSave');
+  var addClientError = $('addClientError');
+  var _addClientRemoveEscape = null;
+  function openAddClientModal() {
+    if (!addClientModal) return;
+    addClientModal.hidden = false;
+    addClientModal.setAttribute('aria-hidden', 'false');
+    if (addClientError) { addClientError.hidden = true; addClientError.textContent = ''; }
+    _addClientRemoveEscape = (typeof window.uiCloseOnEscape === 'function') ? window.uiCloseOnEscape(addClientModal, closeAddClientModal) : null;
+    if (typeof window.uiTrapFocus === 'function') window.uiTrapFocus(addClientModal);
+    setTimeout(function(){ var el = $('addClientRfc'); if (el) el.focus(); }, 80);
+  }
+  function closeAddClientModal() {
+    if (!addClientModal) return;
+    if (typeof window.uiReleaseFocusTrap === 'function') window.uiReleaseFocusTrap();
+    if (_addClientRemoveEscape) { _addClientRemoveEscape(); _addClientRemoveEscape = null; }
+    addClientModal.hidden = true;
+    addClientModal.setAttribute('aria-hidden', 'true');
+  }
+  if (addClientBtn) addClientBtn.addEventListener('click', openAddClientModal);
+  if (addClientBtnEmpty) addClientBtnEmpty.addEventListener('click', openAddClientModal);
+  if (addClientBackdrop) addClientBackdrop.addEventListener('click', closeAddClientModal);
+  if (addClientClose) addClientClose.addEventListener('click', closeAddClientModal);
+  if (addClientCancel) addClientCancel.addEventListener('click', closeAddClientModal);
+  if (addClientSave) addClientSave.addEventListener('click', async function () {
+    var rfc = (($('addClientRfc') && $('addClientRfc').value) || '').trim().toUpperCase();
+    var legalName = (($('addClientName') && $('addClientName').value) || '').trim();
+    if (!rfc || !legalName) {
+      if (addClientError) { addClientError.textContent = 'RFC y Razón social son obligatorios.'; addClientError.hidden = false; }
+      return;
+    }
+    var zip = (($('addClientZip') && $('addClientZip').value) || '').trim();
+    var taxSystem = (($('addClientTaxSystem') && $('addClientTaxSystem').value) || '').trim();
+    var email = (($('addClientEmail') && $('addClientEmail').value) || '').trim() || null;
+    var alias = (($('addClientAlias') && $('addClientAlias').value) || '').trim() || null;
+    if (addClientError) { addClientError.hidden = true; addClientError.textContent = ''; }
+    addClientSave.disabled = true;
+    var csrf = document.querySelector('meta[name="csrf-token"]') && document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+    var headers = { 'Content-Type': 'application/json' };
+    if (csrf) headers['X-CSRF-Token'] = csrf;
+    try {
+      var res = await (window.portalFetchJSON ? window.portalFetchJSON('/api/customers/create', { method: 'POST', credentials: 'same-origin', headers: headers, body: JSON.stringify({ rfc: rfc, legal_name: legalName, zip: zip, tax_system: taxSystem, email: email, alias: alias }) }, { timeoutMs: 30000, retry: 0 }) : Promise.resolve({ ok: false, detail: 'Helper no disponible' }));
+      addClientSave.disabled = false;
+      if (res && res.ok && res.data && res.data.ok) {
+        closeAddClientModal();
+        if (window.uiToast) window.uiToast({ type: 'success', title: 'Cliente guardado', message: 'Se añadió ' + rfc });
+        setTimeout(function(){ window.location.reload(); }, 400);
+        return;
+      }
+      var msg = (res && res.data && res.data.detail) ? String(res.data.detail) : ((res && res.detail) || 'No se pudo guardar.');
+      if (addClientError) { addClientError.textContent = msg; addClientError.hidden = false; }
+    } catch (e) {
+      addClientSave.disabled = false;
+      if (addClientError) { addClientError.textContent = (e && e.message) || 'Error de conexión.'; addClientError.hidden = false; }
+    }
+  });
+
+  function setBulkMode(on) {
+    bulkMode = !!on;
+    if (bulkToggleBtn) {
+      bulkToggleBtn.setAttribute('aria-pressed', bulkMode ? 'true' : 'false');
+      bulkToggleBtn.textContent = bulkMode ? 'Cancelar selección' : 'Escoger varios';
+    }
+    if (bulkBar) bulkBar.hidden = !bulkMode;
+    if (bulkTh) bulkTh.hidden = !bulkMode;
+    document.querySelectorAll('.bulkTd').forEach(function (td) { td.hidden = !bulkMode; });
+    if (!bulkMode) {
+      selected.clear();
+      document.querySelectorAll('.js-bulk-item').forEach(function (cb) { cb.checked = false; });
+      if (bulkSelectAll) bulkSelectAll.checked = false;
+      refreshBulkCount();
+    }
+  }
+  function refreshBulkCount() {
+    if (bulkCountText) bulkCountText.textContent = selected.size ? (selected.size + ' seleccionados') : '';
+  }
+  if (bulkToggleBtn) bulkToggleBtn.addEventListener('click', function () { setBulkMode(!bulkMode); });
+  if (bulkCancelBtn) bulkCancelBtn.addEventListener('click', function () { setBulkMode(false); });
+
+  document.querySelectorAll('.js-bulk-item').forEach(function (cb) {
+    cb.addEventListener('change', function () {
+      var id = cb.getAttribute('data-id');
+      if (!id) return;
+      if (cb.checked) selected.add(String(id));
+      else selected.delete(String(id));
+      refreshBulkCount();
+    });
+  });
+  if (bulkSelectAll) bulkSelectAll.addEventListener('change', function () {
+    var checked = !!bulkSelectAll.checked;
+    document.querySelectorAll('.js-bulk-item').forEach(function (cb) {
+      cb.checked = checked;
+      var id = cb.getAttribute('data-id');
+      if (!id) return;
+      if (checked) selected.add(String(id));
+      else selected.delete(String(id));
+    });
+    refreshBulkCount();
+  });
+
+  function openBulkIssueModal() {
+    if (!bulkIssueModal) return;
+    if (bulkIssueError) { bulkIssueError.hidden = true; bulkIssueError.textContent = ''; }
+    bulkIssueModal.hidden = false;
+    bulkIssueModal.setAttribute('aria-hidden', 'false');
+    _bulkRemoveEscape = (typeof window.uiCloseOnEscape === 'function') ? window.uiCloseOnEscape(bulkIssueModal, closeBulkIssueModal) : null;
+    if (typeof window.uiTrapFocus === 'function') window.uiTrapFocus(bulkIssueModal);
+    if (bulkIssueSummary) bulkIssueSummary.textContent = 'Clientes seleccionados: ' + selected.size;
+    if (bulkIssueClientsPreview) {
+      var names = [];
+      document.querySelectorAll('.js-bulk-item').forEach(function (cb) {
+        if (!cb.checked) return;
+        var name = cb.getAttribute('data-name') || cb.getAttribute('data-rfc') || '';
+        if (name) names.push(name);
+      });
+      var preview = names.slice(0, 8).join(' · ');
+      bulkIssueClientsPreview.textContent = preview ? ('Incluye: ' + preview + (names.length > 8 ? '…' : '')) : '';
+    }
+    setTimeout(function () { try { if (bulkPickProductBtn) bulkPickProductBtn.focus(); } catch (_) {} }, 80);
+  }
+  function closeBulkIssueModal() {
+    if (!bulkIssueModal) return;
+    if (typeof window.uiReleaseFocusTrap === 'function') window.uiReleaseFocusTrap();
+    if (_bulkRemoveEscape) { _bulkRemoveEscape(); _bulkRemoveEscape = null; }
+    bulkIssueModal.hidden = true;
+    bulkIssueModal.setAttribute('aria-hidden', 'true');
+  }
+  if (bulkIssueModal) bulkIssueModal.addEventListener('click', function (e) {
+    if (e.target && e.target.dataset && e.target.dataset.close === 'true') closeBulkIssueModal();
+  });
+
+  if (bulkOpenIssueBtn) bulkOpenIssueBtn.addEventListener('click', function () {
+    if (!selected.size) {
+      if (window.uiToast) window.uiToast({ type: 'info', title: 'Selecciona clientes', message: 'Elige uno o más clientes.' });
+      return;
+    }
+    openBulkIssueModal();
+  });
+
+  if (bulkPickProductBtn) bulkPickProductBtn.addEventListener('click', async function () {
+    if (!(window.QuickInvoice && typeof window.QuickInvoice.pickProduct === 'function')) {
+      if (bulkIssueError) { bulkIssueError.textContent = 'No se pudo abrir el selector de productos. Refresca la página.'; bulkIssueError.hidden = false; }
+      return;
+    }
+    try {
+      var p = await window.QuickInvoice.pickProduct();
+      if (p && p.id != null) {
+        bulkProductId = Number(p.id);
+        if (bulkPickedProductText) bulkPickedProductText.textContent = (p.description || p.name || p.product_key || '') + (p.unit_price != null ? (' · $' + Number(p.unit_price).toFixed(2)) : '');
+      }
+    } catch (e) {
+      if (bulkIssueError) { bulkIssueError.textContent = (e && e.message) || 'No se pudo elegir el producto.'; bulkIssueError.hidden = false; }
+    }
+  });
+
+  if (bulkIssueSubmitBtn) bulkIssueSubmitBtn.addEventListener('click', async function () {
+    if (!selected.size) return;
+    if (!bulkProductId) {
+      if (bulkIssueError) { bulkIssueError.textContent = 'Elige un producto.'; bulkIssueError.hidden = false; }
+      return;
+    }
+    var qty = bulkQty ? Number(bulkQty.value || 1) : 1;
+    if (!Number.isFinite(qty) || qty <= 0) {
+      if (bulkIssueError) { bulkIssueError.textContent = 'Cantidad inválida.'; bulkIssueError.hidden = false; }
+      return;
+    }
+    if (bulkIssueError) { bulkIssueError.hidden = true; bulkIssueError.textContent = ''; }
+    if (bulkIssueSubmitBtn) bulkIssueSubmitBtn.disabled = true;
+    try {
+      var csrf = document.querySelector('meta[name="csrf-token"]') && document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+      var headers = { 'Content-Type': 'application/json' };
+      if (csrf) headers['X-CSRF-Token'] = csrf;
+      var res = await (window.portalFetchJSON
+        ? window.portalFetchJSON('/api/invoices/bulk_issue', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: headers,
+            body: JSON.stringify({ customer_ids: Array.from(selected).map(function (x) { return Number(x); }), product_id: bulkProductId, qty: qty })
+          }, { timeoutMs: 120000, retry: 0 })
+        : Promise.resolve({ ok: false, detail: 'Helper no disponible' })
+      );
+      if (bulkIssueSubmitBtn) bulkIssueSubmitBtn.disabled = false;
+      if (!res || !res.ok || !res.data || !res.data.ok) {
+        var msg = (res && res.data && (res.data.detail || res.data.message)) ? String(res.data.detail || res.data.message) : ((res && res.detail) || 'No se pudo emitir.');
+        if (bulkIssueError) { bulkIssueError.textContent = msg; bulkIssueError.hidden = false; }
+        return;
+      }
+      var list = (res.data && res.data.data && res.data.data.results) ? res.data.data.results : (res.data.results || []);
+      var okCount = (Array.isArray(list) ? list.filter(function (x) { return x && x.ok; }).length : 0);
+      var errCount = (Array.isArray(list) ? list.filter(function (x) { return x && !x.ok; }).length : 0);
+      closeBulkIssueModal();
+      setBulkMode(false);
+      if (window.uiToast) window.uiToast({
+        type: errCount ? 'warning' : 'success',
+        title: 'Factura masiva',
+        message: 'Emitidas: ' + okCount + ' · Errores: ' + errCount
+      });
+    } catch (e) {
+      if (bulkIssueSubmitBtn) bulkIssueSubmitBtn.disabled = false;
+      if (bulkIssueError) { bulkIssueError.textContent = (e && e.message) || 'No se pudo emitir.'; bulkIssueError.hidden = false; }
+    }
+  });
+
+  function openModal() {
+    if (!modal) return;
+    modal.hidden = false;
+    modal.setAttribute('aria-hidden', 'false');
+    _editModalRemoveEscape = (typeof window.uiCloseOnEscape === 'function') ? window.uiCloseOnEscape(modal, closeModal) : null;
+    if (typeof window.uiTrapFocus === 'function') window.uiTrapFocus(modal);
+  }
+  function closeModal() {
+    if (!modal) return;
+    if (typeof window.uiReleaseFocusTrap === 'function') window.uiReleaseFocusTrap();
+    if (_editModalRemoveEscape) { _editModalRemoveEscape(); _editModalRemoveEscape = null; }
+    modal.hidden = true;
+    modal.setAttribute('aria-hidden', 'true');
+  }
+
+  if (modal) modal.addEventListener('click', function(e){
+    if (e.target && e.target.dataset && e.target.dataset.close === 'true') closeModal();
+  });
+
+  document.querySelectorAll('.js-edit').forEach(function (b) {
+    b.addEventListener('click', function () {
+      $('cId').value = b.getAttribute('data-id') || '';
+      $('cName').value = b.getAttribute('data-name') || '';
+      $('cCp').value = b.getAttribute('data-cp') || '';
+      $('cRegimen').value = b.getAttribute('data-regimen') || '';
+      $('cUso').value = b.getAttribute('data-uso') || '';
+      $('cEmail').value = b.getAttribute('data-email') || '';
+      $('cPhone').value = b.getAttribute('data-phone') || '';
+      openModal();
+    });
+  });
+
+  // Borrar cliente (tabla clients)
+  document.querySelectorAll('.js-delete').forEach(function (b) {
+    b.addEventListener('click', async function () {
+      var id = b.getAttribute('data-id');
+      var name = b.getAttribute('data-name') || b.getAttribute('data-rfc') || 'este cliente';
+      if (!id) return;
+      if (typeof window.portalConfirm === 'function') {
+        var ok = await window.portalConfirm({
+          title: 'Borrar cliente',
+          message: '¿Seguro que quieres borrar “' + name + '”? Esta acción no se puede deshacer.',
+          confirmLabel: 'Sí, borrar',
+          cancelLabel: 'Cancelar'
+        });
+        if (!ok) return;
+      } else {
+        if (!confirm('¿Borrar “' + name + '”?')) return;
+      }
+      try {
+        var res = await (window.portalFetchJSON
+          ? window.portalFetchJSON('/portal/clients/' + encodeURIComponent(id) + '/delete', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({})
+            }, { timeoutMs: 30000, retry: 0 })
+          : Promise.resolve({ ok: false, detail: 'Helper no disponible' })
+        );
+        if (!res || !res.ok || !res.data || !res.data.ok) {
+          var msg = (res && res.data && (res.data.detail || res.data.message)) ? String(res.data.detail || res.data.message) : ((res && res.detail) || 'No se pudo borrar.');
+          if (window.uiToast) window.uiToast({ type: 'danger', title: 'Error', message: msg });
+          return;
+        }
+        if (window.uiToast) window.uiToast({ type: 'success', title: 'Borrado', message: 'Cliente eliminado.' });
+        setTimeout(function(){ window.location.reload(); }, 300);
+      } catch (e) {
+        if (window.uiToast) window.uiToast({ type: 'danger', title: 'Error', message: (e && e.message) || 'Error de red.' });
+      }
+    });
+  });
+
+  // Facturar (se conectará al QuickInvoice reutilizable)
+  document.querySelectorAll('.js-invoice').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var rfc = b.getAttribute('data-rfc') || '';
+      if (!rfc) return;
+      if (window.QuickInvoice && typeof window.QuickInvoice.open === 'function') {
+        window.QuickInvoice.open({ preselectedCustomerRfc: rfc });
+      } else {
+        if (window.uiToast) window.uiToast({ type: 'info', title: 'Factura rápida', message: 'Cargando…' });
+      }
+    });
+  });
+
+  if (saveBtn) saveBtn.addEventListener('click', async function () {
+    var payload = {
+      id: $('cId').value,
+      name: $('cName').value,
+      cp: $('cCp').value,
+      regimen_fiscal: $('cRegimen').value,
+      uso_cfdi_default: $('cUso').value,
+      email: $('cEmail').value,
+      phone: $('cPhone').value
+    };
+    if (window.uiSetButtonLoading) window.uiSetButtonLoading(saveBtn, true, 'Guardando…');
+    try {
+      var res = await (window.portalFetchJSON
+        ? window.portalFetchJSON('/portal/clients/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          }, { timeoutMs: 30000, retry: 0 })
+        : Promise.resolve({ ok: false, detail: 'Helper no disponible' })
+      );
+      if (window.uiSetButtonLoading) window.uiSetButtonLoading(saveBtn, false);
+      if (!res || !res.ok || !res.data || !res.data.ok) {
+        var msg = (res && res.data && (res.data.detail || res.data.message)) ? String(res.data.detail || res.data.message) : ((res && res.detail) || 'No se pudo guardar.');
+        if (window.uiToast) window.uiToast({ type: 'danger', title: 'Error', message: msg });
+        return;
+      }
+      closeModal();
+      if (window.uiToast) window.uiToast({ type: 'success', title: 'Guardado', message: 'Cliente actualizado.' });
+      setTimeout(function(){ window.location.reload(); }, 400);
+    } catch (e) {
+      if (window.uiSetButtonLoading) window.uiSetButtonLoading(saveBtn, false);
+      if (window.uiToast) window.uiToast({ type: 'danger', title: 'Error', message: (e && e.message) || 'Error de red.' });
+    }
+  });
+
+  setBulkMode(false);
+})();
+</script>
+
+{% include "components/quick_invoice_modal.html" %}
+<script src="/static/js/quick-invoice.js"></script>

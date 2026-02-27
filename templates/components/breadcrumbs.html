@@ -1,0 +1,62 @@
+{# Breadcrumb del portal. Requiere: active_page (del contexto de base_portal). #}
+<nav class="portal-topbar__breadcrumb" aria-label="Breadcrumb">
+  <a href="/portal/home" class="portal-topbar__breadcrumb-item">Inicio</a>
+  {% if active_page == 'issued' %}
+    <span class="portal-topbar__breadcrumb-sep" aria-hidden="true">›</span>
+    <span class="portal-topbar__breadcrumb-item portal-topbar__breadcrumb-item--current">Emitidas</span>
+  {% elif active_page == 'received' %}
+    <span class="portal-topbar__breadcrumb-sep" aria-hidden="true">›</span>
+    <span class="portal-topbar__breadcrumb-item portal-topbar__breadcrumb-item--current">Recibidas</span>
+  {% elif active_page == 'nomina' %}
+    <span class="portal-topbar__breadcrumb-sep" aria-hidden="true">›</span>
+    <span class="portal-topbar__breadcrumb-item portal-topbar__breadcrumb-item--current">Nómina</span>
+  {% elif active_page == 'quotations' %}
+    <span class="portal-topbar__breadcrumb-sep" aria-hidden="true">›</span>
+    <span class="portal-topbar__breadcrumb-item portal-topbar__breadcrumb-item--current">Cotizaciones</span>
+  {% elif active_page == 'create' %}
+    <span class="portal-topbar__breadcrumb-sep" aria-hidden="true">›</span>
+    <span class="portal-topbar__breadcrumb-item portal-topbar__breadcrumb-item--current">Generar factura</span>
+  {% elif active_page == 'facturas_hub' %}
+    <span class="portal-topbar__breadcrumb-sep" aria-hidden="true">›</span>
+    <span class="portal-topbar__breadcrumb-item portal-topbar__breadcrumb-item--current">Facturas</span>
+  {% elif active_page == 'contactos_hub' %}
+    <span class="portal-topbar__breadcrumb-sep" aria-hidden="true">›</span>
+    <span class="portal-topbar__breadcrumb-item portal-topbar__breadcrumb-item--current">Contactos</span>
+  {% elif active_page == 'bancos_hub' %}
+    <span class="portal-topbar__breadcrumb-sep" aria-hidden="true">›</span>
+    <span class="portal-topbar__breadcrumb-item portal-topbar__breadcrumb-item--current">Bancos</span>
+  {% elif active_page == 'clients' %}
+    <span class="portal-topbar__breadcrumb-sep" aria-hidden="true">›</span>
+    <span class="portal-topbar__breadcrumb-item portal-topbar__breadcrumb-item--current">Clientes</span>
+  {% elif active_page == 'providers' %}
+    <span class="portal-topbar__breadcrumb-sep" aria-hidden="true">›</span>
+    <span class="portal-topbar__breadcrumb-item portal-topbar__breadcrumb-item--current">Proveedores</span>
+  {% elif active_page == 'products' %}
+    <span class="portal-topbar__breadcrumb-sep" aria-hidden="true">›</span>
+    <span class="portal-topbar__breadcrumb-item portal-topbar__breadcrumb-item--current">Productos</span>
+  {% elif active_page == 'product_suggestions' %}
+    <span class="portal-topbar__breadcrumb-sep" aria-hidden="true">›</span>
+    <span class="portal-topbar__breadcrumb-item portal-topbar__breadcrumb-item--current">Productos sugeridos</span>
+  {% elif active_page == 'summary' %}
+    <span class="portal-topbar__breadcrumb-sep" aria-hidden="true">›</span>
+    <span class="portal-topbar__breadcrumb-item portal-topbar__breadcrumb-item--current">Resumen</span>
+  {% elif active_page == 'bank_pdf_to_excel' or active_page == 'convertir_edo_cuenta' %}
+    <span class="portal-topbar__breadcrumb-sep" aria-hidden="true">›</span>
+    <span class="portal-topbar__breadcrumb-item portal-topbar__breadcrumb-item--current">Convertir Edo. de Cuenta</span>
+  {% elif active_page == 'bank_statements' %}
+    <span class="portal-topbar__breadcrumb-sep" aria-hidden="true">›</span>
+    <span class="portal-topbar__breadcrumb-item portal-topbar__breadcrumb-item--current">Estados de cuenta</span>
+  {% elif active_page == 'bank_movements' %}
+    <span class="portal-topbar__breadcrumb-sep" aria-hidden="true">›</span>
+    <span class="portal-topbar__breadcrumb-item portal-topbar__breadcrumb-item--current">Movimientos</span>
+  {% elif active_page == 'plan' %}
+    <span class="portal-topbar__breadcrumb-sep" aria-hidden="true">›</span>
+    <span class="portal-topbar__breadcrumb-item portal-topbar__breadcrumb-item--current">Mi plan</span>
+  {% elif active_page == 'config_sat' %}
+    <span class="portal-topbar__breadcrumb-sep" aria-hidden="true">›</span>
+    <span class="portal-topbar__breadcrumb-item portal-topbar__breadcrumb-item--current">FIEL SAT</span>
+  {% elif active_page == 'datos_fiscales' %}
+    <span class="portal-topbar__breadcrumb-sep" aria-hidden="true">›</span>
+    <span class="portal-topbar__breadcrumb-item portal-topbar__breadcrumb-item--current">Datos fiscales</span>
+  {% endif %}
+</nav>

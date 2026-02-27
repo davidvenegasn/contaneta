@@ -1,0 +1,40 @@
+{% extends "base_portal.html" %}
+{% set title = 'Datos fiscales' %}
+{% block content %}
+<header class="app-header app-header--with-back">
+  <div class="app-header__left">
+    <a href="/portal/home" class="btn btn--ghost btn--sm app-header__back" style="text-decoration:none;">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" width="18" height="18"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+      Inicio
+    </a>
+    <div>
+      <h1 class="app-title">Datos fiscales</h1>
+      <p class="app-subtitle muted">Información fiscal del emisor (solo lectura).</p>
+    </div>
+  </div>
+</header>
+
+<nav class="portal-breadcrumb" aria-label="Breadcrumb" style="margin-bottom:var(--space-4);">
+  <a href="/portal/home">Inicio</a>
+  <span aria-hidden="true">›</span>
+  <span>Datos fiscales</span>
+</nav>
+
+<div class="card p-20 fiel-card">
+  <dl class="datos-fiscales-list">
+    <div class="datos-fiscales-row">
+      <dt class="datos-fiscales-label">RFC</dt>
+      <dd class="datos-fiscales-value">{{ issuer_rfc or '—' }}</dd>
+    </div>
+    <div class="datos-fiscales-row">
+      <dt class="datos-fiscales-label">Razón social</dt>
+      <dd class="datos-fiscales-value">{{ issuer_razon_social|default(issuer_alias)|default('—') }}</dd>
+    </div>
+    <div class="datos-fiscales-row">
+      <dt class="datos-fiscales-label">Régimen fiscal</dt>
+      <dd class="datos-fiscales-value">{{ issuer_regimen_label or '—' }}</dd>
+    </div>
+  </dl>
+  <p class="muted" style="margin:16px 0 0; font-size:13px;">Para modificar estos datos, contacta a soporte o usa la configuración de tu cuenta.</p>
+</div>
+{% endblock %}

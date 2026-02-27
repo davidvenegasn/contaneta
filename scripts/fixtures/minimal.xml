@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<cfdi:Comprobante xmlns:cfdi="http://www.sat.gob.mx/cfd/3" Version="3.3" Serie="A" Folio="1" Fecha="2024-01-01T12:00:00" SubTotal="100.00" Total="116.00" Moneda="MXN" TipoDeComprobante="I" LugarExpedicion="64000" NoCertificado="" Certificado="" Sello="">
+  <cfdi:Emisor Rfc="XAXX010101000" Nombre="Emisor Prueba" RegimenFiscal="612"/>
+  <cfdi:Receptor Rfc="XEXX010101000" Nombre="Receptor Prueba" UsoCFDI="G03" DomicilioFiscalReceptor="64000" RegimenFiscalReceptor="616"/>
+  <cfdi:Conceptos>
+    <cfdi:Concepto ClaveProdServ="84111506" Cantidad="1" ClaveUnidad="E48" Unidad="Servicio" Descripcion="Concepto prueba" ValorUnitario="100.00" Importe="100.00">
+      <cfdi:Impuestos><cfdi:Traslados><cfdi:Traslado Base="100.00" Impuesto="002" TipoFactor="Tasa" TasaOCuota="0.160000" Importe="16.00"/></cfdi:Traslados></cfdi:Impuestos>
+    </cfdi:Concepto>
+  </cfdi:Conceptos>
+  <cfdi:Impuestos TotalImpuestosTrasladados="16.00">
+    <cfdi:Traslados><cfdi:Traslado Base="100.00" Impuesto="002" TipoFactor="Tasa" TasaOCuota="0.160000" Importe="16.00"/></cfdi:Traslados>
+  </cfdi:Impuestos>
+</cfdi:Comprobante>

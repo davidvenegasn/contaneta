@@ -1,0 +1,52 @@
+/**
+ * Links en login, registro, planes: evitar color morado (visited) y aspecto consistente.
+ * Usar .auth-link en <a> de páginas públicas (login, register, pricing).
+ */
+.auth-link,
+.auth-link:link,
+.auth-link:visited {
+  color: var(--auth-link-color, #0d9488);
+  text-decoration: none;
+  font-weight: 600;
+}
+.auth-link:hover {
+  text-decoration: underline;
+  color: var(--auth-link-hover, #0f766e);
+}
+.auth-link:active {
+  color: var(--auth-link-active, #115e59);
+}
+.auth-link:focus-visible {
+  outline: 2px solid var(--auth-link-color, #0d9488);
+  outline-offset: 2px;
+}
+
+/* Contenedor de varios links (footer login/register) */
+.auth-footer .auth-link,
+.auth-footer a {
+  color: var(--auth-link-color, #0d9488) !important;
+  font-weight: 600;
+  text-decoration: none;
+}
+.auth-footer .auth-link:visited,
+.auth-footer a:visited {
+  color: var(--auth-link-color, #0d9488) !important;
+}
+.auth-footer .auth-link:hover,
+.auth-footer a:hover {
+  text-decoration: underline;
+  color: var(--auth-link-hover, #0f766e) !important;
+}
+
+.token-link .auth-link,
+.token-link a {
+  color: var(--auth-link-color, #0d9488) !important;
+  font-weight: 600;
+  text-decoration: none;
+}
+.token-link a:visited {
+  color: var(--auth-link-color, #0d9488) !important;
+}
+.token-link a:hover {
+  text-decoration: underline;
+}

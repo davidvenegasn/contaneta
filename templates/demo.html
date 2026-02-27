@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  {% set seo_title = "Demo interactivo · ContaNeta" %}
+  {% set seo_description = "Prueba el portal de ContaNeta sin instalar nada: SAT Sync, facturas emitidas, factura rápida y cotizaciones. Simulación en vivo." %}
+  {% include "_meta_seo.html" %}
+  {% include "_schema_software.html" %}
+  <title>Demo interactivo — ContaNeta</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --demo-bg: #f8fafc;
+      --demo-card: #fff;
+      --demo-border: #e2e8f0;
+      --demo-text: #1e293b;
+      --demo-muted: #64748b;
+      --demo-accent: #0f766e;
+      --demo-accent-hover: #0d9488;
+      --demo-radius: 16px;
+      --demo-shadow: 0 4px 6px -1px rgba(0,0,0,.06), 0 2px 4px -2px rgba(0,0,0,.04);
+      --demo-shadow-hover: 0 20px 25px -5px rgba(0,0,0,.08), 0 8px 10px -6px rgba(0,0,0,.04);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+      background: var(--demo-bg);
+      color: var(--demo-text);
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+    .demo-header {
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--demo-border);
+      background: var(--demo-card);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .demo-header__inner {
+      max-width: 960px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .demo-logo { font-weight: 700; font-size: 1.25rem; color: var(--demo-text); text-decoration: none; }
+    .demo-logo:hover { color: var(--demo-accent); }
+    .demo-nav { display: flex; gap: 8px; }
+    .demo-nav a {
+      padding: 8px 14px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 500;
+      text-decoration: none;
+      color: var(--demo-muted);
+      transition: color .15s, background .15s;
+    }
+    .demo-nav a:hover { color: var(--demo-accent); background: rgba(15, 118, 110, .08); }
+    .demo-nav a.demo-cta { background: var(--demo-accent); color: #fff; }
+    .demo-nav a.demo-cta:hover { background: var(--demo-accent-hover); }
+
+    .demo-hero {
+      padding: 48px 24px 32px;
+      text-align: center;
+      opacity: 0;
+      transform: translateY(12px);
+      transition: opacity .6s ease, transform .6s ease;
+    }
+    .demo-hero.reveal { opacity: 1; transform: translateY(0); }
+    .demo-hero h1 { margin: 0 0 8px; font-size: clamp(1.5rem, 4vw, 2rem); font-weight: 700; letter-spacing: -0.02em; }
+    .demo-hero p { margin: 0; font-size: 1rem; color: var(--demo-muted); max-width: 480px; margin-left: auto; margin-right: auto; }
+
+    .demo-hero-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+      max-width: 640px;
+      margin: 32px auto 0;
+      padding: 0 16px;
+    }
+    @media (max-width: 520px) {
+      .demo-hero-stats { grid-template-columns: 1fr; }
+    }
+    .demo-hero-stat {
+      background: var(--demo-card);
+      border-radius: var(--demo-radius);
+      padding: 20px;
+      text-align: center;
+      box-shadow: var(--demo-shadow);
+      border: 1px solid var(--demo-border);
+      opacity: 0;
+      transform: translateY(10px);
+      transition: opacity .5s ease, transform .5s ease, box-shadow .2s, transform .2s;
+    }
+    .demo-hero.reveal .demo-hero-stat { opacity: 1; transform: translateY(0); }
+    .demo-hero.reveal .demo-hero-stat:nth-child(1) { transition-delay: .15s; }
+    .demo-hero.reveal .demo-hero-stat:nth-child(2) { transition-delay: .25s; }
+    .demo-hero.reveal .demo-hero-stat:nth-child(3) { transition-delay: .35s; }
+    .demo-hero-stat:hover { box-shadow: var(--demo-shadow-hover); }
+    .demo-hero-stat__value {
+      font-size: clamp(1.5rem, 4vw, 2rem);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      line-height: 1.2;
+      color: var(--demo-text);
+    }
+    .demo-hero-stat__value[data-count-prefix="$"] { color: var(--demo-accent); }
+    .demo-hero-stat__label {
+      margin-top: 4px;
+      font-size: 13px;
+      color: var(--demo-muted);
+      font-weight: 500;
+    }
+
+    .demo-tabs {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 0 24px 24px;
+    }
+    .demo-tablist {
+      display: flex;
+      gap: 4px;
+      padding: 4px;
+      background: var(--demo-card);
+      border-radius: 12px;
+      box-shadow: var(--demo-shadow);
+      margin-bottom: 24px;
+      overflow-x: auto;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity .5s ease .1s, transform .5s ease .1s;
+    }
+    .demo-tabs.reveal .demo-tablist { opacity: 1; transform: translateY(0); }
+    .demo-tab {
+      flex: 1;
+      min-width: 120px;
+      padding: 12px 16px;
+      border: none;
+      border-radius: 10px;
+      font: inherit;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--demo-muted);
+      background: transparent;
+      cursor: pointer;
+      transition: color .2s, background .2s, transform .15s;
+    }
+    .demo-tab:hover { color: var(--demo-text); background: rgba(0,0,0,.04); }
+    .demo-tab:focus { outline: none; box-shadow: 0 0 0 2px var(--demo-accent); }
+    .demo-tab[aria-selected="true"] { color: var(--demo-accent); background: rgba(15, 118, 110, .12); }
+
+    .demo-panel {
+      display: none;
+      animation: demo-fadeIn .4s ease;
+    }
+    .demo-panel[aria-hidden="false"] { display: block; }
+    @keyframes demo-fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+    .demo-cards {
+      display: grid;
+      gap: 20px;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    }
+    .demo-card {
+      background: var(--demo-card);
+      border-radius: var(--demo-radius);
+      padding: 20px;
+      box-shadow: var(--demo-shadow);
+      border: 1px solid var(--demo-border);
+      transition: transform .2s ease, box-shadow .2s ease;
+      opacity: 0;
+      transform: translateY(16px);
+      transition: opacity .5s ease, transform .5s ease, box-shadow .2s, transform .2s;
+    }
+    .demo-card.reveal { opacity: 1; transform: translateY(0); }
+    .demo-card:hover { transform: translateY(-2px); box-shadow: var(--demo-shadow-hover); }
+    .demo-card__title { margin: 0 0 8px; font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+    .demo-card__title svg { flex-shrink: 0; opacity: .9; }
+    .demo-card__meta { font-size: 13px; color: var(--demo-muted); margin-bottom: 12px; }
+    .demo-card__value { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.02em; }
+    .demo-mock-table { width: 100%; font-size: 13px; border-collapse: collapse; }
+    .demo-mock-table th { text-align: left; padding: 8px 0; color: var(--demo-muted); font-weight: 600; }
+    .demo-mock-table td { padding: 10px 0; border-top: 1px solid var(--demo-border); }
+    .demo-mock-row { opacity: 0.85; }
+
+    .demo-cta-block {
+      margin-top: 28px;
+      padding: 24px;
+      background: linear-gradient(135deg, rgba(15, 118, 110, .08) 0%, rgba(13, 148, 136, .06) 100%);
+      border-radius: var(--demo-radius);
+      border: 1px solid rgba(15, 118, 110, .2);
+      text-align: center;
+      opacity: 0;
+      transform: translateY(12px);
+      transition: opacity .5s ease .2s, transform .5s ease .2s;
+    }
+    .demo-cta-block.reveal { opacity: 1; transform: translateY(0); }
+    .demo-cta-block p { margin: 0 0 16px; color: var(--demo-muted); font-size: 14px; }
+    .demo-cta-block .demo-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 24px;
+      border-radius: 12px;
+      font: inherit;
+      font-size: 15px;
+      font-weight: 600;
+      text-decoration: none;
+      background: var(--demo-accent);
+      color: #fff;
+      border: none;
+      cursor: pointer;
+      transition: background .2s, transform .1s;
+    }
+    .demo-cta-block .demo-btn:hover { background: var(--demo-accent-hover); transform: scale(1.02); }
+    .demo-cta-block .demo-btn:active { transform: scale(0.98); }
+
+    .demo-footer {
+      margin-top: 48px;
+      padding: 24px;
+      text-align: center;
+      font-size: 13px;
+      color: var(--demo-muted);
+    }
+    .demo-footer a { color: var(--demo-accent); text-decoration: none; }
+    .demo-footer a:hover { text-decoration: underline; }
+
+    /* Sticky CTA bar: mobile siempre; desktop al scrollear 30%. Safe area para no tapar contenido. */
+    .demo-sticky-cta {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 20;
+      padding: 12px 16px;
+      padding-left: calc(16px + env(safe-area-inset-left, 0));
+      padding-right: calc(16px + env(safe-area-inset-right, 0));
+      padding-bottom: calc(12px + env(safe-area-inset-bottom, 0));
+      background: var(--demo-card);
+      border-top: 1px solid var(--demo-border);
+      box-shadow: 0 -4px 20px rgba(0,0,0,.08);
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      justify-content: center;
+      transform: translateY(100%);
+      opacity: 0;
+      visibility: hidden;
+      transition: transform .3s ease, opacity .25s ease, visibility .25s;
+    }
+    .demo-sticky-cta.sticky-cta--visible {
+      transform: translateY(0);
+      opacity: 1;
+      visibility: visible;
+    }
+    body.sticky-cta-visible {
+      padding-bottom: calc(72px + env(safe-area-inset-bottom, 0));
+    }
+    .demo-sticky-cta__btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 12px 20px;
+      border-radius: 12px;
+      font: inherit;
+      font-size: 15px;
+      font-weight: 600;
+      text-decoration: none;
+      border: none;
+      cursor: pointer;
+      transition: background .2s, color .2s, transform .05s;
+      min-height: 48px;
+    }
+    .demo-sticky-cta__btn--primary {
+      background: var(--demo-accent);
+      color: #fff;
+      flex: 1;
+      max-width: 220px;
+    }
+    .demo-sticky-cta__btn--primary:hover { background: var(--demo-accent-hover); }
+    .demo-sticky-cta__btn--secondary {
+      background: transparent;
+      color: var(--demo-muted);
+      border: 1px solid var(--demo-border);
+    }
+    .demo-sticky-cta__btn--secondary:hover { color: var(--demo-accent); border-color: var(--demo-accent); }
+  </style>
+</head>
+<body>
+  <header class="demo-header">
+    <div class="demo-header__inner">
+      <a href="/" class="demo-logo">ContaNeta</a>
+      <nav class="demo-nav">
+        <a href="/pricing">Planes</a>
+        <a href="/login">Entrar</a>
+        <a href="/signup" class="demo-cta">Crear cuenta</a>
+      </nav>
+    </div>
+  </header>
+
+  <section class="demo-hero" id="demo-hero" data-reveal>
+    <h1>Así se ve tu portal</h1>
+    <p>Explora una simulación del panel: SAT Sync, facturas emitidas, factura rápida y cotizaciones. Sin instalar nada.</p>
+    <div class="demo-hero-stats" aria-label="Estadísticas">
+      <div class="demo-hero-stat">
+        <div class="demo-hero-stat__value" data-count-to="124500" data-count-from="0" data-count-duration="1600" data-count-prefix="$" data-count-decimals="0" data-count-view="once">0</div>
+        <div class="demo-hero-stat__label">Ingresos gestionados (ejemplo)</div>
+      </div>
+      <div class="demo-hero-stat">
+        <div class="demo-hero-stat__value" data-count-to="98" data-count-from="0" data-count-duration="1200" data-count-suffix="%" data-count-decimals="0" data-count-view="once">0</div>
+        <div class="demo-hero-stat__label">Satisfacción cliente</div>
+      </div>
+      <div class="demo-hero-stat">
+        <div class="demo-hero-stat__value" data-count-to="3" data-count-from="0" data-count-duration="800" data-count-suffix=" pasos" data-count-decimals="0" data-count-view="once">0</div>
+        <div class="demo-hero-stat__label">Para tu primera factura</div>
+      </div>
+    </div>
+  </section>
+
+  <div class="demo-tabs" id="demo-tabs" data-reveal>
+    <div class="demo-tablist" role="tablist" aria-label="Secciones del demo">
+      <button type="button" class="demo-tab" role="tab" id="tab-sat" aria-selected="true" aria-controls="panel-sat" data-panel="panel-sat">SAT Sync</button>
+      <button type="button" class="demo-tab" role="tab" id="tab-emitidas" aria-selected="false" aria-controls="panel-emitidas" data-panel="panel-emitidas">Emitidas</button>
+      <button type="button" class="demo-tab" role="tab" id="tab-rapida" aria-selected="false" aria-controls="panel-rapida" data-panel="panel-rapida">Factura rápida</button>
+      <button type="button" class="demo-tab" role="tab" id="tab-cotizaciones" aria-selected="false" aria-controls="panel-cotizaciones" data-panel="panel-cotizaciones">Cotizaciones</button>
+    </div>
+
+    <div id="panel-sat" class="demo-panel" role="tabpanel" aria-labelledby="tab-sat" aria-hidden="false">
+      <div class="demo-cards">
+        <div class="demo-card" data-reveal>
+          <div class="demo-card__title">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9"/><path d="M21 3v6h-6"/></svg>
+            Último sync
+          </div>
+          <div class="demo-card__meta">Emitidas · Ene 2025</div>
+          <div class="demo-card__value">Hace 2 h</div>
+        </div>
+        <div class="demo-card" data-reveal>
+          <div class="demo-card__title">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg>
+            Estado
+          </div>
+          <div class="demo-card__meta">Sincronización</div>
+          <div class="demo-card__value" style="color: var(--demo-accent);">Listo</div>
+        </div>
+      </div>
+      <div class="demo-cta-block" data-reveal>
+        <p>Sincroniza tus CFDI con el SAT desde tu cuenta. Conecta tu FIEL y descarga emitidas y recibidas.</p>
+        <a href="/signup" class="demo-btn">Probar SAT Sync en el portal →</a>
+      </div>
+    </div>
+
+    <div id="panel-emitidas" class="demo-panel" role="tabpanel" aria-labelledby="tab-emitidas" aria-hidden="true">
+      <div class="demo-cards">
+        <div class="demo-card" data-reveal style="grid-column: 1 / -1;">
+          <div class="demo-card__title">Facturas emitidas · Ene 2025</div>
+          <table class="demo-mock-table">
+            <thead><tr><th>UUID</th><th>Receptor</th><th>Total</th><th>Estatus</th></tr></thead>
+            <tbody>
+              <tr class="demo-mock-row"><td>a1b2c3d4-…</td><td>Cliente Demo S.A.</td><td>$12,450.00</td><td>Vigente</td></tr>
+              <tr class="demo-mock-row"><td>e5f6g7h8-…</td><td>Otro Cliente</td><td>$8,320.00</td><td>Vigente</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="demo-cta-block" data-reveal>
+        <p>Consulta, descarga XML y genera PDF de tus facturas emitidas en un solo lugar.</p>
+        <a href="/login" class="demo-btn">Ver emitidas en el portal →</a>
+      </div>
+    </div>
+
+    <div id="panel-rapida" class="demo-panel" role="tabpanel" aria-labelledby="tab-rapida" aria-hidden="true">
+      <div class="demo-cards">
+        <div class="demo-card" data-reveal>
+          <div class="demo-card__title">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            Cliente
+          </div>
+          <div class="demo-card__meta">Seleccionar</div>
+          <div class="demo-card__value" style="font-size:1rem; font-weight:500;">— Cliente Demo S.A.</div>
+        </div>
+        <div class="demo-card" data-reveal>
+          <div class="demo-card__title">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 12h8M8 16h8M8 8h3"/></svg>
+            Producto
+          </div>
+          <div class="demo-card__meta">Seleccionar</div>
+          <div class="demo-card__value" style="font-size:1rem; font-weight:500;">— Servicio consultoría</div>
+        </div>
+      </div>
+      <div class="demo-cta-block" data-reveal>
+        <p>Elige cliente y producto, genera la factura en un clic. Ideal para ventas recurrentes.</p>
+        <a href="/signup" class="demo-btn">Crear cuenta y usar factura rápida →</a>
+      </div>
+    </div>
+
+    <div id="panel-cotizaciones" class="demo-panel" role="tabpanel" aria-labelledby="tab-cotizaciones" aria-hidden="true">
+      <div class="demo-cards">
+        <div class="demo-card" data-reveal>
+          <div class="demo-card__title">Cotización #COT-2025-001</div>
+          <div class="demo-card__meta">Cliente: Acme Corp · Enviada</div>
+          <div class="demo-card__value">$24,800.00</div>
+        </div>
+        <div class="demo-card" data-reveal>
+          <div class="demo-card__title">Cotización #COT-2025-002</div>
+          <div class="demo-card__meta">Cliente: Beta S.A. · Borrador</div>
+          <div class="demo-card__value">$15,200.00</div>
+        </div>
+      </div>
+      <div class="demo-cta-block" data-reveal>
+        <p>Crea cotizaciones, envía el enlace al cliente y convierte en factura cuando acepte.</p>
+        <a href="/login" class="demo-btn">Gestionar cotizaciones en el portal →</a>
+      </div>
+    </div>
+  </div>
+
+  <footer class="demo-footer">
+    <a href="/">Inicio</a> · <a href="/pricing">Planes</a> · <a href="/login">Entrar</a>
+  </footer>
+
+  <aside class="demo-sticky-cta" id="demo-sticky-cta" aria-label="Acciones rápidas">
+    <a href="/signup" class="demo-sticky-cta__btn demo-sticky-cta__btn--primary">Crear cuenta</a>
+    <a href="/login" class="demo-sticky-cta__btn demo-sticky-cta__btn--secondary">Iniciar sesión</a>
+  </aside>
+
+  <script src="/static/js/count-up.js"></script>
+  <script>
+    (function() {
+      var MOBILE_MAX = 768;
+      var SCROLL_THRESHOLD = 0.3;
+      var bar = document.getElementById('demo-sticky-cta');
+      function updateStickyCta() {
+        if (!bar) return;
+        var w = window.innerWidth;
+        var scrollY = window.scrollY || window.pageYOffset;
+        var maxScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+        var isMobile = w <= MOBILE_MAX;
+        var show = isMobile
+          ? true
+          : maxScroll > 0 && scrollY >= maxScroll * SCROLL_THRESHOLD;
+        if (show) {
+          bar.classList.add('sticky-cta--visible');
+          document.body.classList.add('sticky-cta-visible');
+        } else {
+          bar.classList.remove('sticky-cta--visible');
+          document.body.classList.remove('sticky-cta-visible');
+        }
+      }
+      window.addEventListener('scroll', updateStickyCta, { passive: true });
+      window.addEventListener('resize', updateStickyCta);
+      updateStickyCta();
+
+      var tablist = document.getElementById('demo-tabs');
+      if (!tablist) return;
+      var tabs = tablist.querySelectorAll('.demo-tab');
+      var panels = tablist.querySelectorAll('.demo-panel');
+      function showPanel(id) {
+        panels.forEach(function(p) {
+          p.setAttribute('aria-hidden', p.id !== id);
+        });
+        tabs.forEach(function(t) {
+          t.setAttribute('aria-selected', t.getAttribute('data-panel') === id);
+        });
+        var panel = document.getElementById(id);
+        if (panel) {
+          var toReveal = panel.querySelectorAll('.demo-card[data-reveal], .demo-cta-block[data-reveal]');
+          toReveal.forEach(function(el, i) {
+            setTimeout(function() { el.classList.add('reveal'); }, 60 * i);
+          });
+        }
+      }
+      tabs.forEach(function(t) {
+        t.addEventListener('click', function() {
+          showPanel(this.getAttribute('data-panel'));
+        });
+      });
+
+      function reveal() {
+        var els = document.querySelectorAll('[data-reveal]');
+        var observer = new IntersectionObserver(function(entries) {
+          entries.forEach(function(e) {
+            if (e.isIntersecting) {
+              e.target.classList.add('reveal');
+              var cards = e.target.querySelectorAll('.demo-card[data-reveal], .demo-cta-block[data-reveal]');
+              cards.forEach(function(card, i) {
+                setTimeout(function() { card.classList.add('reveal'); }, 80 * i);
+              });
+            }
+          });
+        }, { rootMargin: '-40px 0px -20px 0px', threshold: 0.1 });
+        els.forEach(function(el) { observer.observe(el); });
+      }
+      reveal();
+      var hero = document.getElementById('demo-hero');
+      if (hero) {
+        var heroObs = new IntersectionObserver(function(entries) {
+          if (entries[0].isIntersecting) {
+            hero.classList.add('reveal');
+            if (window.CountUp) {
+              var statValues = hero.querySelectorAll('.demo-hero-stat__value[data-count-to]');
+              statValues.forEach(function(el, i) {
+                setTimeout(function() {
+                  if (!el._countUpDone) window.CountUp.run(el);
+                }, 200 + i * 120);
+              });
+            }
+          }
+        }, { threshold: 0.2 });
+        heroObs.observe(hero);
+      }
+    })();
+  </script>
+</body>
+</html>

@@ -146,20 +146,31 @@ $markFinished = $pdo->prepare(
 );
 
 $upsertMinimal = $pdo->prepare(
-    "INSERT INTO sat_cfdi(issuer_id, direction, uuid, xml_path, xml_sha256, xml_downloaded_at, xml_status, updated_at)
-     VALUES(:issuer_id, :direction, :uuid, :xml_path, :sha, datetime('now'), 'downloaded', datetime('now'))
+    "INSERT INTO sat_cfdi(issuer_id, direction, uuid, xml_path, xml_sha256, xml_downloaded_at, xml_status, status, updated_at)
+     VALUES(:issuer_id, :direction, :uuid, :xml_path, :sha, datetime('now'), 'downloaded', 'V', datetime('now'))
      ON CONFLICT(issuer_id, direction, uuid) DO UPDATE SET
        xml_path = excluded.xml_path,
        xml_sha256 = excluded.xml_sha256,
        xml_downloaded_at = excluded.xml_downloaded_at,
        xml_status = 'downloaded',
+       status = COALESCE(NULLIF(TRIM(status), ''), 'V'),
        updated_at = datetime('now')"
 );
 
+// Búsqueda case-insensitive para evitar duplicados (metadata puede tener uuid en distinto caso que el XML)
 $findNeedsXml = $pdo->prepare(
-    "SELECT xml_path FROM sat_cfdi
-     WHERE issuer_id=:issuer_id AND direction=:direction AND uuid=:uuid
+    "SELECT id, xml_path FROM sat_cfdi
+     WHERE issuer_id=:issuer_id AND direction=:direction AND LOWER(TRIM(uuid))=LOWER(TRIM(:uuid))
      LIMIT 1"
+);
+$updateRowWithXml = $pdo->prepare(
+    "UPDATE sat_cfdi SET
+       xml_path=:xml_path, xml_sha256=:xml_sha256,
+       xml_downloaded_at=datetime('now'), xml_status='downloaded',
+       uuid=:uuid,
+       status = COALESCE(NULLIF(TRIM(status), ''), 'V'),
+       updated_at=datetime('now')
+     WHERE id=:id"
 );
 
 // === Service cache per issuer ===
@@ -207,7 +218,7 @@ $processOne = function (array $req) use (
     $pdo, $baseDir, $tz, $xmlBase,
     $markVerifying, $incTries, $markError, $markFinished,
     $getServiceForIssuer,
-    $findNeedsXml, $upsertMinimal
+    $findNeedsXml, $updateRowWithXml, $upsertMinimal
 ): void {
     $id = (int) $req['id'];
     $issuerId = (int) $req['issuer_id'];
@@ -297,7 +308,7 @@ $processOne = function (array $req) use (
             $reader = CfdiPackageReader::createFromFile($zipPath);
 
             foreach ($reader->cfdis() as $uuid => $content) {
-                $uuid = (string) $uuid;
+                $uuid = strtolower((string) $uuid);
 
                 $findNeedsXml->execute([
                     ':issuer_id' => $issuerId,
@@ -326,13 +337,23 @@ $processOne = function (array $req) use (
                 // Ruta relativa a la raíz del proyecto (para guardar en DB)
                 $relative = ltrim(str_replace($baseDir . '/', '', $filePath), '/');
 
-                $upsertMinimal->execute([
-                    ':issuer_id' => $issuerId,
-                    ':direction' => $direction,
-                    ':uuid' => $uuid,
-                    ':xml_path' => $relative,
-                    ':sha' => $sha,
-                ]);
+                if ($row && isset($row['id'])) {
+                    // Ya existe fila (metadata); actualizar por id para no duplicar
+                    $updateRowWithXml->execute([
+                        ':id' => (int) $row['id'],
+                        ':uuid' => $uuid,
+                        ':xml_path' => $relative,
+                        ':xml_sha256' => $sha,
+                    ]);
+                } else {
+                    $upsertMinimal->execute([
+                        ':issuer_id' => $issuerId,
+                        ':direction' => $direction,
+                        ':uuid' => $uuid,
+                        ':xml_path' => $relative,
+                        ':sha' => $sha,
+                    ]);
+                }
 
                 $saved++;
             }

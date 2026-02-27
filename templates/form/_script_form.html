@@ -121,12 +121,13 @@
 
   async function loadSelect(url, selectEl, { defaultValue = "", topCodes = null } = {}) {
     try {
-      const data =
+      const raw =
         typeof window.portalCatalogGetJson === "function" && url.indexOf("/api/catalogs/") !== -1
           ? await window.portalCatalogGetJson(url)
           : await portalFetch(url, { credentials: "same-origin" }, 30000).then((r) =>
               r.ok ? r.json() : Promise.reject(new Error("HTTP " + r.status))
             );
+      const data = raw && raw.ok === true && raw.data ? raw.data : raw;
 
       const normalized = [];
       for (const raw of data) {
@@ -161,10 +162,11 @@
 
   async function loadDatalist(url, datalistEl) {
     try {
-      const data =
+      const raw =
         typeof window.portalCatalogGetJson === "function" && url.indexOf("/api/catalogs/") !== -1
           ? await window.portalCatalogGetJson(url)
           : await portalFetch(url, { credentials: "same-origin" }, 30000).then((r) => (r.ok ? r.json() : null));
+      const data = raw && raw.ok === true && raw.data ? raw.data : raw;
       if (!Array.isArray(data) && !data) return;
       datalistEl.innerHTML = "";
       const arr = Array.isArray(data) ? data : [];

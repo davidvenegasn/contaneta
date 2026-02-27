@@ -35,7 +35,12 @@
     var fetcher = (typeof window.portalFetchJSON === 'function')
       ? function (u, o) {
         return window.portalFetchJSON(u, o, { timeoutMs: 30000, retry: 1 }).then(function (r) {
-          if (r && r.ok) return r.data;
+          if (r && r.ok) {
+            // portalFetchJSON devuelve { ok:true, data:<body> }. Si el body usa {ok:true,data:...}, desempaquetar.
+            var body = r.data;
+            if (body && typeof body === 'object' && body.ok === true && Object.prototype.hasOwnProperty.call(body, 'data')) return body.data;
+            return body;
+          }
           var e = new Error((r && r.detail) || ('HTTP ' + ((r && r.status) || 0)));
           if (r && r.error === 'timeout') e.isTimeout = true;
           throw e;
@@ -44,7 +49,10 @@
       : function (u, o) {
         return fetch(u, o).then(function (r) {
           if (!r.ok) throw new Error('HTTP ' + r.status);
-          return r.json();
+          return r.json().then(function (body) {
+            if (body && typeof body === 'object' && body.ok === true && Object.prototype.hasOwnProperty.call(body, 'data')) return body.data;
+            return body;
+          });
         });
       };
     if (!isCachedApiUrl(url)) {

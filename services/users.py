@@ -11,8 +11,16 @@ from database import db, db_rows
 def _user_from_row(row) -> dict:
     if not row:
         return None
-    d = dict(row)
-    return {"id": d["id"], "email": d.get("email"), "phone": d.get("phone"), "name": d.get("name")}
+    if isinstance(row, dict):
+        d = row
+    elif hasattr(row, "keys"):
+        d = dict(zip(row.keys(), row))
+    else:
+        try:
+            d = dict(row)
+        except Exception:
+            return None
+    return {"id": d.get("id"), "email": d.get("email"), "phone": d.get("phone"), "name": d.get("name")}
 
 
 def hash_password(plain: str) -> str:
@@ -31,11 +39,19 @@ def verify_password(plain: str, hashed: str) -> bool:
 def get_user_by_email(email: str):
     if not (email and str(email).strip()):
         return None
-    rows = db_rows(
-        "SELECT id, email, phone, name FROM users WHERE email = ? AND (active IS NULL OR active = 1) LIMIT 1",
-        (email.strip().lower(),),
-    )
-    return _user_from_row(rows[0]) if rows else None
+    # Verificar si la columna active existe antes de usarla
+    from database import has_column, db
+    conn = db()
+    try:
+        has_active = has_column(conn, "users", "active")
+        if has_active:
+            sql = "SELECT id, email, phone, name FROM users WHERE email = ? AND (active IS NULL OR active = 1) LIMIT 1"
+        else:
+            sql = "SELECT id, email, phone, name FROM users WHERE email = ? LIMIT 1"
+        rows = db_rows(sql, (email.strip().lower(),))
+        return _user_from_row(rows[0]) if rows else None
+    finally:
+        conn.close()
 
 
 def get_user_by_phone(phone: str):
@@ -44,11 +60,19 @@ def get_user_by_phone(phone: str):
     normalized = re.sub(r"\D", "", str(phone).strip())
     if not normalized:
         return None
-    rows = db_rows(
-        "SELECT id, email, phone, name FROM users WHERE (REPLACE(REPLACE(phone, ' ', ''), '-', '') = ? OR phone = ?) AND (active IS NULL OR active = 1) LIMIT 1",
-        (normalized, str(phone).strip()),
-    )
-    return _user_from_row(rows[0]) if rows else None
+    # Verificar si la columna active existe antes de usarla
+    from database import has_column, db
+    conn = db()
+    try:
+        has_active = has_column(conn, "users", "active")
+        if has_active:
+            sql = "SELECT id, email, phone, name FROM users WHERE (REPLACE(REPLACE(phone, ' ', ''), '-', '') = ? OR phone = ?) AND (active IS NULL OR active = 1) LIMIT 1"
+        else:
+            sql = "SELECT id, email, phone, name FROM users WHERE (REPLACE(REPLACE(phone, ' ', ''), '-', '') = ? OR phone = ?) LIMIT 1"
+        rows = db_rows(sql, (normalized, str(phone).strip()))
+        return _user_from_row(rows[0]) if rows else None
+    finally:
+        conn.close()
 
 
 def get_user_by_email_or_phone(login: str):

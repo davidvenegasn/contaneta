@@ -1,0 +1,325 @@
+/* Rail delgado fijo (estilo Mindtrip): blanco, activo con barra vertical. */
+:root {
+  --rail-w: 64px;
+  --rail-expand-w: 200px;
+  --rail-border: rgba(0, 0, 0, 0.08);
+  --rail-muted: #ffffff;
+  --rail-t: 280ms;
+  --rail-ease: cubic-bezier(0.25, 0.1, 0.25, 1);
+  --rail-drawer-t: 280ms;
+}
+
+/* Una sola barra lateral: rail + zona expandida (continuidad visual) */
+.portal-sidebar-unified {
+  position: fixed;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: var(--rail-w);
+  display: flex;
+  flex-direction: row;
+  background: #fff;
+  border-right: 1px solid var(--rail-border);
+  z-index: 50;
+  box-sizing: border-box;
+  transition: width var(--rail-drawer-t) var(--rail-ease);
+}
+
+.portal-shell-wrap.drawer-open .portal-sidebar-unified {
+  width: calc(var(--rail-w) + var(--rail-expand-w));
+  overflow: visible;
+}
+
+.portal-rail {
+  position: relative;
+  z-index: 1;
+  width: var(--rail-w);
+  min-width: var(--rail-w);
+  height: 100vh;
+  background: transparent;
+  border-right: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 14px 10px;
+  gap: 10px;
+  box-sizing: border-box;
+}
+
+.rail-item {
+  width: 44px;
+  height: 44px;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  position: relative;
+  cursor: pointer;
+  text-decoration: none;
+  color: var(--text, #1e293b);
+  transition: transform var(--rail-t) var(--rail-ease), background var(--rail-t) var(--rail-ease);
+}
+
+/* Icono Movimientos: más grande, delgado sin selección, más bold al estar activo */
+.rail-item--movements .icon {
+  width: 28px;
+  height: 28px;
+}
+.rail-item--movements .icon path {
+  stroke-width: 2;
+  transition: stroke-width var(--rail-t, 200ms) ease;
+}
+.rail-item--movements.is-active .icon path {
+  stroke-width: 3;
+}
+
+button.rail-item {
+  border: none;
+  background: transparent;
+  font: inherit;
+  -webkit-appearance: none;
+  appearance: none;
+  padding: 0;
+}
+
+/* Espaciador: solo cuando el menú está abierto, para que los iconos coincidan con los títulos del drawer */
+.rail-align-spacer {
+  display: none;
+  flex-shrink: 0;
+}
+
+.portal-shell-wrap.drawer-open .rail-align-spacer {
+  display: block;
+  min-height: 44px;
+  transition: min-height var(--rail-drawer-t) var(--rail-ease);
+}
+
+/* Un solo botón: cerrado = en rail (›), abierto = al otro extremo (‹) con animación */
+.rail-toggle-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #fff;
+  border: 1px solid var(--rail-border);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  transition: transform var(--rail-drawer-t) var(--rail-ease);
+}
+
+.rail-toggle-btn:hover {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.12);
+}
+
+.rail-toggle-btn__icon {
+  display: block;
+  transition: transform var(--rail-drawer-t) var(--rail-ease);
+}
+
+/* Cuando el menú está abierto: botón se desplaza al extremo derecho y la flecha gira */
+.portal-shell-wrap.drawer-open .rail-toggle-btn {
+  position: absolute;
+  left: 12px;
+  top: 14px;
+  transform: translateX(var(--rail-expand-w));
+  z-index: 60;
+}
+
+.portal-shell-wrap.drawer-open .rail-toggle-btn__icon {
+  transform: rotate(180deg);
+}
+
+.rail-item:hover {
+  background: rgba(0, 0, 0, 0.06);
+  transform: translateY(-1px);
+}
+
+.rail-item:focus-visible {
+  outline: 2px solid rgba(0, 0, 0, 0.2);
+  outline-offset: 2px;
+}
+
+/* Activo: barra vertical a la derecha del icono (estilo Mindtrip) */
+.rail-item.is-active {
+  background: transparent;
+  color: #1e293b;
+}
+
+.rail-item.is-active::after {
+  content: "";
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 22px;
+  background: #1e293b;
+  border-radius: 2px;
+  pointer-events: none;
+}
+
+.rail-item.is-active .icon {
+  color: #1e293b;
+}
+
+.rail-item.is-active .icon path,
+.rail-item.is-active .icon circle {
+  stroke-width: 2.25;
+}
+
+.rail-item .icon {
+  width: 22px;
+  height: 22px;
+}
+
+.rail-tooltip {
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(0, 0, 0, 0.92);
+  color: #fff;
+  font-size: 12px;
+  padding: 9px 10px;
+  border-radius: 12px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--rail-t) var(--rail-ease), transform var(--rail-t) var(--rail-ease);
+  z-index: 100;
+}
+
+.rail-item:hover .rail-tooltip {
+  opacity: 1;
+}
+
+/* Contenido principal: transición smooth al abrir/cerrar drawer */
+.portal-main {
+  margin-left: var(--rail-w);
+  min-height: 100vh;
+  box-sizing: border-box;
+  transition: margin-left var(--rail-drawer-t) var(--rail-ease);
+}
+
+/* ----- Job 2: Drawer tipo Mindtrip (continuo con el rail, animación smooth) ----- */
+.portal-shell-wrap {
+  position: relative;
+}
+
+.portal-shell-wrap.drawer-open .portal-main {
+  margin-left: calc(var(--rail-w) + var(--rail-expand-w));
+}
+
+/* Sin animación al cargar la página si el drawer ya estaba abierto (navegación) */
+.portal-shell-wrap.drawer-instant.drawer-open .portal-sidebar-unified,
+.portal-shell-wrap.drawer-instant.drawer-open .portal-main,
+.portal-shell-wrap.drawer-instant.drawer-open .portal-drawer,
+.portal-shell-wrap.drawer-instant.drawer-open .rail-toggle-btn,
+.portal-shell-wrap.drawer-instant.drawer-open .rail-toggle-btn__icon,
+.portal-shell-wrap.drawer-instant.drawer-open .rail-align-spacer {
+  transition: none !important;
+}
+
+/* Zona expandida: misma barra, solo se ensancha (sin borde/sombra propios) */
+.portal-drawer {
+  width: 0;
+  min-width: 0;
+  height: 100vh;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  overflow: hidden;
+  flex-shrink: 0;
+  transition: min-width var(--rail-drawer-t) var(--rail-ease);
+  box-sizing: border-box;
+}
+
+.portal-shell-wrap.drawer-open .portal-drawer {
+  min-width: var(--rail-expand-w);
+  overflow: visible;
+}
+
+.portal-drawer__inner {
+  width: var(--rail-expand-w);
+  min-height: 100%;
+  padding: 14px 12px 14px 0;
+  background: transparent;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow: visible;
+}
+
+/* Primera fila: solo ContaNeta (el botón cerrar es el mismo que expandir, al otro extremo) */
+.portal-drawer__head {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.portal-drawer__brand {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text, #1e293b);
+  font-family: var(--font-family);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Filas de enlaces: solo texto; los iconos son los del rail. La sombra gris abarca icono + texto (estilo Mindtrip). */
+.portal-drawer__links {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.drawer-link {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  margin-left: calc(-1 * var(--rail-w));
+  padding-left: calc(var(--rail-w) + 8px);
+  padding-right: 10px;
+  border-radius: 12px;
+  text-decoration: none;
+  color: rgba(0, 0, 0, 0.88);
+  font-size: 14px;
+  font-family: var(--font-family);
+  transition: background var(--rail-t) var(--rail-ease), color var(--rail-t) var(--rail-ease);
+}
+
+/* Hover y activo: la sombra gris abarca desde el icono (rail) hasta el texto */
+.drawer-link:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: #1e293b;
+}
+
+.drawer-link--active {
+  background: rgba(0, 0, 0, 0.06);
+  font-weight: 600;
+  color: #1e293b;
+}
+
+/* Móvil: overlay sobre contenido */
+@media (max-width: 900px) {
+  .portal-shell-wrap.drawer-open .portal-main {
+    margin-left: var(--rail-w);
+  }
+  .portal-shell-wrap.drawer-open .portal-sidebar-unified {
+    width: calc(var(--rail-w) + min(var(--rail-expand-w), 78vw));
+  }
+  .portal-shell-wrap.drawer-open .portal-drawer {
+    min-width: min(var(--rail-expand-w), 78vw);
+  }
+  .portal-drawer__inner {
+    width: min(var(--rail-expand-w), 78vw);
+  }
+  .portal-shell-wrap.drawer-open::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.2);
+    z-index: 35;
+    pointer-events: auto;
+  }
+}

@@ -1,0 +1,10 @@
+{# Shell V2 (rail + drawer). La integración real está en base_portal.html con {% if portal_shell_v2 %}. #}
+{# Este archivo documenta la estructura del shell V2; el layout activo se controla con PORTAL_SHELL_V2=1. #}
+<div data-portal-shell class="portal-shell portal-shell--v2">
+  {% include 'components/portal_rail.html' %}
+  {% include 'components/portal_drawer.html' %}
+  <main class="portal-main">
+    {# Topbar y block content se renderizan desde base_portal.html #}
+    {% block portal_main_content %}{% endblock %}
+  </main>
+</div>

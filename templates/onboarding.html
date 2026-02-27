@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Completa tu perfil fiscal · ContaNeta</title>
+  <link rel="stylesheet" href="/static/css/form.css">
+  <style>
+    body { max-width: 480px; margin: 2rem auto; padding: 0 1rem; }
+    .auth-card { padding: 1.5rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card-bg); box-shadow: var(--shadow); }
+    .auth-card h1 { margin: 0 0 0.5rem; font-size: 1.25rem; }
+    .auth-card .muted { margin-bottom: 1rem; }
+    .auth-card .danger { color: #c00; margin-bottom: 1rem; font-size: 14px; }
+    .auth-card label { display: block; font-size: 12px; font-weight: 700; margin-bottom: 0.25rem; }
+    .auth-card input, .auth-card select { width: 100%; padding: 0.5rem 0.75rem; margin-bottom: 1rem; border-radius: 12px; border: 1px solid var(--border-strong); }
+    .auth-card button[type="submit"] { width: 100%; padding: 0.6rem; }
+    .checkbox-group { margin: 1rem 0; font-size: 13px; }
+    .checkbox-group label { display: flex; align-items: flex-start; gap: 0.5rem; cursor: pointer; }
+    .checkbox-group input { width: auto; margin: 0.2rem 0 0; }
+  </style>
+</head>
+<body>
+  <div class="auth-card">
+    <h1>Completa tu perfil fiscal</h1>
+    <p class="muted">Datos del emisor (RFC) para facturación y descarga de CFDI.</p>
+    {% if error %}
+      <p class="danger">
+        {% if error == 'required' %}RFC y razón social son obligatorios.{% else %}{{ error }}{% endif %}
+      </p>
+    {% endif %}
+    <form method="post" action="/onboarding">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token or '' }}" />
+      <label for="rfc">RFC *</label>
+      <input type="text" name="rfc" id="rfc" placeholder="XAXX010101000" maxlength="13" value="{{ (issuer or {}).get('rfc') or '' }}" required />
+      <label for="razon_social">Razón social *</label>
+      <input type="text" name="razon_social" id="razon_social" placeholder="Nombre o razón social del contribuyente" value="{{ (issuer or {}).get('alias') or '' }}" required />
+      <label for="regimen_fiscal">Régimen fiscal</label>
+      <select name="regimen_fiscal" id="regimen_fiscal">
+        <option value="616" {% if ((issuer or {}).get('regimen_fiscal') or '') == '616' %}selected{% endif %}>616 - Sin obligaciones fiscales</option>
+        <option value="601" {% if ((issuer or {}).get('regimen_fiscal') or '') == '601' %}selected{% endif %}>601 - General de Ley Personas Morales</option>
+        <option value="603" {% if ((issuer or {}).get('regimen_fiscal') or '') == '603' %}selected{% endif %}>603 - Personas Morales con Fines no Lucrativos</option>
+        <option value="612" {% if ((issuer or {}).get('regimen_fiscal') or '') == '612' %}selected{% endif %}>612 - Personas Físicas con Actividades Empresariales y Profesionales</option>
+        <option value="620" {% if ((issuer or {}).get('regimen_fiscal') or '') == '620' %}selected{% endif %}>620 - Sociedad Cooperativa de Producción</option>
+        <option value="622" {% if ((issuer or {}).get('regimen_fiscal') or '') == '622' %}selected{% endif %}>622 - Régimen de Actividades Agrícolas, Ganaderas, Silvícolas y Pesqueras</option>
+        <option value="626" {% if ((issuer or {}).get('regimen_fiscal') or '') == '626' %}selected{% endif %}>626 - Régimen Simplificado de Confianza</option>
+      </select>
+      <label for="cp">Código postal (opcional)</label>
+      <input type="text" name="cp" id="cp" placeholder="00000" maxlength="5" />
+      <div class="checkbox-group">
+        <label>
+          <input type="checkbox" name="authorize_firm" />
+          <span>Autorizo a V&G Fiscal a acceder como despacho para prestar el servicio (contabilidad, facturación, revisión).</span>
+        </label>
+      </div>
+      <button type="submit" class="btn btn-primary">Continuar al portal</button>
+    </form>
+  </div>
+</body>
+</html>

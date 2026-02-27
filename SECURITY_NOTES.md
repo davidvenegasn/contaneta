@@ -35,10 +35,10 @@ Todas las rutas que devuelven o modifican datos de negocio deben filtrar por el 
 
 ### 1.3 Descargas (routers/invoicing.py)
 
-| Ruta | Validación issuer_id |
-|------|----------------------|
-| `GET /download/xml/{uuid}` | `SELECT ... FROM sat_cfdi WHERE issuer_id = ? AND uuid = ?`; entrega vía `_safe_abs_path`. |
-| `GET /download/pdf/{uuid}` | Misma cláusula y `_safe_abs_path`. |
+| Ruta | Validación issuer_id | Auditoría |
+|------|----------------------|-----------|
+| `GET /download/xml/{uuid}` | `SELECT ... FROM sat_cfdi WHERE issuer_id = ? AND LOWER(TRIM(uuid)) = LOWER(?)`; entrega vía `_safe_abs_path`. | `audit.log(action="download_xml", ...)` con user_id, issuer_id, entity_id=uuid, request (IP/UA). |
+| `GET /download/pdf/{uuid}` | Misma cláusula y `_safe_abs_path`. | `audit.log(action="download_pdf", ...)`. |
 
 ### 1.4 Rutas públicas (sin issuer de sesión)
 
@@ -71,11 +71,12 @@ Todas las rutas que devuelven o modifican datos de negocio deben filtrar por el 
   - **max_age:** `SESSION_TTL_DAYS * 86400` (ej. 7 días).
   - **path:** `/`.
 
-### COOKIE_SECURE en producción
+### COOKIE_SECURE y ENV
 
-- **Variable:** `COOKIE_SECURE` (env). Valores: `0` (false) o `1` (true).
-- **Producción con HTTPS:** Debe ser `COOKIE_SECURE=1` para que el navegador solo envíe la cookie por HTTPS.
-- **Desarrollo sin HTTPS:** `COOKIE_SECURE=0`. No usar `1` en HTTP o la cookie no se enviará y parecerá que no hay sesión.
+- **ENV:** `ENV=prod` activa modo producción: `COOKIE_SECURE` pasa a `True` por defecto.
+- **Variable:** `COOKIE_SECURE` (env). Valores: `0` (false) o `1` (true). En prod el default es `1`.
+- **Producción con HTTPS:** Debe ser `COOKIE_SECURE=1` (automático con `ENV=prod`).
+- **Desarrollo sin HTTPS:** `COOKIE_SECURE=0` (default cuando `ENV≠prod`). No usar `1` en HTTP o la cookie no se enviará.
 - **Override por request:** Si el request llega con `X-Forwarded-Proto: https` o `request.url.scheme == "https"`, `session_cookie_params()` fuerza `secure=True` aunque `COOKIE_SECURE` sea 0 (útil detrás de un proxy HTTPS).
 
 ---
@@ -85,8 +86,9 @@ Todas las rutas que devuelven o modifican datos de negocio deben filtrar por el 
 Resumen; ver `env.example` para lista completa y valores por defecto seguros.
 
 - **DEV_MODE:** En producción debe ser `0`. Con `1`, se permite acceso al portal sin sesión usando `DEV_TOKEN`.
-- **SESSION_SECRET:** Secreto para firmar la cookie; debe ser aleatorio y fuerte (ej. 32+ bytes hex). Si no se define, se genera uno al arrancar (no recomendado en producción multi-worker).
-- **COOKIE_SECURE:** `1` en producción con HTTPS.
+- **SESSION_SECRET:** Secreto para firmar la cookie; debe ser aleatorio y fuerte (ej. 32+ bytes hex). **En producción debe definirse** (no usar el aleatorio por proceso); rotar si se compromete (invalida todas las sesiones).
+- **ENV:** `prod` activa `COOKIE_SECURE=1` por defecto y CSP estricta. Usar `ENV=prod` en producción.
+- **COOKIE_SECURE:** `1` en producción con HTTPS (default cuando `ENV=prod`).
 - **APP_DB_PATH:** Ruta absoluta a `invoicing.db` en producción.
 - **FACTURAPI_SECRET_KEY:** Requerido para timbrado real (facturapi_client).
 

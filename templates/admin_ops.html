@@ -1,0 +1,36 @@
+{% extends "base_admin.html" %}
+{% block title %}Operaciones{% endblock %}
+{% block content %}
+  <h1>Operaciones</h1>
+  <p style="color:#64748b; margin-bottom: 16px;">Acciones seguras sin usar terminal. Cada acción se registra en audit_log.</p>
+
+  {% if message %}
+  <div class="alert {{ 'alert-success' if message_ok else 'alert-error' }}">{{ message }}</div>
+  {% endif %}
+
+  <div class="card">
+    <h2>Acciones</h2>
+    <form method="post" action="/admin/ops" style="margin-bottom: 12px;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+      <input type="hidden" name="action" value="migrations" />
+      <button type="submit" class="btn btn-primary">Correr migraciones</button>
+    </form>
+    <form method="post" action="/admin/ops" style="margin-bottom: 12px;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+      <input type="hidden" name="action" value="verify_db" />
+      <button type="submit" class="btn btn-secondary">Verificar DB</button>
+    </form>
+    <form method="post" action="/admin/ops" style="margin-bottom: 12px;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+      <input type="hidden" name="action" value="backup" />
+      <button type="submit" class="btn btn-secondary">Crear backup ahora</button>
+    </form>
+  </div>
+
+  {% if result %}
+  <div class="card">
+    <h2>Resultado</h2>
+    <pre class="ops-result">{{ result }}</pre>
+  </div>
+  {% endif %}
+{% endblock %}

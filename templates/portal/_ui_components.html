@@ -1,0 +1,29 @@
+{# Componentes reutilizables del portal: empty-state, load-error. Ver docs/UI_PATTERNS.md #}
+
+{% macro portal_empty_state(title, desc, id=none, show_icon=true, extra_class='') %}
+<div class="empty-state empty-state--empty {{ extra_class }}"{% if id %} id="{{ id }}"{% endif %}{% if id %} hidden{% endif %}>
+  {% if show_icon %}
+  <div class="empty-state__icon" aria-hidden="true">
+    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/>
+      <path d="M14 2v5a1 1 0 0 0 1 1h5"/>
+      <path d="M12 12v6"/>
+      <path d="m15 15-3-3-3 3"/>
+    </svg>
+  </div>
+  {% endif %}
+  <div class="empty-state__title">{{ title }}</div>
+  <div class="empty-state__desc">{{ desc }}</div>
+  <div class="empty-state__actions">
+    {{ caller() if caller else '' }}
+  </div>
+</div>
+{% endmacro %}
+
+{% macro portal_load_error(id_prefix, extra_class='') %}
+<div class="empty-state empty-state--error load-error {{ extra_class }}" id="{{ id_prefix }}" hidden aria-live="polite">
+  <div class="empty-state__title">No pudimos cargar esto ahora.</div>
+  <p class="empty-state__desc" id="{{ id_prefix }}Msg">Puedes intentar de nuevo.</p>
+  <button type="button" class="btn btn--secondary" id="{{ id_prefix }}Retry">Reintentar</button>
+</div>
+{% endmacro %}

@@ -1,0 +1,170 @@
+/**
+ * Design System v1 — Tokens
+ * Single source of truth: tipografía (base 16px), colores, spacing, radius, sombras.
+ * Usar en components.css y portal.css vía var(--token).
+ * Componentes UI: .ui-input, .ui-btn, .ui-card, .ui-table (components.css).
+ */
+
+:root {
+  /* ----- Tipografía (base 16px) ----- */
+  --font-family: "Plus Jakarta Sans", system-ui, -apple-system, Segoe UI, sans-serif;
+
+  --text-2xs: 0.6875rem;   /* 11px */
+  --text-xs: 0.8125rem;    /* 13px */
+  --text-sm: 0.9375rem;    /* 15px */
+  --text-base: 1rem;       /* 16px */
+  --text-md: 1.0625rem;   /* 17px */
+  --text-lg: 1.25rem;     /* 20px — títulos sección */
+  --text-xl: 1.3125rem;   /* 21px — H3 */
+  --text-2xl: 1.5rem;     /* 24px — H2 */
+  --text-3xl: 1.75rem;    /* 28px — H1 */
+
+  --fw-normal: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+  --fw-bold: 700;
+
+  --leading-tight: 1.25;
+  --leading-snug: 1.375;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.6;
+  --leading-body: 1.55;
+
+  /* ----- Colores ----- */
+  --bg: #ffffff;
+  --bg-subtle: #ffffff;
+  --surface: #ffffff;
+  --surface-hover: #fafafb;
+
+  --text: #0d1f1c;
+  --text-muted: #3d524f;
+  --text-inverse: #ffffff;
+
+  --border: rgba(13, 31, 28, 0.08);
+  --border-strong: rgba(13, 31, 28, 0.14);
+
+  --primary: #14b8a6;
+  --primary-hover: #0d9488;
+  --accent: var(--primary);
+  --accent-hover: var(--primary-hover);
+  --accent-soft: #ccfbf1;
+  --accent-border: #99f6e4;
+
+  --track-inactive: #e5e7eb;
+  --track-active: #14b8a6;
+
+  --success: #059669;
+  --success-bg: #d1fae5;
+  --success-border: #6ee7b7;
+
+  --warn: #d97706;
+  --warning: var(--warn);
+  --warn-bg: #fef3c7;
+  --warn-border: #fcd34d;
+
+  --danger: #dc2626;
+  --danger-bg: #fee2e2;
+  --danger-border: #fca5a5;
+
+  --neutral: #6b7280;
+  --neutral-bg: #f3f4f6;
+  --neutral-border: #e5e7eb;
+
+  --muted: var(--text-muted);
+  /* Labels y títulos secundarios: más visibles que muted, menos que text */
+  --label-color: #2d3d3a;
+  --focus: rgba(20, 184, 166, 0.22);
+  /* A11Y: anillo de foco visible (solo :focus-visible) */
+  --focus-ring: 2px solid var(--accent);
+  --focus-ring-offset: 2px;
+
+  /* ----- Spacing (escala 4px) ----- */
+  --space-0: 0;
+  --space-1: 0.25rem;   /* 4px */
+  --space-2: 0.5rem;    /* 8px */
+  --space-3: 0.75rem;   /* 12px */
+  --space-4: 1rem;      /* 16px */
+  --space-5: 1.25rem;   /* 20px */
+  --space-6: 1.5rem;    /* 24px */
+  --space-8: 2rem;      /* 32px */
+  --space-10: 2.5rem;   /* 40px */
+  --space-12: 3rem;     /* 48px */
+
+  /* Margen horizontal del contenido del portal (simétrico). Donde empieza/termina el texto en todas las páginas. */
+  --content-inset: var(--space-12);
+
+  /* Gap único entre sidebar/rail y contenido (todas las páginas). ~Mitad del antiguo page-pad-x (28px) para alineación consistente.
+   * Origen del espacio: .portal-container (portal_shell.css) aplica padding-left/right: var(--sidebar-content-gap). El topbar usa --content-inset que en .portal se iguala a esta variable. */
+  /* Gap único sidebar→contenido en TODO el portal (desktop). Objetivo: ~mitad del gap anterior de Inicio. */
+  --sidebar-content-gap: 14px;
+  /* Alias solicitado por UX: un solo nombre para el gap. */
+  --sidebar-gap: var(--sidebar-content-gap);
+
+  /* ----- Page layout (Mindtrip-style: mismo padding en todas las vistas) ----- */
+  --page-pad-top: 28px;
+  --page-pad-bottom: 40px;
+  --page-pad-x: 28px;
+  --page-max-width: 1120px;
+
+  /* ----- Radius ----- */
+  --radius-xs: 6px;
+  --radius-sm: 12px;
+  --radius: 14px;
+  --radius-md: 14px;
+  --radius-lg: 18px;
+  --radius-full: 9999px;
+
+  /* ----- Sombras ----- */
+  --shadow-1: 0 6px 18px rgba(13, 31, 28, 0.06);
+  --shadow-2: 0 12px 34px rgba(13, 31, 28, 0.10);
+  --shadow-3: 0 22px 70px rgba(13, 31, 28, 0.18);
+  --shadow-sm: var(--shadow-1);
+  --shadow-md: var(--shadow-3);
+  --shadow-focus: 0 0 0 3px var(--accent-soft);
+
+  /* ----- Componentes (alturas unificadas) ----- */
+  --input-height: 46px;
+  --btn-height: 46px;
+  --btn-height-sm: 38px;
+  --btn-height-lg: 48px;
+
+  /* ----- Section / card spacing ----- */
+  --card-padding: 22px;
+  --section-gap: 22px;
+
+  /* ----- Layout / safe areas ----- */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+
+  --bg-grad: none;
+
+  --sidebar-w: 260px;
+  --main-pad: 22px;
+  --concept-cols: 120px minmax(260px, 2.2fr) minmax(220px, 1.6fr) 170px 140px 260px 44px;
+
+  /* ----- Iconos (estilo único: stroke redondo, look premium) ----- */
+  --icon-stroke: 1.75;
+  --icon-size: 1.25em;
+  --icon-size-sm: 1rem;
+  --icon-size-lg: 1.5rem;
+
+  /* ----- P48: Motion (Phantom-style, consistencia). Respetar prefers-reduced-motion. ----- */
+  --motion-micro: 150ms;   /* hovers, focus, micro-interacciones */
+  --motion-modal: 200ms;  /* modales, drawers, overlays */
+  --motion-page: 180ms;   /* entrada/salida de página */
+  --ease-out: cubic-bezier(0.25, 0.1, 0.25, 1);
+  --ease-in-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* Page spacing: móvil */
+@media (max-width: 900px) {
+  :root {
+    --page-pad-top: 18px;
+    --page-pad-bottom: 28px;
+    --page-pad-x: 16px;
+    --sidebar-content-gap: 12px;
+    --sidebar-gap: var(--sidebar-content-gap);
+  }
+}

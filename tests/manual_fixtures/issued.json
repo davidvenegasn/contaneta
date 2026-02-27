@@ -1,0 +1,46 @@
+{
+  "data": [
+    {
+      "uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "fecha_emision": "2025-02-15T12:00:00",
+      "rfc_receptor": "EKU9003173V8",
+      "nombre_receptor": "ACME SA DE CV",
+      "concepto": "Servicio de consultoría febrero",
+      "total": 1740.0,
+      "moneda": "MXN",
+      "impuestos": 240.0,
+      "retenciones": 0.0,
+      "metodo_pago": "PUE",
+      "status": "1",
+      "xml_path": "/storage/xml/issued/ejemplo.xml"
+    },
+    {
+      "uuid": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+      "fecha_emision": "2025-02-10T10:30:00",
+      "rfc_receptor": "XAXX010101000",
+      "nombre_receptor": "PUBLICO GENERAL",
+      "concepto": "Venta producto demo",
+      "total": 290.58,
+      "moneda": "MXN",
+      "impuestos": 40.08,
+      "retenciones": 0.0,
+      "metodo_pago": "PUE",
+      "status": "1",
+      "xml_path": "/storage/xml/issued/ejemplo2.xml"
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "per_page": 50,
+    "total": 2,
+    "pages": 1
+  },
+  "filters": {
+    "ym": "2025-02",
+    "search": null,
+    "status": null,
+    "min_amount": null,
+    "max_amount": null,
+    "metodo_pago": null
+  }
+}

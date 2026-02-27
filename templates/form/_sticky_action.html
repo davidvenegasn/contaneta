@@ -1,0 +1,16 @@
+<button type="submit" id="submitInvoiceHidden" style="display:none;"></button>
+
+<div class="card sticky-action-card" id="stickyActionCard">
+  <div class="card-title-row mb-14 sac-title">
+    <h3 class="section-title sac-h">Total a cobrar</h3>
+    <span class="pill" id="action_total_text">—</span>
+  </div>
+  <div class="row sac-row">
+    <div>
+      <p class="muted m-0">Se calcula con tu captura. El timbrado final depende del PAC/Facturapi.</p>
+    </div>
+    <div class="sac-actions">
+      <button type="button" class="btn-primary" onclick="document.getElementById('submitInvoiceHidden')?.click()">Emitir factura</button>
+    </div>
+  </div>
+</div>

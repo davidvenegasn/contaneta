@@ -3,8 +3,13 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  {% set seo_title = "Entrar al portal · ContaNeta" %}
+  {% set seo_description = "Accede al portal de ContaNeta. Facturación electrónica CFDI, sincronización SAT, clientes y cotizaciones." %}
+  {% include "_meta_seo.html" %}
+  {% include "_schema_software.html" %}
   <title>Entrar al portal · ContaNeta</title>
   <link rel="stylesheet" href="/static/css/form.css">
+  <link rel="stylesheet" href="/static/css/auth.css">
   <style>
     body { max-width: 420px; margin: 2rem auto; padding: 0 1rem; }
     .auth-card { padding: 1.5rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card-bg); box-shadow: var(--shadow); }
@@ -51,7 +56,7 @@
         <input type="tel" name="phone" id="phone" placeholder="55 1234 5678" autocomplete="tel" />
       </div>
       <input type="password" name="password" id="password" placeholder="Contraseña" autocomplete="current-password" required />
-      <p style="margin: -0.5rem 0 1rem; font-size: 13px;"><a href="/forgot">¿Olvidaste tu contraseña?</a></p>
+      <p style="margin: -0.5rem 0 1rem; font-size: 13px;"><a class="auth-link" href="/forgot">¿Olvidaste tu contraseña?</a></p>
       <button type="submit" class="btn btn-primary">Entrar</button>
     </form>
     {% if google_oauth_configured or facebook_oauth_configured %}
@@ -69,9 +74,9 @@
       {% endif %}
     </div>
     {% endif %}
-    <p class="token-link"><a href="/login?token=">Entrar con token de acceso</a> (si te dieron un enlace)</p>
+    <p class="token-link"><a class="auth-link" href="/login?token=">Entrar con token de acceso</a> (si te dieron un enlace)</p>
     <div class="auth-footer">
-      ¿No tienes cuenta? <a href="/signup">Crear cuenta</a>
+      ¿No tienes cuenta? <a class="auth-link" href="/signup">Crear cuenta</a> · <a class="auth-link" href="/pricing">Ver planes</a>
     </div>
   </div>
   <script>
@@ -90,7 +95,7 @@
       var div = document.querySelector('.divider');
       if (div) div.style.display = 'none';
       var p = document.createElement('p');
-      p.innerHTML = 'Pega tu token en la URL: <code>/login?token=TU_TOKEN</code> o <a href="/login">volver a correo/teléfono</a>.';
+      p.innerHTML = 'Pega tu token en la URL: <code>/login?token=TU_TOKEN</code> o <a class="auth-link" href="/login">volver a correo/teléfono</a>.';
       document.querySelector('.auth-card').insertBefore(p, document.querySelector('.auth-footer'));
     }
   </script>

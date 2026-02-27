@@ -1,0 +1,25 @@
+{% extends "base_admin.html" %}
+{% block title %}Usuarios{% endblock %}
+{% block content %}
+  <h1>Usuarios</h1>
+  <div class="card">
+    {% if users %}
+    <table>
+      <thead><tr><th>ID</th><th>Email</th><th>Nombre</th><th>Creado</th><th>Rol (máx.)</th></tr></thead>
+      <tbody>
+      {% for u in users %}
+      <tr>
+        <td>{{ u.id }}</td>
+        <td>{{ u.email or '-' }}</td>
+        <td>{{ u.name or '-' }}</td>
+        <td>{{ u.created_at or '-' }}</td>
+        <td>{{ u.max_role or '-' }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p style="margin:0;color:#64748b;">No hay usuarios.</p>
+    {% endif %}
+  </div>
+{% endblock %}

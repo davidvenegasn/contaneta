@@ -1,0 +1,603 @@
+{# Contenido de lista de facturas recibidas. Usar en hub /portal/facturas?tab=received o tab=ppd (con default_metodo_pago). #}
+{% set _base_url = month_picker_base_url|default('/portal/invoices/received') %}
+{% set _list_title = list_title|default('Facturas recibidas') %}
+<div class="card ym-card ym-card--collapsible" data-resumen-key="portal_resumen_collapsed">
+  <div class="ym-card__head">
+    <div class="ym-selector">
+      {{ month_picker(_base_url, token, ym, ym_label) }}
+    </div>
+    <button type="button" class="ym-card__toggle btn btn--sm btn--ghost" aria-label="Ocultar totales" title="Ocultar totales (proteger tu información)">
+      <span class="ym-card__toggle-icon" aria-hidden="true">−</span>
+      <span class="ym-card__toggle-label">Ocultar totales</span>
+    </button>
+  </div>
+  {% set mt = month_totals|default({}) %}
+  <div class="ym-card__resumen dashboard-metrics">
+    <div class="card metric-card">
+      <div class="metric-label">Total egresos</div>
+      <div class="metric-value">${{ '{:,.2f}'.format(mt.total_base|default(0)) }}</div>
+      <div class="metric-sub">{{ ym_label }} (subtotal)</div>
+    </div>
+    <div class="card metric-card">
+      <div class="metric-label">IVA pagado</div>
+      <div class="metric-value">${{ '{:,.2f}'.format(mt.total_iva|default(0)) }}</div>
+      <div class="metric-sub">{{ ym_label }}</div>
+    </div>
+    {% if (mt.total_retenciones|default(0)) > 0 %}
+    <div class="card metric-card">
+      <div class="metric-label">Retenciones IVA pagadas</div>
+      <div class="metric-value">${{ '{:,.2f}'.format(mt.total_retenciones|default(0)) }}</div>
+      <div class="metric-sub">{{ ym_label }}</div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card card--invoice-list ui-card">
+  <div class="card__header card__header--row ui-card__header">
+    <h3 class="card__title section-title">{{ _list_title }}</h3>
+    <div class="card__header-actions card__header-actions--wrap">
+      {% if has_fiel_validated is defined and sat_sync_status is defined %}
+        {% include "portal_list_sync_bar.html" %}
+      {% endif %}
+      <button type="button" class="btn btn--sm btn--ghost filters-toggle" id="filtersToggleBtn" aria-expanded="false" aria-controls="filtersPanel">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true" width="18" height="18"><path d="M4 6h16M4 12h10M4 18h6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
+        <span>Filtros</span>
+        <span class="filters-toggle__badge" id="filtersBadge" aria-hidden="true"></span>
+      </button>
+    </div>
+  </div>
+
+  <div class="filters-panel" id="filtersPanel" hidden aria-hidden="true">
+    <div class="filters-panel__inner">
+      <div class="filters-panel__search">
+        <svg class="icon filters-panel__search-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" stroke="currentColor" stroke-width="1.75"/><path d="M16.2 16.2 21 21" stroke="currentColor" stroke-width="1.75"/></svg>
+        <input type="search" id="searchInput" class="input input--compact" placeholder="Buscar UUID, RFC, concepto..." />
+      </div>
+      <div class="filters-panel__row">
+        <select id="statusFilter" class="select select--compact" aria-label="Estatus">
+          <option value="">Estatus</option>
+          <option value="vigente">Vigentes</option>
+          <option value="cancelada">Canceladas</option>
+        </select>
+        <select id="metodoPagoFilter" class="select select--compact" aria-label="Método de pago">
+          <option value="">Pago</option>
+          <option value="PUE">PUE</option>
+          <option value="PPD">PPD</option>
+        </select>
+        <input type="number" id="minAmount" class="input input--compact" placeholder="Mín" step="0.01" aria-label="Monto mínimo" />
+        <input type="number" id="maxAmount" class="input input--compact" placeholder="Máx" step="0.01" aria-label="Monto máximo" />
+      </div>
+      <div class="filters-panel__actions">
+        <button type="button" class="btn btn--sm btn--ghost" id="clearFiltersBtn">Limpiar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card__body ui-card__body">
+    <div class="table-wrap ui-table-wrap" id="tableWrap">
+      <table class="table table--zebra ui-table ui-table--zebra" id="invoicesTable">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Emisor</th>
+            <th>Concepto</th>
+            <th>UUID</th>
+            <th>Total</th>
+            <th>IVA pagado</th>
+            <th>Pago</th>
+            <th>Estatus</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody">
+          <tr><td colspan="9"><div class="skeleton skeleton--row-46"></div></td></tr>
+          <tr><td colspan="9"><div class="skeleton skeleton--row-46"></div></td></tr>
+          <tr><td colspan="9"><div class="skeleton skeleton--row-46"></div></td></tr>
+          <tr><td colspan="9"><div class="skeleton skeleton--row-46"></div></td></tr>
+          <tr><td colspan="9"><div class="skeleton skeleton--row-46"></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="invoice-list-mobile" id="invoiceListMobile" aria-label="Lista de facturas recibidas">
+      <div class="invoice-card-mobile"><div class="skeleton skeleton--card-72"></div></div>
+      <div class="invoice-card-mobile"><div class="skeleton skeleton--card-72"></div></div>
+      <div class="invoice-card-mobile"><div class="skeleton skeleton--card-72"></div></div>
+    </div>
+    <div class="pagination" id="pagination" hidden>
+      <div class="pagination__info"></div>
+      <div class="pagination__controls">
+        <button type="button" class="btn btn--sm btn--ghost" id="prevPageBtn" disabled>Anterior</button>
+        <span class="pagination__page"></span>
+        <button type="button" class="btn btn--sm btn--ghost" id="nextPageBtn" disabled>Siguiente</button>
+      </div>
+    </div>
+    {% from 'portal/_ui_components.html' import portal_empty_state, portal_load_error %}
+    {{ portal_load_error('loadErrorState') }}
+    {% call portal_empty_state('No hay facturas recibidas este mes', 'Aún no hay facturas recibidas este mes.', id='emptyState') %}
+      <a href="/portal/facturas?tab=issued" class="btn btn--primary">Ver facturas emitidas</a>
+    {% endcall %}
+  </div>
+</div>
+
+<div class="ui-overlay cfdi-drawer-overlay" id="cfdiDrawerOverlay" aria-label="Detalle CFDI" hidden aria-hidden="true">
+  <div class="ui-overlay__backdrop" id="cfdiDrawerBackdrop"></div>
+  <div class="ui-drawer cfdi-drawer" role="dialog" aria-labelledby="cfdiDrawerTitle" aria-modal="true">
+    <div class="cfdi-drawer__header">
+      <h2 id="cfdiDrawerTitle" class="cfdi-drawer__title">Detalle CFDI</h2>
+      <button type="button" class="ui-drawer__close cfdi-drawer__close" id="cfdiDrawerClose" aria-label="Cerrar">&times;</button>
+    </div>
+    <div class="cfdi-drawer__body">
+      <dl class="cfdi-drawer__grid">
+        <dt>UUID</dt><dd id="cfdiDrawerUuid" class="cfdi-drawer__uuid"></dd>
+        <dt id="cfdiDrawerPartyLabel">Emisor</dt><dd id="cfdiDrawerParty"></dd>
+        <dt>Concepto</dt><dd id="cfdiDrawerConcepto"></dd>
+        <dt>Total</dt><dd id="cfdiDrawerTotal"></dd>
+        <dt>IVA</dt><dd id="cfdiDrawerIva"></dd>
+        <dt>Estatus</dt><dd id="cfdiDrawerStatus"></dd>
+      </dl>
+    </div>
+    <div class="cfdi-drawer__footer">
+      <button type="button" class="btn btn--sm btn--ghost" id="cfdiDrawerCopyUuid">Copiar UUID</button>
+      <a id="cfdiDrawerXml" href="#" target="_blank" rel="noopener" class="btn btn--sm link-none u-hidden">XML</a>
+      <button type="button" class="btn btn--sm u-hidden" id="cfdiDrawerPdf" data-pdf-url="">PDF</button>
+      <a id="cfdiDrawerFullPage" href="#" class="btn btn--sm btn--ghost link-none">Ver página completa</a>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  const API_BASE = '/api/invoices/received';
+  const currentYM = '{{ ym }}';
+  const CFDI_DIRECTION = 'received';
+  const defaultMetodoPago = '{{ default_metodo_pago|default("") }}';
+  let currentPage = 1;
+  const perPage = 50;
+  let filters = {};
+  let debounceTimer = null;
+  let currentPagination = null;
+  let lastRenderedRows = [];
+
+  function parseURLParams() {
+    const params = new URLSearchParams(window.location.search);
+    filters = {
+      ym: params.get('ym') || currentYM,
+      search: params.get('search') || '',
+      status: params.get('status') || '',
+      min_amount: params.get('min_amount') ? parseFloat(params.get('min_amount')) : null,
+      max_amount: params.get('max_amount') ? parseFloat(params.get('max_amount')) : null,
+      metodo_pago: params.get('metodo_pago') || (defaultMetodoPago || ''),
+      page: parseInt(params.get('page') || '1', 10),
+    };
+    currentPage = filters.page;
+  }
+
+  function updateURL() {
+    const params = new URLSearchParams();
+    if (filters.ym && filters.ym !== currentYM) params.set('ym', filters.ym);
+    if (filters.search) params.set('search', filters.search);
+    if (filters.status) params.set('status', filters.status);
+    if (filters.min_amount) params.set('min_amount', filters.min_amount.toString());
+    if (filters.max_amount) params.set('max_amount', filters.max_amount.toString());
+    if (filters.metodo_pago) params.set('metodo_pago', filters.metodo_pago);
+    if (currentPage > 1) params.set('page', currentPage.toString());
+    const newURL = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
+    window.history.replaceState({}, '', newURL);
+  }
+
+  function syncFormInputs() {
+    document.getElementById('searchInput').value = filters.search || '';
+    document.getElementById('statusFilter').value = filters.status || '';
+    document.getElementById('minAmount').value = filters.min_amount || '';
+    document.getElementById('maxAmount').value = filters.max_amount || '';
+    document.getElementById('metodoPagoFilter').value = filters.metodo_pago || '';
+    updateFiltersBadge();
+  }
+
+  function countActiveFilters() {
+    let n = 0;
+    if (filters.search && filters.search.trim()) n++;
+    if (filters.status) n++;
+    if (filters.metodo_pago) n++;
+    if (filters.min_amount != null && filters.min_amount !== '') n++;
+    if (filters.max_amount != null && filters.max_amount !== '') n++;
+    return n;
+  }
+
+  function updateFiltersBadge() {
+    const badge = document.getElementById('filtersBadge');
+    if (!badge) return;
+    const n = countActiveFilters();
+    if (n > 0) { badge.textContent = n; badge.hidden = false; } else { badge.hidden = true; }
+  }
+
+  const filtersToggleBtn = document.getElementById('filtersToggleBtn');
+  const filtersPanel = document.getElementById('filtersPanel');
+  if (filtersToggleBtn && filtersPanel) {
+    filtersToggleBtn.addEventListener('click', function() {
+      const isOpen = !filtersPanel.hidden;
+      filtersPanel.hidden = !isOpen;
+      filtersPanel.setAttribute('aria-hidden', isOpen ? 'true' : 'false');
+      filtersToggleBtn.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
+    });
+  }
+
+  async function loadData() {
+    var skeletonShownAt = Date.now();
+    const tableBody = document.getElementById('tableBody');
+    const tableWrap = document.getElementById('tableWrap');
+    const emptyState = document.getElementById('emptyState');
+    const pagination = document.getElementById('pagination');
+    tableBody.innerHTML = (window.uiSkeletonTableRows && window.uiSkeletonTableRows(9, 5)) || '<tr><td colspan="9"><div class="skeleton skeleton-line"></div></td></tr>'.repeat(5);
+    tableWrap.style.display = '';
+    var mobileList = document.getElementById('invoiceListMobile');
+    if (mobileList) mobileList.innerHTML = (window.uiSkeletonCards && window.uiSkeletonCards(3)) || '<div class="invoice-card-mobile"><div class="skeleton skeleton-card"></div></div>'.repeat(3);
+    emptyState.hidden = true;
+    var loadErr0 = document.getElementById('loadErrorState');
+    if (loadErr0) loadErr0.hidden = true;
+    pagination.hidden = true;
+    const params = new URLSearchParams();
+    params.set('ym', filters.ym || currentYM);
+    if (filters.search) params.set('search', filters.search);
+    if (filters.status) params.set('status', filters.status);
+    if (filters.min_amount) params.set('min_amount', filters.min_amount.toString());
+    if (filters.max_amount) params.set('max_amount', filters.max_amount.toString());
+    if (filters.metodo_pago) params.set('metodo_pago', filters.metodo_pago);
+    params.set('page', currentPage.toString());
+    params.set('per_page', perPage.toString());
+    try {
+      if (window.portalProgressBar) window.portalProgressBar.start();
+      const r = window.uiFetchJSON ? await window.uiFetchJSON(`${API_BASE}?${params.toString()}`) : { ok: false, status: 0, data: null, error: 'Helper no disponible' };
+      var list = (r.data && r.data.data) ? r.data.data : [];
+      await (window.uiMinSkeletonDelay && window.uiMinSkeletonDelay(skeletonShownAt, 300));
+      if (r.ok && (!list || list.length === 0)) {
+        tableWrap.style.display = 'none';
+        var mobileListEmpty = document.getElementById('invoiceListMobile');
+        if (mobileListEmpty) mobileListEmpty.innerHTML = '';
+        emptyState.hidden = false;
+        var loadErrHide = document.getElementById('loadErrorState');
+        if (loadErrHide) loadErrHide.hidden = true;
+        pagination.hidden = true;
+        return;
+      }
+      if (r.status === 401) {
+        tableWrap.style.display = 'none';
+        var mobileList401 = document.getElementById('invoiceListMobile');
+        if (mobileList401) mobileList401.innerHTML = '';
+        emptyState.hidden = true;
+        var loadErr401 = document.getElementById('loadErrorState');
+        var loadErrMsg401 = document.getElementById('loadErrorStateMsg');
+        if (loadErrMsg401) loadErrMsg401.innerHTML = window.uiSessionExpiredMessage ? window.uiSessionExpiredMessage() : 'Sesión expirada. <a href="/login">Inicia sesión</a>';
+        if (loadErr401) loadErr401.hidden = false;
+        pagination.hidden = true;
+        return;
+      }
+      if (!r.ok) {
+        const msg = window.uiListLoadErrorText ? window.uiListLoadErrorText(r, 'recibidas') : (r.error || 'Revisa tu conexión e intenta de nuevo.');
+        tableWrap.style.display = 'none';
+        var mobileListErr = document.getElementById('invoiceListMobile');
+        if (mobileListErr) mobileListErr.innerHTML = '';
+        emptyState.hidden = true;
+        var loadErr = document.getElementById('loadErrorState');
+        var loadErrMsg = document.getElementById('loadErrorStateMsg');
+        if (loadErrMsg) loadErrMsg.textContent = msg;
+        if (loadErr) loadErr.hidden = false;
+        pagination.hidden = true;
+        return;
+      }
+      renderTable(list);
+      currentPagination = r.data.pagination;
+      renderPagination(r.data.pagination);
+      updateURL();
+    } catch (err) {
+      const fallbackMsg = (err && err.message) ? err.message : 'Revisa tu conexión e intenta de nuevo.';
+      tableWrap.style.display = 'none';
+      if (tableBody) tableBody.innerHTML = '';
+      var mobileListCatch = document.getElementById('invoiceListMobile');
+      if (mobileListCatch) mobileListCatch.innerHTML = '';
+      emptyState.hidden = true;
+      var loadErr = document.getElementById('loadErrorState');
+      var loadErrMsg = document.getElementById('loadErrorStateMsg');
+      if (loadErrMsg) loadErrMsg.textContent = fallbackMsg;
+      if (loadErr) loadErr.hidden = false;
+      pagination.hidden = true;
+    } finally {
+      if (window.portalProgressBar) window.portalProgressBar.done();
+    }
+  }
+
+  var loadErrorRetryBtn = document.getElementById('loadErrorStateRetry');
+  if (loadErrorRetryBtn) loadErrorRetryBtn.addEventListener('click', loadData);
+
+  function formatDate(dt) {
+    if (!dt || dt.length < 10) return '—';
+    const part = dt.substring(0, 10);
+    const [y, m, d] = part.split('-');
+    return d && m && y ? `${d}/${m}/${y}` : part;
+  }
+  function formatMoney(x, m) {
+    if (x == null) return '—';
+    const n = parseFloat(x);
+    return Number.isFinite(n) ? `$${n.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${m || ''}`.trim() : '—';
+  }
+  function truncate(txt, maxlen) {
+    return txt && txt.length > maxlen ? txt.substring(0, maxlen) + '…' : (txt || '—');
+  }
+  function escapeHtml(s) {
+    return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  function renderStatus(s) {
+    const st = String(s || '').toUpperCase();
+    if (st === 'V' || st === 'VIGENTE' || st === '1') return '<span class="badge badge--success">Vigente</span>';
+    if (st === 'C' || st === 'CANCELADO' || st === 'CANCELADA' || st === '0') return '<span class="badge badge--danger">Cancelada</span>';
+    if (st.includes('CANCELACION') || st.includes('CANCELACIÓN')) return '<span class="badge badge--warn">En cancelación</span>';
+    return '<span class="badge badge--neutral">' + escapeHtml(s || 'Sin estatus') + '</span>';
+  }
+
+  function renderTable(rows) {
+    lastRenderedRows = rows;
+    const tbody = document.getElementById('tableBody');
+    const mobileEl = document.getElementById('invoiceListMobile');
+    const fragment = document.createDocumentFragment();
+    const temp = document.createElement('tbody');
+    const mobileCards = [];
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const fecha = row.fecha_emision ? formatDate(row.fecha_emision) : '—';
+      const emisor = escapeHtml(row.nombre_emisor || '—');
+      const rfc = escapeHtml(row.rfc_emisor || '');
+      const concepto = truncate(escapeHtml(row.concepto || '—'), 60);
+      const uuid = row.uuid ? `${row.uuid.substring(0, 8)}…${row.uuid.substring(row.uuid.length - 4)}` : '—';
+      const uuidCopyBtn = row.uuid ? `<button type="button" class="uuid-copy-btn" data-copy-uuid="${escapeHtml(row.uuid)}" aria-label="Copiar UUID" title="Copiar UUID"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>` : '';
+      const total = formatMoney(row.total, row.moneda);
+      const iva = formatMoney(row.impuestos || 0, row.moneda);
+      const metodoPago = row.metodo_pago ? `<span class="badge badge--neutral badge--xs">${escapeHtml(row.metodo_pago)}</span>` : '<span class="muted">—</span>';
+      const status = renderStatus(row.status);
+      const hasXML = row.xml_path && row.xml_path.trim();
+      const detailUrl = `/portal/cfdi/received/${row.uuid}`;
+      const xmlUrl = hasXML ? `/portal/sat/xml/${row.uuid}` : null;
+      const pdfUrl = hasXML ? `/portal/sat/pdf/${row.uuid}` : null;
+      temp.innerHTML = `<tr data-row-index="${i}">
+        <td class="muted">${fecha}</td>
+        <td><div class="u-fw-semibold">${emisor}</div><div class="muted u-text-xs font-mono">${rfc}</div></td>
+        <td class="concepto-cell">${concepto}</td>
+        <td><div class="uuid-copy-wrap"><span class="uuid-copy-wrap__text">${uuid}</span>${uuidCopyBtn}</div></td>
+        <td class="u-fw-semibold">${total}</td>
+        <td class="muted">${iva}</td>
+        <td>${metodoPago}</td>
+        <td>${status}</td>
+        <td class="text-right"><div class="u-flex u-gap-1 u-justify-end u-flex-wrap">
+          <a href="${detailUrl}" class="btn btn--sm btn--ghost cfdi-detail-link link-none">Detalle</a>
+          ${xmlUrl ? `<a href="${xmlUrl}" target="_blank" rel="noopener" class="btn btn--sm link-none">XML</a>` : ''}
+          ${pdfUrl ? `<button type="button" class="btn btn--sm" data-pdf-url="${pdfUrl}">PDF</button>` : ''}
+        </div></td>
+      </tr>`;
+      fragment.appendChild(temp.firstElementChild);
+      if (mobileEl) {
+        const actions = [
+          '<a href="' + detailUrl + '" class="btn btn--sm btn--ghost cfdi-detail-link link-none" data-row-index="' + i + '">Detalle</a>',
+          xmlUrl ? '<a href="' + xmlUrl + '" target="_blank" rel="noopener" class="btn btn--sm btn--secondary link-none">XML</a>' : '',
+          pdfUrl ? '<button type="button" class="btn btn--sm btn--secondary" data-pdf-url="' + escapeHtml(pdfUrl) + '">PDF</button>' : ''
+        ].filter(Boolean).join('');
+        const mobileUuidCopy = row.uuid ? '<button type="button" class="uuid-copy-btn" data-copy-uuid="' + escapeHtml(row.uuid) + '" aria-label="Copiar UUID" title="Copiar UUID"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>' : '';
+        mobileCards.push('<div class="invoice-card-mobile" data-row-index="' + i + '">' +
+          '<div class="invoice-card-mobile__row">' +
+            '<div class="invoice-card-mobile__main">' +
+              '<div class="invoice-card-mobile__title">' + emisor + '</div>' +
+              '<div class="invoice-card-mobile__meta muted">' + fecha + (rfc ? ' · ' + rfc : '') + '</div>' +
+              '<div class="invoice-card-mobile__uuid uuid-copy-wrap u-mt-1">' +
+                '<span class="uuid-copy-wrap__text">' + uuid + '</span>' + mobileUuidCopy +
+              '</div>' +
+              '<div class="invoice-card-mobile__concept" title="' + escapeHtml(row.concepto || '') + '">' + concepto + '</div>' +
+            '</div>' +
+            '<div class="invoice-card-mobile__total">' + total + '</div>' +
+          '</div>' +
+          '<div class="invoice-card-mobile__row">' + status + '</div>' +
+          '<div class="invoice-card-mobile__actions">' + actions + '</div>' +
+        '</div>');
+      }
+    }
+    tbody.replaceChildren(fragment);
+    if (mobileEl) mobileEl.innerHTML = mobileCards.join('');
+  }
+
+  function renderPagination(pag) {
+    const pagination = document.getElementById('pagination');
+    if (pag.pages <= 1) { pagination.hidden = true; return; }
+    pagination.hidden = false;
+    document.getElementById('prevPageBtn').disabled = pag.page <= 1;
+    document.getElementById('nextPageBtn').disabled = pag.page >= pag.pages;
+    var from = (pag.page - 1) * pag.per_page + 1;
+    var to = Math.min(pag.page * pag.per_page, pag.total);
+    document.querySelector('.pagination__info').textContent =
+      pag.page === 1 ? 'Mostrando los primeros ' + to + ' de ' + pag.total : 'Mostrando ' + from + '-' + to + ' de ' + pag.total;
+    document.querySelector('.pagination__page').textContent = `Página ${pag.page} de ${pag.pages}`;
+  }
+
+  function applyFilters() {
+    filters.search = document.getElementById('searchInput').value.trim();
+    filters.status = document.getElementById('statusFilter').value;
+    const minVal = document.getElementById('minAmount').value.trim();
+    filters.min_amount = minVal ? parseFloat(minVal) : null;
+    const maxVal = document.getElementById('maxAmount').value.trim();
+    filters.max_amount = maxVal ? parseFloat(maxVal) : null;
+    filters.metodo_pago = document.getElementById('metodoPagoFilter').value;
+    currentPage = 1;
+    filters.page = 1;
+    updateFiltersBadge();
+    loadData();
+  }
+
+  document.getElementById('searchInput').addEventListener('input', function() {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(applyFilters, 400);
+  });
+  document.getElementById('statusFilter').addEventListener('change', applyFilters);
+  document.getElementById('minAmount').addEventListener('change', applyFilters);
+  document.getElementById('maxAmount').addEventListener('change', applyFilters);
+  document.getElementById('metodoPagoFilter').addEventListener('change', applyFilters);
+  document.getElementById('clearFiltersBtn').addEventListener('click', function() {
+    filters = { ym: currentYM, search: '', status: '', min_amount: null, max_amount: null, metodo_pago: defaultMetodoPago || '', page: 1 };
+    currentPage = 1;
+    syncFormInputs();
+    loadData();
+    updateFiltersBadge();
+  });
+  document.getElementById('prevPageBtn').addEventListener('click', function() {
+    if (currentPage > 1) { currentPage--; filters.page = currentPage; loadData(); }
+  });
+  document.getElementById('nextPageBtn').addEventListener('click', function() {
+    if (currentPagination && currentPage < currentPagination.pages) { currentPage++; filters.page = currentPage; loadData(); }
+  });
+  document.addEventListener('click', function(e) {
+    const btn = e.target.closest('[data-pdf-url]');
+    if (btn && window.openPdfModal) window.openPdfModal(btn.getAttribute('data-pdf-url'));
+  });
+
+  const cfdiDrawerOverlay = document.getElementById('cfdiDrawerOverlay');
+  const cfdiDrawerBackdrop = document.getElementById('cfdiDrawerBackdrop');
+  const cfdiDrawerClose = document.getElementById('cfdiDrawerClose');
+  function openCfdiDrawer(row) {
+    if (!row || !cfdiDrawerOverlay) return;
+    const partyLabel = document.getElementById('cfdiDrawerPartyLabel');
+    const partyValue = document.getElementById('cfdiDrawerParty');
+    const uuidEl = document.getElementById('cfdiDrawerUuid');
+    const conceptoEl = document.getElementById('cfdiDrawerConcepto');
+    const totalEl = document.getElementById('cfdiDrawerTotal');
+    const ivaEl = document.getElementById('cfdiDrawerIva');
+    const statusEl = document.getElementById('cfdiDrawerStatus');
+    const xmlLink = document.getElementById('cfdiDrawerXml');
+    const pdfBtn = document.getElementById('cfdiDrawerPdf');
+    const fullPageLink = document.getElementById('cfdiDrawerFullPage');
+    const copyBtn = document.getElementById('cfdiDrawerCopyUuid');
+    if (partyLabel) partyLabel.textContent = 'Emisor';
+    if (uuidEl) uuidEl.textContent = row.uuid || '—';
+    if (partyValue) partyValue.innerHTML = (row.nombre_emisor ? escapeHtml(row.nombre_emisor) : '—') + (row.rfc_emisor ? '<div class="muted u-text-xs font-mono">' + escapeHtml(row.rfc_emisor) + '</div>' : '');
+    if (conceptoEl) conceptoEl.textContent = row.concepto || '—';
+    if (totalEl) totalEl.textContent = formatMoney(row.total, row.moneda);
+    if (ivaEl) ivaEl.textContent = formatMoney(row.impuestos || 0, row.moneda);
+    if (statusEl) statusEl.innerHTML = renderStatus(row.status);
+    const hasXML = row.xml_path && row.xml_path.trim();
+    if (xmlLink) { xmlLink.classList.toggle('u-hidden', !hasXML); xmlLink.href = hasXML ? '/portal/sat/xml/' + row.uuid : '#'; }
+    if (pdfBtn) { pdfBtn.classList.toggle('u-hidden', !hasXML); pdfBtn.setAttribute('data-pdf-url', hasXML ? '/portal/sat/pdf/' + row.uuid : ''); }
+    if (fullPageLink) fullPageLink.href = '/portal/cfdi/received/' + (row.uuid || '');
+    copyBtn.textContent = 'Copiar UUID';
+    copyBtn.onclick = function() {
+      if (row.uuid && navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(row.uuid).then(function() {
+          var toast = window.uiToast || window.portalToast;
+          if (toast) toast({ type: 'success', title: 'Copiado', message: '', timeout: 2000 });
+          else copyBtn.textContent = 'Copiado';
+        });
+      }
+    };
+    cfdiDrawerOverlay.hidden = false;
+    cfdiDrawerOverlay.classList.add('is-open');
+    cfdiDrawerOverlay.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('no-scroll');
+    window._cfdiDrawerRemoveEscape = (typeof window.uiCloseOnEscape === 'function') ? window.uiCloseOnEscape(cfdiDrawerOverlay, closeCfdiDrawer) : null;
+    if (typeof window.uiTrapFocus === 'function') window.uiTrapFocus(cfdiDrawerOverlay);
+  }
+  function closeCfdiDrawer() {
+    if (!cfdiDrawerOverlay) return;
+    if (typeof window.uiReleaseFocusTrap === 'function') window.uiReleaseFocusTrap();
+    if (window._cfdiDrawerRemoveEscape) { window._cfdiDrawerRemoveEscape(); window._cfdiDrawerRemoveEscape = null; }
+    cfdiDrawerOverlay.hidden = true;
+    cfdiDrawerOverlay.classList.remove('is-open');
+    cfdiDrawerOverlay.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('no-scroll');
+  }
+  if (cfdiDrawerBackdrop) cfdiDrawerBackdrop.addEventListener('click', closeCfdiDrawer);
+  if (cfdiDrawerClose) cfdiDrawerClose.addEventListener('click', closeCfdiDrawer);
+  document.addEventListener('click', function(e) {
+    var copyBtn = e.target && e.target.closest ? e.target.closest('[data-copy-uuid]') : null;
+    if (copyBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      var uuid = (copyBtn.getAttribute('data-copy-uuid') || '').trim();
+      if (uuid && navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(uuid).then(function() {
+          var toast = window.uiToast || window.portalToast;
+          if (toast) toast({ type: 'success', title: 'Copiado', message: '', timeout: 2000 });
+        }).catch(function() {});
+      }
+    }
+  });
+  document.getElementById('tableWrap')?.addEventListener('click', function(e) {
+    const link = e.target.closest('a.cfdi-detail-link');
+    const tr = e.target.closest('tr[data-row-index]');
+    if (link) {
+      e.preventDefault();
+      const idx = tr ? tr.getAttribute('data-row-index') : link.getAttribute('data-row-index');
+      if (idx != null && lastRenderedRows[parseInt(idx, 10)]) openCfdiDrawer(lastRenderedRows[parseInt(idx, 10)]);
+    } else if (tr && !e.target.closest('a, button')) {
+      const idx = tr.getAttribute('data-row-index');
+      if (idx != null && lastRenderedRows[parseInt(idx, 10)]) openCfdiDrawer(lastRenderedRows[parseInt(idx, 10)]);
+    }
+  });
+  document.getElementById('invoiceListMobile')?.addEventListener('click', function(e) {
+    const link = e.target.closest('a.cfdi-detail-link');
+    const card = e.target.closest('.invoice-card-mobile[data-row-index]');
+    if (link) {
+      e.preventDefault();
+      const idx = (link.getAttribute('data-row-index') ?? card?.getAttribute('data-row-index'));
+      if (idx != null && lastRenderedRows[parseInt(idx, 10)]) openCfdiDrawer(lastRenderedRows[parseInt(idx, 10)]);
+    } else if (card && !e.target.closest('a, button')) {
+      const idx = card.getAttribute('data-row-index');
+      if (idx != null && lastRenderedRows[parseInt(idx, 10)]) openCfdiDrawer(lastRenderedRows[parseInt(idx, 10)]);
+    }
+  });
+
+  const monthPicker = document.querySelector('.month-picker');
+  if (monthPicker) {
+    const observer = new MutationObserver(function() {
+      const newYm = monthPicker.getAttribute('data-ym');
+      if (newYm && newYm !== filters.ym) {
+        filters.ym = newYm;
+        currentPage = 1;
+        filters.page = 1;
+        loadData();
+      }
+    });
+    observer.observe(monthPicker, { attributes: true, attributeFilter: ['data-ym'] });
+  }
+
+  parseURLParams();
+  syncFormInputs();
+  updateFiltersBadge();
+  loadData();
+})();
+</script>
+
+<style>
+.card__header--row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.card__header-actions { display: flex; align-items: center; gap: var(--space-2); }
+.filters-toggle { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 6px 12px; font-size: 13px; }
+.filters-toggle .icon { flex-shrink: 0; }
+.filters-toggle__badge { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 5px; font-size: 11px; font-weight: 700; line-height: 1; color: var(--text-inverse, #fff); background: var(--primary, #0d9488); border-radius: 9px; }
+.filters-toggle__badge[hidden] { display: none !important; }
+.filters-panel { border-top: 1px solid var(--border); background: var(--surface-hover, rgba(0,0,0,.02)); overflow: hidden; }
+.filters-panel[hidden] { display: none !important; }
+.filters-panel__inner { padding: var(--space-3); display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.filters-panel__search { position: relative; flex: 1; min-width: 140px; }
+.filters-panel__search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; opacity: 0.6; pointer-events: none; }
+.filters-panel__search .input { padding-left: 32px; }
+.filters-panel__row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.filters-panel__actions { margin-left: auto; }
+.input--compact, .select--compact { font-size: 13px; padding: 6px 10px; min-height: 34px; border-radius: 8px; }
+.input--compact { width: 100%; min-width: 0; }
+.select--compact { min-width: 90px; }
+.filters-panel__row .input--compact { width: 80px; min-width: 80px; }
+.pagination { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-2); }
+@media (max-width: 640px) {
+  .card__header--row { flex-direction: column; align-items: stretch; }
+  .card__header-actions { justify-content: flex-end; }
+  .filters-toggle { align-self: flex-end; }
+  .filters-panel__inner { flex-direction: column; align-items: stretch; padding: var(--space-2); }
+  .filters-panel__search { min-width: 0; }
+  .filters-panel__row { flex-direction: column; width: 100%; }
+  .filters-panel__row .select--compact, .filters-panel__row .input--compact { width: 100%; min-width: 0; }
+  .filters-panel__actions { margin-left: 0; justify-content: flex-end; }
+}
+</style>

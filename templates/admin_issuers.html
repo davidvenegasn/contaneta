@@ -21,7 +21,11 @@
         <td>{{ i.facturapi_org_id or '-' }}</td>
         <td>
           {% if can_impersonate %}
-          <a href="/admin/impersonate/{{ i.id }}" class="btn btn-primary btn-sm">Entrar como</a>
+          <form method="post" action="/admin/impersonate-form" style="display:inline;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+            <input type="hidden" name="issuer_id" value="{{ i.id }}" />
+            <button type="submit" class="btn btn-primary btn-sm">Impersonar</button>
+          </form>
           {% else %}
           <span class="muted" style="font-size:13px;">Solo admin</span>
           {% endif %}

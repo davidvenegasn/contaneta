@@ -1,0 +1,46 @@
+{
+  "data": [
+    {
+      "uuid": "f1e2d3c4-b5a6-9780-1234-567890abcdef",
+      "fecha_emision": "2025-02-14T08:00:00",
+      "rfc_emisor": "OCC9901012A1",
+      "nombre_emisor": "OFICINA CONTABLE EJEMPLO",
+      "concepto": "Honorarios contables",
+      "total": 3500.0,
+      "moneda": "MXN",
+      "impuestos": 482.76,
+      "retenciones": 0.0,
+      "metodo_pago": "PUE",
+      "status": "1",
+      "xml_path": "/storage/xml/received/recibida1.xml"
+    },
+    {
+      "uuid": "e2d3c4b5-a697-8012-3456-7890abcdef12",
+      "fecha_emision": "2025-02-01T14:00:00",
+      "rfc_emisor": "CFE010101000",
+      "nombre_emisor": "COMISION FEDERAL DE ELECTRICIDAD",
+      "concepto": "Suministro energía eléctrica",
+      "total": 1250.5,
+      "moneda": "MXN",
+      "impuestos": 172.48,
+      "retenciones": 0.0,
+      "metodo_pago": "PPD",
+      "status": "1",
+      "xml_path": "/storage/xml/received/cfe.xml"
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "per_page": 50,
+    "total": 2,
+    "pages": 1
+  },
+  "filters": {
+    "ym": "2025-02",
+    "search": null,
+    "status": null,
+    "min_amount": null,
+    "max_amount": null,
+    "metodo_pago": null
+  }
+}

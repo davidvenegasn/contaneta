@@ -1,0 +1,53 @@
+<div class="card">
+  <div class="app-content">
+    <div class="card-title-row mb-14"><h3 class="section-title">01 — Receptor</h3></div>
+
+    <div class="row">
+      <div><label>RFC</label><input name="customer_rfc" required placeholder="XAXX010101000" value="{{ customer_prefill.customer_rfc | e if customer_prefill else '' }}" /></div>
+      <div><label>Razón social</label><input name="customer_legal_name" required placeholder="Nombre / Razón social" value="{{ customer_prefill.customer_legal_name | e if customer_prefill else '' }}" /></div>
+    </div>
+
+    <div class="row">
+      <div class="checkline">
+        <input type="checkbox" id="receiver_is_pm" name="receiver_is_pm" value="1" />
+        <label for="receiver_is_pm" class="checkline__label checkline__label--bold">Receptor es Persona Moral</label>
+        <span class="muted checkline__hint">(se detecta por RFC, puedes corregirlo)</span>
+      </div>
+      <div>
+        <input type="hidden" id="issuer_tax_system" value="{{ issuer_tax_system | default('') }}" />
+      </div>
+    </div>
+
+    <div class="row">
+      <div><label>CP</label><input name="customer_zip" required placeholder="64000" value="{{ customer_prefill.customer_zip | e if customer_prefill else '' }}" /></div>
+      <div>
+        <label>Régimen fiscal (receptor)</label>
+        <select name="customer_tax_system" id="customer_tax_system" required data-prefill="{{ customer_prefill.customer_tax_system | e if customer_prefill else '' }}">
+          <option value="">Cargando…</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label>Uso CFDI</label>
+        <select name="cfdi_use" id="cfdi_use" required>
+          <option value="">Cargando…</option>
+        </select>
+      </div>
+      <div><label>Email (opcional)</label><input name="customer_email" placeholder="mail@ejemplo.com" value="{{ customer_prefill.customer_email | e if customer_prefill else '' }}" /></div>
+    </div>
+
+    <div class="row">
+      <div class="checkline">
+        <input type="checkbox" id="save_customer" name="save_customer" value="1" />
+        <label for="save_customer" class="checkline__label">Guardar cliente frecuente</label>
+      </div>
+      <div>
+        <label>Alias del cliente (opcional)</label>
+        <input name="customer_alias" id="customer_alias" placeholder="Ej. Cliente ACME / Juan nómina" disabled />
+        <p class="muted mt-6">Se guardará para este emisor y podrás seleccionarlo en futuras facturas.</p>
+      </div>
+    </div>
+  </div>
+</div>

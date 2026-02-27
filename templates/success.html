@@ -1,19 +1,65 @@
-<!doctype html>
-<html>
-  <head><meta charset="utf-8" /><title>Factura emitida</title></head>
-  <body style="font-family: Arial; max-width: 900px; margin: 24px auto; padding: 0 16px;">
-    <h2>✅ Factura emitida (TEST)</h2>
-    <p>Invoice ID (Facturapi): <b>{{ facturapi_invoice_id }}</b></p>
-    <p>UUID (si aplica): <b>{{ uuid or "—" }}</b></p>
-    <p>Total: <b>{% if total is defined and total is not none %}${{ '{:,.2f}'.format(total|float) }}{% else %}{{ total or "—" }}{% endif %}</b></p>
+{% extends "base_portal.html" %}
+{% set title = 'Factura emitida' %}
 
-    <h3>Descargas</h3>
-    <ul>
-      <li><a href="/download/pdf/{{ facturapi_invoice_id }}">PDF</a></li>
-      <li><a href="/download/xml/{{ facturapi_invoice_id }}">XML</a></li>
-      <li><a href="/download/zip/{{ facturapi_invoice_id }}">ZIP (PDF+XML)</a></li>
-    </ul>
+{% block content %}
+<div class="success-page-wrap" style="max-width: 560px; margin: 2rem auto; padding: 0 16px; text-align: center;">
+  <p class="muted" id="successFallback">Cargando…</p>
+</div>
+<script>
+(function () {
+  var uuid = {% if uuid %}"{{ uuid | e }}"{% else %}null{% endif %};
+  var total = {% if total is defined and total is not none %}{{ total }}{% else %}null{% endif %};
+  var facturapiId = "{{ facturapi_invoice_id | e }}";
 
-    <p><a href="/portal/create">Crear otra</a></p>
-  </body>
-</html>
+  function formatTotal(v) {
+    if (v == null || v === '') return '—';
+    var n = Number(v);
+    if (Number.isFinite(n)) return '$' + n.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return String(v);
+  }
+
+  function showOverlay() {
+    var actions = [];
+    if (uuid) {
+      actions.push({ label: 'Descargar PDF', href: '/download/pdf/' + uuid });
+      actions.push({ label: 'Descargar XML', href: '/download/xml/' + uuid });
+    }
+    actions.push({ label: 'Crear otra factura', href: '/portal/create' });
+
+    if (window.uiSuccessOverlay) {
+      window.uiSuccessOverlay({
+        title: 'Factura emitida',
+        message: 'Total ' + formatTotal(total) + '. Puedes descargar PDF y XML o crear otra factura.',
+        actions: actions
+      });
+      var el = document.getElementById('successFallback');
+      if (el) el.textContent = '';
+    } else {
+      var el = document.getElementById('successFallback');
+      if (el) {
+        el.innerHTML = 'Factura emitida. Total: <strong>' + formatTotal(total) + '</strong>. ' +
+          (uuid ? '<a href="/download/pdf/' + uuid + '">PDF</a> · <a href="/download/xml/' + uuid + '">XML</a> · ' : '') +
+          '<a href="/portal/create">Crear otra</a>';
+      }
+    }
+  }
+
+  if (window !== window.top) {
+    try {
+      window.parent.postMessage({
+        type: 'quick-invoice-success',
+        uuid: uuid,
+        total: total,
+        fact_id: facturapiId
+      }, '*');
+    } catch (err) {}
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', showOverlay);
+  } else {
+    showOverlay();
+  }
+})();
+</script>
+{% endblock %}

@@ -89,7 +89,11 @@ foreach ($rows as $cred) {
             $pass
         );
     } catch (Throwable $e) {
-        fwrite(STDERR, "[{$label}] Error al crear FIEL: " . $e->getMessage() . "\n");
+        $msg = $e->getMessage();
+        if (strpos($msg, 'bad decrypt') !== false || strpos($msg, 'Cannot open private key') !== false) {
+            $msg = 'La contraseña de la clave privada (.key) no es correcta. Verifica que sea exactamente la que te entregó el SAT al emitir tu e.firma (FIEL), sin espacios al inicio o final. Si acabas de subir los archivos, revisa el campo «Contraseña de la clave FIEL».';
+        }
+        fwrite(STDERR, "[{$label}] Error al crear FIEL: " . $msg . "\n");
         $allOk = false;
         continue;
     }

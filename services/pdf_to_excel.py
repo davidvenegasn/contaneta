@@ -2,9 +2,12 @@ import hashlib
 import os
 import re
 import unicodedata
+import logging
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from typing import Optional, Iterable, Any
+
+logger = logging.getLogger(__name__)
 
 
 _DATE_PATTERNS = [
@@ -180,20 +183,50 @@ def _detect_account_last4(all_text_norm: str) -> str:
 
 def _detect_period(all_text_norm: str) -> tuple[str, str]:
     """
-    Intenta detectar rango de periodo en el PDF.
+    Intenta detectar rango de periodo en el PDF (encabezado del estado de cuenta).
     Devuelve (period_start, period_end) como YYYY-MM-DD o ("","") si no detecta.
+    Prioriza el texto explícito "del ... al ..." / "periodo ..." sobre fechas de movimientos.
     """
     t = all_text_norm or ""
-    # ejemplos: "DEL 01/01/2026 AL 31/01/2026"
+    date_part = r"(\d{2}[\/\-]\d{2}[\/\-]\d{2,4})"
+    # 1) "DEL 01/01/2026 AL 31/01/2026" o "PERIODO DEL 01/01/2026 AL 31/01/2026"
     m = re.search(
-        r"\bDEL\s+(\d{2}[\/\-]\d{2}[\/\-]\d{2,4})\s+(?:AL|A)\s+(\d{2}[\/\-]\d{2}[\/\-]\d{2,4})\b",
+        r"\b(?:PERIODO\s+)?DEL\s+" + date_part + r"\s+(?:AL|A)\s+" + date_part + r"\b",
         t,
     )
     if m:
-        d1 = _detect_date(m.group(1))
-        d2 = _detect_date(m.group(2))
-        return (d1 or "", d2 or "")
+        d1, d2 = _detect_date(m.group(1)), _detect_date(m.group(2))
+        if d1 and d2:
+            return (d1, d2)
+    # 2) "PERIODO 01/01/2026 AL 31/01/2026" o "01/01/2026 AL 31/01/2026" (sin DEL)
+    m = re.search(
+        r"\b(?:PERIODO\s*:?\s*)?(\d{2}[\/\-]\d{2}[\/\-]\d{2,4})\s+(?:AL|A)\s+(\d{2}[\/\-]\d{2}[\/\-]\d{2,4})\b",
+        t,
+    )
+    if m:
+        d1, d2 = _detect_date(m.group(1)), _detect_date(m.group(2))
+        if d1 and d2:
+            return (d1, d2)
+    # 3) "DE 01/01/2026 A 31/01/2026"
+    m = re.search(r"\bDE\s+" + date_part + r"\s+A\s+" + date_part + r"\b", t)
+    if m:
+        d1, d2 = _detect_date(m.group(1)), _detect_date(m.group(2))
+        if d1 and d2:
+            return (d1, d2)
     return ("", "")
+
+
+def detect_statement_period_from_text(raw_text: str) -> tuple[str, str]:
+    """
+    Detecta periodo del estado de cuenta desde texto crudo (ej. páginas del PDF concatenadas).
+    Útil para el pipeline de preview sin depender del Excel.
+    Returns (period_start, period_end) en YYYY-MM-DD o ("", "").
+    """
+    if not (raw_text or "").strip():
+        return ("", "")
+    all_text = " ".join((raw_text or "").split())
+    all_text_norm = _norm_text(all_text)
+    return _detect_period(all_text_norm)
 
 
 def _detect_date(line: str) -> Optional[str]:
@@ -454,12 +487,17 @@ class ConvertMeta:
     mode: str  # 'parsed' | 'raw'
 
 
-def convert_pdf_to_xlsx(pdf_path_abs: str, xlsx_path_abs: str, issuer_id: int | None = None) -> dict[str, Any]:
+def convert_pdf_to_xlsx(
+    pdf_path_abs: str,
+    xlsx_path_abs: str,
+    issuer_id: int | None = None,
+    statement_id: int | None = None,
+) -> dict[str, Any]:
     """
     Convierte un PDF de estado de cuenta a Excel.
-    - Intenta heurística simple (fecha + montos) con normalización.
-    - Genera un XLSX con estructura contable útil (Movimientos/Gastos/Ingresos/Resumen/Conciliacion_CFDI/Gastos_sin_factura).
-    - Siempre genera un XLSX válido. Si no detecta estructura, genera RAW y hojas vacías con headers.
+    - Usa parser Banorte (solo montos con 2 decimales, sección DETALLE DE MOVIMIENTOS (PESOS)).
+    - Si statement_id y issuer_id se pasan, persiste movimientos en bank_movements con dedupe por hash.
+    - Genera XLSX: Movimientos, Gastos, Ingresos, Resumen, RAW.
     """
     try:
         import pdfplumber  # lazy import (dependencia opcional hasta instalar)
@@ -473,49 +511,21 @@ def convert_pdf_to_xlsx(pdf_path_abs: str, xlsx_path_abs: str, issuer_id: int | 
         raise FileNotFoundError("PDF no encontrado")
 
     HEAD_MOV = [
-        "movimiento_id",
-        "issuer_id",
-        "bank_name",
-        "account_last4",
-        "period_start",
-        "period_end",
         "fecha",
-        "descripcion_raw",
-        "descripcion_norm",
-        "referencia",
-        "tipo",
-        "monto",
-        "moneda",
+        "descripcion",
+        "deposito",
+        "retiro",
         "saldo",
+        "tipo",
         "categoria",
-        "subcategoria",
-        "metodo_pago_hint",
         "contraparte_hint",
-        "es_comision_bancaria",
-        "es_impuesto_bancario",
-        "posible_facturable",
-        "match_cfdi_uuid",
-        "match_score",
-        "match_status",
-        "parse_confidence",
+        "metodo_hint",
+        "referencia",
+        "cve_rastreo",
+        "rfc_encontrado",
+        "confidence_score",
+        "source_page_first",
     ]
-    HEAD_C = [
-        "movimiento_id",
-        "fecha_mov",
-        "monto_gasto",
-        "contraparte_hint",
-        "categoria",
-        "cfdi_uuid_sugerido",
-        "cfdi_fecha",
-        "cfdi_total",
-        "cfdi_rfc_emisor",
-        "cfdi_nombre_emisor",
-        "score_sugerido",
-        "decision_usuario",
-        "cfdi_uuid_final",
-        "nota",
-    ]
-    HEAD_GSF = ["movimiento_id", "fecha", "monto", "contraparte_hint", "categoria", "motivo"]
 
     def _freeze_filter(ws, ncols: int, nrows: int) -> None:
         ws.freeze_panes = "A2"
@@ -556,17 +566,15 @@ def convert_pdf_to_xlsx(pdf_path_abs: str, xlsx_path_abs: str, issuer_id: int | 
         ensure_parent_dir(xlsx_path_abs)
         wb = Workbook()
         wb.remove(wb.active)
-        _write_table(wb.create_sheet("Movimientos"), HEAD_MOV, [], money_cols=[12, 14])
-        _write_table(wb.create_sheet("Gastos"), HEAD_MOV, [], money_cols=[12, 14])
-        _write_table(wb.create_sheet("Ingresos"), HEAD_MOV, [], money_cols=[12, 14])
+        _write_table(wb.create_sheet("Movimientos"), HEAD_MOV, [], money_cols=[3, 4, 5])
+        _write_table(wb.create_sheet("Gastos"), HEAD_MOV, [], money_cols=[3, 4, 5])
+        _write_table(wb.create_sheet("Ingresos"), HEAD_MOV, [], money_cols=[3, 4, 5])
         ws_r = wb.create_sheet("Resumen")
         ws_r.append(["campo", "valor"])
         ws_r["A1"].font = Font(bold=True)
         ws_r["B1"].font = Font(bold=True)
         ws_r.append(["error", "Falta dependencia: pdfplumber (instala requirements.txt)"])
         ws_r.freeze_panes = "A2"
-        _write_table(wb.create_sheet("Conciliacion_CFDI"), HEAD_C, [], money_cols=[3, 8])
-        _write_table(wb.create_sheet("Gastos_sin_factura"), HEAD_GSF, [], money_cols=[3])
         _write_table(wb.create_sheet("RAW"), ["page", "line", "text"], [], money_cols=[])
         wb.save(xlsx_path_abs)
         return {
@@ -574,22 +582,22 @@ def convert_pdf_to_xlsx(pdf_path_abs: str, xlsx_path_abs: str, issuer_id: int | 
             "raw_lines": 0,
             "mode": "raw",
             "error": "pdfplumber_missing",
+            "period_start": "",
+            "period_end": "",
+            "bank_name": "",
+            "account_last4": "",
+            "transactions": [],
             "processed_count": 0,
             "total_ingresos": 0.0,
             "total_gastos": 0.0,
             "sin_factura_count": 0,
+            "movements_count": 0,
+            "ingresos_total": 0.0,
+            "gastos_total": 0.0,
+            "sin_parse_count": 0,
         }
 
     raw_rows: list[dict[str, Any]] = []
-    parsed_rows: list[dict[str, Any]] = []  # filas base tipo v1 (fecha/descripcion/cargo/abono/saldo)
-
-    # métricas de extracción (calidad)
-    date_lines = 0
-    movement_candidate_lines = 0
-    parsed_movement_lines = 0
-    blank_desc_lines = 0
-
-    prev_saldo: Optional[float] = None
     with pdfplumber.open(pdf_path_abs) as pdf:
         for page_idx, page in enumerate(pdf.pages, start=1):
             text = page.extract_text() or ""
@@ -597,467 +605,279 @@ def convert_pdf_to_xlsx(pdf_path_abs: str, xlsx_path_abs: str, issuer_id: int | 
             for li, ln in enumerate(lines, start=1):
                 raw_rows.append({"Page": page_idx, "Line": li, "Text": ln})
 
-            for ln in lines:
-                # detectar fecha al inicio del renglón (lo más común)
-                dt = _detect_date(ln)
-                if not dt:
-                    continue
-                date_lines += 1
-                # quitar fecha al inicio para parsear lo demás
-                rest = (ln or "").strip()
-                rest = re.sub(r"^\s*\d{2}[\/\-]\d{2}[\/\-]\d{2,4}\s+", "", rest)
-                rest = re.sub(r"^\s*\d{4}[\/\-]\d{2}[\/\-]\d{2}\s+", "", rest)
-                rest = re.sub(r"^\s*\d{2}[\/\-\s][A-Za-zÁÉÍÓÚÜÑ\.]{3,}[\/\-\s]\d{2,4}\s+", "", rest)
-
-                # estrategia columnas (si hay)
-                cols = _split_columns(rest)
-                if cols and len(cols) >= 2:
-                    rest_for_amounts = " ".join(cols)
-                else:
-                    rest_for_amounts = rest
-
-                desc_wo_amounts, amounts = _extract_amounts_from_end(rest_for_amounts, max_amounts=3)
-                if amounts:
-                    movement_candidate_lines += 1
-                descripcion = (desc_wo_amounts or "").strip()
-                if not descripcion:
-                    blank_desc_lines += 1
-                    continue
-
-                cargo = None
-                abono = None
-                saldo = None
-                if len(amounts) >= 3:
-                    cargo = amounts[-3]
-                    abono = amounts[-2]
-                    saldo = amounts[-1]
-                elif len(amounts) == 2:
-                    # suele ser (cargo|abono, saldo)
-                    saldo = amounts[-1]
-                    trans = amounts[-2]
-                    dnorm = _norm_text(descripcion)
-                    if any(k in dnorm for k in ["ABONO", "DEPOSITO", "DEPÓSITO", "DEPOSITO", "DEPOSITO"]):
-                        abono = trans
-                    else:
-                        cargo = trans
-                elif len(amounts) == 1:
-                    # a veces solo viene un monto; usar heurística por keywords y/o delta de saldo si existe
-                    trans = amounts[0]
-                    dnorm = _norm_text(descripcion)
-                    if any(k in dnorm for k in ["ABONO", "DEPOSITO", "DEPÓSITO", "DEPOSITO"]):
-                        abono = trans
-                    elif any(k in dnorm for k in ["CARGO", "COMPRA", "PAGO", "COMISION", "RETIRO"]):
-                        cargo = trans
-                    else:
-                        # desconocido -> cargo por defecto (es más común en estados)
-                        cargo = trans
-
-                # delta por saldo (si hay)
-                if saldo is not None and prev_saldo is not None and (cargo is None and abono is None):
-                    delta = saldo - prev_saldo
-                    if delta >= 0:
-                        abono = delta
-                    else:
-                        cargo = abs(delta)
-                if saldo is not None:
-                    prev_saldo = saldo
-
-                parsed_movement_lines += 1
-                parsed_rows.append(
-                    {
-                        "Fecha": dt,
-                        "Descripción": descripcion,
-                        "Referencia": "",
-                        "Cargo": cargo,
-                        "Abono": abono,
-                        "Saldo": saldo,
-                    }
-                )
-
-    ensure_parent_dir(xlsx_path_abs)
-    mode = "parsed" if parsed_rows else "raw"
-
-    all_text_norm = _norm_text(" ".join([r["Text"] for r in raw_rows]))
-    has_text = len(raw_rows) > 0 and bool(all_text_norm.strip())
-    section_found = any(
-        kw in all_text_norm
-        for kw in [
-            "DETALLE DE MOVIMIENTOS",
-            "DETALLE MOVIMIENTOS",
-            "RELACION DE MOVIMIENTOS",
-            "RELACIÓN DE MOVIMIENTOS",
-            "MOVIMIENTOS DEL PERIODO",
-            "MOVIMIENTOS DEL MES",
-        ]
-    )
+    all_text = " ".join(str(r.get("Text") or "") for r in raw_rows)
+    all_text_norm = _norm_text(all_text)
+    period_start, period_end = _detect_period(all_text_norm)
     bank_name = _detect_bank_name(all_text_norm)
     account_last4 = _detect_account_last4(all_text_norm)
-    period_start, period_end = _detect_period(all_text_norm)
 
-    # normalizar movimientos a la estructura nueva
-    movimientos: list[dict[str, Any]] = []
-    fechas_ok: list[date] = []
+    ensure_parent_dir(xlsx_path_abs)
 
-    low_confidence_count = 0
-    for idx, r in enumerate(parsed_rows, start=1):
-        fecha_s = r.get("Fecha") or ""
-        fd = _to_date(fecha_s)
-        if fd:
-            fechas_ok.append(fd)
-        desc_raw = str(r.get("Descripción") or "").strip()
-        desc_norm = _norm_text(desc_raw)
-        referencia = _extract_referencia(desc_norm)
+    # -------- pipeline robusta (Banorte o similares) --------
+    from config import DEV_MODE
+    from services.bank_statement_parser import parse_bank_statement, write_debug_json
 
-        cargo = r.get("Cargo")
-        abono = r.get("Abono")
-        saldo = r.get("Saldo")
-        tipo = ""
-        monto = None
-        if abono is not None and float(abono or 0) > 0:
-            tipo = "INGRESO"
-            monto = abs(float(abono))
-        elif cargo is not None and float(cargo or 0) > 0:
-            tipo = "GASTO"
-            monto = abs(float(cargo))
-        else:
-            # si no se pudo inferir, skip (o dejar vacío)
-            tipo = ""
-            monto = None
+    debug_on = bool(DEV_MODE) and (os.environ.get("BANK_PARSER_DEBUG", "0").strip() == "1")
+    parsed = parse_bank_statement(raw_rows, debug=debug_on)
+    txs: list[dict[str, Any]] = parsed.transactions or []
+    metrics: dict[str, Any] = parsed.metrics or {}
 
-        confidence = "OK"
-        if not tipo or monto is None or saldo is None or len(desc_raw) < 6:
-            confidence = "BAJA"
-        if confidence == "BAJA" and tipo in ("INGRESO", "GASTO"):
-            low_confidence_count += 1
-
-        categoria, subcategoria, es_com, es_imp, fact = _clasificar(desc_norm)
-        metodo = _metodo_pago_hint(desc_norm)
-        contraparte = _contraparte_hint(desc_norm)
-
-        # movimiento_id estable por contenido (evita colisiones al reordenar)
-        base = f"{issuer_id or 0}|{fecha_s}|{desc_norm}|{monto or ''}|{saldo or ''}"
-        h = hashlib.sha1(base.encode("utf-8")).hexdigest()[:12]
-        mov_id = f"{issuer_id or 0}-{fecha_s.replace('-', '')}-{h}-{idx}"
-
-        movimientos.append(
-            {
-                "movimiento_id": mov_id,
-                "issuer_id": int(issuer_id or 0) if issuer_id is not None else "",
-                "bank_name": bank_name,
-                "account_last4": account_last4,
-                "period_start": period_start,
-                "period_end": period_end,
-                "fecha": fecha_s,
-                "descripcion_raw": desc_raw,
-                "descripcion_norm": desc_norm,
-                "referencia": referencia,
-                "tipo": tipo,
-                "monto": float(monto) if monto is not None else "",
-                "moneda": "MXN",
-                "saldo": float(saldo) if saldo is not None else "",
-                "categoria": categoria,
-                "subcategoria": subcategoria,
-                "metodo_pago_hint": metodo,
-                "contraparte_hint": contraparte,
-                "es_comision_bancaria": int(es_com),
-                "es_impuesto_bancario": int(es_imp),
-                "posible_facturable": int(fact) if tipo == "GASTO" else 0,
-                "match_cfdi_uuid": "",
-                "match_score": "",
-                "match_status": "PENDIENTE",
-                "parse_confidence": confidence,
-            }
-        )
-
-    # si no detectó periodo del texto, usar min/max de fechas
-    if (not period_start or not period_end) and fechas_ok:
-        dmin = min(fechas_ok).isoformat()
-        dmax = max(fechas_ok).isoformat()
-        period_start = period_start or dmin
-        period_end = period_end or dmax
-        for m in movimientos:
-            m["period_start"] = period_start
-            m["period_end"] = period_end
-
-    # cargar CFDIs recibidos (una sola vez) y sugerir match para gastos
-    cfdis: list[dict[str, Any]] = []
-    concilia_rows: list[list[Any]] = []
-    sugerencias: dict[str, dict[str, Any]] = {}
-    if issuer_id and fechas_ok:
-        try:
-            from database import db, has_column
-        except Exception:
-            db = None
-            has_column = None
-        if db:
-            conn = db()
-            try:
-                has_tipo = has_column(conn, "sat_cfdi", "tipo_comprobante") if has_column else True
-                where_extra = " AND (tipo_comprobante IS NULL OR UPPER(TRIM(tipo_comprobante)) != 'N')" if has_tipo else ""
-                d0 = (min(fechas_ok) - timedelta(days=7)).isoformat()
-                d1 = (max(fechas_ok) + timedelta(days=7)).isoformat()
-                rows = conn.execute(
-                    f"""
-                    SELECT uuid, fecha_emision, total, rfc_emisor, COALESCE(nombre_emisor, '') AS nombre_emisor
-                    FROM sat_cfdi
-                    WHERE issuer_id = ? AND direction = 'received'
-                      AND fecha_emision IS NOT NULL
-                      AND substr(fecha_emision,1,10) >= ? AND substr(fecha_emision,1,10) <= ?
-                      AND total IS NOT NULL AND total >= 0.01
-                      {where_extra}
-                    """,
-                    (int(issuer_id), d0, d1),
-                ).fetchall()
-                cfdis = [dict(x) for x in rows] if rows else []
-            finally:
-                conn.close()
-
-    # preparar conciliación (solo gastos)
-    for m in movimientos:
-        if m.get("tipo") != "GASTO":
-            continue
-        mov_date = _to_date(m.get("fecha"))
-        mov_amount = m.get("monto")
-        if not mov_date or not mov_amount or not isinstance(mov_amount, (int, float)):
-            best, score = None, 0
-        else:
-            best, score = _best_cfdi_for_movement(mov_date, float(mov_amount), m.get("contraparte_hint") or "", cfdis)
-        suger = {
-            "cfdi_uuid_sugerido": (best.get("uuid") if best else "") if score > 0 else "",
-            "cfdi_fecha": (best.get("fecha_emision") or "")[:10] if best else "",
-            "cfdi_total": float(best.get("total")) if (best and best.get("total") is not None) else "",
-            "cfdi_rfc_emisor": (best.get("rfc_emisor") or "") if best else "",
-            "cfdi_nombre_emisor": (best.get("nombre_emisor") or "") if best else "",
-            "score": int(score) if score else "",
-        }
-        sugerencias[m["movimiento_id"]] = suger
-        concilia_rows.append(
-            [
-                m["movimiento_id"],
-                m.get("fecha") or "",
-                m.get("monto") if isinstance(m.get("monto"), (int, float)) else "",
-                m.get("contraparte_hint") or "",
-                m.get("categoria") or "",
-                suger["cfdi_uuid_sugerido"],
-                suger["cfdi_fecha"],
-                suger["cfdi_total"],
-                suger["cfdi_rfc_emisor"],
-                suger["cfdi_nombre_emisor"],
-                suger["score"],
-                "",
-                "",
-                "",
-            ]
-        )
-
-    # gastos sin factura
-    gastos_sin_factura_rows: list[list[Any]] = []
-    for m in movimientos:
-        if m.get("tipo") != "GASTO":
-            continue
-        if (m.get("categoria") or "").strip().upper() == "COMISIONES BANCARIAS":
-            continue
-        sug = sugerencias.get(m["movimiento_id"]) or {}
-        score = sug.get("score")
-        score_ok = isinstance(score, int) and score >= 70
-        if score_ok:
-            continue
-        gastos_sin_factura_rows.append(
-            [
-                m["movimiento_id"],
-                m.get("fecha") or "",
-                m.get("monto") if isinstance(m.get("monto"), (int, float)) else "",
-                m.get("contraparte_hint") or "",
-                m.get("categoria") or "",
-                "SIN MATCH CFDI",
-            ]
-        )
-
-    # resumen
-    ingresos = [m for m in movimientos if m.get("tipo") == "INGRESO" and isinstance(m.get("monto"), (int, float))]
-    gastos = [m for m in movimientos if m.get("tipo") == "GASTO" and isinstance(m.get("monto"), (int, float))]
-    total_ingresos = sum(float(m["monto"]) for m in ingresos)
-    total_gastos = sum(float(m["monto"]) for m in gastos)
-    neto = total_ingresos - total_gastos
-    n_movs = len([m for m in movimientos if (m.get("tipo") in ("INGRESO", "GASTO"))])
-    total_comisiones = sum(float(m["monto"]) for m in gastos if int(m.get("es_comision_bancaria") or 0) == 1)
-
-    partial_parse = False
-    partial_reason = ""
-    no_movements_reason = ""
-    if has_text and (date_lines > 0 or movement_candidate_lines > 0):
-        if n_movs == 0:
-            partial_parse = True
-            if not section_found:
-                no_movements_reason = (
-                    "No se encontró la sección “Detalle de Movimientos” (o un bloque similar). "
-                    "Si tu banco usa otro formato, intenta con la hoja RAW."
-                )
+    # fallback (para bancos que no tengan DETALLE DE MOVIMIENTOS): parser simple por línea con fecha
+    if int(metrics.get("movements_count") or 0) <= 0:
+        simple_txs: list[dict[str, Any]] = []
+        prev_saldo: Optional[float] = None
+        rfc_re = re.compile(r"\b([A-Z&Ñ]{3,4}\d{6}[A-Z0-9]{3})\b")
+        rast_re = re.compile(r"\b(?:CVE\\s*RAST(?:REO)?)\s*[:=\-]?\s*([A-Z0-9]{8,40})\b")
+        for rr in raw_rows:
+            ln = str(rr.get("Text") or "").strip()
+            dt = _detect_date(ln)
+            if not dt:
+                continue
+            rest = re.sub(r"^\s*\d{2}[\/\-]\d{2}[\/\-]\d{2,4}\s+", "", ln.strip())
+            rest = re.sub(r"^\s*\d{4}[\/\-]\d{2}[\/\-]\d{2}\s+", "", rest)
+            rest = re.sub(r"^\s*\d{2}[\/\-\s][A-Za-zÁÉÍÓÚÜÑ\.]{3,}[\/\-\s]\d{2,4}\s+", "", rest)
+            cols = _split_columns(rest)
+            rest_for_amounts = " ".join(cols) if (cols and len(cols) >= 2) else rest
+            desc_wo_amounts, amounts = _extract_amounts_from_end(rest_for_amounts, max_amounts=3)
+            desc_raw = (desc_wo_amounts or "").strip()
+            if not desc_raw:
+                continue
+            cargo = None
+            abono = None
+            saldo = None
+            if len(amounts) >= 3:
+                cargo, abono, saldo = amounts[-3], amounts[-2], amounts[-1]
+            elif len(amounts) == 2:
+                cargo, saldo = amounts[-2], amounts[-1]
+            elif len(amounts) == 1:
+                cargo = amounts[-1]
+            if saldo is not None:
+                prev_saldo = saldo
+            desc_norm = _norm_text(desc_raw)
+            categoria, _, _, _, _ = _clasificar(desc_norm)
+            contraparte = _contraparte_hint(desc_norm)
+            metodo_raw = _metodo_pago_hint(desc_norm)
+            if metodo_raw in ("SPEI",):
+                metodo_hint = "SPEI"
+            elif metodo_raw in ("TARJETA", "TPV"):
+                metodo_hint = "TARJETA"
+            elif metodo_raw in ("EFECTIVO",):
+                metodo_hint = "EFECTIVO"
             else:
-                no_movements_reason = (
-                    "Se detectó texto/fechas, pero no pudimos identificar correctamente montos/columnas. "
-                    "Revisa la hoja RAW."
-                )
-            partial_reason = no_movements_reason
-        else:
-            # parcial si vimos muchas líneas candidatas pero pocas filas parseadas
-            if movement_candidate_lines > max(10, int(n_movs * 2.0)) or blank_desc_lines > max(10, int(n_movs * 1.0)):
-                partial_parse = True
-                partial_reason = (
-                    "Detectamos texto y algunos movimientos, pero el parse fue parcial. "
-                    "Si ves movimientos partidos o faltantes, usa la hoja RAW."
-                )
-    elif not has_text:
-        no_movements_reason = (
-            "No se detectó texto seleccionable en el PDF. Probablemente es un escaneo; "
-            "para eso se necesitará OCR (v2)."
-        )
+                metodo_hint = "OTRO"
+            tipo = "DESCONOCIDO"
+            deposito = abs(float(abono)) if (abono is not None and float(abono or 0) > 0) else None
+            retiro = abs(float(cargo)) if (cargo is not None and float(cargo or 0) > 0) else None
+            if deposito:
+                tipo = "INGRESO"
+            elif retiro:
+                tipo = "GASTO"
+            ref = _extract_referencia(desc_norm)
+            rast = (rast_re.search(desc_norm).group(1) if rast_re.search(desc_norm) else "")
+            rfc = (rfc_re.search(desc_norm).group(1) if rfc_re.search(desc_norm) else "")
+            score = 35
+            if deposito or retiro:
+                score += 25
+            if saldo is not None:
+                score += 15
+            if dt:
+                score += 15
+            score = min(100, score)
+            pg = int(rr.get("Page") or 0)
+            simple_txs.append(
+                {
+                    "fecha": dt,
+                    "descripcion_full": " ".join(desc_raw.split()),
+                    "descripcion_norm": desc_norm,
+                    "deposito": deposito,
+                    "retiro": retiro,
+                    "saldo": float(saldo) if saldo is not None else None,
+                    "tipo": tipo,
+                    "categoria": categoria,
+                    "contraparte_hint": contraparte,
+                    "metodo_hint": metodo_hint,
+                    "referencia": ref,
+                    "cve_rastreo": rast,
+                    "rfc_encontrado": rfc,
+                    "confidence_score": score,
+                    "source_page_first": pg,
+                    "source_page_last": pg,
+                }
+            )
+        txs = simple_txs
+        metrics = {
+            "sections_detected": 0,
+            "transactions_grouped": len(simple_txs),
+            "movements_count": sum(1 for t in simple_txs if (t.get("deposito") or 0) or (t.get("retiro") or 0)),
+            "sin_parse_count": 0,
+            "saldo_count": sum(1 for t in simple_txs if isinstance(t.get("saldo"), (int, float))),
+            "rfc_count": sum(1 for t in simple_txs if (t.get("rfc_encontrado") or "").strip()),
+            "rastreo_count": sum(1 for t in simple_txs if (t.get("cve_rastreo") or "").strip()),
+            "avg_confidence": (sum(float(t.get("confidence_score") or 0) for t in simple_txs) / len(simple_txs)) if simple_txs else 0.0,
+            "low_confidence_count": sum(1 for t in simple_txs if int(t.get("confidence_score") or 0) < 60),
+            "total_ingresos": sum(float(t.get("deposito") or 0) for t in simple_txs),
+            "total_gastos": sum(float(t.get("retiro") or 0) for t in simple_txs),
+        }
 
-    def _top(items: list[dict], key: str, topn: int = 8) -> list[tuple[str, float]]:
-        agg: dict[str, float] = {}
-        for it in items:
-            k = (it.get(key) or "").strip() or "—"
-            v = float(it.get("monto") or 0)
-            agg[k] = agg.get(k, 0.0) + v
-        return sorted(agg.items(), key=lambda x: x[1], reverse=True)[:topn]
+    movements_count = int(metrics.get("movements_count") or 0)
+    sin_parse_count = int(metrics.get("sin_parse_count") or 0)
+    total_ingresos = float(metrics.get("total_ingresos") or 0.0)
+    total_gastos = float(metrics.get("total_gastos") or 0.0)
+    low_confidence_count = int(metrics.get("low_confidence_count") or 0)
+    mode = "parsed" if movements_count > 0 else "raw"
 
-    top_cats = _top(gastos, "categoria", 10)
-    top_cps = _top([g for g in gastos if (g.get("contraparte_hint") or "").strip()], "contraparte_hint", 10)
+    # Persistir movimientos en DB con dedupe (solo INGRESO/GASTO)
+    if statement_id and issuer_id and txs:
+        try:
+            from services.bank_statement_parser import upsert_bank_movements
+            upsert_bank_movements(int(issuer_id), int(statement_id), txs)
+        except Exception:
+            logger.exception("bank_parser: no se pudieron guardar movimientos en DB")
 
+    logger.info(
+        "bank_parser: sections=%s grouped=%s movements=%s saldo=%s rfc=%s rastreo=%s avg_conf=%.1f",
+        int(metrics.get("sections_detected") or 0),
+        int(metrics.get("transactions_grouped") or 0),
+        movements_count,
+        int(metrics.get("saldo_count") or 0),
+        int(metrics.get("rfc_count") or 0),
+        int(metrics.get("rastreo_count") or 0),
+        float(metrics.get("avg_confidence") or 0.0),
+    )
+
+    if debug_on and parsed.debug_payload:
+        try:
+            write_debug_json(parsed.debug_payload, xlsx_path_abs + ".debug.json")
+        except Exception:
+            logger.exception("bank_parser: no se pudo escribir debug json")
+
+    # -------- export Excel (5 hojas) --------
     wb = Workbook()
-    # remover sheet default
     wb.remove(wb.active)
 
-    # Movimientos
-    rows_mov = [
-        [
-            m.get("movimiento_id", ""),
-            m.get("issuer_id", ""),
-            m.get("bank_name", ""),
-            m.get("account_last4", ""),
-            m.get("period_start", ""),
-            m.get("period_end", ""),
-            m.get("fecha", ""),
-            m.get("descripcion_raw", ""),
-            m.get("descripcion_norm", ""),
-            m.get("referencia", ""),
-            m.get("tipo", ""),
-            m.get("monto", ""),
-            m.get("moneda", "MXN"),
-            m.get("saldo", ""),
-            m.get("categoria", ""),
-            m.get("subcategoria", ""),
-            m.get("metodo_pago_hint", ""),
-            m.get("contraparte_hint", ""),
-            m.get("es_comision_bancaria", 0),
-            m.get("es_impuesto_bancario", 0),
-            m.get("posible_facturable", 0),
-            "",
-            "",
-            m.get("match_status", "PENDIENTE"),
-            m.get("parse_confidence", ""),
-        ]
-        for m in movimientos
-    ]
+    rows_mov: list[list[Any]] = []
+    for t in txs:
+        rows_mov.append(
+            [
+                t.get("fecha") or "",
+                t.get("descripcion_full") or "",
+                t.get("deposito") if isinstance(t.get("deposito"), (int, float)) else "",
+                t.get("retiro") if isinstance(t.get("retiro"), (int, float)) else "",
+                t.get("saldo") if isinstance(t.get("saldo"), (int, float)) else "",
+                t.get("tipo") or "DESCONOCIDO",
+                t.get("categoria") or "",
+                t.get("contraparte_hint") or "",
+                t.get("metodo_hint") or "OTRO",
+                t.get("referencia") or "",
+                t.get("cve_rastreo") or "",
+                t.get("rfc_encontrado") or "",
+                int(t.get("confidence_score") or 0),
+                int(t.get("source_page_first") or 0),
+            ]
+        )
+
     ws_mov = wb.create_sheet("Movimientos")
-    _write_table(ws_mov, HEAD_MOV, rows_mov, money_cols=[12, 14])
+    _write_table(ws_mov, HEAD_MOV, rows_mov, money_cols=[3, 4, 5])
 
-    # Gastos
     ws_g = wb.create_sheet("Gastos")
-    gastos_rows = [r for r in rows_mov if r[10] == "GASTO"]
-    _write_table(ws_g, HEAD_MOV, gastos_rows, money_cols=[12, 14])
-    if gastos_rows:
-        ws_g.append([""] * (len(HEAD_MOV)))
-        ws_g.append(["TOTAL", "", "", "", "", "", "", "", "", "", "", total_gastos, "MXN", "", "", "", "", "", "", "", "", "", "", ""])
-        ws_g.cell(row=ws_g.max_row, column=1).font = Font(bold=True)
-        ws_g.cell(row=ws_g.max_row, column=12).number_format = '"$"#,##0.00'
+    gastos_rows = [r for r in rows_mov if r[5] == "GASTO"]
+    _write_table(ws_g, HEAD_MOV, gastos_rows, money_cols=[3, 4, 5])
 
-    # Ingresos
     ws_i = wb.create_sheet("Ingresos")
-    ingresos_rows = [r for r in rows_mov if r[10] == "INGRESO"]
-    _write_table(ws_i, HEAD_MOV, ingresos_rows, money_cols=[12, 14])
-    if ingresos_rows:
-        ws_i.append([""] * (len(HEAD_MOV)))
-        ws_i.append(["TOTAL", "", "", "", "", "", "", "", "", "", "", total_ingresos, "MXN", "", "", "", "", "", "", "", "", "", "", ""])
-        ws_i.cell(row=ws_i.max_row, column=1).font = Font(bold=True)
-        ws_i.cell(row=ws_i.max_row, column=12).number_format = '"$"#,##0.00'
+    ingresos_rows = [r for r in rows_mov if r[5] == "INGRESO"]
+    _write_table(ws_i, HEAD_MOV, ingresos_rows, money_cols=[3, 4, 5])
 
-    # Resumen
     ws_r = wb.create_sheet("Resumen")
     ws_r.append(["campo", "valor"])
     ws_r["A1"].font = Font(bold=True)
     ws_r["B1"].font = Font(bold=True)
-    ws_r.append(["period_start", period_start or ""])
-    ws_r.append(["period_end", period_end or ""])
+    ws_r.append(["movements_count", movements_count])
+    ws_r.append(["sin_parse_count", sin_parse_count])
     ws_r.append(["total_ingresos", total_ingresos])
     ws_r.append(["total_gastos", total_gastos])
-    ws_r.append(["neto", neto])
-    ws_r.append(["#movimientos", n_movs])
-    ws_r.append(["comisiones_bancarias_total", total_comisiones])
+    ws_r.append(["neto", total_ingresos - total_gastos])
+    ws_r.append(["saldo_count", int(metrics.get("saldo_count") or 0)])
+    ws_r.append(["rfc_count", int(metrics.get("rfc_count") or 0)])
+    ws_r.append(["rastreo_count", int(metrics.get("rastreo_count") or 0)])
+    ws_r.append(["avg_confidence", float(metrics.get("avg_confidence") or 0.0)])
     for r in range(2, ws_r.max_row + 1):
-        if ws_r.cell(row=r, column=2).value and isinstance(ws_r.cell(row=r, column=2).value, (int, float)):
-            if ws_r.cell(row=r, column=1).value in ("total_ingresos", "total_gastos", "neto", "comisiones_bancarias_total"):
-                ws_r.cell(row=r, column=2).number_format = '"$"#,##0.00'
+        k = ws_r.cell(row=r, column=1).value
+        v = ws_r.cell(row=r, column=2).value
+        if isinstance(v, (int, float)) and k in ("total_ingresos", "total_gastos", "neto"):
+            ws_r.cell(row=r, column=2).number_format = '"$"#,##0.00'
     ws_r.freeze_panes = "A2"
-    ws_r.column_dimensions["A"].width = 30
-    ws_r.column_dimensions["B"].width = 22
+    ws_r.column_dimensions["A"].width = 28
+    ws_r.column_dimensions["B"].width = 18
+
+    def _top(rows: list[list[Any]], key_idx: int, amt_idx: int, topn: int = 10) -> list[tuple[str, float]]:
+        agg: dict[str, float] = {}
+        for rr in rows:
+            k = (rr[key_idx] or "").strip() or "—"
+            amt = rr[amt_idx] if isinstance(rr[amt_idx], (int, float)) else 0.0
+            agg[k] = agg.get(k, 0.0) + float(amt)
+        return sorted(agg.items(), key=lambda x: x[1], reverse=True)[:topn]
+
+    top_cats = _top(gastos_rows, 6, 3, 10)  # categoria, retiro
     ws_r.append([])
-    ws_r.append(["Top categorías de gasto", "monto", "%"])
+    ws_r.append(["Top categorías (gasto)", "monto"])
     ws_r["A" + str(ws_r.max_row)].font = Font(bold=True)
     ws_r["B" + str(ws_r.max_row)].font = Font(bold=True)
-    ws_r["C" + str(ws_r.max_row)].font = Font(bold=True)
     for k, v in top_cats:
-        pct = (v / total_gastos) if total_gastos > 0 else 0.0
-        ws_r.append([k, v, pct])
+        ws_r.append([k, v])
         ws_r.cell(row=ws_r.max_row, column=2).number_format = '"$"#,##0.00'
-        ws_r.cell(row=ws_r.max_row, column=3).number_format = "0.0%"
-    ws_r.append([])
-    ws_r.append(["Top contrapartes por gasto", "monto", "%"])
-    ws_r["A" + str(ws_r.max_row)].font = Font(bold=True)
-    ws_r["B" + str(ws_r.max_row)].font = Font(bold=True)
-    ws_r["C" + str(ws_r.max_row)].font = Font(bold=True)
-    for k, v in top_cps:
-        pct = (v / total_gastos) if total_gastos > 0 else 0.0
-        ws_r.append([k, v, pct])
-        ws_r.cell(row=ws_r.max_row, column=2).number_format = '"$"#,##0.00'
-        ws_r.cell(row=ws_r.max_row, column=3).number_format = "0.0%"
 
-    # Conciliacion_CFDI
-    ws_c = wb.create_sheet("Conciliacion_CFDI")
-    _write_table(ws_c, HEAD_C, concilia_rows, money_cols=[3, 8])
-
-    # Gastos_sin_factura
-    ws_gsf = wb.create_sheet("Gastos_sin_factura")
-    _write_table(ws_gsf, HEAD_GSF, gastos_sin_factura_rows, money_cols=[3])
-
-    # RAW (siempre)
     ws_raw = wb.create_sheet("RAW")
     raw_table = [[r["Page"], r["Line"], r["Text"]] for r in raw_rows]
     _write_table(ws_raw, ["page", "line", "text"], raw_table, money_cols=[])
 
     wb.save(xlsx_path_abs)
 
+    transactions_for_db = [
+        {
+            "fecha": t.get("fecha") or "",
+            "descripcion": (t.get("descripcion_full") or "")[:2000],
+            "deposito": t.get("deposito") if isinstance(t.get("deposito"), (int, float)) else None,
+            "retiro": t.get("retiro") if isinstance(t.get("retiro"), (int, float)) else None,
+            "saldo": t.get("saldo") if isinstance(t.get("saldo"), (int, float)) else None,
+            "tipo": t.get("tipo") or "DESCONOCIDO",
+            "categoria": (t.get("categoria") or "")[:200],
+            "metodo_hint": (t.get("metodo_hint") or "")[:64],
+            "contraparte_hint": (t.get("contraparte_hint") or "")[:200],
+            "rfc_encontrado": (t.get("rfc_encontrado") or "")[:20],
+            "confidence_score": int(t.get("confidence_score") or 0),
+            "source_page_first": int(t.get("source_page_first") or 0),
+        }
+        for t in txs
+    ]
+
     return {
-        "rows": len(movimientos),
+        "rows": len(rows_mov),
         "raw_lines": len(raw_rows),
         "mode": mode,
-        "bank_name": bank_name,
-        "account_last4": account_last4,
         "period_start": period_start,
         "period_end": period_end,
-        "cfdis_loaded": len(cfdis) if cfdis else 0,
-        "processed_count": int(n_movs),
-        "total_ingresos": float(total_ingresos),
-        "total_gastos": float(total_gastos),
-        "sin_factura_count": int(len(gastos_sin_factura_rows)),
-        "low_confidence_count": int(low_confidence_count),
-        "has_text": bool(has_text),
-        "section_found": bool(section_found),
-        "date_lines": int(date_lines),
-        "movement_candidate_lines": int(movement_candidate_lines),
-        "parsed_movement_lines": int(parsed_movement_lines),
-        "partial_parse": bool(partial_parse),
-        "partial_reason": partial_reason,
-        "no_movements_reason": no_movements_reason,
+        "bank_name": bank_name,
+        "account_last4": account_last4,
+        "transactions": transactions_for_db,
+        # compat UI previa
+        "processed_count": movements_count,
+        "total_ingresos": total_ingresos,
+        "total_gastos": total_gastos,
+        "sin_factura_count": sin_parse_count,
+        # métricas solicitadas
+        "movements_count": movements_count,
+        "ingresos_total": total_ingresos,
+        "gastos_total": total_gastos,
+        "sin_parse_count": sin_parse_count,
+        "low_confidence_count": low_confidence_count,
+        "quality": {
+            "sections_detected": int(metrics.get("sections_detected") or 0),
+            "transactions_grouped": int(metrics.get("transactions_grouped") or 0),
+            "saldo_count": int(metrics.get("saldo_count") or 0),
+            "rfc_count": int(metrics.get("rfc_count") or 0),
+            "rastreo_count": int(metrics.get("rastreo_count") or 0),
+            "avg_confidence": float(metrics.get("avg_confidence") or 0.0),
+            "low_confidence_count": low_confidence_count,
+        },
     }
 

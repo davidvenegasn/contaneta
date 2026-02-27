@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  {% set seo_title = "Seguridad · ContaNeta" %}
+  {% set seo_description = "Cómo protegemos tu sesión, tus datos y tu FIEL. Aislamiento por cuenta, cifrado y uso de credenciales solo para sincronización con el SAT." %}
+  {% include "_meta_seo.html" %}
+  <title>Seguridad · ContaNeta</title>
+  <link rel="stylesheet" href="/static/css/form.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --seg-bg: #f0fdfa;
+      --seg-card: #ffffff;
+      --seg-border: #ccfbf1;
+      --seg-text: #0f172a;
+      --seg-muted: #475569;
+      --seg-accent: #0d9488;
+      --seg-accent-soft: #ccfbf1;
+    }
+    body {
+      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+      margin: 0;
+      padding: 0;
+      background: var(--seg-bg);
+      min-height: 100vh;
+      color: var(--seg-text);
+    }
+    .seg-wrap { max-width: 720px; margin: 0 auto; padding: 2.5rem 1.25rem 3rem; }
+    .seg-nav {
+      margin-bottom: 2rem;
+      font-size: 14px;
+    }
+    .seg-nav a {
+      color: var(--seg-accent);
+      font-weight: 600;
+      text-decoration: none;
+    }
+    .seg-nav a:hover { text-decoration: underline; }
+    .seg-hero {
+      text-align: center;
+      margin-bottom: 2.5rem;
+    }
+    .seg-hero__icon {
+      width: 56px;
+      height: 56px;
+      margin: 0 auto 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--seg-accent-soft);
+      border-radius: 16px;
+      color: var(--seg-accent);
+    }
+    .seg-hero__icon svg { width: 28px; height: 28px; stroke-width: 1.75; }
+    .seg-hero h1 { margin: 0 0 0.5rem; font-size: 1.75rem; font-weight: 700; letter-spacing: -0.02em; }
+    .seg-hero p { margin: 0; font-size: 1rem; color: var(--seg-muted); line-height: 1.5; max-width: 32ch; margin-left: auto; margin-right: auto; }
+
+    .seg-section {
+      background: var(--seg-card);
+      border: 1px solid var(--seg-border);
+      border-radius: 16px;
+      padding: 1.5rem 1.5rem 1.75rem;
+      margin-bottom: 1rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,.04);
+    }
+    .seg-section__title {
+      margin: 0 0 0.5rem;
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--seg-text);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .seg-section__title .icon-wrap {
+      width: 32px;
+      height: 32px;
+      border-radius: 10px;
+      background: var(--seg-accent-soft);
+      color: var(--seg-accent);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .seg-section__title .icon-wrap svg { width: 18px; height: 18px; }
+    .seg-section p { margin: 0; font-size: 15px; line-height: 1.6; color: var(--seg-muted); }
+
+    .seg-footer {
+      margin-top: 2.5rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--seg-border);
+      font-size: 14px;
+      color: var(--seg-muted);
+    }
+    .seg-footer__links { display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 0.5rem; }
+    .seg-footer__links a {
+      color: var(--seg-accent);
+      font-weight: 600;
+      text-decoration: none;
+    }
+    .seg-footer__links a:hover { text-decoration: underline; }
+    .seg-footer__back { margin-top: 1rem; }
+    .seg-footer__back a { color: var(--seg-muted); font-weight: 500; text-decoration: none; }
+    .seg-footer__back a:hover { color: var(--seg-accent); }
+  </style>
+</head>
+<body>
+  <div class="seg-wrap">
+    <nav class="seg-nav" aria-label="Navegación">
+      <a href="/">Inicio</a>
+      <span aria-hidden="true"> · </span>
+      <a href="/login">Entrar</a>
+    </nav>
+
+    <header class="seg-hero">
+      <div class="seg-hero__icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        </svg>
+      </div>
+      <h1>Seguridad</h1>
+      <p>Cómo protegemos tu sesión, tus datos fiscales y tus credenciales. Transparencia tipo fintech.</p>
+    </header>
+
+    <section class="seg-section" aria-labelledby="seg-sesiones">
+      <h2 id="seg-sesiones" class="seg-section__title">
+        <span class="icon-wrap" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+          </svg>
+        </span>
+        Sesiones
+      </h2>
+      <p>Tu sesión se protege con cookies firmadas (HttpOnly cuando el servidor lo permite). Cada inicio de sesión te identifica de forma segura; no compartas tu acceso con nadie. Puedes cerrar sesión desde el menú de usuario cuando termines.</p>
+    </section>
+
+    <section class="seg-section" aria-labelledby="seg-aislamiento">
+      <h2 id="seg-aislamiento" class="seg-section__title">
+        <span class="icon-wrap" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+            <circle cx="12" cy="7" r="4"/>
+          </svg>
+        </span>
+        Aislamiento por cuenta
+      </h2>
+      <p>Cada cuenta (emisor) está aislada: tus facturas, clientes, productos y datos fiscales solo son accesibles para esa cuenta y para las personas con permiso (por ejemplo, si autorizas a un despacho contable). No mezclamos datos entre cuentas.</p>
+    </section>
+
+    <section class="seg-section" aria-labelledby="seg-fiel">
+      <h2 id="seg-fiel" class="seg-section__title">
+        <span class="icon-wrap" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
+            <path d="M3 21v-5h5"/>
+            <path d="M21 3v5h-5"/>
+            <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
+          </svg>
+        </span>
+        Uso de FIEL solo para sincronización
+      </h2>
+      <p>Tus archivos .cer y .key (FIEL) se guardan en el servidor con permisos restringidos y <strong>solo se usan para sincronizar con el SAT</strong>: descargar facturas emitidas y recibidas. No los usamos para firmar facturas en tu nombre ni para ningún otro fin. No compartimos tus credenciales con terceros.</p>
+    </section>
+
+    <footer class="seg-footer">
+      <p class="seg-footer__links">
+        <a href="/terms">Términos y condiciones</a>
+        <a href="/privacy">Aviso de privacidad</a>
+      </p>
+      <p>ContaNeta · Facturación electrónica y sincronización con el SAT.</p>
+      <p class="seg-footer__back"><a href="/">← Volver al inicio</a></p>
+    </footer>
+  </div>
+</body>
+</html>

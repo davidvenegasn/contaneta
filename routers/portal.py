@@ -1829,6 +1829,25 @@ def get_portal_router(templates):
             conn.close()
         return JSONResponse({"ok": True, "active": new_val})
 
+    @router.post("/products/{product_id}/delete", response_class=JSONResponse)
+    def portal_products_delete(request: Request, product_id: int, issuer: dict = Depends(get_portal_issuer)):
+        issuer_id = int(issuer.get("id") or 0)
+        if issuer_id <= 0:
+            raise HTTPException(status_code=401, detail="Sesión inválida")
+        pid = int(product_id)
+        conn = db()
+        try:
+            cur = conn.execute(
+                "DELETE FROM products WHERE issuer_id = ? AND id = ?",
+                (issuer_id, pid),
+            )
+            conn.commit()
+            if cur.rowcount == 0:
+                raise HTTPException(status_code=404, detail="Producto no encontrado")
+        finally:
+            conn.close()
+        return JSONResponse({"ok": True})
+
     @router.post("/clients/save", response_class=JSONResponse)
     def portal_clients_save(request: Request, payload: dict = Body(...), issuer: dict = Depends(get_portal_issuer)):
         issuer_id = int(issuer.get("id") or 0)
@@ -1870,6 +1889,25 @@ def get_portal_router(templates):
             conn.commit()
         finally:
             conn.close()
+
+    @router.post("/clients/{client_id}/delete", response_class=JSONResponse)
+    def portal_clients_delete(request: Request, client_id: int, issuer: dict = Depends(get_portal_issuer)):
+        issuer_id = int(issuer.get("id") or 0)
+        if issuer_id <= 0:
+            raise HTTPException(status_code=401, detail="Sesión inválida")
+        cid = int(client_id)
+        conn = db()
+        try:
+            cur = conn.execute(
+                "DELETE FROM clients WHERE issuer_id = ? AND id = ?",
+                (issuer_id, cid),
+            )
+            conn.commit()
+            if cur.rowcount == 0:
+                raise HTTPException(status_code=404, detail="Cliente no encontrado")
+        finally:
+            conn.close()
+        return JSONResponse({"ok": True})
         return JSONResponse({"ok": True, "id": client_id})
 
     @router.get("/datos-fiscales", response_class=HTMLResponse)

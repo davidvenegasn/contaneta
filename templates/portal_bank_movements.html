@@ -1,0 +1,412 @@
+{% extends "base_portal.html" %}
+{% set title = title|default('Movimientos') %}
+
+{% block content %}
+  <div class="card ym-card">
+    <div class="ym-selector">
+      {{ month_picker('/portal/movimientos', token|default(''), ym|default(period_month|default('')), ym_label|default('')) }}
+    </div>
+    <div class="dashboard-metrics">
+      <div class="card metric-card">
+        <div class="metric-label">Total ingresos</div>
+        <div class="metric-value">${{ '{:,.2f}'.format(sum_ingresos|default(0)) }}</div>
+        <div class="metric-sub">{{ ym_label|default('') }}</div>
+      </div>
+      <div class="card metric-card">
+        <div class="metric-label">Total gastos</div>
+        <div class="metric-value">${{ '{:,.2f}'.format(sum_gastos|default(0)) }}</div>
+        <div class="metric-sub">{{ ym_label|default('') }}</div>
+      </div>
+      <div class="card metric-card">
+        <div class="metric-label">Movimientos</div>
+        <div class="metric-value">{{ total_count|default(0) }}</div>
+        <div class="metric-sub">{{ ym_label|default('') }}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card card--invoice-list ui-card">
+    <div class="card__header card__header--row ui-card__header">
+      <h3 class="card__title section-title">Movimientos bancarios</h3>
+      <p class="muted u-m0 u-text-sm">Del estado de cuenta del mes seleccionado. Los movimientos se asocian al mes de su estado de cuenta.</p>
+    </div>
+
+    <div class="filters-panel filters-panel--inline" id="movementsFiltersPanel">
+      <form class="bank-movements-filters" method="get" action="/portal/movimientos">
+        <input type="hidden" name="ym" value="{{ ym|default(period_month|default('')) }}" />
+        <input type="hidden" name="limit" value="{{ limit }}" />
+        <div class="bank-movements-filters__row">
+          <label class="label">Estado de cuenta</label>
+          <select name="statement_id" class="input select">
+            <option value="">Todos</option>
+            {% for opt in statements_opt %}
+            <option value="{{ opt.statement_id }}" {{ 'selected' if statement_id == opt.statement_id else '' }}>{{ opt.label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="bank-movements-filters__row">
+          <label class="label">Tipo</label>
+          <select name="tipo" class="input select">
+            <option value="">Todos</option>
+            <option value="INGRESO" {{ 'selected' if tipo == 'INGRESO' else '' }}>Ingreso</option>
+            <option value="GASTO" {{ 'selected' if tipo == 'GASTO' else '' }}>Gasto</option>
+            <option value="INFO" {{ 'selected' if tipo == 'INFO' else '' }}>Info</option>
+            <option value="DESCONOCIDO" {{ 'selected' if tipo == 'DESCONOCIDO' else '' }}>Desconocido</option>
+          </select>
+        </div>
+        <div class="bank-movements-filters__row">
+          <label class="label">Match CFDI</label>
+          <select name="cfdi_match_status" class="input select">
+            <option value="">Todos</option>
+            <option value="pending" {{ 'selected' if cfdi_match_status == 'pending' else '' }}>Pendiente</option>
+            <option value="suggested" {{ 'selected' if cfdi_match_status == 'suggested' else '' }}>Sugerido</option>
+            <option value="confirmed" {{ 'selected' if cfdi_match_status == 'confirmed' else '' }}>Confirmado</option>
+            <option value="rejected" {{ 'selected' if cfdi_match_status == 'rejected' else '' }}>Rechazado</option>
+          </select>
+        </div>
+        <div class="bank-movements-filters__row">
+          <label class="label">Buscar</label>
+          <input type="search" name="search" class="input" value="{{ search }}" placeholder="Descripción, contraparte..." />
+        </div>
+        <div class="bank-movements-filters__actions">
+          <button type="submit" class="btn btn-primary">Filtrar</button>
+          <a href="/portal/movimientos?ym={{ ym|default(period_month|default(''))|urlencode }}" class="btn btn--secondary">Limpiar</a>
+          {% if total_count and total_count > 0 %}
+          <button type="button" class="btn btn--danger bank-movements-delete-all" data-count="{{ total_count }}">Borrar todos los movimientos</button>
+          {% endif %}
+        </div>
+      </form>
+    </div>
+    <script>
+    (function () {
+      var btn = document.querySelector('.bank-movements-delete-all');
+      if (!btn) return;
+      btn.addEventListener('click', function () {
+        var confirmFn = window.portalConfirm || window.uiConfirm;
+        if (!confirmFn) {
+          if (confirm('¿Borrar todos los movimientos? Esta acción no se puede deshacer.\n\nSe eliminarán todos los movimientos de tu cuenta.')) doDelete();
+          return;
+        }
+        confirmFn({
+          title: '¿Borrar todos los movimientos?',
+          message: 'Esta acción no se puede deshacer. Se eliminarán todos los movimientos de tu cuenta.',
+          confirmLabel: 'Borrar todos',
+          cancelLabel: 'Cancelar'
+        }).then(function (ok) {
+          if (!ok) return;
+          doDelete();
+        });
+        function doDelete() {
+          var csrf = document.querySelector('meta[name="csrf-token"]') && document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+          var headers = { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' };
+          if (csrf) headers['X-CSRF-Token'] = csrf;
+          fetch('/portal/bank/movements/delete-all', { method: 'POST', headers: headers })
+            .then(function (r) { if (!r.ok) throw new Error('Error'); return r.json(); })
+            .then(function (data) {
+              if (data.ok && (data.deleted || 0) >= 0) {
+                if (window.uiToast) window.uiToast({ type: 'success', title: 'Listo', message: 'Se borraron ' + (data.deleted || 0) + ' movimientos.' });
+                window.location.href = '/portal/movimientos';
+              }
+            })
+            .catch(function () {
+              if (window.uiToast) window.uiToast({ type: 'danger', title: 'Error', message: 'No se pudieron borrar los movimientos.' });
+              else alert('No se pudieron borrar los movimientos.');
+            });
+        }
+      });
+    })();
+    </script>
+
+    <div class="card__body ui-card__body">
+      {% if not movements or movements|length == 0 %}
+        <div class="empty-state empty-state--empty">
+          <div class="empty-state__title">No hay movimientos en {{ ym_label|default(period_month|default('')) }}</div>
+          <div class="empty-state__desc">Cambia de mes con el selector arriba o sube un estado de cuenta en <a href="/portal/bank/pdf-to-excel">Convertir Edo. de Cuenta</a>. Los movimientos se muestran según el mes de su estado de cuenta.</div>
+          <a href="/portal/bank/pdf-to-excel" class="btn btn--primary">Subir estado de cuenta</a>
+        </div>
+      {% else %}
+      <p class="muted u-m0 u-mb-8">Mostrando {{ offset + 1 }}–{{ offset + movements|length }} de {{ total_count|default(0) }} en {{ ym_label|default('') }}</p>
+      <div class="table-wrap table-wrap--overflow">
+        <table class="table ui-table ui-table--zebra bank-movements-table bank-multi-table">
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Concepto</th>
+              <th>Tipo</th>
+              <th class="text-right">Monto</th>
+              <th class="text-right">Saldo</th>
+              <th>Categoría</th>
+              <th class="text-right">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for m in movements %}
+            {% set monto_val = (m.deposito or 0) if (m.deposito is not none and m.deposito != '') else (0 - (m.retiro or 0) if (m.retiro is not none and m.retiro != '') else 0) %}
+            {% set es_ingreso = (m.deposito is not none and m.deposito != '' and (m.deposito or 0) > 0) %}
+            {% set es_gasto = (m.retiro is not none and m.retiro != '' and (m.retiro or 0) > 0) %}
+            {% set tipo_label = 'Ingreso' if es_ingreso else ('Gasto' if es_gasto else '—') %}
+            {% set concepto_display = (m.concepto or m.descripcion or '—') %}
+            {% set concepto_short = concepto_display[:50] + '…' if concepto_display|length > 50 else concepto_display %}
+            <tr class="bank-movements-row" data-movement-id="{{ m.id }}" data-descripcion="{{ (m.descripcion or '')|e }}" data-categoria="{{ (m.categoria or '')|e }}">
+              <td class="muted u-nowrap">{{ m.fecha or '—' }}</td>
+              <td class="concepto-cell bank-movements-concept-editable bank-concept-editable" title="Clic para editar">{{ concepto_short }}</td>
+              <td>
+                {% if es_ingreso %}<span class="badge badge--success">Ingreso</span>
+                {% elif es_gasto %}<span class="badge badge--warn">Gasto</span>
+                {% else %}<span class="badge badge--neutral">—</span>{% endif %}
+              </td>
+              <td class="text-right {% if es_ingreso %}bank-monto-ingreso{% elif es_gasto %}bank-monto-gasto{% endif %}">
+                {% if es_ingreso %}+${{ '{:,.2f}'.format(m.deposito) }}{% elif es_gasto %}−${{ '{:,.2f}'.format(m.retiro) }}{% else %}—{% endif %}
+              </td>
+              <td class="text-right muted">{% if m.saldo is not none and m.saldo != '' %}${{ '{:,.2f}'.format(m.saldo) }}{% else %}—{% endif %}</td>
+              <td class="bank-movements-category-editable bank-category-editable bank-category-dropdown" title="Clic para abrir menú y elegir otra categoría"><span class="badge badge--neutral">{{ m.categoria or '—' }}</span><span class="bank-category-chevron" aria-hidden="true"> ▼</span></td>
+              <td class="text-right">
+                <button type="button" class="btn btn--sm btn--ghost bank-movement-ver-detalle" data-id="{{ m.id }}" data-descripcion="{{ (m.descripcion or '')|e }}" data-categoria="{{ (m.categoria or '')|e }}" aria-label="Ver detalle">Ver detalle</button>
+              </td>
+            </tr>
+            <tr class="bank-movements-detail-row bank-multi-detail-row" data-detail-for="{{ m.id }}" hidden>
+              <td colspan="7" class="bank-multi-detail-cell u-p-4 u-text-xs">
+                <dl class="bank-detail-dl">
+                  <dt>Descripción completa</dt>
+                  <dd class="u-break-word">{{ (m.descripcion or '—')|e }}</dd>
+                  <dt>Método</dt>
+                  <dd>{{ m.metodo_hint or '—' }}</dd>
+                  <dt>Contraparte</dt>
+                  <dd>{{ m.contraparte_hint or '—' }}</dd>
+                  <dt>RFC</dt>
+                  <dd><code>{{ m.rfc_encontrado or '—' }}</code></dd>
+                  <dt>Confianza</dt>
+                  <dd>{{ (m.confidence_score ~ '%') if m.confidence_score is not none else '—' }}</dd>
+                  {% if m.cfdi_match_status %}
+                  <dt>Match CFDI</dt>
+                  <dd><span class="badge badge--{{ 'success' if m.cfdi_match_status == 'confirmed' else ('warning' if m.cfdi_match_status == 'suggested' else ('danger' if m.cfdi_match_status == 'rejected' else 'secondary') ) }}">{{ m.cfdi_match_status }}</span></dd>
+                  {% endif %}
+                  <dt>Archivo / Estado de cuenta</dt>
+                  <dd>{{ m.statement_file_id or '—' }}</dd>
+                </dl>
+                <p class="u-mt-2 u-mb-0">
+                  <button type="button" class="btn btn--sm btn--secondary bank-movement-editar-en-modal" data-id="{{ m.id }}" data-descripcion="{{ (m.descripcion or '')|e }}" data-categoria="{{ (m.categoria or '')|e }}">Editar concepto y categoría</button>
+                </p>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <div id="bankMovementDetailModal" class="modal" role="dialog" aria-labelledby="bankMovementDetailModalTitle" aria-hidden="true" hidden>
+        <div class="modal__backdrop" data-dismiss="modal"></div>
+        <div class="modal__panel">
+          <div class="modal__head">
+            <h2 id="bankMovementDetailModalTitle" class="modal__title">Editar movimiento</h2>
+            <button type="button" class="modal__close btn btn--icon" data-dismiss="modal" aria-label="Cerrar">&times;</button>
+          </div>
+          <div class="modal__body">
+            <form id="bankMovementDetailForm">
+              <input type="hidden" id="bankMovementDetailId" name="id" value="" />
+              <div class="form-group u-mb-4">
+                <label class="label" for="bankMovementDetailDescripcion">Concepto (descripción)</label>
+                <input type="text" id="bankMovementDetailDescripcion" name="descripcion" class="input" placeholder="Descripción del movimiento" />
+              </div>
+              <div class="form-group u-mb-4">
+                <label class="label" for="bankMovementDetailCategoria">Categoría</label>
+                <select id="bankMovementDetailCategoria" name="categoria" class="input select">
+                  <option value="">—</option>
+                  <option value="CUENTA_PROPIA">CUENTA_PROPIA</option>
+                  <option value="FINANCIERO_PAGO_TARJETA">FINANCIERO_PAGO_TARJETA</option>
+                  <option value="TRANSFERENCIA">TRANSFERENCIA</option>
+                  <option value="ALIMENTOS">ALIMENTOS</option>
+                  <option value="IMPUESTOS">IMPUESTOS</option>
+                  <option value="COMISION_BANCARIA">COMISION_BANCARIA</option>
+                  <option value="EFECTIVO">EFECTIVO</option>
+                  <option value="NOMINA">NOMINA</option>
+                  <option value="TARJETAS_CREDITO">TARJETAS_CREDITO</option>
+                  <option value="SERVICIOS">SERVICIOS</option>
+                  <option value="OTROS">OTROS</option>
+                </select>
+              </div>
+            </form>
+          </div>
+          <div class="modal__foot">
+            <button type="submit" form="bankMovementDetailForm" class="btn btn--primary">Guardar</button>
+            <button type="button" class="btn btn--secondary" data-dismiss="modal">Cancelar</button>
+          </div>
+        </div>
+      </div>
+      <script>
+      (function () {
+        var MULTI_CATEGORIES = ['CUENTA_PROPIA', 'FINANCIERO_PAGO_TARJETA', 'TRANSFERENCIA', 'ALIMENTOS', 'IMPUESTOS', 'COMISION_BANCARIA', 'EFECTIVO', 'NOMINA', 'TARJETAS_CREDITO', 'SERVICIOS', 'OTROS'];
+        function escapeHtml(s) { return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+        function getHeaders() {
+          var h = { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' };
+          var csrf = document.querySelector('meta[name="csrf-token"]') && document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+          if (csrf) h['X-CSRF-Token'] = csrf;
+          return h;
+        }
+        function patchMovement(id, payload) {
+          return fetch('/portal/bank/movements/' + id, { method: 'PATCH', headers: getHeaders(), body: JSON.stringify(payload) })
+            .then(function (r) { if (!r.ok) throw new Error('Error'); return r.json(); });
+        }
+        document.querySelectorAll('.bank-movements-row').forEach(function (row) {
+          var id = row.getAttribute('data-movement-id');
+          if (!id) return;
+          var conceptCell = row.querySelector('.bank-movements-concept-editable');
+          var categoryCell = row.querySelector('.bank-movements-category-editable');
+          if (conceptCell) {
+            conceptCell.addEventListener('click', function () {
+              if (conceptCell.querySelector('input')) return;
+              var desc = (row.getAttribute('data-descripcion') || '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"');
+              var input = document.createElement('input');
+              input.type = 'text';
+              input.className = 'input input--sm';
+              input.value = desc;
+              input.style.width = '100%';
+              conceptCell.textContent = '';
+              conceptCell.appendChild(input);
+              input.focus();
+              input.select();
+              function commitConcept() {
+                var val = input.value.trim();
+                conceptCell.removeChild(input);
+                conceptCell.textContent = val.length > 50 ? val.substring(0, 50) + '…' : (val || '—');
+                conceptCell.title = 'Clic para editar';
+                patchMovement(id, { descripcion: val }).then(function () {
+                  row.setAttribute('data-descripcion', val);
+                  row.querySelectorAll('.bank-movement-ver-detalle').forEach(function (b) { b.setAttribute('data-descripcion', val); });
+                }).catch(function () { conceptCell.textContent = (desc || '').length > 50 ? (desc || '').substring(0, 50) + '…' : (desc || '—'); conceptCell.title = 'Clic para editar'; });
+              }
+              input.addEventListener('blur', commitConcept);
+              input.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') { ev.preventDefault(); commitConcept(); } });
+            });
+          }
+          if (categoryCell) {
+            categoryCell.addEventListener('click', function (e) {
+              if (e.target.tagName === 'SELECT' || categoryCell.querySelector('select')) return;
+              var cat = row.getAttribute('data-categoria') || '';
+              var select = document.createElement('select');
+              select.className = 'bank-category-select';
+              select.title = 'Elegir otra categoría';
+              MULTI_CATEGORIES.forEach(function (c) {
+                var opt = document.createElement('option');
+                opt.value = c;
+                opt.textContent = c;
+                if (c === cat) opt.selected = true;
+                select.appendChild(opt);
+              });
+              if (cat && MULTI_CATEGORIES.indexOf(cat) < 0) {
+                var o = document.createElement('option');
+                o.value = cat;
+                o.textContent = cat;
+                o.selected = true;
+                select.appendChild(o);
+              }
+              categoryCell.innerHTML = '';
+              categoryCell.appendChild(select);
+              select.focus();
+              setTimeout(function () { select.click(); }, 0);
+              function commitCategory() {
+                if (!categoryCell.querySelector('select')) return;
+                var val = select.value || '';
+                categoryCell.innerHTML = '<span class="badge badge--neutral">' + escapeHtml(val || '—') + '</span><span class="bank-category-chevron" aria-hidden="true"> ▼</span>';
+                patchMovement(id, { categoria: val }).then(function () {
+                  row.setAttribute('data-categoria', val);
+                  row.querySelectorAll('.bank-movement-ver-detalle').forEach(function (b) { b.setAttribute('data-categoria', val); });
+                }).catch(function () { categoryCell.innerHTML = '<span class="badge badge--neutral">' + escapeHtml(cat || '—') + '</span><span class="bank-category-chevron" aria-hidden="true"> ▼</span>'; });
+              }
+              select.addEventListener('change', commitCategory);
+              select.addEventListener('blur', commitCategory);
+            });
+          }
+        });
+
+        var modal = document.getElementById('bankMovementDetailModal');
+        var form = document.getElementById('bankMovementDetailForm');
+        var idInput = document.getElementById('bankMovementDetailId');
+        var descInput = document.getElementById('bankMovementDetailDescripcion');
+        var catSelect = document.getElementById('bankMovementDetailCategoria');
+        function openModal(id, descripcion, categoria) {
+          idInput.value = id || '';
+          descInput.value = (descripcion || '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"');
+          catSelect.value = categoria || '';
+          modal.removeAttribute('hidden');
+          modal.setAttribute('aria-hidden', 'false');
+        }
+        function closeModal() {
+          modal.setAttribute('hidden', '');
+          modal.setAttribute('aria-hidden', 'true');
+        }
+        document.querySelectorAll('.bank-movement-ver-detalle').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            var id = btn.getAttribute('data-id');
+            var detailRow = document.querySelector('.bank-movements-detail-row[data-detail-for="' + id + '"]');
+            if (detailRow) {
+              detailRow.hidden = !detailRow.hidden;
+            }
+          });
+        });
+        document.querySelectorAll('.bank-movement-editar-en-modal').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            var id = btn.getAttribute('data-id');
+            var desc = btn.getAttribute('data-descripcion') || '';
+            var cat = btn.getAttribute('data-categoria') || '';
+            openModal(id, desc, cat);
+          });
+        });
+        modal.querySelectorAll('[data-dismiss="modal"]').forEach(function (el) {
+          el.addEventListener('click', closeModal);
+        });
+        form.addEventListener('submit', function (e) {
+          e.preventDefault();
+          var id = idInput.value;
+          if (!id) return;
+          var payload = { descripcion: descInput.value.trim(), categoria: catSelect.value.trim() };
+          var headers = { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' };
+          var csrf = document.querySelector('meta[name="csrf-token"]') && document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+          if (csrf) headers['X-CSRF-Token'] = csrf;
+          fetch('/portal/bank/movements/' + id, {
+            method: 'PATCH',
+            headers: headers,
+            body: JSON.stringify(payload)
+          }).then(function (r) {
+            if (!r.ok) throw new Error('Error al guardar');
+            return r.json();
+          }).then(function (data) {
+            if (data.updated) {
+              var row = document.querySelector('.bank-movements-row[data-movement-id="' + id + '"]');
+              if (row) {
+                var desc = descInput.value.trim();
+                var cat = catSelect.value;
+                row.setAttribute('data-descripcion', desc);
+                row.setAttribute('data-categoria', cat);
+                var conceptoCell = row.querySelector('.concepto-cell');
+                if (conceptoCell) { conceptoCell.textContent = desc.length > 50 ? desc.substring(0, 50) + '…' : (desc || '—'); conceptoCell.title = desc; }
+                var catTd = row.querySelectorAll('td')[5];
+                if (catTd) { var badge = catTd.querySelector('.badge'); if (badge) badge.textContent = cat || '—'; }
+                row.querySelectorAll('.bank-movement-ver-detalle').forEach(function (b) { b.setAttribute('data-descripcion', desc); b.setAttribute('data-categoria', cat); });
+                var detailRow = document.querySelector('.bank-movements-detail-row[data-detail-for="' + id + '"]');
+                if (detailRow) {
+                  var firstDd = detailRow.querySelector('.bank-detail-dl dd');
+                  if (firstDd) firstDd.textContent = desc || '—';
+                  detailRow.querySelectorAll('.bank-movement-editar-en-modal').forEach(function (b) { b.setAttribute('data-descripcion', desc); b.setAttribute('data-categoria', cat); });
+                }
+              }
+            }
+            closeModal();
+          }).catch(function () { alert('No se pudo guardar el movimiento.'); });
+        });
+      })();
+      </script>
+      {% set next_offset = offset + limit %}
+      {% set prev_offset = offset - limit %}
+      <nav class="bank-movements-pagination u-mt-8" aria-label="Paginación">
+        {% if offset > 0 %}
+        <a href="?ym={{ (ym|default(period_month|default('')))|urlencode }}&statement_id={{ statement_id|urlencode }}&tipo={{ tipo|urlencode }}&categoria={{ categoria|urlencode }}&cfdi_match_status={{ cfdi_match_status|urlencode }}&min_confidence={{ min_confidence if min_confidence is not none else '' }}&search={{ search|urlencode }}&limit={{ limit }}&offset={{ prev_offset }}" class="btn btn--sm btn--secondary">Anterior</a>
+        {% endif %}
+        {% if next_offset < total_count %}
+        <a href="?ym={{ (ym|default(period_month|default('')))|urlencode }}&statement_id={{ statement_id|urlencode }}&tipo={{ tipo|urlencode }}&categoria={{ categoria|urlencode }}&cfdi_match_status={{ cfdi_match_status|urlencode }}&min_confidence={{ min_confidence if min_confidence is not none else '' }}&search={{ search|urlencode }}&limit={{ limit }}&offset={{ next_offset }}" class="btn btn--sm btn--secondary">Siguiente</a>
+        {% endif %}
+      </nav>
+      {% endif %}
+    </div>
+  </div>
+{% endblock %}

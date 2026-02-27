@@ -1,0 +1,2 @@
+-- 016_issuers_trial_expires_at.sql
+-- Trial por issuer: trial_expires_at (TEXT, ISO datetime). Aplicado por migrations_runner (Python _safe_add_column).

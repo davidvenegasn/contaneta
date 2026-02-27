@@ -10,7 +10,7 @@ from fastapi.responses import RedirectResponse, HTMLResponse
 from config import DB_PATH
 from database import db, db_rows
 from migrations_runner import apply_migrations
-from services import session, issuers, users, audit
+from services import session, issuers, users, audit, csrf as csrf_service
 
 
 def _get_session_user_and_issuer(request: Request) -> tuple[int, int, int | None]:
@@ -143,6 +143,7 @@ def get_admin_router(templates):
                 "issuers": rows,
                 "search_q": search,
                 "can_impersonate": can_impersonate,
+                "csrf_token": csrf_service.generate_csrf_token(),
             },
         )
 
@@ -238,15 +239,19 @@ def get_admin_router(templates):
     ):
         return templates.TemplateResponse(
             "admin_ops.html",
-            {"request": request, "active_page": "ops", "message": None, "result": None},
+            {"request": request, "active_page": "ops", "message": None, "result": None, "csrf_token": csrf_service.generate_csrf_token()},
         )
 
     @router.post("/ops", response_class=HTMLResponse)
     def admin_ops_post(
         request: Request,
         action: str = Form(...),
+        csrf_token: str | None = Form(None),
         _admin: tuple[int, int, int | None] = Depends(require_admin_or_owner),
     ):
+        token_val = (csrf_token or request.headers.get("X-CSRF-Token") or "").strip()
+        if not csrf_service.verify_csrf_token(token_val):
+            raise HTTPException(status_code=403, detail="Token CSRF inválido o expirado")
         user_id, issuer_id, _ = _admin
         result_text = ""
         message_ok = True
@@ -389,11 +394,11 @@ def get_admin_router(templates):
         if not target_issuer:
             raise HTTPException(status_code=400, detail="Issuer no encontrado (issuer_id o rfc válido)")
         audit.log(
-            action="impersonate",
+            action="impersonate_start",
             user_id=user_id,
             issuer_id=current_issuer_id,
             target_issuer_id=target_issuer["id"],
-            details=f"impersonate issuer_id={target_issuer['id']}",
+            details=f"target_issuer_id={target_issuer['id']} rfc={target_issuer.get('rfc') or ''}",
             request=request,
         )
         cookie_val = session.sign_session(
@@ -441,22 +446,29 @@ def get_admin_router(templates):
         request: Request,
         issuer_id: int | None = Form(None),
         rfc: str | None = Form(None),
+        csrf_token: str | None = Form(None),
         _admin: tuple[int, int, int | None] = Depends(require_admin),
     ):
+        token_val = (csrf_token or request.headers.get("X-CSRF-Token") or "").strip()
+        if not csrf_service.verify_csrf_token(token_val):
+            raise HTTPException(status_code=403, detail="Token CSRF inválido o expirado")
         user_id, current_issuer_id, _ = _admin
         return _do_impersonate(request, user_id, current_issuer_id, issuer_id, rfc)
 
     @router.post("/stop-impersonate")
-    def admin_stop_impersonate(request: Request):
+    def admin_stop_impersonate(request: Request, csrf_token: str | None = Form(None)):
+        token_val = (csrf_token or request.headers.get("X-CSRF-Token") or "").strip()
+        if not csrf_service.verify_csrf_token(token_val):
+            raise HTTPException(status_code=403, detail="Token CSRF inválido o expirado")
         user_id, _current_issuer_id, restore_issuer_id = _get_session_user_and_issuer(request)
         if restore_issuer_id is None:
             raise HTTPException(status_code=400, detail="No estás en modo impersonación")
         audit.log(
-            action="stop_impersonate",
+            action="impersonate_stop",
             user_id=user_id,
             issuer_id=_current_issuer_id,
             target_issuer_id=restore_issuer_id,
-            details="stop_impersonate",
+            details=f"restored_issuer_id={restore_issuer_id}",
             request=request,
         )
         cookie_val = session.sign_session(user_id, restore_issuer_id, restore_issuer_id=None)

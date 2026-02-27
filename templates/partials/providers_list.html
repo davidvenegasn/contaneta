@@ -1,0 +1,705 @@
+<section class="page-section">
+  <div class="card">
+    <div class="card-header card-header--with-tools">
+      <div class="card-header__left">
+        <div class="table-tools table-tools--inline">
+          <div class="table-tools__search">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M16.2 16.2 21 21" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+            </svg>
+            <input id="provSearch" class="input" type="search" placeholder="Buscar por RFC o razón social" autocomplete="off" />
+          </div>
+          <button id="provNewBtn" type="button" class="btn btn-primary">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M12 5v14" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+              <path d="M5 12h14" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+            </svg>
+            Agregar proveedor
+          </button>
+        </div>
+      </div>
+      <div class="card-header__right">
+        <h3 class="section-title">Listado</h3>
+        <p class="muted u-m0"><span id="provCount">Cargando…</span></p>
+      </div>
+    </div>
+
+    <div class="table-wrap table-wrap--overflow" id="provTableWrap">
+      <table class="table table--zebra table--min-w-900" id="provTable">
+        <thead>
+          <tr>
+            <th class="th--w-140">RFC</th>
+            <th class="th--w-260">Razón social</th>
+            <th class="th--w-100">Facturas</th>
+            <th class="th--w-140">Total recibido</th>
+            <th class="th--w-200">Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="provTbody">
+          <tr><td colspan="5"><div class="skeleton skeleton-line"></div></td></tr>
+          <tr><td colspan="5"><div class="skeleton skeleton-line"></div></td></tr>
+          <tr><td colspan="5"><div class="skeleton skeleton-line"></div></td></tr>
+          <tr><td colspan="5"><div class="skeleton skeleton-line"></div></td></tr>
+          <tr><td colspan="5"><div class="skeleton skeleton-line"></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div id="provTablePagination" class="table-pagination" hidden aria-label="Paginación del listado"></div>
+
+    {% from 'portal/_ui_components.html' import portal_empty_state, portal_load_error %}
+    {{ portal_load_error('provLoadError') }}
+    {% call portal_empty_state('Aún no hay proveedores', 'Agrega proveedores manualmente o sincroniza facturas recibidas desde el SAT para que aparezcan aquí.', id='provEmpty') %}
+      <button type="button" class="btn btn-primary" id="provEmptyBtn">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M12 5v14" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+          <path d="M5 12h14" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+        </svg>
+        Agregar primer proveedor
+      </button>
+      <a href="/portal/invoices/received" class="btn btn-ghost">Ver facturas recibidas</a>
+    {% endcall %}
+  </div>
+
+  <!-- Drawer: Ver facturas del proveedor (overlay + drawer pro: sticky header/footer, scroll body) -->
+  <div id="providerInvoicesPanel" class="ui-overlay provider-drawer-overlay" aria-label="Facturas del proveedor" aria-hidden="true" hidden>
+    <div class="ui-overlay__backdrop provider-drawer-overlay__backdrop" id="providerInvoicesBackdrop" aria-hidden="true"></div>
+    <aside id="providerInvoicesDrawer" class="ui-drawer provider-drawer" role="dialog" aria-modal="true" aria-labelledby="providerInvoicesTitle" aria-describedby="providerInvoicesBody">
+      <header class="ui-drawer__header provider-drawer__header">
+        <div class="provider-drawer__header-text">
+          <h2 id="providerInvoicesTitle" class="ui-drawer__title provider-drawer__title">Facturas del proveedor</h2>
+          <p id="providerInvoicesRfc" class="provider-drawer__rfc muted" aria-hidden="true"></p>
+        </div>
+        <button type="button" class="ui-drawer__close provider-drawer__close" id="providerInvoicesClose" aria-label="Cerrar panel">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
+      </header>
+      <div id="providerInvoicesBody" class="ui-drawer__body provider-drawer__body">
+        <div id="providerInvoicesLoading" class="provider-drawer__loading" hidden>
+          <p class="muted u-m0">Cargando…</p>
+        </div>
+        <div id="providerInvoicesSummary" class="provider-drawer__summary" hidden>
+          <div class="provider-drawer__summary-grid">
+            <div class="provider-drawer__summary-card">
+              <span class="provider-drawer__summary-label">Facturas</span>
+              <span id="providerInvoicesSummaryCount" class="provider-drawer__summary-value">0</span>
+            </div>
+            <div class="provider-drawer__summary-card">
+              <span class="provider-drawer__summary-label">Total recibido</span>
+              <span id="providerInvoicesSummaryTotal" class="provider-drawer__summary-value">$0.00</span>
+            </div>
+            <div class="provider-drawer__summary-card">
+              <span class="provider-drawer__summary-label">Vigentes</span>
+              <span id="providerInvoicesSummaryVigentes" class="provider-drawer__summary-value">0</span>
+            </div>
+          </div>
+        </div>
+        <div id="providerInvoicesList" class="provider-invoices-panel__list"></div>
+        {% from 'portal/_ui_components.html' import portal_empty_state, portal_load_error %}
+        {% call portal_empty_state('No hay facturas para este proveedor', 'Si esperabas ver facturas, intenta sincronizar con SAT o revisa Facturas recibidas.', id='providerInvoicesEmpty', extra_class='provider-drawer__empty') %}
+          <a href="/portal/invoices/received" class="btn btn--secondary provider-drawer__link">Ver facturas recibidas</a>
+        {% endcall %}
+        {{ portal_load_error('providerInvoicesError', extra_class='provider-drawer__error') }}
+      </div>
+      <footer class="ui-drawer__footer provider-drawer__footer">
+        <div id="providerInvoicesPagination" class="ui-drawer__pagination provider-drawer__pagination" hidden>
+          <span class="ui-drawer__page-info" id="providerInvoicesPageInfo"></span>
+          <div class="ui-drawer__page-btns">
+            <button type="button" class="btn btn--sm btn--ghost" id="providerInvoicesPrev" aria-label="Página anterior">Anterior</button>
+            <button type="button" class="btn btn--sm btn--ghost" id="providerInvoicesNext" aria-label="Página siguiente">Siguiente</button>
+          </div>
+        </div>
+        <div id="providerInvoicesDownloads" class="provider-drawer__actions" hidden>
+          <a id="providerInvoicesDownloadPdf" href="#" class="btn btn--sm" target="_blank" rel="noopener">Descargar PDF</a>
+          <a id="providerInvoicesDownloadExcel" href="#" class="btn btn--sm btn--ghost" target="_blank" rel="noopener">Descargar Excel</a>
+        </div>
+        <a id="providerInvoicesVerTodas" href="/portal/invoices/received" class="btn btn--ghost provider-drawer__link">Ver todas en Facturas recibidas</a>
+      </footer>
+    </aside>
+  </div>
+
+  <!-- Modal: agregar proveedor -->
+  <div class="modal" id="provModal" role="dialog" aria-modal="true" aria-labelledby="provModalTitle" aria-label="Agregar proveedor" hidden aria-hidden="true">
+    <div class="modal__backdrop" data-close="true"></div>
+    <div class="modal__panel">
+      <div class="modal__head">
+        <div>
+          <div class="modal__title" id="provModalTitle">Agregar proveedor</div>
+          <div class="modal__subtitle">Guarda el RFC y datos para tenerlo a mano.</div>
+        </div>
+        <button type="button" class="icon-btn" data-close="true" aria-label="Cerrar">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M6 6l12 12" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+            <path d="M18 6 6 18" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+      <div class="modal__body">
+        <div class="grid-2">
+          <div class="field">
+            <label class="label">RFC *</label>
+            <input id="provRfc" class="input" type="text" placeholder="XAXX010101000" autocomplete="off" />
+          </div>
+          <div class="field">
+            <label class="label">Alias (opcional)</label>
+            <input id="provAlias" class="input" type="text" placeholder="Ej. Proveedor frecuente" autocomplete="off" />
+          </div>
+        </div>
+        <div class="field">
+          <label class="label">Razón social *</label>
+          <input id="provName" class="input" type="text" placeholder="Nombre / Razón social" autocomplete="off" />
+        </div>
+        <div class="grid-2">
+          <div class="field">
+            <label class="label">Email (opcional)</label>
+            <input id="provEmail" class="input" type="email" placeholder="correo@dominio.com" autocomplete="off" />
+          </div>
+          <div class="field">
+            <label class="label">C.P. / Régimen (opcional)</label>
+            <input id="provZip" class="input" type="text" placeholder="64000 / 601" autocomplete="off" />
+          </div>
+        </div>
+      </div>
+      <div class="modal__foot">
+        <button type="button" class="btn btn-ghost" data-close="true">Cancelar</button>
+        <button type="button" class="btn btn-primary" id="provSaveBtn">Guardar</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+(function(){
+  function getToken(){
+    var p = new URLSearchParams(window.location.search);
+    return p.get('token') || "{{ token }}";
+  }
+  const token = getToken();
+  const tbody = document.getElementById('provTbody');
+  const countEl = document.getElementById('provCount');
+  const emptyEl = document.getElementById('provEmpty');
+  const tableWrap = document.getElementById('provTableWrap');
+  const searchEl = document.getElementById('provSearch');
+
+  let allRows = [];
+
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+  function fmtMoney(v) {
+    const n = parseFloat(v);
+    return Number.isFinite(n) ? n.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00';
+  }
+
+  const ROWS_PAGE_LIMIT = 200;
+  var clientPage = 1;
+  var totalFromApi = undefined;
+  var lastFilteredRows = [];
+  function setCount(n, from, to){
+    if (typeof n === 'number' && from != null && to != null && n > 0)
+      countEl.textContent = (from === 1) ? ('Mostrando los primeros ' + to + ' de ' + n) : ('Mostrando ' + from + '-' + to + ' de ' + n);
+    else if (typeof n === 'number' && n > 0)
+      countEl.textContent = (n === 1) ? 'Total: 1 proveedor' : 'Total: ' + n + ' proveedores';
+    else
+      countEl.textContent = 'Sin proveedores';
+  }
+
+  const modal = document.getElementById('provModal');
+  const openBtn = document.getElementById('provNewBtn');
+  const emptyBtn = document.getElementById('provEmptyBtn');
+  const saveBtn = document.getElementById('provSaveBtn');
+  const rfcEl = document.getElementById('provRfc');
+  const aliasEl = document.getElementById('provAlias');
+  const nameEl = document.getElementById('provName');
+  const emailEl = document.getElementById('provEmail');
+  const zipEl = document.getElementById('provZip');
+
+  function openModal(){
+    rfcEl.value = ''; aliasEl.value = ''; nameEl.value = ''; emailEl.value = ''; zipEl.value = '';
+    if (typeof window.openPortalModal === 'function') window.openPortalModal(modal, { returnFocusEl: openBtn || emptyBtn });
+    else {
+      modal.hidden = false;
+      modal.setAttribute('aria-hidden', 'false');
+      document.body.classList.add('no-scroll');
+      if (typeof window.uiTrapFocus === 'function') window.uiTrapFocus(modal);
+    }
+    try { if (rfcEl) rfcEl.focus(); } catch (_) {}
+  }
+  function closeModal(){
+    if (typeof window.closePortalModal === 'function') window.closePortalModal(modal);
+    else {
+      if (typeof window.uiReleaseFocusTrap === 'function') window.uiReleaseFocusTrap();
+      modal.hidden = true;
+      modal.setAttribute('aria-hidden', 'true');
+      document.body.classList.remove('no-scroll');
+    }
+  }
+
+  (openBtn || {}).addEventListener('click', openModal);
+  (emptyBtn || {}).addEventListener('click', openModal);
+  // cierre por `[data-close]` lo maneja openPortalModal()
+
+  saveBtn.addEventListener('click', async () => {
+    const rfc = (rfcEl.value || '').trim().toUpperCase();
+    const legal_name = (nameEl.value || '').trim();
+    if (!rfc || !legal_name) {
+      window.portalToast && window.portalToast({ type: 'warning', title: 'Datos requeridos', message: 'RFC y razón social son obligatorios.' });
+      return;
+    }
+    saveBtn.disabled = true;
+    try {
+      const r = window.portalFetchJSON
+        ? await window.portalFetchJSON('/api/providers/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              token,
+              rfc,
+              legal_name,
+              alias: (aliasEl.value || '').trim() || undefined,
+              email: (emailEl.value || '').trim() || undefined,
+              zip: (zipEl.value || '').trim() || undefined,
+            }),
+          }, { timeoutMs: 30000, retry: 0 })
+        : { ok: false, status: 0, data: null, detail: 'Helper no disponible' };
+      if (r.status === 401) return;
+      const data = r.data || {};
+      if (!r.ok) throw new Error(window.portalApiErrorMessage ? window.portalApiErrorMessage(data) : (data.detail || data.message || 'Error'));
+      if (window.uiSuccessOverlay) window.uiSuccessOverlay({ title: 'Proveedor guardado', message: 'Los datos se guardaron correctamente.', actions: [{ label: 'Entendido', onClick: function () { if (window.uiSuccessOverlayClose) window.uiSuccessOverlayClose(); } }] });
+      else window.portalToast && window.portalToast({ type: 'success', title: 'Guardado', message: 'Proveedor agregado correctamente.' });
+      closeModal();
+      load();
+    } catch (e) {
+      window.portalToastError && window.portalToastError(e, 'No pudimos guardar', 'Revisa RFC y razón social e intenta de nuevo.');
+    } finally {
+      saveBtn.disabled = false;
+    }
+  });
+
+  const hl = (text, q) => (window.uiHighlightSearch ? window.uiHighlightSearch(text, q) : esc(text));
+
+  function rowHTML(r, searchQ){
+    const q = (searchQ || '').trim();
+    const rfc = q ? hl(r.rfc, q) : esc(r.rfc);
+    const name = q ? hl(r.legal_name || '—', q) : esc(r.legal_name || '—');
+    const count = Number(r.facturas_count) || 0;
+    const total = fmtMoney(r.total_recibido);
+
+    return `
+      <tr>
+        <td><code>${rfc}</code></td>
+        <td><div class="u-fw-650">${name}</div></td>
+        <td>${count}</td>
+        <td class="muted">$${total} MXN</td>
+        <td>
+          <button type="button" class="btn btn-small btn-ghost" data-copy="${esc(r.rfc || '')}">Copiar RFC</button>
+          <button type="button" class="btn btn-small" data-provider-rfc="${esc(r.rfc || '')}" data-provider-name="${esc(r.legal_name || '')}">Ver facturas</button>
+        </td>
+      </tr>
+    `;
+  }
+
+  function render(rows){
+    lastFilteredRows = rows;
+    const total = rows.length;
+    const totalCount = (typeof totalFromApi === 'number') ? totalFromApi : total;
+    const totalPages = totalCount > 0 ? Math.max(1, Math.ceil(totalCount / ROWS_PAGE_LIMIT)) : 0;
+    if (clientPage > totalPages && totalPages > 0) clientPage = totalPages;
+    const start = (clientPage - 1) * ROWS_PAGE_LIMIT;
+    const displayRows = rows;
+    const n = displayRows.length;
+    if (totalCount > 0 && typeof totalFromApi === 'number')
+      setCount(totalFromApi, start + 1, Math.min(start + n, totalFromApi));
+    else if (total > 0)
+      setCount(total);
+    else
+      setCount(0);
+    if (total === 0) {
+      tbody.innerHTML = '';
+      if (tableWrap) { tableWrap.hidden = true; tableWrap.style.display = 'none'; }
+      if (emptyEl) { emptyEl.hidden = false; emptyEl.removeAttribute('hidden'); emptyEl.style.display = ''; }
+      if (loadErrorEl) loadErrorEl.hidden = true;
+      var pagEl = document.getElementById('provTablePagination'); if (pagEl) pagEl.hidden = true;
+      return;
+    }
+    if (tableWrap) { tableWrap.hidden = false; tableWrap.style.display = ''; }
+    if (emptyEl) { emptyEl.hidden = true; emptyEl.setAttribute('hidden', ''); emptyEl.style.display = 'none'; }
+    if (loadErrorEl) loadErrorEl.hidden = true;
+    const searchQ = (searchEl.value || '').trim();
+    tbody.innerHTML = displayRows.map(r => rowHTML(r, searchQ)).join('');
+    var pagEl = document.getElementById('provTablePagination');
+    if (pagEl) {
+      if (totalPages <= 1 || totalCount <= ROWS_PAGE_LIMIT) { pagEl.hidden = true; } else {
+        pagEl.hidden = false;
+        var from = start + 1, to = Math.min(start + n, totalCount);
+        var rangeText = (clientPage === 1) ? ('Mostrando los primeros ' + to + ' de ' + totalCount) : ('Mostrando ' + from + '-' + to + ' de ' + totalCount);
+        pagEl.innerHTML = '<span class="muted">' + rangeText + '</span>' +
+          (clientPage > 1 ? ' <button type="button" class="btn btn--sm btn--secondary" id="provTablePrev">Anterior</button>' : '') +
+          (clientPage < totalPages ? ' <button type="button" class="btn btn--sm btn--secondary" id="provTableNext">Siguiente</button>' : '');
+        var prevBtn = document.getElementById('provTablePrev'); var nextBtn = document.getElementById('provTableNext');
+        if (prevBtn) prevBtn.onclick = function(){ clientPage--; load(clientPage); };
+        if (nextBtn) nextBtn.onclick = function(){ clientPage++; load(clientPage); };
+      }
+    }
+  }
+
+  function filter(){
+    clientPage = 1;
+    const q = (searchEl.value || '').trim().toLowerCase();
+    if (!q) return render(allRows);
+    const filtered = allRows.filter(r => {
+      return String(r.rfc || '').toLowerCase().includes(q)
+        || String(r.legal_name || '').toLowerCase().includes(q);
+    });
+    render(filtered);
+  }
+
+  const loadErrorEl = document.getElementById('provLoadError');
+  const loadErrorMsgEl = document.getElementById('provLoadErrorMsg');
+
+  async function load(page){
+    if (typeof page !== 'number' || page < 1) page = 1;
+    clientPage = page;
+    var skeletonShownAt = Date.now();
+    if (loadErrorEl) loadErrorEl.hidden = true;
+    if (emptyEl) { emptyEl.hidden = true; emptyEl.style.display = 'none'; }
+    if (tableWrap) { tableWrap.hidden = false; tableWrap.style.display = ''; }
+    tbody.innerHTML = (window.uiSkeletonTableRows && window.uiSkeletonTableRows(5, 5)) || '<tr><td colspan="5"><div class="skeleton skeleton-line"></div></td></tr>'.repeat(5);
+    try {
+      if (window.portalProgressBar) window.portalProgressBar.start();
+      const offset = (page - 1) * ROWS_PAGE_LIMIT;
+      const url = '/api/providers?limit=' + ROWS_PAGE_LIMIT + '&offset=' + offset;
+      const r = window.uiFetchJSON ? await window.uiFetchJSON(url) : { ok: false, status: 0, data: null, error: 'Helper no disponible' };
+      const list = window.uiGetListFromResponse ? window.uiGetListFromResponse(r.data) : (Array.isArray(r.data) ? r.data : []);
+      totalFromApi = (typeof window.uiGetTotalFromResponse === 'function') ? window.uiGetTotalFromResponse(r.data) : (r.data && typeof r.data.total === 'number' ? r.data.total : undefined);
+      await (window.uiMinSkeletonDelay && window.uiMinSkeletonDelay(skeletonShownAt, 300));
+      if (r.ok && (!list || list.length === 0) && (totalFromApi === undefined || totalFromApi === 0)) {
+        allRows = [];
+        if (loadErrorEl) loadErrorEl.hidden = true;
+        if (tableWrap) tableWrap.hidden = true;
+        if (emptyEl) { emptyEl.hidden = false; emptyEl.style.display = ''; }
+        tbody.innerHTML = '';
+        return;
+      }
+      if (r.status === 401) {
+        allRows = [];
+        totalFromApi = undefined;
+        if (loadErrorMsgEl) loadErrorMsgEl.innerHTML = window.uiSessionExpiredMessage ? window.uiSessionExpiredMessage() : 'Sesión expirada. <a href="/login">Inicia sesión</a>';
+        if (loadErrorEl) loadErrorEl.hidden = false;
+        if (tableWrap) tableWrap.hidden = true;
+        if (emptyEl) emptyEl.hidden = true;
+        tbody.innerHTML = '';
+        return;
+      }
+      if (!r.ok) {
+        allRows = [];
+        totalFromApi = undefined;
+        const msg = window.uiListLoadErrorText ? window.uiListLoadErrorText(r, 'proveedores') : (r.error || 'Revisa tu conexión e intenta de nuevo.');
+        if (loadErrorMsgEl) loadErrorMsgEl.textContent = msg;
+        if (loadErrorEl) loadErrorEl.hidden = false;
+        if (tableWrap) tableWrap.hidden = true;
+        if (emptyEl) emptyEl.hidden = true;
+        tbody.innerHTML = '';
+        return;
+      }
+      allRows = list;
+      if (typeof totalFromApi !== 'number' && list.length >= 0) totalFromApi = list.length;
+      render(allRows);
+    } catch (e) {
+      allRows = [];
+      totalFromApi = undefined;
+      tbody.innerHTML = '';
+      const fallbackMsg = 'Revisa tu conexión e intenta de nuevo.';
+      if (loadErrorMsgEl) loadErrorMsgEl.textContent = fallbackMsg;
+      if (loadErrorEl) loadErrorEl.hidden = false;
+      if (tableWrap) tableWrap.hidden = true;
+      if (emptyEl) emptyEl.hidden = true;
+    } finally {
+      if (window.portalProgressBar) window.portalProgressBar.done();
+    }
+  }
+
+  const provLoadErrorRetry = document.getElementById('provLoadErrorRetry');
+  if (provLoadErrorRetry) provLoadErrorRetry.addEventListener('click', load);
+
+  // Copy RFC
+  document.addEventListener('click', async (e) => {
+    const btn = e.target && e.target.closest ? e.target.closest('[data-copy]') : null;
+    if (!btn) return;
+    const value = btn.getAttribute('data-copy') || '';
+    try{
+      await navigator.clipboard.writeText(value);
+      window.portalToast && window.portalToast({ type: 'success', title: 'Copiado', message: 'RFC copiado al portapapeles.' });
+    }catch(_){
+      window.portalToast && window.portalToast({ type: 'danger', title: 'No se pudo copiar', message: 'Tu navegador bloqueó el portapapeles.' });
+    }
+  });
+
+  // Panel: Ver facturas del proveedor (10 por página, más reciente primero; solo el panel hace scroll)
+  const PAGE_SIZE = 10;
+  const panel = document.getElementById('providerInvoicesPanel');
+  const panelBackdrop = document.getElementById('providerInvoicesBackdrop');
+  const panelClose = document.getElementById('providerInvoicesClose');
+  const panelTitle = document.getElementById('providerInvoicesTitle');
+  const panelRfc = document.getElementById('providerInvoicesRfc');
+  const panelLoading = document.getElementById('providerInvoicesLoading');
+  const panelSummary = document.getElementById('providerInvoicesSummary');
+  const panelSummaryCount = document.getElementById('providerInvoicesSummaryCount');
+  const panelSummaryTotal = document.getElementById('providerInvoicesSummaryTotal');
+  const panelSummaryVigentes = document.getElementById('providerInvoicesSummaryVigentes');
+  const panelList = document.getElementById('providerInvoicesList');
+  const panelEmpty = document.getElementById('providerInvoicesEmpty');
+  const panelError = document.getElementById('providerInvoicesError');
+  const panelErrorMsg = document.getElementById('providerInvoicesErrorMsg');
+  const panelRetryBtn = document.getElementById('providerInvoicesRetry');
+  const panelVerTodas = document.getElementById('providerInvoicesVerTodas');
+  const panelPagination = document.getElementById('providerInvoicesPagination');
+  const panelPageInfo = document.getElementById('providerInvoicesPageInfo');
+  const panelPrev = document.getElementById('providerInvoicesPrev');
+  const panelNext = document.getElementById('providerInvoicesNext');
+  const panelDownloads = document.getElementById('providerInvoicesDownloads');
+  const panelDownloadPdf = document.getElementById('providerInvoicesDownloadPdf');
+  const panelDownloadExcel = document.getElementById('providerInvoicesDownloadExcel');
+
+  let allInvoicesList = [];
+  let currentProviderRfc = '';
+  let currentProviderName = '';
+  let currentPage = 1;
+
+  function formatDate(s) {
+    if (!s) return '—';
+    const part = String(s).split('T')[0];
+    const [y, m, d] = part.split('-');
+    return d && m && y ? `${d}/${m}/${y}` : part;
+  }
+
+  function renderInvoiceRow(inv) {
+    const totalStr = inv.moneda === 'MXN' ? '$' + fmtMoney(inv.total) : fmtMoney(inv.total) + ' ' + (inv.moneda || '');
+    const detailUrl = inv.uuid ? '/portal/cfdi/received/' + inv.uuid : '';
+    const pdfUrl = inv.uuid && inv.has_pdf ? '/portal/sat/pdf/' + inv.uuid : '';
+    const xmlUrl = inv.uuid && inv.has_pdf ? '/portal/sat/xml/' + inv.uuid : '';
+    const statusCls = inv.status === '1' ? 'provider-invoice-card__badge provider-invoice-card__badge--ok' : 'provider-invoice-card__badge';
+    const statusTxt = inv.status === '1' ? 'Vigente' : (inv.status === '0' ? 'Cancelada' : (inv.status || '—'));
+    const cardMod = inv.status === '1' ? ' provider-invoice-card--vigente' : (inv.status === '0' ? ' provider-invoice-card--cancelada' : '');
+    const concept = esc((inv.concepto || '—').substring(0, 200));
+    const row = document.createElement('article');
+    row.className = 'provider-invoice-card' + cardMod;
+    row.setAttribute('aria-label', 'Factura ' + formatDate(inv.fecha_emision) + ', ' + totalStr);
+    row.innerHTML =
+      '<div class="provider-invoice-card__top">' +
+        '<span class="provider-invoice-card__date">' + formatDate(inv.fecha_emision) + '</span>' +
+        '<span class="' + statusCls + '">' + statusTxt + '</span>' +
+      '</div>' +
+      '<div class="provider-invoice-card__total-wrap">' +
+        '<span class="provider-invoice-card__total">' + totalStr + '</span>' +
+      '</div>' +
+      '<p class="provider-invoice-card__concepto" title="' + esc(inv.concepto || '') + '">' + concept + '</p>' +
+      '<div class="provider-invoice-card__actions">' +
+        (detailUrl ? '<a href="' + detailUrl + '" class="provider-invoice-card__link">Ver detalle</a>' : '') +
+        (pdfUrl ? '<a href="' + pdfUrl + '" target="_blank" rel="noopener" class="provider-invoice-card__link">PDF</a>' : '') +
+        (xmlUrl ? '<a href="' + xmlUrl + '" target="_blank" rel="noopener" class="provider-invoice-card__link">XML</a>' : '') +
+      '</div>';
+    return row;
+  }
+
+  function renderPage(page) {
+    currentPage = page;
+    const total = allInvoicesList.length;
+    const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+    const from = (page - 1) * PAGE_SIZE;
+    const slice = allInvoicesList.slice(from, from + PAGE_SIZE);
+    panelList.innerHTML = '';
+    slice.forEach(function(inv) { panelList.appendChild(renderInvoiceRow(inv)); });
+    if (panelPageInfo) {
+      const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+      const from = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+      const to = Math.min(page * PAGE_SIZE, total);
+      if (total === 0) {
+        panelPageInfo.textContent = 'Sin facturas';
+      } else if (totalPages <= 1) {
+        panelPageInfo.textContent = total + ' factura' + (total !== 1 ? 's' : '');
+      } else {
+        panelPageInfo.textContent = 'Página ' + page + ' de ' + totalPages + ' · ' + from + '–' + to + ' de ' + total;
+      }
+    }
+    if (panelPrev) { panelPrev.disabled = page <= 1; }
+    if (panelNext) { panelNext.disabled = page >= totalPages; }
+    panelList.scrollTop = 0;
+  }
+
+  var lastProviderFocusEl = null;
+
+  function openProviderInvoices(rfc, name) {
+    if (!panel || !panelTitle || !panelList) return;
+    lastProviderFocusEl = document.activeElement;
+    currentProviderRfc = rfc || '';
+    currentProviderName = name || 'Proveedor';
+    panelTitle.textContent = 'Facturas de ' + currentProviderName;
+    if (panelRfc) {
+      panelRfc.textContent = currentProviderRfc ? 'RFC ' + currentProviderRfc : '';
+      panelRfc.hidden = !currentProviderRfc;
+    }
+    panelVerTodas.href = '/portal/invoices/received';
+    panel.hidden = false;
+    panel.setAttribute('aria-hidden', 'false');
+    panel.classList.add('is-open');
+    document.body.classList.add('no-scroll');
+    window._provDrawerRemoveEscape = (typeof window.uiCloseOnEscape === 'function') ? window.uiCloseOnEscape(panel, closeProviderInvoices) : null;
+    if (typeof window.uiTrapFocus === 'function') window.uiTrapFocus(panel);
+    else requestAnimationFrame(function() { if (panelClose) panelClose.focus(); });
+    panelList.innerHTML = '';
+    panelEmpty.hidden = true;
+    if (panelSummary) panelSummary.hidden = true;
+    if (panelError) panelError.hidden = true;
+    if (panelErrorMsg) panelErrorMsg.textContent = 'Puedes intentar de nuevo.';
+    if (panelPagination) panelPagination.hidden = true;
+    if (panelDownloads) panelDownloads.hidden = true;
+    if (panelLoading) panelLoading.hidden = false;
+
+    const url = '/api/provider-invoices?rfc=' + encodeURIComponent(rfc || '');
+    if (window.portalProgressBar) window.portalProgressBar.start();
+    (window.uiFetchJSON ? window.uiFetchJSON(url, { credentials: 'same-origin' }) : (window.portalFetchJSON ? window.portalFetchJSON(url, { credentials: 'same-origin' }, { timeoutMs: 30000, retry: 1 }).then(function(r){ return { ok: r.ok, status: r.status, data: r.data, error: r.detail || '' }; }) : Promise.resolve({ ok: false, status: 0, data: null, error: 'No pudimos cargar' })))
+      .then(function(r) {
+        if (panelLoading) panelLoading.hidden = true;
+        if (panelError) panelError.hidden = true;
+        if (panelErrorMsg) panelErrorMsg.textContent = 'Puedes intentar de nuevo.';
+        if (r.status === 401) {
+          panelList.innerHTML = '';
+          panelEmpty.hidden = true;
+          if (panelError) panelError.hidden = false;
+          if (panelErrorMsg) panelErrorMsg.innerHTML = (window.uiSessionExpiredMessage ? window.uiSessionExpiredMessage() : 'Sesión expirada. <a href="/login">Inicia sesión</a>');
+          return;
+        }
+        if (!r.ok) {
+          panelList.innerHTML = '';
+          panelEmpty.hidden = true;
+          if (panelError) panelError.hidden = false;
+          if (panelErrorMsg) panelErrorMsg.textContent = (r.error || 'No pudimos cargar esto ahora.');
+          return;
+        }
+        var raw = r.data;
+        const list = Array.isArray(raw) ? raw : (raw && Array.isArray(raw.items) ? raw.items : (raw && Array.isArray(raw.data) ? raw.data : []));
+        list.sort(function(a, b) {
+          const da = (a.fecha_emision || '').replace('T', '');
+          const db = (b.fecha_emision || '').replace('T', '');
+          return db.localeCompare(da);
+        });
+        allInvoicesList = list;
+        if (list.length === 0) {
+          panelEmpty.hidden = false;
+          if (panelSummary) panelSummary.hidden = true;
+          return;
+        }
+        panelEmpty.hidden = true;
+        var totalRecibido = list.reduce(function(s, inv) { return s + (parseFloat(inv.total) || 0); }, 0);
+        var vigentes = list.filter(function(inv) { return String(inv.status || '') === '1'; }).length;
+        if (panelSummary && panelSummaryCount && panelSummaryTotal && panelSummaryVigentes) {
+          panelSummary.hidden = false;
+          panelSummaryCount.textContent = list.length;
+          panelSummaryTotal.textContent = '$' + totalRecibido.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+          panelSummaryVigentes.textContent = vigentes;
+        }
+        if (panelPagination) panelPagination.hidden = false;
+        if (panelDownloads) panelDownloads.hidden = false;
+        if (panelDownloadPdf) panelDownloadPdf.href = '/api/provider-invoices/report?rfc=' + encodeURIComponent(currentProviderRfc) + '&format=pdf';
+        if (panelDownloadExcel) panelDownloadExcel.href = '/api/provider-invoices/report?rfc=' + encodeURIComponent(currentProviderRfc) + '&format=xlsx';
+        renderPage(1);
+      })
+      .catch(function(err) {
+        if (panelLoading) panelLoading.hidden = true;
+        panelList.innerHTML = '';
+        panelEmpty.hidden = true;
+        if (panelError) panelError.hidden = false;
+        if (panelErrorMsg) panelErrorMsg.textContent = 'No pudimos cargar esto ahora.';
+      })
+      .finally(function() {
+        if (window.portalProgressBar) window.portalProgressBar.done();
+      });
+  }
+
+  if (panelRetryBtn) {
+    panelRetryBtn.addEventListener('click', function () {
+      openProviderInvoices(currentProviderRfc, currentProviderName);
+    });
+  }
+
+  function closeProviderInvoices() {
+    if (!panel) return;
+    if (typeof window.uiReleaseFocusTrap === 'function') window.uiReleaseFocusTrap();
+    if (window._provDrawerRemoveEscape) { window._provDrawerRemoveEscape(); window._provDrawerRemoveEscape = null; }
+    panel.hidden = true;
+    panel.setAttribute('aria-hidden', 'true');
+    panel.classList.remove('is-open');
+    document.body.classList.remove('no-scroll');
+    if (lastProviderFocusEl && typeof lastProviderFocusEl.focus === 'function') lastProviderFocusEl.focus();
+  }
+
+  if (panelPrev) panelPrev.addEventListener('click', function() { if (currentPage > 1) renderPage(currentPage - 1); });
+  if (panelNext) panelNext.addEventListener('click', function() {
+    const totalPages = Math.max(1, Math.ceil(allInvoicesList.length / PAGE_SIZE));
+    if (currentPage < totalPages) renderPage(currentPage + 1);
+  });
+
+  document.addEventListener('click', (e) => {
+    const btn = e.target && e.target.closest ? e.target.closest('[data-provider-rfc]') : null;
+    if (btn) {
+      e.preventDefault();
+      const rfc = btn.getAttribute('data-provider-rfc') || '';
+      const name = btn.getAttribute('data-provider-name') || '';
+      openProviderInvoices(rfc, name);
+    }
+  });
+  if (panelClose) panelClose.addEventListener('click', closeProviderInvoices);
+  if (panelBackdrop) panelBackdrop.addEventListener('click', closeProviderInvoices);
+
+  // P39: Search debounce 250ms + teclado Enter/Esc
+  var filterDebounce;
+  searchEl.addEventListener('input', function(){
+    clearTimeout(filterDebounce);
+    filterDebounce = setTimeout(filter, 250);
+  });
+  searchEl.addEventListener('keydown', function(e){
+    if (e.key === 'Escape') {
+      searchEl.value = '';
+      filter();
+      searchEl.blur();
+      e.preventDefault();
+      return;
+    }
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      var firstBtn = tbody && tbody.querySelector('button[data-provider-rfc]');
+      if (firstBtn) { firstBtn.focus(); firstBtn.click(); }
+    }
+  });
+
+  load();
+})();
+</script>
+
+<style>
+/* Page local layout helpers (keep minimal) */
+.page-section{ display:flex; flex-direction:column; gap: 14px; }
+.page-head{ display:flex; justify-content:space-between; align-items:flex-end; gap: 14px; margin-bottom: 2px; }
+.page-title{ margin:0; font-size: 20px; font-weight: 850; letter-spacing: -.02em; }
+.page-subtitle{ margin: 6px 0 0; color: var(--muted); font-size: 13px; }
+.table-tools{ display:flex; align-items:center; gap: 10px; }
+.table-tools__search{ position:relative; display:flex; align-items:center; gap: 8px; }
+.table-tools__search .icon{ position:absolute; left: 12px; width:18px; height:18px; opacity:.75; }
+.table-tools__search input{ padding-left: 40px; }
+/* Proveedores: misma estructura que facturas emitidas/recibidas */
+#provTable td { vertical-align: middle; }
+#provTable .btn { margin-right: 6px; }
+#provTable .btn:last-child { margin-right: 0; }
+.grid-2{ display:grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.grid-3{ display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+.field{ display:flex; flex-direction:column; gap: 8px; }
+.label{ font-size: 12px; color: var(--muted); font-weight: 700; }
+
+@media (max-width: 860px){
+  .page-head{ flex-direction:column; align-items:stretch; }
+  .table-tools{ justify-content:space-between; }
+  .table-tools__search input{ width: 100%; }
+  .grid-2{ grid-template-columns: 1fr; }
+  .grid-3{ grid-template-columns: 1fr; }
+}
+</style>

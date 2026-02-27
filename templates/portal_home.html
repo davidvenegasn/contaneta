@@ -21,347 +21,200 @@
   }
   var getJson = typeof window.portalCatalogGetJson === 'function' ? window.portalCatalogGetJson : null;
   if (getJson) {
-    window.__prefetchCustomersPromise = getJson('/api/customers', { signal: signal }).then(normCustomers).catch(function() { return []; });
-    window.__prefetchProductsPromise = getJson('/api/products', { signal: signal }).then(normProducts).catch(function() { return []; });
+    window.__prefetchCustomersPromise = getJson('/api/customers?limit=200', { signal: signal }).then(function(d) { return normCustomers(d && d.items != null ? d.items : d); }).catch(function() { return []; });
+    window.__prefetchProductsPromise = getJson('/api/products?limit=200', { signal: signal }).then(function(d) { return normProducts(d && d.items != null ? d.items : d); }).catch(function() { return []; });
   } else {
-    window.__prefetchCustomersPromise = (window.portalFetchJSON ? window.portalFetchJSON('/api/customers', { credentials: 'same-origin', signal: signal }, { timeoutMs: 30000, retry: 1 }) : Promise.resolve({ ok: false, data: [] }))
-      .then(function(r) { return (r && r.ok) ? (r.data || []) : []; })
+    window.__prefetchCustomersPromise = (window.portalFetchJSON ? window.portalFetchJSON('/api/customers?limit=200', { credentials: 'same-origin', signal: signal }, { timeoutMs: 30000, retry: 1 }) : Promise.resolve({ ok: false, data: [] }))
+      .then(function(r) { var d = (r && r.ok) ? (r.data || null) : null; return (d && d.items != null ? d.items : (Array.isArray(d) ? d : [])); })
       .then(normCustomers)
       .catch(function() { return []; });
-    window.__prefetchProductsPromise = (window.portalFetchJSON ? window.portalFetchJSON('/api/products', { credentials: 'same-origin', signal: signal }, { timeoutMs: 30000, retry: 1 }) : Promise.resolve({ ok: false, data: [] }))
-      .then(function(r) { return (r && r.ok) ? (r.data || []) : []; })
+    window.__prefetchProductsPromise = (window.portalFetchJSON ? window.portalFetchJSON('/api/products?limit=200', { credentials: 'same-origin', signal: signal }, { timeoutMs: 30000, retry: 1 }) : Promise.resolve({ ok: false, data: [] }))
+      .then(function(r) { var d = (r && r.ok) ? (r.data || null) : null; return (d && d.items != null ? d.items : (Array.isArray(d) ? d : [])); })
       .then(normProducts)
       .catch(function() { return []; });
   }
   window.addEventListener('pagehide', function() { try { prefetchAbort.abort(); } catch(e) {} });
 })();
 </script>
-<div class="app-header fade-in fade-in--1 mb-22">
-  <div class="app-header__left">
-    <div class="app-title"></div>
-    <div class="app-subtitle muted">Hola <b>{{ issuer_alias }}</b> 👋</div>
+<div class="ui-page-wrap">
+  <header class="app-header fade-in fade-in--1">
+    <h1 class="app-header__title page-title">Hola, {{ issuer_alias }}</h1>
+    <p class="muted u-m0 u-mt-1" style="font-size: var(--text-sm);">Resumen del mes en curso</p>
+  </header>
+
+  {% set _has_data = (ingresos_sin_iva|default(0)|float + gastos_sin_iva|default(0)|float + count_issued|default(0) + count_received|default(0)) != 0 %}
+  {% if not _has_data and not (onboarding.get('has_any_issued') if onboarding else false) %}
+  <div class="ui-card ui-empty">
+    <div class="ui-empty__icon" aria-hidden="true">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9" stroke-linecap="round"/><path d="M21 3v6h-6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </div>
+    <h2 class="ui-empty__title">Aún no hay datos del mes</h2>
+    <p class="ui-empty__subtitle">Sincroniza con el SAT para traer tus facturas emitidas y recibidas. Así podrás ver aquí ingresos, IVA y resumen.</p>
+    <div class="ui-empty__actions">
+      <a href="/portal/config/sat" class="ui-btn ui-btn--primary">Configurar FIEL / Sincronizar SAT</a>
+      <a href="/portal/facturas" class="ui-btn ui-btn--secondary">Ver facturas</a>
+    </div>
   </div>
-</div>
+  {% endif %}
 
-<p class="muted" style="margin:0 0 12px; font-size:13px;">Resumen del mes en curso ({{ ym_label }})</p>
+  <section class="fade-in fade-in--2" aria-labelledby="resumen-mes-title">
+    <div class="card ym-card ym-card--collapsible ym-card--home" data-resumen-key="portal_resumen_collapsed">
+      <div class="ym-card__head">
+        <h2 id="resumen-mes-title" class="u-m0" style="font-size: var(--text-lg); font-weight: 600;">Resumen del mes ({{ ym_label }})</h2>
+        <button type="button" class="ym-card__toggle btn btn--sm btn--ghost" aria-label="Ocultar totales" title="Ocultar totales (proteger tu información)">
+          <span class="ym-card__toggle-icon" aria-hidden="true">−</span>
+          <span class="ym-card__toggle-label">Ocultar totales</span>
+        </button>
+      </div>
+      <div class="ym-card__resumen">
+    <div class="ui-kpi-grid dashboard-metrics">
+      <div class="ui-kpi-card card metric-card">
+        <div class="ui-kpi-card__label metric-label">
+          <svg class="icon" viewBox="0 0 24 24" fill="none"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Ingresos (sin IVA)
+        </div>
+        <div class="ui-kpi-card__value metric-value"><span class="metric-value-full">${{ '{:,.2f}'.format(ingresos_sin_iva|default(0)) }}</span></div>
+        <div class="ui-kpi-card__sub metric-sub">Del mes ({{ ym_label }})</div>
+      </div>
+      <div class="ui-kpi-card card metric-card">
+        <div class="ui-kpi-card__label metric-label">
+          <svg class="icon" viewBox="0 0 24 24" fill="none"><path d="M12 22v-20M7 19h5a3.5 3.5 0 0 0 0-7H7M14 5H9.5a3.5 3.5 0 0 0 0 7H6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Gastos (sin IVA)
+        </div>
+        <div class="ui-kpi-card__value metric-value"><span class="metric-value-full">${{ '{:,.2f}'.format(gastos_sin_iva|default(0)) }}</span></div>
+        <div class="ui-kpi-card__sub metric-sub">Del mes ({{ ym_label }})</div>
+      </div>
+      <div class="ui-kpi-card card metric-card">
+        <div class="ui-kpi-card__label metric-label">
+          <svg class="icon" viewBox="0 0 24 24" fill="none"><path d="M21 12a9 9 0 1 1-9-9" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/><path d="M21 3v6h-6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          IVA recibido (neto)
+        </div>
+        <div class="ui-kpi-card__value metric-value"><span class="metric-value-full">${{ '{:,.2f}'.format(iva_recibido_neto|default(0)) }}</span></div>
+        <div class="ui-kpi-card__sub metric-sub">{% if iva_retenciones|default(0) != 0 %}(– ${{ '{:,.2f}'.format((iva_retenciones|default(0))|float|abs) }} ret.){% else %}Del mes ({{ ym_label }}){% endif %}</div>
+      </div>
+      <div class="ui-kpi-card card metric-card">
+        <div class="ui-kpi-card__label metric-label">
+          <svg class="icon" viewBox="0 0 24 24" fill="none"><path d="M22 12h-4l-3 9L9 3l-3 9H2" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          IVA pagado
+        </div>
+        <div class="ui-kpi-card__value metric-value"><span class="metric-value-full">${{ '{:,.2f}'.format(iva_pagado|default(0)) }}</span></div>
+        <div class="ui-kpi-card__sub metric-sub">Del mes ({{ ym_label }})</div>
+      </div>
+    </div>
+      </div>
+    </div>
+  </section>
 
-<div class="dashboard-metrics fade-in fade-in--3 mb-20">
-  <div class="card metric-card">
-    <div class="metric-label">
-      <svg class="icon" viewBox="0 0 24 24" fill="none"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      Ingresos (sin IVA)
-    </div>
-    <div class="metric-value">
-      <span class="metric-value-full">${{ '{:,.2f}'.format(ingresos_sin_iva|default(0)) }}</span>
-      {% set _v = (ingresos_sin_iva|default(0))|float %}
-      {% if _v >= 1000000 %}<span class="metric-value-short">${{ "%.1f"|format(_v/1000000) }}M</span>{% elif _v >= 100000 %}<span class="metric-value-short">${{ "%.0f"|format(_v/1000) }}k</span>{% elif _v <= -1000000 %}<span class="metric-value-short">-${{ "%.1f"|format(-_v/1000000) }}M</span>{% elif _v <= -100000 %}<span class="metric-value-short">-${{ "%.0f"|format(-_v/1000) }}k</span>{% endif %}
-    </div>
-    <div class="metric-sub">Del mes ({{ ym_label }})</div>
-  </div>
-
-  <div class="card metric-card">
-    <div class="metric-label">
-      <svg class="icon" viewBox="0 0 24 24" fill="none"><path d="M12 22v-20M7 19h5a3.5 3.5 0 0 0 0-7H7M14 5H9.5a3.5 3.5 0 0 0 0 7H6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      Gastos (sin IVA)
-    </div>
-    <div class="metric-value">
-      <span class="metric-value-full">${{ '{:,.2f}'.format(gastos_sin_iva|default(0)) }}</span>
-      {% set _v = (gastos_sin_iva|default(0))|float %}
-      {% if _v >= 1000000 %}<span class="metric-value-short">${{ "%.1f"|format(_v/1000000) }}M</span>{% elif _v >= 100000 %}<span class="metric-value-short">${{ "%.0f"|format(_v/1000) }}k</span>{% elif _v <= -1000000 %}<span class="metric-value-short">-${{ "%.1f"|format(-_v/1000000) }}M</span>{% elif _v <= -100000 %}<span class="metric-value-short">-${{ "%.0f"|format(-_v/1000) }}k</span>{% endif %}
-    </div>
-    <div class="metric-sub">Del mes ({{ ym_label }})</div>
-  </div>
-
-  <div class="card metric-card">
-    <div class="metric-label">
-      <svg class="icon" viewBox="0 0 24 24" fill="none"><path d="M21 12a9 9 0 1 1-9-9" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/><path d="M21 3v6h-6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      IVA recibido (neto)
-    </div>
-    <div class="metric-value">
-      <span class="metric-value-full">${{ '{:,.2f}'.format(iva_recibido_neto|default(0)) }}</span>
-      {% set _v = (iva_recibido_neto|default(0))|float %}
-      {% if _v >= 1000000 %}<span class="metric-value-short">${{ "%.1f"|format(_v/1000000) }}M</span>{% elif _v >= 100000 %}<span class="metric-value-short">${{ "%.0f"|format(_v/1000) }}k</span>{% elif _v <= -1000000 %}<span class="metric-value-short">-${{ "%.1f"|format(-_v/1000000) }}M</span>{% elif _v <= -100000 %}<span class="metric-value-short">-${{ "%.0f"|format(-_v/1000) }}k</span>{% endif %}
-    </div>
-    <div class="metric-sub">{% if iva_retenciones|default(0) != 0 %}
-      {% set _r = (iva_retenciones|default(0))|float %}
-      {% set _r_abs = -_r if _r < 0 else _r %}
-      <span class="metric-sub-full">(– ${{ '{:,.2f}'.format(_r_abs) }} retenciones)</span>
-      {% if _r_abs >= 1000000 %}<span class="metric-sub-short">(– ${{ "%.1f"|format(_r_abs/1000000) }}M ret.)</span>{% elif _r_abs >= 100000 %}<span class="metric-sub-short">(– ${{ "%.0f"|format(_r_abs/1000) }}k ret.)</span>{% endif %}
-      {% else %}Del mes ({{ ym_label }}){% endif %}</div>
-  </div>
-
-  <div class="card metric-card">
-    <div class="metric-label">
-      <svg class="icon" viewBox="0 0 24 24" fill="none"><path d="M22 12h-4l-3 9L9 3l-3 9H2" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      IVA pagado
-    </div>
-    <div class="metric-value">
-      <span class="metric-value-full">${{ '{:,.2f}'.format(iva_pagado|default(0)) }}</span>
-      {% set _v = (iva_pagado|default(0))|float %}
-      {% if _v >= 1000000 %}<span class="metric-value-short">${{ "%.1f"|format(_v/1000000) }}M</span>{% elif _v >= 100000 %}<span class="metric-value-short">${{ "%.0f"|format(_v/1000) }}k</span>{% elif _v <= -1000000 %}<span class="metric-value-short">-${{ "%.1f"|format(-_v/1000000) }}M</span>{% elif _v <= -100000 %}<span class="metric-value-short">-${{ "%.0f"|format(-_v/1000) }}k</span>{% endif %}
-    </div>
-    <div class="metric-sub">Del mes ({{ ym_label }})</div>
-  </div>
-</div>
-
-<div class="dashboard-half-row fade-in fade-in--4 mb-20">
-  <div class="card p-20 quick-invoice-card">
-    <h3 class="section-title mb-14">
+  <!-- Home top (desktop): 3 columnas -->
+  <div class="home-top-grid fade-in fade-in--3">
+  <div class="ui-card quick-invoice-card">
+    <div class="ui-card__header">
+      <h3 class="ui-card__title" style="margin: 0;">
       <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7z" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 2v5h5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 12h8M8 16h8M8 8h3" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
       Factura rápida
-    </h3>
-    <p class="muted" style="margin:0 0 16px; font-size:13px;">Elige cliente y producto, revisa el precálculo y timbra sin salir de Inicio.</p>
-    <div style="display:flex; flex-direction:column; gap:14px;">
+      </h3>
+    </div>
+    <div class="ui-card__body">
+    <p class="muted u-m0 u-mb-4 u-text-xs">Elige cliente y producto, revisa el precálculo y timbra sin salir de Inicio.</p>
+    <div class="quick-invoice-form">
       <div>
-        <label class="label" for="quickCustomer" style="display:block; margin-bottom:6px; font-weight:600;">Cliente</label>
-        <select id="quickCustomer" class="input" style="width:100%; padding:10px 12px; border-radius:10px; font-size:14px; border:1px solid var(--border, #e2e8f0);" aria-label="Cliente">
-          <option value="">— Seleccionar cliente —</option>
-        </select>
-        <p class="muted" style="margin:6px 0 0; font-size:12px; display:flex; align-items:center; gap:10px;">
-          <button type="button" id="quickAddCustomerBtn" class="btn btn--sm btn--secondary">+ Añadir cliente</button>
-          <a href="/portal/clients" class="muted">Ver todos</a>
-        </p>
+        <div class="qi-section-head">
+          <div class="qi-section-title">Cliente</div>
+          <button type="button" id="quickAddCustomerBtn" class="qi-link-btn">Añadir nuevo</button>
+        </div>
+        <div class="qsel" id="qselCustomer">
+          <div class="qsel-input-wrap">
+            <button type="button" class="qsel-icon-btn" id="qiOpenClientPicker" aria-label="Abrir lista de clientes" title="Ver todos los clientes">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.75"></circle>
+                <path d="M20 20l-3.2-3.2" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"></path>
+              </svg>
+            </button>
+            <input type="text" class="qsel-input input input--full" id="qselCustomerInput" placeholder="Buscar cliente por nombre o RFC…" autocomplete="off" aria-label="Buscar cliente" aria-autocomplete="list" aria-controls="qselCustomerMenu" aria-expanded="false" />
+          </div>
+          <div class="qsel-menu" id="qselCustomerMenu" role="listbox" aria-label="Resultados cliente" hidden></div>
+          <p class="qsel-error muted u-mt-1 u-text-12" hidden role="alert"></p>
+        </div>
+        <input type="hidden" id="quickCustomer" value="" />
+        <p class="muted u-mt-2 u-mb-0 u-text-12"><a href="/portal/clients" class="muted">Ver todos</a></p>
       </div>
       <div>
-        <label class="label" for="quickProduct" style="display:block; margin-bottom:6px; font-weight:600;">Producto</label>
-        <select id="quickProduct" class="input" style="width:100%; padding:10px 12px; border-radius:10px; font-size:14px; border:1px solid var(--border, #e2e8f0);" aria-label="Producto">
-          <option value="">— Seleccionar producto —</option>
-        </select>
-        <p class="muted" style="margin:6px 0 0; font-size:12px; display:flex; align-items:center; gap:10px;">
-          <button type="button" id="quickAddProductBtn" class="btn btn--sm btn--secondary">+ Añadir producto</button>
-          <a href="/portal/products" class="muted">Ver todos</a>
-        </p>
+        <div class="qi-section-head">
+          <div class="qi-section-title">Producto</div>
+          <button type="button" id="quickAddProductBtn" class="qi-link-btn">Añadir nuevo</button>
+        </div>
+        <div class="qsel" id="qselProduct">
+          <div class="qsel-input-wrap">
+            <button type="button" class="qsel-icon-btn" id="qiOpenProductPicker" aria-label="Abrir lista de productos" title="Ver todos los productos">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.75"></circle>
+                <path d="M20 20l-3.2-3.2" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"></path>
+              </svg>
+            </button>
+            <input type="text" class="qsel-input input input--full" id="qselProductInput" placeholder="Buscar producto…" autocomplete="off" aria-label="Buscar producto" aria-autocomplete="list" aria-controls="qselProductMenu" aria-expanded="false" />
+          </div>
+          <div class="qsel-menu" id="qselProductMenu" role="listbox" aria-label="Resultados producto" hidden></div>
+          <p class="qsel-error muted u-mt-1 u-text-12" hidden role="alert"></p>
+        </div>
+        <input type="hidden" id="quickProduct" value="" />
+        <p class="muted u-mt-2 u-mb-0 u-text-12"><a href="/portal/products" class="muted">Ver todos</a></p>
       </div>
-      <div style="margin-top:6px;">
-        <button type="button" id="quickInvoiceBtn" class="btn btn-primary" disabled>Generar factura</button>
-        <span id="quickInvoiceBtnHint" class="muted" style="margin-left:10px; font-size:12px;">Elige cliente y producto</span>
+      <div class="quick-invoice-form__actions">
+        <button type="button" id="quickInvoiceBtn" class="ui-btn ui-btn--primary btn btn-primary" disabled>Generar factura</button>
+        <span id="quickInvoiceBtnHint" class="muted u-ml-2 u-text-12">Elige cliente y producto</span>
+      </div>
+      <p class="u-mt-3 u-mb-0">
+        <a href="/portal/create" class="muted u-text-12">Ir a facturación completa</a>
+      </p>
+    </div>
+    </div>
+  </div>
+
+  <div class="ui-card notifications-card">
+    <div class="ui-card__header">
+      <h3 class="ui-card__title" style="margin: 0;">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/><path d="M13.73 21a2 2 0 0 1-3.46 0" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Notificaciones
+      </h3>
+    </div>
+    <div class="ui-card__body">
+      <div class="activity-list-wrap activity-list-wrap--notifications" aria-live="polite">
+        <div class="activity-list">
+          {% for a in activities %}
+          <div class="activity-row">
+            <div>
+              <div class="activity-title">
+                {% if a.direction == 'issued' %}{{ icon_issued() }}{% else %}{{ icon_received() }}{% endif %}
+                Factura {{ 'emitida' if a.direction == 'issued' else 'recibida' }}
+              </div>
+              <div class="activity-sub">{{ a.nombre or 'Sin nombre' }}</div>
+            </div>
+            <div class="activity-sub">{{ a.time_ago }}</div>
+          </div>
+          {% else %}
+          <p class="muted u-m0 u-text-sm">No hay notificaciones por ahora.</p>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="ui-card quick-actions-card">
+      <div class="ui-card__header">
+        <h3 class="ui-card__title">Acciones rápidas</h3>
+      </div>
+      <div class="ui-card__body">
+        <div class="ui-quick-actions">
+          <a href="/portal/config/sat" class="ui-btn ui-btn--secondary">Sincronizar con SAT</a>
+          <a href="/portal/bancos?tab=subir_pdf" class="ui-btn ui-btn--secondary">Subir estado de cuenta</a>
+          <a href="/portal/facturas" class="ui-btn ui-btn--primary">Ver facturas</a>
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- Modal factura rápida: precálculo editable + Timbrar -->
-  <div id="quickInvoiceModal" class="quick-invoice-modal" role="dialog" aria-modal="true" aria-labelledby="quickInvoiceModalTitle" aria-describedby="quickInvoiceModalDesc" hidden>
-    <div class="quick-invoice-modal__backdrop" id="quickInvoiceModalBackdrop"></div>
-    <div class="quick-invoice-modal__panel quick-invoice-modal__panel--precalc" id="quickInvoiceModalPanel" tabindex="-1">
-      <div class="quick-invoice-modal__header">
-        <h2 id="quickInvoiceModalTitle" class="quick-invoice-modal__title">Factura rápida</h2>
-        <button type="button" class="quick-invoice-modal__close" id="quickInvoiceModalClose" aria-label="Cerrar">&times;</button>
-      </div>
-      <p id="quickInvoiceModalDesc" class="quick-invoice-modal__desc muted">Precálculo editable. Puedes ajustar receptor, concepto e impuestos antes de timbrar.</p>
-      <div class="quick-invoice-modal__body">
-        <div class="quick-invoice-modal__section">
-          <div class="quick-invoice-modal__section-title">Receptor</div>
-          <div class="quick-invoice-modal__row">
-            <span id="quickModalCustomerRfc" class="muted" style="font-size:12px;"></span>
-          </div>
-          <div class="quick-form-grid">
-            <div class="quick-form-field quick-form-field--full">
-              <label for="quickModalCustomerName" class="label">Razón social</label>
-              <input id="quickModalCustomerName" class="input" autocomplete="off" />
-            </div>
-            <div class="quick-form-field">
-              <label for="quickModalCustomerZip" class="label">CP</label>
-              <input id="quickModalCustomerZip" class="input" autocomplete="off" />
-            </div>
-            <div class="quick-form-field">
-              <label for="quickModalCustomerTaxSystem" class="label">Régimen</label>
-              <input id="quickModalCustomerTaxSystem" class="input" autocomplete="off" />
-            </div>
-            <div class="quick-form-field quick-form-field--full">
-              <label for="quickModalCustomerEmail" class="label">Email</label>
-              <input id="quickModalCustomerEmail" class="input" type="email" autocomplete="off" />
-            </div>
-          </div>
-        </div>
+  {% include "components/quick_invoice_modal.html" %}
 
-        <div class="quick-invoice-modal__section">
-          <div class="quick-invoice-modal__section-title">Concepto</div>
-          <div class="quick-form-grid">
-            <div class="quick-form-field quick-form-field--full">
-              <label for="quickModalProductDesc" class="label">Descripción</label>
-              <input id="quickModalProductDesc" class="input" autocomplete="off" />
-            </div>
-            <div class="quick-form-field">
-              <label for="quickModalProductKey" class="label">ProdServ</label>
-              <input id="quickModalProductKey" class="input" autocomplete="off" />
-            </div>
-            <div class="quick-form-field">
-              <label for="quickModalUnitKey" class="label">Unidad</label>
-              <input id="quickModalUnitKey" class="input" autocomplete="off" />
-            </div>
-            <div class="quick-form-field">
-              <label for="quickModalQty" class="label">Cantidad</label>
-              <input type="number" id="quickModalQty" class="input" min="0.01" step="0.01" value="1" aria-label="Cantidad" />
-            </div>
-            <div class="quick-form-field">
-              <label for="quickModalUnitPrice" class="label">P. unit. (sin IVA)</label>
-              <input type="number" id="quickModalUnitPrice" class="input" min="0" step="0.01" aria-label="Precio unitario" />
-            </div>
-            <div class="quick-form-field">
-              <label for="quickModalIvaRate" class="label">IVA rate</label>
-              <input type="number" id="quickModalIvaRate" class="input" min="0" max="1" step="0.01" value="0.16" />
-            </div>
-            <div class="quick-form-field">
-              <label for="quickModalIsrRetRate" class="label">Ret ISR rate</label>
-              <input type="number" id="quickModalIsrRetRate" class="input" min="0" max="1" step="0.01" value="0" />
-            </div>
-            <div class="quick-form-field">
-              <label for="quickModalIvaRetRate" class="label">Ret IVA rate</label>
-              <input type="number" id="quickModalIvaRetRate" class="input" min="0" max="1" step="0.01" value="0" />
-            </div>
-          </div>
-          <p class="muted" style="margin:8px 0 0; font-size:12px;">Ret IVA aplica sobre el IVA trasladado. Ret ISR aplica sobre la base.</p>
-        </div>
-
-        <div class="quick-invoice-modal__section">
-          <div class="quick-invoice-modal__section-title">Comprobante</div>
-          <div class="quick-form-grid">
-            <div class="quick-form-field">
-              <label for="quickModalCfdiUse" class="label">Uso CFDI</label>
-              <input id="quickModalCfdiUse" class="input" autocomplete="off" value="G03" />
-            </div>
-            <div class="quick-form-field">
-              <label for="quickModalPaymentForm" class="label">Forma de pago</label>
-              <input id="quickModalPaymentForm" class="input" autocomplete="off" value="03" />
-            </div>
-            <div class="quick-form-field">
-              <label for="quickModalPaymentMethod" class="label">Método</label>
-              <input id="quickModalPaymentMethod" class="input" autocomplete="off" value="PUE" />
-            </div>
-          </div>
-        </div>
-
-        <div class="quick-invoice-modal__totals">
-          <div class="quick-invoice-modal__total-row"><span>Subtotal</span><span id="quickModalSubtotal">$0.00</span></div>
-          <div class="quick-invoice-modal__total-row"><span>IVA</span><span id="quickModalIva">$0.00</span></div>
-          <div class="quick-invoice-modal__total-row"><span>Retenciones</span><span id="quickModalRetenciones">$0.00</span></div>
-          <div class="quick-invoice-modal__total-row quick-invoice-modal__total-row--final"><span>Total</span><span id="quickModalTotal">$0.00</span></div>
-        </div>
-      </div>
-      <div id="quickInvoiceModalError" class="quick-invoice-modal__error" hidden role="alert"></div>
-      <div class="quick-invoice-modal__footer">
-        <button type="button" id="quickInvoiceModalCancel" class="btn btn-ghost">Cancelar</button>
-        <button type="button" id="quickInvoiceModalSubmit" class="btn btn-primary">Timbrar factura</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal: añadir cliente desde Home -->
-  <div id="quickAddCustomerModal" class="quick-invoice-modal" role="dialog" aria-modal="true" aria-labelledby="quickAddCustomerTitle" hidden>
-    <div class="quick-invoice-modal__backdrop" id="quickAddCustomerBackdrop"></div>
-    <div class="quick-invoice-modal__panel" id="quickAddCustomerPanel" tabindex="-1">
-      <div class="quick-invoice-modal__header">
-        <h2 id="quickAddCustomerTitle" class="quick-invoice-modal__title">Añadir cliente</h2>
-        <button type="button" class="quick-invoice-modal__close" id="quickAddCustomerClose" aria-label="Cerrar">&times;</button>
-      </div>
-      <div class="quick-invoice-modal__body">
-        <div class="quick-form-grid">
-          <div class="quick-form-field">
-            <label for="quickCustomerRfc" class="label">RFC *</label>
-            <input id="quickCustomerRfc" class="input" autocomplete="off" placeholder="XAXX010101000" />
-          </div>
-          <div class="quick-form-field">
-            <label for="quickCustomerName" class="label">Razón social *</label>
-            <input id="quickCustomerName" class="input" autocomplete="off" placeholder="Cliente SA de CV" />
-          </div>
-          <div class="quick-form-field">
-            <label for="quickCustomerZip" class="label">CP</label>
-            <input id="quickCustomerZip" class="input" autocomplete="off" placeholder="64000" />
-          </div>
-          <div class="quick-form-field">
-            <label for="quickCustomerTaxSystem" class="label">Régimen (receptor)</label>
-            <input id="quickCustomerTaxSystem" class="input" autocomplete="off" placeholder="616" />
-          </div>
-          <div class="quick-form-field quick-form-field--full">
-            <label for="quickCustomerEmail" class="label">Email</label>
-            <input id="quickCustomerEmail" class="input" type="email" autocomplete="off" placeholder="cliente@dominio.com" />
-          </div>
-          <div class="quick-form-field quick-form-field--full">
-            <label for="quickCustomerAlias" class="label">Alias</label>
-            <input id="quickCustomerAlias" class="input" autocomplete="off" placeholder="(opcional) Ej: OXXO" />
-          </div>
-        </div>
-      </div>
-      <div id="quickAddCustomerError" class="quick-invoice-modal__error" hidden role="alert"></div>
-      <div class="quick-invoice-modal__footer">
-        <button type="button" id="quickAddCustomerCancel" class="btn btn-ghost">Cancelar</button>
-        <button type="button" id="quickAddCustomerSave" class="btn btn-primary">Guardar cliente</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal: añadir producto desde Home -->
-  <div id="quickAddProductModal" class="quick-invoice-modal" role="dialog" aria-modal="true" aria-labelledby="quickAddProductTitle" hidden>
-    <div class="quick-invoice-modal__backdrop" id="quickAddProductBackdrop"></div>
-    <div class="quick-invoice-modal__panel" id="quickAddProductPanel" tabindex="-1">
-      <div class="quick-invoice-modal__header">
-        <h2 id="quickAddProductTitle" class="quick-invoice-modal__title">Añadir producto</h2>
-        <button type="button" class="quick-invoice-modal__close" id="quickAddProductClose" aria-label="Cerrar">&times;</button>
-      </div>
-      <div class="quick-invoice-modal__body">
-        <div class="quick-form-grid">
-          <div class="quick-form-field quick-form-field--full">
-            <label for="quickProductDesc" class="label">Descripción *</label>
-            <input id="quickProductDesc" class="input" autocomplete="off" placeholder="Servicio / producto" />
-          </div>
-          <div class="quick-form-field quick-form-field--full">
-            <label for="quickProductKey" class="label">Clave ProdServ *</label>
-            <input id="quickProductKey" class="input" autocomplete="off" placeholder="Ej: 84111500" />
-            <p class="muted" style="margin:4px 0 0; font-size:12px;">Tip: usa la misma clave que en “Generar tu factura”.</p>
-          </div>
-          <div class="quick-form-field">
-            <label for="quickProductUnitKey" class="label">Unidad</label>
-            <input id="quickProductUnitKey" class="input" autocomplete="off" value="E48" />
-          </div>
-          <div class="quick-form-field">
-            <label for="quickProductUnitPrice" class="label">Precio unitario *</label>
-            <input id="quickProductUnitPrice" class="input" type="number" min="0" step="0.01" placeholder="0.00" />
-          </div>
-          <div class="quick-form-field">
-            <label for="quickProductIvaRate" class="label">IVA rate</label>
-            <input id="quickProductIvaRate" class="input" type="number" min="0" max="1" step="0.01" value="0.16" />
-          </div>
-        </div>
-      </div>
-      <div id="quickAddProductError" class="quick-invoice-modal__error" hidden role="alert"></div>
-      <div class="quick-invoice-modal__footer">
-        <button type="button" id="quickAddProductCancel" class="btn btn-ghost">Cancelar</button>
-        <button type="button" id="quickAddProductSave" class="btn btn-primary">Guardar producto</button>
-      </div>
-    </div>
-  </div>
-  <style>
-    .quick-invoice-modal { position: fixed; inset: 0; z-index: 9000; display: flex; align-items: center; justify-content: center; padding: 16px; }
-    .quick-invoice-modal[hidden] { display: none !important; }
-    .quick-invoice-modal__backdrop { position: absolute; inset: 0; background: rgba(0,0,0,.4); }
-    .quick-invoice-modal__panel { position: relative; background: var(--surface, #fff); border-radius: 16px; box-shadow: 0 20px 50px rgba(0,0,0,.15); max-width: 420px; width: 100%; max-height: 90vh; overflow-y: auto; outline: none; }
-    .quick-invoice-modal__panel--precalc { max-width: 920px; }
-    body.quick-invoice-modal-open { overflow: hidden; }
-    .quick-invoice-modal__header { display: flex; align-items: center; justify-content: space-between; padding: 18px 20px; border-bottom: 1px solid var(--border, #e2e8f0); }
-    .quick-invoice-modal__title { margin: 0; font-size: 1.2rem; font-weight: 700; }
-    .quick-invoice-modal__close { background: none; border: none; font-size: 24px; line-height: 1; cursor: pointer; color: var(--text-muted, #64748b); padding: 4px; }
-    .quick-invoice-modal__close:hover { color: var(--text, #111); }
-    .quick-invoice-modal__desc { margin: 0 20px 14px; font-size: 13px; }
-    .quick-invoice-modal__body { padding: 0 20px 20px; }
-    .quick-invoice-modal__row { margin-bottom: 10px; }
-    .quick-invoice-modal__label { font-weight: 600; font-size: 12px; color: var(--text-muted); display: block; margin-bottom: 2px; }
-    .quick-invoice-modal__value { font-size: 14px; }
-    .quick-invoice-modal__edits { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 14px 0; }
-    .quick-invoice-modal__section { padding: 14px 0; border-bottom: 1px solid var(--border, #e2e8f0); }
-    .quick-invoice-modal__section:last-of-type { border-bottom: none; }
-    .quick-invoice-modal__section-title { font-weight: 800; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted, #64748b); margin-bottom: 10px; }
-    .quick-invoice-modal__totals { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
-    .quick-invoice-modal__total-row { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 6px; }
-    .quick-invoice-modal__total-row--final { font-weight: 700; font-size: 16px; margin-top: 8px; }
-    .quick-invoice-modal__error { padding: 10px 14px; margin: 0 20px 12px; background: rgba(220,38,38,.1); border-radius: 10px; font-size: 13px; color: var(--danger, #b91c1c); border: 1px solid rgba(220,38,38,.25); }
-    .quick-invoice-modal__footer { display: flex; justify-content: flex-end; gap: 10px; padding: 16px 20px; border-top: 1px solid var(--border); }
-    .quick-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    .quick-form-field--full { grid-column: 1 / -1; }
-    @media (max-width: 520px) {
-      .quick-form-grid { grid-template-columns: 1fr; }
-    }
-  </style>
-
+  <script src="/static/js/quick-invoice.js"></script>
   <script>
   (function(){
     var customerSelect = document.getElementById('quickCustomer');
@@ -369,9 +222,12 @@
     var btn = document.getElementById('quickInvoiceBtn');
     var hint = document.getElementById('quickInvoiceBtnHint');
     if (!customerSelect || !productSelect || !btn) return;
+    // Legacy (desactivado): la lógica ahora vive en /static/js/quick-invoice.js
+    return;
 
-    window.__quickCustomersData = [];
-    window.__quickProductsData = [];
+    function reloadQuickInvoiceData() {
+      if (typeof window.quickInvoiceReload === 'function') window.quickInvoiceReload();
+    }
 
     function setBtn() {
       var cId = customerSelect.value;
@@ -383,73 +239,6 @@
         btn.disabled = true;
         if (hint) hint.textContent = 'Elige cliente y producto';
       }
-    }
-
-    function loadCustomers() {
-      var p = window.__prefetchCustomersPromise;
-      var done = function(data) {
-        var list = Array.isArray(data) ? data : (data && data.customers) ? data.customers : (data && data.data) ? data.data : [];
-        window.__quickCustomersData = list;
-        customerSelect.innerHTML = '<option value="">— Seleccionar cliente —</option>';
-        list.forEach(function(c) {
-          var o = document.createElement('option');
-          o.value = String(c.id != null ? c.id : '');
-          o.textContent = (c.legal_name || c.rfc || 'Sin nombre').trim() || '—';
-          customerSelect.appendChild(o);
-        });
-        if (window.__quickAfterCustomerRfc) {
-          var rfcToSelect = String(window.__quickAfterCustomerRfc || '').toUpperCase();
-          var match = list.find(function(c) { return String((c.rfc || '')).toUpperCase() === rfcToSelect; });
-          if (match && match.id != null) customerSelect.value = String(match.id);
-          window.__quickAfterCustomerRfc = null;
-        }
-        setBtn();
-      };
-      if (p) {
-        p.then(done).catch(function() { setBtn(); });
-        return;
-      }
-      if (window.portalCatalogGetJson) {
-        window.portalCatalogGetJson('/api/customers').then(function(r) { return Array.isArray(r) ? r : (r && r.customers) || (r && r.data) || []; }).then(done).catch(function() { setBtn(); });
-        return;
-      }
-      (window.portalFetchJSON ? window.portalFetchJSON('/api/customers', { credentials: 'same-origin' }, { timeoutMs: 30000, retry: 1 }) : Promise.resolve({ ok: false, data: [] }))
-        .then(function(r) { return (r && r.ok) ? (r.data || []) : []; })
-        .then(done)
-        .catch(function() { setBtn(); });
-    }
-    function loadProducts() {
-      var p = window.__prefetchProductsPromise;
-      var done = function(data) {
-        var list = Array.isArray(data) ? data : (data && data.products) ? data.products : (data && data.data) ? data.data : [];
-        window.__quickProductsData = list;
-        productSelect.innerHTML = '<option value="">— Seleccionar producto —</option>';
-        list.forEach(function(p) {
-          var o = document.createElement('option');
-          o.value = String(p.id != null ? p.id : '');
-          o.textContent = (p.description || p.product_key || 'Sin descripción').trim() || '—';
-          productSelect.appendChild(o);
-        });
-        if (window.__quickAfterProductId != null) {
-          var idToSelect = String(window.__quickAfterProductId);
-          var match = list.find(function(p) { return String(p.id) === idToSelect; });
-          if (match && match.id != null) productSelect.value = String(match.id);
-          window.__quickAfterProductId = null;
-        }
-        setBtn();
-      };
-      if (p) {
-        p.then(done).catch(function() { setBtn(); });
-        return;
-      }
-      if (window.portalCatalogGetJson) {
-        window.portalCatalogGetJson('/api/products').then(function(r) { return Array.isArray(r) ? r : (r && r.products) || (r && r.data) || []; }).then(done).catch(function() { setBtn(); });
-        return;
-      }
-      (window.portalFetchJSON ? window.portalFetchJSON('/api/products', { credentials: 'same-origin' }, { timeoutMs: 30000, retry: 1 }) : Promise.resolve({ ok: false, data: [] }))
-        .then(function(r) { return (r && r.ok) ? (r.data || []) : []; })
-        .then(done)
-        .catch(function() { setBtn(); });
     }
 
     var modal = document.getElementById('quickInvoiceModal');
@@ -470,19 +259,234 @@
     var modalIvaRate = document.getElementById('quickModalIvaRate');
     var modalIsrRetRate = document.getElementById('quickModalIsrRetRate');
     var modalIvaRetRate = document.getElementById('quickModalIvaRetRate');
+    var modalCurrency = document.getElementById('quickModalCurrency');
     var modalCfdiUse = document.getElementById('quickModalCfdiUse');
     var modalPaymentForm = document.getElementById('quickModalPaymentForm');
     var modalPaymentMethod = document.getElementById('quickModalPaymentMethod');
+    var modalAutoEmail = document.getElementById('quickModalAutoEmail');
+    var modalProdservBtn = document.getElementById('quickModalProdservBtn');
 
-    function fmtMoney(n) { return '$' + (Number(n).toFixed(2)).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+    var unidadDatalist = document.getElementById('quickUnidadList');
+
+    // Buscador ProdServ (modal tipo form)
+    var prodservModal = document.getElementById('quickProdservModal');
+    var prodservModalInput = document.getElementById('quickProdservModalInput');
+    var prodservModalResults = document.getElementById('quickProdservModalResults');
+    var _prodservTargetInputId = null;
+    var _prodservAbort = null;
+
+    // Modales añadir cliente/producto
+    var addCustomerUsoCfdi = document.getElementById('quickCustomerUsoCfdi');
+    var addProductProdservBtn = document.getElementById('quickProductProdservBtn');
+
+    function parseNum(v) {
+      if (v === null || v === undefined) return 0;
+      var s = String(v).replace(/,/g, '').replace(/\$/g, '').trim();
+      var n = Number(s);
+      return Number.isFinite(n) ? n : 0;
+    }
+
+    function fmtMoney(n) { return '$' + (Number(n || 0).toFixed(2)).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+
+    function formatMoneyInput(el) {
+      if (!el) return;
+      var n = parseNum(el.value);
+      el.value = Number(n).toFixed(2);
+    }
+
+    function getSelectedIvaRate() {
+      var v = (modalIvaRate && modalIvaRate.value) || '';
+      if (String(v).toUpperCase() === 'EXENTO') return { rate: 0, exempt: true };
+      var n = parseNum(v);
+      n = Math.max(0, Math.min(1, n));
+      return { rate: n, exempt: false };
+    }
+
+    async function fetchCatalog(path) {
+      if (window.portalCatalogGetJson) {
+        return await window.portalCatalogGetJson(path);
+      }
+      var r = window.portalFetchJSON
+        ? await window.portalFetchJSON(path, { credentials: 'same-origin' }, { timeoutMs: 30000, retry: 1 })
+        : { ok: false, data: null };
+      if (r && r.ok) {
+        var body = r.data;
+        if (body && typeof body === 'object' && body.ok === true && body.data != null) return body.data;
+        return body;
+      }
+      return null;
+    }
+
+    function fillSelect(selectEl, items, preferredKey) {
+      if (!selectEl) return;
+      var prev = preferredKey != null ? String(preferredKey) : String(selectEl.value || '');
+      selectEl.innerHTML = '';
+      var arr = Array.isArray(items) ? items : [];
+      if (arr.length === 0) {
+        var opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = '—';
+        selectEl.appendChild(opt);
+        return;
+      }
+      arr.forEach(function (it) {
+        var k = String(it.key != null ? it.key : '');
+        var lbl = String(it.label != null ? it.label : k);
+        var o = document.createElement('option');
+        o.value = k;
+        o.textContent = k + ' — ' + lbl;
+        selectEl.appendChild(o);
+      });
+      if (prev) selectEl.value = prev;
+    }
+
+    async function loadQuickInvoiceCatalogs() {
+      try {
+        var defs = window.__quickInvoiceDefaults || null;
+        var regimen = await fetchCatalog('/api/catalogs/regimen_fiscal');
+        fillSelect(addCustomerTaxSystem, regimen, (addCustomerTaxSystem && addCustomerTaxSystem.value) || (defs && defs.regimen) || '616');
+        fillSelect(modalCustomerTaxSystem, regimen, (defs && defs.regimen) || '616');
+
+        var usos = await fetchCatalog('/api/catalogs/uso_cfdi');
+        fillSelect(addCustomerUsoCfdi, usos, (defs && defs.uso_cfdi) || 'G03');
+        fillSelect(modalCfdiUse, usos, (defs && defs.uso_cfdi) || 'G03');
+
+        var fp = await fetchCatalog('/api/catalogs/forma_pago');
+        fillSelect(modalPaymentForm, fp, (defs && defs.payment_form) || '03');
+
+        var mp = await fetchCatalog('/api/catalogs/metodo_pago');
+        fillSelect(modalPaymentMethod, mp, (defs && defs.payment_method) || 'PUE');
+
+        var mon = await fetchCatalog('/api/catalogs/moneda');
+        // moneda suele ser corta: mostramos solo clave en el select del modal
+        if (modalCurrency) {
+          modalCurrency.innerHTML = '';
+          (Array.isArray(mon) ? mon : []).forEach(function (it) {
+            var o = document.createElement('option');
+            o.value = String(it.key || '');
+            o.textContent = String(it.key || '');
+            modalCurrency.appendChild(o);
+          });
+          modalCurrency.value = (defs && defs.currency) ? String(defs.currency) : 'MXN';
+          if (!modalCurrency.value) modalCurrency.value = 'MXN';
+        }
+      } catch (e) {
+        // fallbacks: no bloquear la UI
+        if (modalCfdiUse && !modalCfdiUse.value) modalCfdiUse.innerHTML = '<option value="G03">G03 — Gastos en general</option>';
+        if (modalPaymentForm && !modalPaymentForm.value) modalPaymentForm.innerHTML = '<option value="03">03 — Transferencia electrónica</option>';
+        if (modalPaymentMethod && !modalPaymentMethod.value) modalPaymentMethod.innerHTML = '<option value="PUE">PUE — Pago en una sola exhibición</option><option value="PPD">PPD — Parcialidades</option>';
+      }
+    }
+
+    function debounce(fn, ms) {
+      var t = null;
+      return function () {
+        var args = arguments;
+        clearTimeout(t);
+        t = setTimeout(function () { fn.apply(null, args); }, ms);
+      };
+    }
+
+    var searchUnidadDebounced = debounce(async function (term) {
+      if (!unidadDatalist) return;
+      var q = String(term || '').trim();
+      if (q.length < 1) { unidadDatalist.innerHTML = ''; return; }
+      try {
+        var list = await fetchCatalog('/api/catalogs/unidad?q=' + encodeURIComponent(q));
+        unidadDatalist.innerHTML = '';
+        (Array.isArray(list) ? list : []).forEach(function (it) {
+          var opt = document.createElement('option');
+          opt.value = String(it.key || '');
+          opt.label = (it.key ? (String(it.key) + ' — ') : '') + String(it.label || '');
+          unidadDatalist.appendChild(opt);
+        });
+      } catch (e) {
+        unidadDatalist.innerHTML = '';
+      }
+    }, 250);
+
+    function openQuickProdservModal(targetInputId) {
+      if (!prodservModal || !prodservModalInput || !prodservModalResults) return;
+      _prodservTargetInputId = targetInputId;
+      prodservModal.style.display = 'block';
+      prodservModal.setAttribute('aria-hidden', 'false');
+      document.body.classList.add('no-scroll');
+      prodservModalResults.innerHTML = '';
+      prodservModalInput.value = '';
+      requestAnimationFrame(function () { try { prodservModalInput.focus(); } catch (_) {} });
+    }
+
+    function closeQuickProdservModal() {
+      if (!prodservModal) return;
+      prodservModal.style.display = 'none';
+      prodservModal.setAttribute('aria-hidden', 'true');
+      document.body.classList.remove('no-scroll');
+      _prodservTargetInputId = null;
+      if (_prodservAbort) { try { _prodservAbort.abort(); } catch (_) {} _prodservAbort = null; }
+    }
+
+    async function searchQuickProdserv(term) {
+      if (!prodservModalResults) return;
+      var q = String(term || '').trim();
+      if (q.length < 2) { prodservModalResults.innerHTML = ''; return; }
+      if (_prodservAbort) { try { _prodservAbort.abort(); } catch (_) {} }
+      _prodservAbort = new AbortController();
+      var signal = _prodservAbort.signal;
+      prodservModalResults.innerHTML = '<div class="muted" style="padding:12px;">Buscando…</div>';
+      try {
+        var list = window.portalCatalogGetJson
+          ? await window.portalCatalogGetJson('/api/catalogs/prodserv?q=' + encodeURIComponent(q), { signal: signal })
+          : await fetchCatalog('/api/catalogs/prodserv?q=' + encodeURIComponent(q));
+        if (signal.aborted) return;
+        var items = Array.isArray(list) ? list : [];
+        if (items.length === 0) {
+          prodservModalResults.innerHTML = '<div class="muted" style="padding:12px;">Sin resultados</div>';
+          return;
+        }
+        prodservModalResults.innerHTML = '';
+        items.forEach(function (it) {
+          var btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'result-row';
+          btn.innerHTML = '<span class="result-code">' + String(it.key || '') + '</span><span class="result-desc">' + String(it.label || '') + '</span>';
+          btn.addEventListener('click', function () {
+            var key = String(it.key || '').trim();
+            if (!key) return;
+            var target = _prodservTargetInputId ? document.getElementById(_prodservTargetInputId) : null;
+            if (target) {
+              target.value = key;
+              target.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+            closeQuickProdservModal();
+          });
+          prodservModalResults.appendChild(btn);
+        });
+      } catch (e) {
+        if (signal.aborted) return;
+        prodservModalResults.innerHTML = '<div class="muted" style="padding:12px;">No se pudo buscar. Intenta de nuevo.</div>';
+      }
+    }
+
+    if (prodservModal) {
+      prodservModal.addEventListener('click', function (e) {
+        var t = e.target;
+        if (t && t.getAttribute && t.getAttribute('data-close') === '1') closeQuickProdservModal();
+        if (t && t.closest && t.closest('[data-close=\"1\"]')) closeQuickProdservModal();
+        if (t && t.classList && t.classList.contains('form-modal__backdrop')) closeQuickProdservModal();
+      });
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && prodservModal.style.display === 'block') closeQuickProdservModal();
+      });
+    }
+    if (prodservModalInput) prodservModalInput.addEventListener('input', debounce(function () { searchQuickProdserv(prodservModalInput.value); }, 250));
     function updateModalTotals() {
-      var qty = parseFloat(modalQty.value) || 0;
-      var pu = parseFloat(modalUnitPrice.value) || 0;
-      var ivaRate = parseFloat((modalIvaRate && modalIvaRate.value) || '') ;
-      ivaRate = Number.isFinite(ivaRate) ? Math.max(0, Math.min(1, ivaRate)) : (window.__quickCurrentIva !== undefined ? window.__quickCurrentIva : 0.16);
-      var isrRetRate = parseFloat((modalIsrRetRate && modalIsrRetRate.value) || '');
+      var qty = parseNum(modalQty.value) || 0;
+      var pu = parseNum(modalUnitPrice.value) || 0;
+      var ivaInfo = getSelectedIvaRate();
+      var ivaRate = Number.isFinite(ivaInfo.rate) ? ivaInfo.rate : 0.16;
+      var isrRetRate = parseNum((modalIsrRetRate && modalIsrRetRate.value) || '');
       isrRetRate = Number.isFinite(isrRetRate) ? Math.max(0, Math.min(1, isrRetRate)) : 0;
-      var ivaRetRate = parseFloat((modalIvaRetRate && modalIvaRetRate.value) || '');
+      var ivaRetRate = parseNum((modalIvaRetRate && modalIvaRetRate.value) || '');
       ivaRetRate = Number.isFinite(ivaRetRate) ? Math.max(0, Math.min(1, ivaRetRate)) : 0;
       var subtotal = Math.round(qty * pu * 100) / 100;
       var iva = Math.round(subtotal * ivaRate * 100) / 100;
@@ -492,7 +496,8 @@
       var total = Math.round((subtotal + iva - retTot) * 100) / 100;
       document.getElementById('quickModalSubtotal').textContent = fmtMoney(subtotal);
       document.getElementById('quickModalIva').textContent = fmtMoney(iva);
-      document.getElementById('quickModalRetenciones').textContent = fmtMoney(retTot);
+      var retEl = document.getElementById('quickModalRetenciones');
+      if (retEl) retEl.textContent = fmtMoney(retTot);
       document.getElementById('quickModalTotal').textContent = fmtMoney(total);
     }
 
@@ -508,33 +513,47 @@
       }
       window.__quickCurrentCustomerId = cId;
       window.__quickCurrentProductId = pId;
-      window.__quickCurrentIva = parseFloat(prod.iva_rate) || 0.16;
+      window.__quickCurrentIva = parseNum(prod.iva_rate) || 0.16;
       document.getElementById('quickModalCustomerRfc').textContent = cust.rfc ? ('RFC ' + cust.rfc) : '';
       if (modalCustomerName) modalCustomerName.value = (cust.legal_name || '').trim();
       if (modalCustomerZip) modalCustomerZip.value = (cust.zip || '').trim();
       if (modalCustomerTaxSystem) modalCustomerTaxSystem.value = (cust.tax_system || '').trim();
       if (modalCustomerEmail) modalCustomerEmail.value = (cust.email || '').trim();
+      if (modalAutoEmail) modalAutoEmail.checked = false;
       if (modalProductDesc) modalProductDesc.value = (prod.description || '').trim();
       if (modalProductKey) modalProductKey.value = (prod.product_key || '').trim();
       if (modalUnitKey) modalUnitKey.value = (prod.unit_key || 'E48').trim();
       modalQty.value = '1';
       modalUnitPrice.value = String(prod.unit_price != null ? prod.unit_price : '');
-      if (modalIvaRate) modalIvaRate.value = String(window.__quickCurrentIva);
+      formatMoneyInput(modalUnitPrice);
+      if (modalIvaRate) {
+        var iva = parseNum(window.__quickCurrentIva);
+        if (Math.abs(iva - 0.16) < 0.0001) modalIvaRate.value = '0.16';
+        else if (Math.abs(iva - 0.08) < 0.0001) modalIvaRate.value = '0.08';
+        else if (Math.abs(iva - 0.0) < 0.0001) modalIvaRate.value = '0.00';
+        else modalIvaRate.value = '0.16';
+      }
       if (modalIsrRetRate) modalIsrRetRate.value = '0';
       if (modalIvaRetRate) modalIvaRetRate.value = '0';
-      if (modalCfdiUse) modalCfdiUse.value = 'G03';
-      if (modalPaymentForm) modalPaymentForm.value = '03';
-      if (modalPaymentMethod) modalPaymentMethod.value = 'PUE';
+      var defs = window.__quickInvoiceDefaults || null;
+      if (modalCurrency) modalCurrency.value = (defs && defs.currency) ? String(defs.currency) : 'MXN';
+      if (modalCfdiUse) modalCfdiUse.value = (window.__quickAfterCustomerUsoCfdi || (defs && defs.uso_cfdi) || 'G03');
+      if (modalPaymentForm) modalPaymentForm.value = (defs && defs.payment_form) ? String(defs.payment_form) : '03';
+      if (modalPaymentMethod) modalPaymentMethod.value = (defs && defs.payment_method) ? String(defs.payment_method) : 'PUE';
       modalError.hidden = true;
       modalError.textContent = '';
       updateModalTotals();
       modal.hidden = false;
       modal.removeAttribute('hidden');
       document.body.classList.add('quick-invoice-modal-open');
-      setTimeout(function() { if (modalQty) modalQty.focus(); else document.getElementById('quickInvoiceModalPanel').focus(); }, 100);
+      if (typeof window.uiCloseOnEscape === 'function') window._quickRemoveEscape = window.uiCloseOnEscape(modal, closeQuickModal);
+      if (typeof window.uiTrapFocus === 'function') window.uiTrapFocus(modal);
+      else setTimeout(function() { if (modalQty) modalQty.focus(); else document.getElementById('quickInvoiceModalPanel').focus(); }, 100);
     }
 
     function closeQuickModal() {
+      if (typeof window.uiReleaseFocusTrap === 'function') window.uiReleaseFocusTrap();
+      if (window._quickRemoveEscape) { window._quickRemoveEscape(); window._quickRemoveEscape = null; }
       modal.hidden = true;
       modal.setAttribute('hidden', '');
       document.body.classList.remove('quick-invoice-modal-open');
@@ -544,6 +563,10 @@
     [modalQty, modalUnitPrice, modalIvaRate, modalIsrRetRate, modalIvaRetRate].forEach(function(el) {
       if (el) el.addEventListener('input', updateModalTotals);
     });
+    if (modalUnitPrice) modalUnitPrice.addEventListener('blur', function(){ formatMoneyInput(modalUnitPrice); updateModalTotals(); });
+    if (modalQty) modalQty.addEventListener('blur', function(){ modalQty.value = String(parseNum(modalQty.value) || 0); updateModalTotals(); });
+    if (modalUnitKey) modalUnitKey.addEventListener('input', function () { searchUnidadDebounced(modalUnitKey.value); });
+    if (modalProdservBtn) modalProdservBtn.addEventListener('click', function () { openQuickProdservModal('quickModalProductKey'); });
 
     if (modalBackdrop) modalBackdrop.addEventListener('click', closeQuickModal);
     if (modalClose) modalClose.addEventListener('click', closeQuickModal);
@@ -553,8 +576,8 @@
       var customerId = window.__quickCurrentCustomerId;
       var productId = window.__quickCurrentProductId;
       if (!customerId || !productId) return;
-      var qty = parseFloat(modalQty.value);
-      var unitPrice = parseFloat(modalUnitPrice.value);
+      var qty = parseNum(modalQty.value);
+      var unitPrice = parseNum(modalUnitPrice.value);
       if (!qty || qty <= 0) {
         modalError.textContent = 'Ingresa una cantidad válida.';
         modalError.hidden = false;
@@ -566,7 +589,9 @@
         return;
       }
       modalError.hidden = true;
+      var submitLabel = modalSubmit.textContent;
       modalSubmit.disabled = true;
+      modalSubmit.textContent = 'Timbrando…';
       var custName = (modalCustomerName && modalCustomerName.value || '').trim();
       var custZip = (modalCustomerZip && modalCustomerZip.value || '').trim();
       var custTaxSystem = (modalCustomerTaxSystem && modalCustomerTaxSystem.value || '').trim();
@@ -574,15 +599,18 @@
       var desc = (modalProductDesc && modalProductDesc.value || '').trim();
       var productKey = (modalProductKey && modalProductKey.value || '').trim();
       var unitKey = (modalUnitKey && modalUnitKey.value || '').trim();
-      var ivaRate = parseFloat((modalIvaRate && modalIvaRate.value) || '');
-      ivaRate = Number.isFinite(ivaRate) ? ivaRate : undefined;
-      var isrRetRate = parseFloat((modalIsrRetRate && modalIsrRetRate.value) || '');
+      var ivaInfo = getSelectedIvaRate();
+      var ivaRate = ivaInfo ? ivaInfo.rate : 0.16;
+      var ivaExempt = !!(ivaInfo && ivaInfo.exempt);
+      var isrRetRate = parseNum((modalIsrRetRate && modalIsrRetRate.value) || '');
       isrRetRate = Number.isFinite(isrRetRate) ? isrRetRate : 0;
-      var ivaRetRate = parseFloat((modalIvaRetRate && modalIvaRetRate.value) || '');
+      var ivaRetRate = parseNum((modalIvaRetRate && modalIvaRetRate.value) || '');
       ivaRetRate = Number.isFinite(ivaRetRate) ? ivaRetRate : 0;
       var cfdiUse = (modalCfdiUse && modalCfdiUse.value || '').trim().toUpperCase();
       var paymentForm = (modalPaymentForm && modalPaymentForm.value || '').trim();
       var paymentMethod = (modalPaymentMethod && modalPaymentMethod.value || '').trim().toUpperCase();
+      var currency = (modalCurrency && modalCurrency.value || 'MXN').trim().toUpperCase();
+      var sendEmail = !!(modalAutoEmail && modalAutoEmail.checked);
       var csrf = document.querySelector('meta[name="csrf-token"]') && document.querySelector('meta[name="csrf-token"]').getAttribute('content');
       var headers = { 'Content-Type': 'application/json' };
       if (csrf) headers['X-CSRF-Token'] = csrf;
@@ -607,11 +635,15 @@
           unit_key: unitKey,
           cfdi_use: cfdiUse,
           payment_form: paymentForm,
-          payment_method: paymentMethod
+          payment_method: paymentMethod,
+          currency: currency,
+          iva_exempt: ivaExempt,
+          send_email: sendEmail
         })
       }, { timeoutMs: 30000, retry: 0 }) : Promise.resolve({ ok: false, status: 0, data: null, detail: 'Helper no disponible' }))
         .then(function(res) {
           modalSubmit.disabled = false;
+          modalSubmit.textContent = submitLabel || 'Timbrar factura';
           if (res && res.status === 401) return;
           if (res && res.ok && res.data && res.data.ok) {
             closeQuickModal();
@@ -633,8 +665,7 @@
             }
             window.__prefetchCustomersPromise = null;
             window.__prefetchProductsPromise = null;
-            loadCustomers();
-            loadProducts();
+            reloadQuickInvoiceData();
             return;
           }
           var detail = (res && res.data && res.data.detail) ? (typeof res.data.detail === 'string' ? res.data.detail : JSON.stringify(res.data.detail)) : '';
@@ -643,6 +674,7 @@
         })
         .catch(function(err) {
           modalSubmit.disabled = false;
+          modalSubmit.textContent = submitLabel || 'Timbrar factura';
           modalError.textContent = err.message || 'Error de conexión. Intenta de nuevo.';
           modalError.hidden = false;
         });
@@ -660,9 +692,11 @@
     var addCustomerName = document.getElementById('quickCustomerName');
     var addCustomerZip = document.getElementById('quickCustomerZip');
     var addCustomerTaxSystem = document.getElementById('quickCustomerTaxSystem');
+    var addCustomerUsoCfdi2 = document.getElementById('quickCustomerUsoCfdi');
     var addCustomerEmail = document.getElementById('quickCustomerEmail');
     var addCustomerAlias = document.getElementById('quickCustomerAlias');
 
+    var _addCustomerRemoveEscape = null;
     function openAddCustomer() {
       if (!addCustomerModal) return;
       if (addCustomerError) { addCustomerError.hidden = true; addCustomerError.textContent = ''; }
@@ -670,15 +704,20 @@
       if (addCustomerName) addCustomerName.value = '';
       if (addCustomerZip) addCustomerZip.value = '';
       if (addCustomerTaxSystem) addCustomerTaxSystem.value = '';
+      if (addCustomerUsoCfdi2) addCustomerUsoCfdi2.value = (window.__quickInvoiceDefaults && window.__quickInvoiceDefaults.uso_cfdi) ? String(window.__quickInvoiceDefaults.uso_cfdi) : 'G03';
       if (addCustomerEmail) addCustomerEmail.value = '';
       if (addCustomerAlias) addCustomerAlias.value = '';
       addCustomerModal.hidden = false;
       addCustomerModal.removeAttribute('hidden');
       document.body.classList.add('quick-invoice-modal-open');
-      setTimeout(function() { if (addCustomerRfc) addCustomerRfc.focus(); }, 100);
+      _addCustomerRemoveEscape = (typeof window.uiCloseOnEscape === 'function') ? window.uiCloseOnEscape(addCustomerModal, closeAddCustomer) : null;
+      if (typeof window.uiTrapFocus === 'function') window.uiTrapFocus(addCustomerModal);
+      else setTimeout(function() { if (addCustomerRfc) addCustomerRfc.focus(); }, 100);
     }
     function closeAddCustomer() {
       if (!addCustomerModal) return;
+      if (typeof window.uiReleaseFocusTrap === 'function') window.uiReleaseFocusTrap();
+      if (_addCustomerRemoveEscape) { _addCustomerRemoveEscape(); _addCustomerRemoveEscape = null; }
       addCustomerModal.hidden = true;
       addCustomerModal.setAttribute('hidden', '');
       document.body.classList.remove('quick-invoice-modal-open');
@@ -689,15 +728,13 @@
     if (addCustomerBackdrop) addCustomerBackdrop.addEventListener('click', closeAddCustomer);
     if (addCustomerClose) addCustomerClose.addEventListener('click', closeAddCustomer);
     if (addCustomerCancel) addCustomerCancel.addEventListener('click', closeAddCustomer);
-    if (addCustomerModal) addCustomerModal.addEventListener('keydown', function(e) {
-      if (e.key === 'Escape') { closeAddCustomer(); e.preventDefault(); }
-    });
 
     if (addCustomerSave) addCustomerSave.addEventListener('click', function() {
       var rfc = (addCustomerRfc && addCustomerRfc.value || '').trim().toUpperCase();
       var legalName = (addCustomerName && addCustomerName.value || '').trim();
       var zip = (addCustomerZip && addCustomerZip.value || '').trim();
       var taxSystem = (addCustomerTaxSystem && addCustomerTaxSystem.value || '').trim();
+      var usoCfdi = (addCustomerUsoCfdi2 && addCustomerUsoCfdi2.value || '').trim().toUpperCase();
       var email = (addCustomerEmail && addCustomerEmail.value || '').trim();
       var alias = (addCustomerAlias && addCustomerAlias.value || '').trim();
       if (!rfc || !legalName) {
@@ -720,10 +757,11 @@
           if (res && res.status === 401) return;
           if (res && res.ok && res.data && res.data.ok) {
             window.__quickAfterCustomerRfc = rfc;
+            window.__quickAfterCustomerUsoCfdi = usoCfdi || 'G03';
             closeAddCustomer();
             if (window.portalToast) window.portalToast({ type: 'success', title: 'Cliente guardado', message: rfc });
             window.__prefetchCustomersPromise = null;
-            loadCustomers();
+            reloadQuickInvoiceData();
             return;
           }
           var detail = (res && res.data && res.data.detail) ? (typeof res.data.detail === 'string' ? res.data.detail : JSON.stringify(res.data.detail)) : '';
@@ -749,6 +787,7 @@
     var addProductUnitPrice = document.getElementById('quickProductUnitPrice');
     var addProductIvaRate = document.getElementById('quickProductIvaRate');
 
+    var _addProductRemoveEscape = null;
     function openAddProduct() {
       if (!addProductModal) return;
       if (addProductError) { addProductError.hidden = true; addProductError.textContent = ''; }
@@ -760,10 +799,14 @@
       addProductModal.hidden = false;
       addProductModal.removeAttribute('hidden');
       document.body.classList.add('quick-invoice-modal-open');
-      setTimeout(function() { if (addProductDesc) addProductDesc.focus(); }, 100);
+      _addProductRemoveEscape = (typeof window.uiCloseOnEscape === 'function') ? window.uiCloseOnEscape(addProductModal, closeAddProduct) : null;
+      if (typeof window.uiTrapFocus === 'function') window.uiTrapFocus(addProductModal);
+      else setTimeout(function() { if (addProductDesc) addProductDesc.focus(); }, 100);
     }
     function closeAddProduct() {
       if (!addProductModal) return;
+      if (typeof window.uiReleaseFocusTrap === 'function') window.uiReleaseFocusTrap();
+      if (_addProductRemoveEscape) { _addProductRemoveEscape(); _addProductRemoveEscape = null; }
       addProductModal.hidden = true;
       addProductModal.setAttribute('hidden', '');
       document.body.classList.remove('quick-invoice-modal-open');
@@ -774,18 +817,24 @@
     if (addProductBackdrop) addProductBackdrop.addEventListener('click', closeAddProduct);
     if (addProductClose) addProductClose.addEventListener('click', closeAddProduct);
     if (addProductCancel) addProductCancel.addEventListener('click', closeAddProduct);
-    if (addProductModal) addProductModal.addEventListener('keydown', function(e) {
-      if (e.key === 'Escape') { closeAddProduct(); e.preventDefault(); }
-    });
+    if (addProductProdservBtn) addProductProdservBtn.addEventListener('click', function () { openQuickProdservModal('quickProductKey'); });
+    if (addProductUnitKey) addProductUnitKey.addEventListener('input', function () { searchUnidadDebounced(addProductUnitKey.value); });
+    if (addProductUnitPrice) addProductUnitPrice.addEventListener('blur', function () { formatMoneyInput(addProductUnitPrice); });
 
     if (addProductSave) addProductSave.addEventListener('click', function() {
       var desc = (addProductDesc && addProductDesc.value || '').trim();
       var key = (addProductKey && addProductKey.value || '').trim();
       var unitKey = (addProductUnitKey && addProductUnitKey.value || '').trim();
-      var unitPrice = (addProductUnitPrice && addProductUnitPrice.value || '').trim();
-      var ivaRate = (addProductIvaRate && addProductIvaRate.value || '').trim();
-      if (!desc || !key || unitPrice === '') {
+      var unitPriceRaw = (addProductUnitPrice && addProductUnitPrice.value || '').trim();
+      var unitPrice = parseNum(unitPriceRaw);
+      var ivaRaw = (addProductIvaRate && addProductIvaRate.value || '').trim();
+      var ivaRate = (String(ivaRaw).toUpperCase() === 'EXENTO') ? '0.00' : String(parseNum(ivaRaw));
+      if (!desc || !key || unitPriceRaw === '') {
         if (addProductError) { addProductError.textContent = 'Descripción, clave y precio unitario son requeridos.'; addProductError.hidden = false; }
+        return;
+      }
+      if (!Number.isFinite(unitPrice) || unitPrice < 0) {
+        if (addProductError) { addProductError.textContent = 'Ingresa un precio válido.'; addProductError.hidden = false; }
         return;
       }
       if (addProductError) { addProductError.hidden = true; addProductError.textContent = ''; }
@@ -807,7 +856,7 @@
             closeAddProduct();
             if (window.portalToast) window.portalToast({ type: 'success', title: 'Producto guardado', message: desc });
             window.__prefetchProductsPromise = null;
-            loadProducts();
+            reloadQuickInvoiceData();
             return;
           }
           var detail = (res && res.data && res.data.detail) ? (typeof res.data.detail === 'string' ? res.data.detail : JSON.stringify(res.data.detail)) : '';
@@ -819,10 +868,6 @@
         });
     });
 
-    modal.addEventListener('keydown', function(e) {
-      if (e.key === 'Escape') { closeQuickModal(); e.preventDefault(); }
-    });
-
     btn.addEventListener('click', function(e) {
       e.preventDefault();
       openQuickModal();
@@ -831,55 +876,13 @@
     customerSelect.addEventListener('change', setBtn);
     productSelect.addEventListener('change', setBtn);
     if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', function() { loadCustomers(); loadProducts(); });
+      document.addEventListener('DOMContentLoaded', function() { loadQuickInvoiceCatalogs(); reloadQuickInvoiceData(); });
     } else {
-      loadCustomers();
-      loadProducts();
+      loadQuickInvoiceCatalogs();
+      reloadQuickInvoiceData();
     }
   })();
   </script>
-
-  <div class="card p-20">
-    <div class="card-title-row mb-14">
-      <h3 class="section-title">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.75"></circle><path d="M12 7v6l4 2" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"></path></svg>
-        Actividad reciente
-      </h3>
-    </div>
-    <div class="activity-list-wrap">
-      <div class="activity-list">
-        {% for a in activities %}
-        <div class="activity-row">
-          <div>
-            <div class="activity-title">
-              {% if a.direction == 'issued' %}{{ icon_issued() }}{% else %}{{ icon_received() }}{% endif %}
-              Factura {{ 'emitida' if a.direction == 'issued' else 'recibida' }}
-            </div>
-            <div class="activity-sub">{{ a.nombre or 'Sin nombre' }}</div>
-          </div>
-          <div class="activity-sub">{{ a.time_ago }}</div>
-        </div>
-        {% else %}
-        <p class="muted">No hay actividad reciente.</p>
-        {% endfor %}
-      </div>
-    </div>
-  </div>
-</div>
-
-<div class="dashboard-grid fade-in fade-in--5">
-  <div class="card p-20">
-    <div class="card-title-row mb-14">
-      <h3 class="section-title">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 10-12 0c0 7-3 7-3 7h18s-3 0-3-7"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
-        Alertas
-      </h3>
-    </div>
-
-    <div class="dashboard-alerts">
-      <p class="muted" style="margin:0; font-size:13px;">Sin alertas pendientes.</p>
-    </div>
-  </div>
 
 </div>
 {% endblock %}

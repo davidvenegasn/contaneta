@@ -6,20 +6,20 @@
   <title>Cotización — {{ quotation.issuer_name }}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg: #f7f7f8;
+      --bg: #f0fdf9;
       --surface: #ffffff;
-      --text: #111;
-      --muted: #6b6f76;
-      --border: rgba(0,0,0,.08);
-      --accent: #21c16b;
+      --text: #0d1f1c;
+      --muted: #3d524f;
+      --border: rgba(13,31,28,.08);
+      --accent: #14b8a6;
       --radius: 14px;
-      --shadow: 0 6px 18px rgba(17,17,17,.06);
+      --shadow: 0 6px 18px rgba(13,31,28,.06);
     }
     * { box-sizing: border-box; }
-    body { margin: 0; padding: 0; font-family: Inter, system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; padding: 24px; }
+    body { margin: 0; padding: 0; font-family: "Plus Jakarta Sans", system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; padding: 24px; font-size: 14px; }
     .wrap { max-width: 640px; margin: 0 auto; }
     .card { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 28px; margin-bottom: 20px; }
     h1 { font-size: 22px; font-weight: 700; margin: 0 0 6px; }
@@ -35,7 +35,7 @@
     .btn { display: inline-flex; align-items: center; justify-content: center; padding: 12px 24px; font-size: 15px; font-weight: 600; border-radius: 12px; border: none; cursor: pointer; text-decoration: none; font-family: inherit; transition: transform .15s, box-shadow .15s; }
     .btn:active { transform: scale(0.98); }
     .btn-primary { background: var(--accent); color: #fff; }
-    .btn-primary:hover { box-shadow: 0 4px 14px rgba(33, 193, 107, .4); }
+    .btn-primary:hover { box-shadow: 0 4px 14px rgba(20, 184, 166, .25); }
     .btn-ghost { background: #f0f0f0; color: var(--text); }
     .btn-ghost:hover { background: #e5e5e5; }
     .btn-danger { background: #fef2f2; color: #b91c1c; }

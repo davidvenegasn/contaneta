@@ -1,0 +1,13 @@
+<script>
+  (function () {
+    const mode = "{{ create_mode | default('normal') }}";
+    const multi = document.getElementById('multiRecipients');
+    if (!multi) return;
+
+    if (mode === 'quick') {
+      multi.style.display = 'none';
+    } else if (mode === 'multi') {
+      multi.open = true;
+    }
+  })();
+</script>

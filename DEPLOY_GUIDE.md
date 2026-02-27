@@ -1,5 +1,7 @@
 # Guía de despliegue — ContaNeta (producción 24/7)
 
+> **Consolidado en [OPERATIONS.md](OPERATIONS.md).** Para poner en marcha, checklist de producción (ENV, DEV_MODE, SESSION_SECRET, COOKIE_SECURE), systemd, backups y cron usa **OPERATIONS.md**.
+
 Pasos para dejar la aplicación corriendo en un servidor Ubuntu típico, con reinicio automático, HTTPS, backups y health check.
 
 ---

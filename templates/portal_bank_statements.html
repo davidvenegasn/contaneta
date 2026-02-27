@@ -1,0 +1,6 @@
+{% extends "base_portal.html" %}
+{% set title = title|default('Estados de cuenta') %}
+
+{% block content %}
+{% include "partials/bank_statements.html" with context %}
+{% endblock %}

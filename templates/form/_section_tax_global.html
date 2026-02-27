@@ -1,0 +1,33 @@
+<div class="card tax-global-card" id="ivaCard">
+  <div class="tax-global-card__head">
+    <h3 class="section-title">04 — IVA (global)</h3>
+    <span class="section-title tax-global-card__title2">05 — Retenciones (global)</span>
+  </div>
+  <p class="muted tax-global-card__intro">Tasa de IVA para todos los conceptos. Retenciones: ISR sobre base; IVA ret. sobre IVA trasladado.</p>
+  <div class="tax-global-row">
+    <div class="tax-global-field">
+      <label class="tax-global-field__label" for="global_iva">IVA</label>
+      <select id="global_iva" name="global_iva" class="tax-global-field__input">
+        <option value="0.16" selected>IVA 16%</option>
+        <option value="0.08">IVA 8%</option>
+        <option value="0.00">IVA 0%</option>
+        <option value="EXENTO">Exento</option>
+      </select>
+    </div>
+    <div class="tax-global-field">
+      <label class="tax-global-field__label" for="global_isr_ret">ISR retenido</label>
+      <select id="global_isr_ret" name="global_isr_ret" class="tax-global-field__input">
+        <option value="0" selected>0%</option>
+        <option value="0.0125">1.25% (RESICO a PM)</option>
+      </select>
+    </div>
+    <div class="tax-global-field">
+      <label class="tax-global-field__label" for="global_iva_ret">IVA retenido</label>
+      <select id="global_iva_ret" name="global_iva_ret" class="tax-global-field__input">
+        <option value="0" selected>0%</option>
+        <option value="0.1066666667">2/3 del IVA (16%) = 10.6667%</option>
+        <option value="0.0533333333">2/3 del IVA (8%) = 5.3333%</option>
+      </select>
+    </div>
+  </div>
+</div>

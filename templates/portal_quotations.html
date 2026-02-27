@@ -6,17 +6,17 @@
 {% macro status_pill(s) %}
   {% set st = (s|default('')|string)|lower %}
   {% if st == 'draft' %}
-    <span class="pill" style="border-color:#e0e0e0; background:#f5f5f5;">Borrador</span>
+    <span class="pill pill--draft">Borrador</span>
   {% elif st == 'sent' %}
-    <span class="pill" style="border-color:#c9daf8; background:#eef4fc;">Enviada</span>
+    <span class="pill pill--sent">Enviada</span>
   {% elif st == 'accepted' %}
-    <span class="pill" style="border-color:#cfead9; background:#f3fcf6;">Aceptada</span>
+    <span class="pill pill--accepted">Aceptada</span>
   {% elif st == 'rejected' %}
-    <span class="pill" style="border-color:#f2c9c9; background:#fff4f4;">Rechazada</span>
+    <span class="pill pill--rejected">Rechazada</span>
   {% elif st == 'converted' %}
-    <span class="pill" style="border-color:#d4c9f2; background:#f4f0fc;">Facturada</span>
+    <span class="pill pill--invoiced">Facturada</span>
   {% elif st == 'expired' %}
-    <span class="pill" style="border-color:#ccc; background:#f5f5f5; color:#666;">Expirada</span>
+    <span class="pill pill--expired">Expirada</span>
   {% else %}
     <span class="pill">{{ s or '-' }}</span>
   {% endif %}
@@ -24,7 +24,7 @@
 
 {% block content %}
 <section class="page-section page-section--quotations">
-  <header class="app-header" style="margin-bottom:14px;">
+  <header class="app-header app-header--mb-14">
     <div class="app-header__left">
       <div class="app-title"></div>
       <div class="app-subtitle">Crea cotizaciones y comparte el link para que tu cliente acepte o rechace.</div>
@@ -44,54 +44,46 @@
       </div>
       <div class="card-header__right">
         <h3 class="section-title">Listado</h3>
-        <p class="muted" style="margin:0;"><span id="quotCount">Cargando…</span></p>
+        <p class="muted u-m0"><span id="quotCount">Cargando…</span></p>
       </div>
     </div>
 
     <div class="card-list-sep">
-      <div style="overflow:auto;" id="quotTableWrap">
-        <table class="table ui-table" id="quotTable" style="min-width:1000px;">
+      <div class="table-wrap--overflow" id="quotTableWrap">
+        <table class="table ui-table table--min-w-1000" id="quotTable">
           <thead>
             <tr>
-              <th style="min-width:100px;">Fecha</th>
-              <th style="min-width:200px;">Cliente</th>
-              <th style="min-width:100px;">Total</th>
-              <th style="min-width:110px;">Estatus</th>
-              <th style="min-width:180px;">Link para cliente</th>
-              <th style="min-width:100px;">Acciones</th>
+              <th class="th--w-100">Fecha</th>
+              <th class="th--w-200">Cliente</th>
+              <th class="th--w-100">Total</th>
+              <th class="th--w-110">Estatus</th>
+              <th class="th--w-180">Link para cliente</th>
+              <th class="th--w-100">Acciones</th>
             </tr>
           </thead>
           <tbody id="quotTbody">
-            <tr><td colspan="6"><div class="skeleton" style="height: 46px; border-radius: 14px;"></div></td></tr>
-            <tr><td colspan="6"><div class="skeleton" style="height: 46px; border-radius: 14px;"></div></td></tr>
-            <tr><td colspan="6"><div class="skeleton" style="height: 46px; border-radius: 14px;"></div></td></tr>
-            <tr><td colspan="6"><div class="skeleton" style="height: 46px; border-radius: 14px;"></div></td></tr>
-            <tr><td colspan="6"><div class="skeleton" style="height: 46px; border-radius: 14px;"></div></td></tr>
+            <tr><td colspan="6"><div class="skeleton skeleton-line"></div></td></tr>
+            <tr><td colspan="6"><div class="skeleton skeleton-line"></div></td></tr>
+            <tr><td colspan="6"><div class="skeleton skeleton-line"></div></td></tr>
+            <tr><td colspan="6"><div class="skeleton skeleton-line"></div></td></tr>
+            <tr><td colspan="6"><div class="skeleton skeleton-line"></div></td></tr>
           </tbody>
         </table>
       </div>
       <div id="quotTablePagination" class="table-pagination" hidden aria-label="Paginación del listado"></div>
 
-      <div class="empty-state empty-state--error" id="quotLoadError" hidden aria-live="polite">
-        <div class="empty-state__title">No pudimos cargar esto ahora.</div>
-        <p class="empty-state__desc" id="quotLoadErrorMsg">Puedes intentar de nuevo.</p>
-        <button type="button" class="btn btn--secondary" id="quotLoadErrorRetry">Reintentar</button>
-      </div>
-      <div class="empty-state empty-state--empty" id="quotEmpty" hidden>
-        <div class="empty-state__icon" aria-hidden="true">
-          <svg class="icon" viewBox="0 0 24 24" fill="none"><path d="M8 4h8v2H8z" stroke="currentColor" stroke-width="1.75"/><path d="M8 10h8v2H8z" stroke="currentColor" stroke-width="1.75"/><path d="M8 16h5" stroke="currentColor" stroke-width="1.75"/><path d="M6 2a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6H6z" stroke="currentColor" stroke-width="1.75"/><path d="M14 2v6h6" stroke="currentColor" stroke-width="1.75"/></svg>
-        </div>
-        <div class="empty-state__title">Aún no tienes cotizaciones</div>
-        <div class="empty-state__desc">Crea una cotización, comparte el link con tu cliente y él podrá aceptar o rechazarla desde el navegador.</div>
+      {% from 'portal/_ui_components.html' import portal_empty_state, portal_load_error %}
+      {{ portal_load_error('quotLoadError') }}
+      {% call portal_empty_state('Aún no tienes cotizaciones', 'Crea una cotización, comparte el link con tu cliente y él podrá aceptar o rechazarla desde el navegador.', id='quotEmpty') %}
         <button type="button" class="btn btn-primary" id="quotEmptyBtn">Nueva cotización</button>
-      </div>
+      {% endcall %}
     </div>
   </div>
 
   <!-- Modal: nueva cotización (rediseño pro: secciones claras, footer fijo) -->
-  <div class="modal" id="quotModal" hidden aria-hidden="true">
+  <div class="modal" id="quotModal" role="dialog" aria-modal="true" aria-labelledby="quotModalTitle" aria-label="Nueva cotización" hidden aria-hidden="true">
     <div class="modal__backdrop" data-close="true"></div>
-    <div class="modal__panel modal__panel--wide quot-modal" role="dialog" aria-modal="true" aria-labelledby="quotModalTitle">
+    <div class="modal__panel modal__panel--wide quot-modal">
       <div class="modal__head quot-modal__head">
         <div class="quot-modal__head-text">
           <h2 class="modal__title" id="quotModalTitle">Nueva cotización</h2>
@@ -112,7 +104,7 @@
             </select>
             <button type="button" class="btn btn--secondary quot-modal__btn-add" id="quotAddClientBtn">Añadir cliente</button>
           </div>
-          <div id="quotClientManualWrap" class="quot-manual-wrap" style="display:none;">
+          <div id="quotClientManualWrap" class="quot-manual-wrap" hidden>
             <div class="quot-manual-wrap__grid">
               <div class="field">
                 <label class="label" for="quotClientNameManual">Nombre del cliente *</label>
@@ -171,9 +163,9 @@
   </div>
 
   <!-- Modal: link generado (después de crear); modal--top para quedar por encima del de nueva cotización -->
-  <div class="modal modal--top" id="quotLinkModal" hidden aria-hidden="true">
+  <div class="modal modal--top" id="quotLinkModal" role="dialog" aria-modal="true" aria-labelledby="quotLinkModalTitle" aria-label="Link para tu cliente" hidden aria-hidden="true">
     <div class="modal__backdrop" data-close="true"></div>
-    <div class="modal__panel" role="dialog" aria-modal="true" aria-labelledby="quotLinkModalTitle">
+    <div class="modal__panel">
       <div class="modal__head">
         <div>
           <div class="modal__title" id="quotLinkModalTitle">Link para tu cliente</div>
@@ -186,8 +178,8 @@
       <div class="modal__body">
         <div class="field">
           <label class="label">URL</label>
-          <div style="display:flex; gap:8px;">
-            <input type="text" id="quotLinkInput" class="input" readonly style="flex:1;" />
+          <div class="u-flex u-gap-2">
+            <input type="text" id="quotLinkInput" class="input u-flex-1" readonly />
             <button type="button" class="btn btn-primary" id="quotCopyLink">Copiar</button>
           </div>
         </div>
@@ -312,12 +304,15 @@
 
   const ROWS_PAGE_LIMIT = 200;
   var clientPage = 1;
+  var totalFromApi = undefined;
   var lastFilteredRows = [];
   function setCount(n, from, to){
-    if (from != null && to != null && n > ROWS_PAGE_LIMIT)
-      countEl.textContent = 'Mostrando ' + from + '-' + to + ' de ' + n + ' cotizaciones';
-    else
+    if (typeof n === 'number' && from != null && to != null && n > 0) {
+      countEl.textContent = (from === 1) ? ('Mostrando los primeros ' + to + ' de ' + n) : ('Mostrando ' + from + '-' + to + ' de ' + n);
+    } else if (typeof n === 'number' && n > 0)
       countEl.textContent = (n === 1) ? '1 cotización' : (n + ' cotizaciones');
+    else
+      countEl.textContent = 'Sin cotizaciones';
   }
 
   function rowHTML(r){
@@ -329,10 +324,10 @@
     return `
       <tr>
         <td class="muted">${esc(formatDate(r.created_at))}</td>
-        <td><div style="font-weight:600;">${esc(r.customer_legal_name)}</div><div class="muted" style="font-size:12px;">${esc(r.customer_rfc || '')}</div></td>
+        <td><div class="u-fw-semibold">${esc(r.customer_legal_name)}</div><div class="muted u-text-12">${esc(r.customer_rfc || '')}</div></td>
         <td>${total}</td>
         <td><span class="pill">${esc(status)}</span></td>
-        <td style="font-size:12px;">
+        <td class="u-text-12">
           ${canCopy ? `<button type="button" class="btn btn-small btn-ghost" data-copy-link="${esc(r.public_token)}" title="Copiar link">Copiar link</button>` : '-'}
         </td>
         <td>
@@ -348,13 +343,18 @@
   function render(rows){
     lastFilteredRows = rows;
     const total = rows.length;
-    const totalPages = Math.max(1, Math.ceil(total / ROWS_PAGE_LIMIT));
-    if (clientPage > totalPages) clientPage = totalPages;
+    const totalCount = (typeof totalFromApi === 'number') ? totalFromApi : total;
+    const totalPages = totalCount > 0 ? Math.max(1, Math.ceil(totalCount / ROWS_PAGE_LIMIT)) : 0;
+    if (clientPage > totalPages && totalPages > 0) clientPage = totalPages;
     const start = (clientPage - 1) * ROWS_PAGE_LIMIT;
-    const displayRows = total <= ROWS_PAGE_LIMIT ? rows : rows.slice(start, start + ROWS_PAGE_LIMIT);
+    const displayRows = totalCount <= ROWS_PAGE_LIMIT ? rows : rows.slice(0, ROWS_PAGE_LIMIT);
     const n = displayRows.length;
-    setCount(total);
-    if (total > ROWS_PAGE_LIMIT) setCount(total, start + 1, start + n);
+    if (totalCount > 0 && typeof totalFromApi === 'number')
+      setCount(totalFromApi, start + 1, start + n);
+    else if (total > 0)
+      setCount(total);
+    else
+      setCount(0);
     if (total === 0) {
       tbody.innerHTML = '';
       tableWrap.hidden = true;
@@ -369,15 +369,16 @@
     tbody.innerHTML = displayRows.map(rowHTML).join('');
     var pagEl = document.getElementById('quotTablePagination');
     if (pagEl) {
-      if (total <= ROWS_PAGE_LIMIT) { pagEl.hidden = true; } else {
+      if (totalPages <= 1 || totalCount <= ROWS_PAGE_LIMIT) { pagEl.hidden = true; } else {
         pagEl.hidden = false;
-        var from = start + 1, to = start + n;
-        pagEl.innerHTML = '<span class="muted">Mostrando ' + from + '-' + to + ' de ' + total + '</span>' +
-          (clientPage > 1 ? ' <button type="button" class="btn btn--sm btn--ghost" id="quotTablePrev">Anterior</button>' : '') +
-          (clientPage < totalPages ? ' <button type="button" class="btn btn--sm btn--ghost" id="quotTableNext">Siguiente</button>' : '');
+        var from = start + 1, to = Math.min(start + n, totalCount);
+        var rangeText = (clientPage === 1) ? ('Mostrando los primeros ' + to + ' de ' + totalCount) : ('Mostrando ' + from + '-' + to + ' de ' + totalCount);
+        pagEl.innerHTML = '<span class="muted">' + rangeText + '</span>' +
+          (clientPage > 1 ? ' <button type="button" class="btn btn--sm btn--secondary" id="quotTablePrev">Anterior</button>' : '') +
+          (clientPage < totalPages ? ' <button type="button" class="btn btn--sm btn--secondary" id="quotTableNext">Siguiente</button>' : '');
         var prevBtn = document.getElementById('quotTablePrev'); var nextBtn = document.getElementById('quotTableNext');
-        if (prevBtn) prevBtn.onclick = function(){ clientPage--; render(lastFilteredRows); };
-        if (nextBtn) nextBtn.onclick = function(){ clientPage++; render(lastFilteredRows); };
+        if (prevBtn) prevBtn.onclick = function(){ clientPage--; load(clientPage); };
+        if (nextBtn) nextBtn.onclick = function(){ clientPage++; load(clientPage); };
       }
     }
   }
@@ -385,19 +386,25 @@
   const quotLoadErrorEl = document.getElementById('quotLoadError');
   const quotLoadErrorMsgEl = document.getElementById('quotLoadErrorMsg');
 
-  async function load(){
+  async function load(page){
+    if (typeof page !== 'number' || page < 1) page = 1;
+    clientPage = page;
     var skeletonShownAt = Date.now();
     if (quotLoadErrorEl) quotLoadErrorEl.hidden = true;
     emptyEl.hidden = true;
     tableWrap.hidden = false;
-    tbody.innerHTML = (window.uiSkeletonTableRows && window.uiSkeletonTableRows(6, 5)) || '<tr><td colspan="6"><div class="skeleton" style="height: 46px; border-radius: 14px;"></div></td></tr>'.repeat(5);
+    tbody.innerHTML = (window.uiSkeletonTableRows && window.uiSkeletonTableRows(6, 5)) || '<tr><td colspan="6"><div class="skeleton skeleton-line"></div></td></tr>'.repeat(5);
     try {
       if (window.portalProgressBar) window.portalProgressBar.start();
-      const r = window.uiFetchJSON ? await window.uiFetchJSON('/api/quotations') : { ok: false, status: 0, data: null, error: 'Helper no disponible' };
+      const offset = (page - 1) * ROWS_PAGE_LIMIT;
+      const url = '/api/quotations?limit=' + ROWS_PAGE_LIMIT + '&offset=' + offset;
+      const r = window.uiFetchJSON ? await window.uiFetchJSON(url) : { ok: false, status: 0, data: null, error: 'Helper no disponible' };
       const list = window.uiGetListFromResponse ? window.uiGetListFromResponse(r.data) : (Array.isArray(r.data) ? r.data : []);
+      totalFromApi = (typeof window.uiGetTotalFromResponse === 'function') ? window.uiGetTotalFromResponse(r.data) : (r.data && typeof r.data.total === 'number' ? r.data.total : undefined);
       await (window.uiMinSkeletonDelay && window.uiMinSkeletonDelay(skeletonShownAt, 300));
-      if (r.ok && (!list || list.length === 0)) {
+      if (r.ok && (!list || list.length === 0) && (totalFromApi === undefined || totalFromApi === 0)) {
         allRows = [];
+        totalFromApi = 0;
         if (quotLoadErrorEl) quotLoadErrorEl.hidden = true;
         tableWrap.hidden = true;
         emptyEl.hidden = false;
@@ -406,6 +413,7 @@
       }
       if (r.status === 401) {
         allRows = [];
+        totalFromApi = undefined;
         if (quotLoadErrorMsgEl) quotLoadErrorMsgEl.innerHTML = window.uiSessionExpiredMessage ? window.uiSessionExpiredMessage() : 'Sesión expirada. <a href="/login">Inicia sesión</a>';
         if (quotLoadErrorEl) quotLoadErrorEl.hidden = false;
         tableWrap.hidden = true;
@@ -415,6 +423,7 @@
       }
       if (!r.ok) {
         allRows = [];
+        totalFromApi = undefined;
         const msg = window.uiListLoadErrorText ? window.uiListLoadErrorText(r, 'cotizaciones') : (r.error || 'Revisa tu conexión e intenta de nuevo.');
         if (quotLoadErrorMsgEl) quotLoadErrorMsgEl.textContent = msg;
         if (quotLoadErrorEl) quotLoadErrorEl.hidden = false;
@@ -424,10 +433,12 @@
         return;
       }
       allRows = list;
+      if (typeof totalFromApi !== 'number' && list.length >= 0) totalFromApi = list.length;
       render(allRows);
     } catch (e) {
       allRows = [];
-      const fallbackMsg = 'Revisa tu conexión e intenta de nuevo.';
+      tbody.innerHTML = '';
+      const fallbackMsg = (e && e.message) ? e.message : 'Revisa tu conexión e intenta de nuevo.';
       if (quotLoadErrorMsgEl) quotLoadErrorMsgEl.textContent = fallbackMsg;
       if (quotLoadErrorEl) quotLoadErrorEl.hidden = false;
       tableWrap.hidden = true;
@@ -443,10 +454,10 @@
   async function loadCustomers(){
     try {
       const data = window.portalCatalogGetJson
-        ? await window.portalCatalogGetJson('/api/customers')
-        : await (window.portalFetchJSON ? window.portalFetchJSON('/api/customers', { credentials: 'same-origin' }, { timeoutMs: 30000, retry: 1 }) : Promise.resolve({ ok: false, data: [] }))
-            .then(r => (r && r.ok) ? (r.data || []) : []);
-      customers = Array.isArray(data) ? data : (data && data.customers) || (data && data.data) || [];
+        ? await window.portalCatalogGetJson('/api/customers?limit=200')
+        : await (window.portalFetchJSON ? window.portalFetchJSON('/api/customers?limit=200', { credentials: 'same-origin' }, { timeoutMs: 30000, retry: 1 }) : Promise.resolve({ ok: false, data: [] }))
+            .then(r => (r && r.ok) ? (r.data || null) : null);
+      customers = (data && data.items) || (Array.isArray(data) ? data : (data && data.customers) || (data && data.data) || []);
       quotCustomer.innerHTML = '<option value="">— Selecciona un cliente —</option><option value="__manual__">— Ingresar nombre manualmente —</option>' +
         customers.map(c => '<option value="' + esc(c.rfc) + '" data-name="' + esc(c.legal_name) + '" data-email="' + esc(c.email || '') + '">' + esc(c.legal_name || c.rfc) + (c.rfc ? ' (' + esc(c.rfc) + ')' : '') + '</option>').join('');
     } catch (_) {}
@@ -455,10 +466,10 @@
   async function loadProducts(){
     try {
       const data = window.portalCatalogGetJson
-        ? await window.portalCatalogGetJson('/api/products')
-        : await (window.portalFetchJSON ? window.portalFetchJSON('/api/products', { credentials: 'same-origin' }, { timeoutMs: 30000, retry: 1 }) : Promise.resolve({ ok: false, data: [] }))
-            .then(r => (r && r.ok) ? (r.data || []) : []);
-      products = Array.isArray(data) ? data : (data && data.products) || (data && data.data) || [];
+        ? await window.portalCatalogGetJson('/api/products?limit=200')
+        : await (window.portalFetchJSON ? window.portalFetchJSON('/api/products?limit=200', { credentials: 'same-origin' }, { timeoutMs: 30000, retry: 1 }) : Promise.resolve({ ok: false, data: [] }))
+            .then(r => (r && r.ok) ? (r.data || null) : null);
+      products = (data && data.items) || (Array.isArray(data) ? data : (data && data.products) || (data && data.data) || []);
       quotAddProduct.innerHTML = '<option value="">+ Agregar desde producto</option>' +
         products.map(p => '<option value="' + p.id + '" data-desc="' + esc(p.description) + '" data-price="' + (p.unit_price || 0) + '" data-iva="' + (p.iva_rate || 0.16) + '">' + esc(p.description) + '</option>').join('');
     } catch (_) {}
@@ -561,9 +572,19 @@
     }
     document.getElementById('quotCustomerHelp').hidden = true;
     document.getElementById('quotLinesHelp').hidden = true;
-    modal.hidden = false;
-    modal.setAttribute('aria-hidden', 'false');
-    document.body.classList.add('no-scroll');
+    if (typeof window.openPortalModal === 'function') {
+      window.openPortalModal(modal, {
+        onClose: function () {
+          try { flushDraftToStorage(); } catch (e) {}
+        }
+      });
+    } else {
+      modal.hidden = false;
+      modal.setAttribute('aria-hidden', 'false');
+      document.body.classList.add('no-scroll');
+      window._quotRemoveEscape = (typeof window.uiCloseOnEscape === 'function') ? window.uiCloseOnEscape(modal, closeModal) : null;
+      if (typeof window.uiTrapFocus === 'function') window.uiTrapFocus(modal);
+    }
   }
 
   function resetQuotForm() {
@@ -578,17 +599,27 @@
 
   function closeModal(){
     flushDraftToStorage();
-    modal.hidden = true;
-    modal.setAttribute('aria-hidden', 'true');
-    document.body.classList.remove('no-scroll');
+    if (typeof window.closePortalModal === 'function') window.closePortalModal(modal);
+    else {
+      if (typeof window.uiReleaseFocusTrap === 'function') window.uiReleaseFocusTrap();
+      if (window._quotRemoveEscape) { window._quotRemoveEscape(); window._quotRemoveEscape = null; }
+      modal.hidden = true;
+      modal.setAttribute('aria-hidden', 'true');
+      document.body.classList.remove('no-scroll');
+    }
   }
 
   function openLinkModal(publicToken){
     closeModal();
     quotLinkInput.value = publicLink(publicToken);
-    linkModal.hidden = false;
-    linkModal.setAttribute('aria-hidden', 'false');
-    document.body.classList.add('no-scroll');
+    if (typeof window.openPortalModal === 'function') window.openPortalModal(linkModal);
+    else {
+      linkModal.hidden = false;
+      linkModal.setAttribute('aria-hidden', 'false');
+      document.body.classList.add('no-scroll');
+      window._quotLinkRemoveEscape = (typeof window.uiCloseOnEscape === 'function') ? window.uiCloseOnEscape(linkModal, closeLinkModal) : null;
+      if (typeof window.uiTrapFocus === 'function') window.uiTrapFocus(linkModal);
+    }
     quotCopyLink.onclick = () => {
       navigator.clipboard.writeText(quotLinkInput.value).then(() => {
         window.portalToast && window.portalToast({ type: 'success', title: 'Copiado', message: 'Link copiado al portapapeles.' });
@@ -597,9 +628,14 @@
   }
 
   function closeLinkModal(){
-    linkModal.hidden = true;
-    linkModal.setAttribute('aria-hidden', 'true');
-    document.body.classList.remove('no-scroll');
+    if (typeof window.closePortalModal === 'function') window.closePortalModal(linkModal);
+    else {
+      if (typeof window.uiReleaseFocusTrap === 'function') window.uiReleaseFocusTrap();
+      if (window._quotLinkRemoveEscape) { window._quotLinkRemoveEscape(); window._quotLinkRemoveEscape = null; }
+      linkModal.hidden = true;
+      linkModal.setAttribute('aria-hidden', 'true');
+      document.body.classList.remove('no-scroll');
+    }
   }
 
   function validate(){
@@ -757,17 +793,6 @@
 
   openBtn.addEventListener('click', openModal);
   emptyBtn.addEventListener('click', openModal);
-
-  modal.addEventListener('click', function(e){
-    if (e.target.getAttribute('data-close') === 'true' || e.target.closest('[data-close="true"]') || e.target.classList.contains('modal__backdrop')) closeModal();
-  });
-  linkModal.addEventListener('click', function(e){
-    if (e.target.getAttribute('data-close') === 'true' || e.target.closest('[data-close="true"]') || e.target.classList.contains('modal__backdrop')) closeLinkModal();
-  });
-
-  document.addEventListener('keydown', function(e){
-    if (e.key === 'Escape') { if (!modal.hidden) closeModal(); if (!linkModal.hidden) closeLinkModal(); }
-  });
 
   document.addEventListener('click', async function(e){
     const copyBtn = e.target && e.target.closest ? e.target.closest('[data-copy-link]') : null;

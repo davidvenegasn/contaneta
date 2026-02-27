@@ -1,0 +1,19 @@
+{% extends "base_portal.html" %}
+{% set title = 'Bancos' %}
+
+{% block content %}
+<div class="ui-page-wrap">
+  <section class="page-section hub-section ui-v2">
+    <nav class="ui-tabs hub-tabs" role="tablist" aria-label="Bancos">
+      <a class="hub-tabs__item ui-tab {{ 'hub-tabs__item--active is-active' if active_tab == 'subir_pdf' else '' }}" href="/portal/bancos?tab=subir_pdf" role="tab" aria-selected="{{ active_tab == 'subir_pdf' }}">Subir PDF</a>
+      <a class="hub-tabs__item ui-tab {{ 'hub-tabs__item--active is-active' if active_tab == 'estados_guardados' else '' }}" href="/portal/bancos?tab=estados_guardados" role="tab" aria-selected="{{ active_tab == 'estados_guardados' }}">Estados guardados</a>
+    </nav>
+
+    {% if active_tab == 'subir_pdf' %}
+      {% include "partials/bank_upload.html" with context %}
+    {% elif active_tab == 'estados_guardados' %}
+      {% include "partials/bank_statements.html" with context %}
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

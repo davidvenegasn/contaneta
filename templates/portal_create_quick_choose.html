@@ -8,30 +8,30 @@
     <div class="app-subtitle muted">Elige cliente y producto para abrir la factura con datos precargados.</div>
   </div>
   <div class="app-header__right">
-    <a href="/portal/home" class="btn btn-ghost btn-small" style="text-decoration:none;">Volver al inicio</a>
+    <a href="/portal/home" class="btn btn-ghost btn-small link-none">Volver al inicio</a>
   </div>
 </div>
 
-<div class="card p-20" style="max-width: 560px;">
+<div class="card p-20 card--max-w-560">
   <h2 class="section-title mb-14">Factura rápida</h2>
-  <p class="muted" style="margin:0 0 20px;">Los clientes y productos son los mismos que en <a href="/portal/clients">Clientes</a> y <a href="/portal/products">Productos</a>.</p>
-  <div class="quick-choose-form" style="display:flex; flex-direction:column; gap:20px;">
+  <p class="muted u-m0 u-mb-5">Los clientes y productos son los mismos que en <a href="/portal/clients">Clientes</a> y <a href="/portal/products">Productos</a>.</p>
+  <div class="quick-choose-form quick-choose-form--gap-20">
     <div>
       <label class="label" for="quickChooseCustomer">Cliente</label>
-      <select id="quickChooseCustomer" class="input" style="width:100%; padding:12px 14px; border-radius:12px; font-size:15px;" aria-label="Cliente">
+      <select id="quickChooseCustomer" class="input input--full" aria-label="Cliente">
         <option value="">— Seleccionar cliente —</option>
       </select>
-      <p class="muted" style="margin:6px 0 0; font-size:13px;">¿No tienes clientes? <a href="/portal/clients">Ir a Clientes</a></p>
+      <p class="muted u-mt-1 u-text-xs">¿No tienes clientes? <a href="/portal/clients">Ir a Clientes</a></p>
     </div>
     <div>
       <label class="label" for="quickChooseProduct">Producto</label>
-      <select id="quickChooseProduct" class="input" style="width:100%; padding:12px 14px; border-radius:12px; font-size:15px;" aria-label="Producto">
+      <select id="quickChooseProduct" class="input input--full" aria-label="Producto">
         <option value="">— Seleccionar producto —</option>
       </select>
-      <p class="muted" style="margin:6px 0 0; font-size:13px;">¿No tienes productos? <a href="/portal/products">Ir a Productos</a></p>
+      <p class="muted u-mt-1 u-text-xs">¿No tienes productos? <a href="/portal/products">Ir a Productos</a></p>
     </div>
-    <div style="margin-top:8px;">
-      <a href="#" id="quickChooseSubmit" class="btn btn-primary" style="display:inline-block; text-decoration:none; pointer-events:none; opacity:0.7;" role="button">Abrir factura con estos datos</a>
+    <div class="u-mt-2">
+      <a href="#" id="quickChooseSubmit" class="btn btn-primary link-none btn--disabled-state" role="button">Abrir factura con estos datos</a>
     </div>
   </div>
 </div>
@@ -48,21 +48,18 @@
     var pId = productSelect.value;
     if (cId && pId) {
       submitBtn.href = '/portal/create/quick?customer_id=' + encodeURIComponent(cId) + '&product_id=' + encodeURIComponent(pId);
-      submitBtn.style.pointerEvents = 'auto';
-      submitBtn.style.opacity = '1';
+      submitBtn.classList.remove('btn--disabled-state');
     } else {
       submitBtn.href = '#';
-      submitBtn.style.pointerEvents = 'none';
-      submitBtn.style.opacity = '0.7';
+      submitBtn.classList.add('btn--disabled-state');
     }
   }
 
   function loadCustomers() {
     var get = window.portalCatalogGetJson
-      ? window.portalCatalogGetJson('/api/customers').then(function(r) { return Array.isArray(r) ? r : (r && r.customers) || (r && r.data) || []; })
-      : (window.portalFetchJSON ? window.portalFetchJSON('/api/customers', { credentials: 'same-origin' }, { timeoutMs: 30000, retry: 1 }) : Promise.resolve({ ok: false, data: [] }))
-          .then(function(r) { return (r && r.ok) ? (r.data || []) : []; })
-          .then(function(d) { return Array.isArray(d) ? d : (d && d.customers) || (d && d.data) || []; });
+      ? window.portalCatalogGetJson('/api/customers?limit=200').then(function(r) { return (r && r.items) || (Array.isArray(r) ? r : (r && r.customers) || (r && r.data) || []); })
+      : (window.portalFetchJSON ? window.portalFetchJSON('/api/customers?limit=200', { credentials: 'same-origin' }, { timeoutMs: 30000, retry: 1 }) : Promise.resolve({ ok: false, data: [] }))
+          .then(function(r) { var d = (r && r.ok) ? (r.data || null) : null; return (d && d.items) || (Array.isArray(d) ? d : (d && d.customers) || (d && d.data) || []); });
     get.then(function(list) {
       customerSelect.innerHTML = '<option value="">— Seleccionar cliente —</option>';
       list.forEach(function(c) {
@@ -77,10 +74,9 @@
 
   function loadProducts() {
     var get = window.portalCatalogGetJson
-      ? window.portalCatalogGetJson('/api/products').then(function(r) { return Array.isArray(r) ? r : (r && r.products) || (r && r.data) || []; })
-      : (window.portalFetchJSON ? window.portalFetchJSON('/api/products', { credentials: 'same-origin' }, { timeoutMs: 30000, retry: 1 }) : Promise.resolve({ ok: false, data: [] }))
-          .then(function(r) { return (r && r.ok) ? (r.data || []) : []; })
-          .then(function(d) { return Array.isArray(d) ? d : (d && d.products) || (d && d.data) || []; });
+      ? window.portalCatalogGetJson('/api/products?limit=200').then(function(r) { return (r && r.items) || (Array.isArray(r) ? r : (r && r.products) || (r && r.data) || []); })
+      : (window.portalFetchJSON ? window.portalFetchJSON('/api/products?limit=200', { credentials: 'same-origin' }, { timeoutMs: 30000, retry: 1 }) : Promise.resolve({ ok: false, data: [] }))
+          .then(function(r) { var d = (r && r.ok) ? (r.data || null) : null; return (d && d.items) || (Array.isArray(d) ? d : (d && d.products) || (d && d.data) || []); });
     get.then(function(list) {
       productSelect.innerHTML = '<option value="">— Seleccionar producto —</option>';
       list.forEach(function(p) {

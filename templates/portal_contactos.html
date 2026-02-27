@@ -1,0 +1,19 @@
+{% extends "base_portal.html" %}
+{% set title = 'Contactos' %}
+
+{% block content %}
+<div class="ui-page-wrap">
+  <section class="page-section hub-section ui-v2">
+    <nav class="ui-tabs hub-tabs" role="tablist" aria-label="Contactos">
+      <a class="hub-tabs__item ui-tab {{ 'hub-tabs__item--active is-active' if active_tab == 'clientes' else '' }}" href="/portal/contactos?tab=clientes{% if q %}&q={{ q|urlencode }}{% endif %}{% if page and page > 1 %}&page={{ page }}{% endif %}" role="tab" aria-selected="{{ active_tab == 'clientes' }}">Clientes</a>
+      <a class="hub-tabs__item ui-tab {{ 'hub-tabs__item--active is-active' if active_tab == 'proveedores' else '' }}" href="/portal/contactos?tab=proveedores" role="tab" aria-selected="{{ active_tab == 'proveedores' }}">Proveedores</a>
+    </nav>
+
+    {% if active_tab == 'clientes' %}
+      {% include "partials/clients_list.html" with context %}
+    {% elif active_tab == 'proveedores' %}
+      {% include "partials/providers_list.html" with context %}
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

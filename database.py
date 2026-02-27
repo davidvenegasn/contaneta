@@ -3,6 +3,7 @@ import os
 import sqlite3
 
 from config import CATALOGS_DB, DB_PATH
+from contextlib import contextmanager
 
 
 def _row_factory(cursor, row):
@@ -18,6 +19,29 @@ def db() -> sqlite3.Connection:
     conn.execute("PRAGMA busy_timeout = 5000;")
     conn.execute("PRAGMA journal_mode = WAL;")
     return conn
+
+
+@contextmanager
+def transaction(conn: sqlite3.Connection):
+    """
+    Context manager de transacción explícita.
+    Uso:
+        conn = db()
+        with transaction(conn):
+            conn.execute(...)
+            conn.execute(...)
+    Hace COMMIT si todo sale bien; ROLLBACK si hay excepción.
+    """
+    try:
+        conn.execute("BEGIN")
+        yield conn
+        conn.commit()
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        raise
 
 
 def db_rows(sql: str, params: tuple = ()) -> list[dict]:

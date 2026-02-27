@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
-# Ejemplo de cron para backups diarios. No ejecuta nada por defecto.
-# Copia a crontab -e o configura en tu sistema:
+# Ejemplo de cron para backups. Este script NO ejecuta backups; solo muestra líneas de ejemplo.
+# Copia las líneas que necesites a crontab -e (crontab -e) y ajusta rutas.
 #
-#   # Backup DB y storage a las 2:00 (ajusta PATH y APP_DB_PATH)
-#   0 2 * * * APP_DB_PATH=/var/app/invoicing.db BACKUP_DIR=/var/backups/conta /ruta/al/proyecto/scripts/backup_db.sh >> /var/log/conta_backup_db.log 2>&1
-#   15 2 * * * STORAGE_DIR=/var/app/storage BACKUP_DIR=/var/backups/conta /ruta/al/proyecto/scripts/backup_storage_xml.sh >> /var/log/conta_backup_storage.log 2>&1
+# Retención: los scripts backup_db.sh y backup_storage_xml.sh ya borran backups antiguos
+# según BACKUP_RETAIN_DAYS (default 30). Poner 0 para no borrar.
 #
-# Retención: borrar backups antiguos fuera de este script (ej. find backup/ -name 'invoicing_*.db' -mtime +30 -delete).
+# Ver OPS_RUNBOOK.md sección 8 para cron completo (backups + worker SAT).
 
-echo "Ejemplo de cron; no hace backup. Ver comentarios en este script."
+echo "Ejemplo de cron; no hace backup. Ver comentarios en este script y OPS_RUNBOOK.md."
+
+# Ejemplo crontab:
+# 0 2 * * * cd /ruta/al/proyecto && APP_DB_PATH=/ruta/al/invoicing.db BACKUP_RETAIN_DAYS=30 ./scripts/backup_db.sh >> /var/log/conta_backup_db.log 2>&1
+# 0 3 */3 * * cd /ruta/al/proyecto && ./scripts/backup_storage_xml.sh >> /var/log/conta_backup_storage.log 2>&1

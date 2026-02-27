@@ -1,0 +1,479 @@
+/**
+ * Portal UI v2 — Design tokens + componentes reutilizables (Mindtrip-like, sin branding).
+ * Requiere: portal_tokens.css (--space-*, --radius-*, --primary, etc.)
+ * Uso: .ui-card, .ui-btn, .ui-tabs, .ui-badge, .ui-empty, .ui-skeleton
+ */
+
+/* ============ Tokens adicionales v2 ============ */
+:root {
+  --ui-radius-pill: 9999px;
+  --ui-transition: 150ms cubic-bezier(0.25, 0.1, 0.25, 1);
+  --ui-shadow-card: 0 1px 3px rgba(13, 31, 28, 0.06);
+  --ui-shadow-card-hover: 0 4px 12px rgba(13, 31, 28, 0.08);
+  --ui-page-max: 1120px;
+  --ui-page-pad: clamp(16px, 4vw, 28px);
+  --ui-section-gap: 28px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --ui-transition: 0ms;
+  }
+}
+
+/* ============ Layout contenedor ============ */
+.ui-page-wrap {
+  max-width: var(--ui-page-max);
+  margin-left: auto;
+  margin-right: auto;
+  /* El gutter horizontal lo controla el layout global (.portal-container). */
+  padding-left: 0;
+  padding-right: 0;
+  padding-bottom: var(--space-10);
+}
+
+/* Fila de dos columnas (ej. Factura rápida + Actividad) */
+.ui-half-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: var(--ui-section-gap);
+  margin-bottom: var(--ui-section-gap);
+}
+
+/* ============ Cards ============ */
+.ui-card {
+  background: var(--surface, #fff);
+  border-radius: var(--radius-lg, 18px);
+  box-shadow: var(--ui-shadow-card);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  transition: box-shadow var(--ui-transition), border-color var(--ui-transition);
+}
+
+.ui-card:hover {
+  box-shadow: var(--ui-shadow-card-hover);
+}
+
+.ui-card__header {
+  padding: var(--space-5) var(--space-6);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.ui-card__title {
+  margin: 0;
+  font-size: var(--text-lg, 1.25rem);
+  font-weight: var(--fw-semibold, 600);
+  color: var(--text);
+  letter-spacing: -0.02em;
+}
+
+.ui-card__body {
+  padding: var(--space-6);
+}
+
+.ui-card--no-border {
+  border-color: transparent;
+}
+
+/* ============ Buttons (pill) ============ */
+.ui-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: var(--btn-height, 46px);
+  padding: 0 var(--space-5);
+  font-size: var(--text-sm, 0.9375rem);
+  font-weight: var(--fw-medium, 500);
+  font-family: inherit;
+  line-height: 1.25;
+  border-radius: var(--ui-radius-pill);
+  border: 1px solid transparent;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background-color var(--ui-transition), color var(--ui-transition),
+    border-color var(--ui-transition), transform 0.1s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.ui-btn:focus {
+  outline: none;
+}
+
+.ui-btn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.ui-btn:hover {
+  transform: translateY(-1px);
+}
+
+.ui-btn:active {
+  transform: translateY(0);
+}
+
+.ui-btn--primary {
+  background: var(--primary);
+  color: var(--text-inverse);
+  border-color: var(--primary);
+}
+
+.ui-btn--primary:hover {
+  background: var(--primary-hover, #0d9488);
+  border-color: var(--primary-hover);
+  color: var(--text-inverse);
+}
+
+.ui-btn--secondary {
+  background: var(--neutral-bg, #f3f4f6);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.ui-btn--secondary:hover {
+  background: var(--surface-hover, #fafafb);
+  border-color: var(--border-strong);
+}
+
+.ui-btn--ghost {
+  background: transparent;
+  color: var(--text-muted);
+  border-color: transparent;
+}
+
+.ui-btn--ghost:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.ui-btn--sm {
+  min-height: var(--btn-height-sm, 38px);
+  padding: 0 var(--space-4);
+  font-size: var(--text-xs, 0.8125rem);
+}
+
+.ui-btn:disabled,
+.ui-btn[aria-disabled="true"] {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-btn:hover { transform: none; }
+}
+
+/* ============ Tabs ============ */
+.ui-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: var(--ui-section-gap);
+  flex-wrap: wrap;
+}
+
+.ui-tab {
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--text-sm);
+  font-weight: var(--fw-medium);
+  color: var(--text-muted);
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color var(--ui-transition), border-color var(--ui-transition);
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+}
+
+.ui-tab:hover {
+  color: var(--text);
+}
+
+.ui-tab:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.ui-tab.is-active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
+
+/* ============ Badges ============ */
+.ui-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-xs);
+  font-weight: var(--fw-semibold);
+  line-height: 1.2;
+  border-radius: var(--ui-radius-pill);
+  border: 1px solid transparent;
+}
+
+.ui-badge--success {
+  background: var(--success-bg);
+  color: var(--success);
+  border-color: var(--success-border);
+}
+
+.ui-badge--warn {
+  background: var(--warn-bg);
+  color: var(--warn);
+  border-color: var(--warn-border);
+}
+
+.ui-badge--neutral {
+  background: var(--neutral-bg);
+  color: var(--neutral);
+  border-color: var(--neutral-border);
+}
+
+.ui-badge--danger {
+  background: var(--danger-bg);
+  color: var(--danger);
+  border-color: var(--danger-border);
+}
+
+/* ============ Empty state (centrado) ============ */
+.ui-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: var(--space-10) var(--space-6);
+  min-height: 200px;
+}
+
+.ui-empty__icon {
+  width: 56px;
+  height: 56px;
+  margin-bottom: var(--space-4);
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+
+.ui-empty__icon .icon {
+  width: 100%;
+  height: 100%;
+}
+
+.ui-empty__title {
+  font-size: var(--text-lg);
+  font-weight: var(--fw-semibold);
+  color: var(--text);
+  margin: 0 0 var(--space-2);
+}
+
+.ui-empty__subtitle {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  margin: 0 0 var(--space-5);
+  max-width: 360px;
+  line-height: var(--leading-relaxed);
+}
+
+.ui-empty__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  justify-content: center;
+}
+
+/* ============ Skeleton (shimmer) ============ */
+.ui-skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--neutral-bg) 0%,
+    var(--surface-hover) 50%,
+    var(--neutral-bg) 100%
+  );
+  background-size: 200% 100%;
+  animation: ui-skeleton-shimmer 1.2s ease-in-out infinite;
+  border-radius: var(--radius-sm);
+}
+
+@keyframes ui-skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-skeleton {
+    animation: none;
+    background: var(--neutral-bg);
+  }
+}
+
+.ui-skeleton--text {
+  height: 1em;
+  min-width: 60px;
+}
+
+.ui-skeleton--row {
+  height: 46px;
+}
+
+.ui-skeleton--card {
+  height: 72px;
+}
+
+.ui-skeleton--block {
+  height: 80px;
+}
+
+/* ============ Table wrapper ============ */
+.ui-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+
+.ui-table-wrap .table {
+  width: 100%;
+  min-width: 600px;
+}
+
+/* ============ KPI / metric cards (dashboard) ============ */
+.ui-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--space-4);
+}
+
+.ui-kpi-card {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  border: 1px solid var(--border);
+  box-shadow: var(--ui-shadow-card);
+  transition: box-shadow var(--ui-transition);
+}
+
+.ui-kpi-card:hover {
+  box-shadow: var(--ui-shadow-card-hover);
+}
+
+.ui-kpi-card__label {
+  font-size: var(--text-xs);
+  font-weight: var(--fw-medium);
+  color: var(--text-muted);
+  margin-bottom: var(--space-1);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.ui-kpi-card__label .icon {
+  width: 1rem;
+  height: 1rem;
+  opacity: 0.8;
+}
+
+.ui-kpi-card__value {
+  font-size: var(--text-xl);
+  font-weight: var(--fw-bold);
+  color: var(--text);
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.ui-kpi-card__sub {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  margin-top: var(--space-1);
+}
+
+/* ============ Checklist (pendientes) ============ */
+.ui-checklist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.ui-checklist__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--border);
+  font-size: var(--text-sm);
+}
+
+.ui-checklist__item:last-child {
+  border-bottom: none;
+}
+
+.ui-checklist__icon {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  color: var(--success);
+}
+
+.ui-checklist__icon--warn {
+  color: var(--warn);
+}
+
+.ui-checklist__icon--muted {
+  color: var(--text-muted);
+}
+
+.ui-checklist__label {
+  flex: 1;
+  color: var(--text);
+}
+
+.ui-checklist__action {
+  flex-shrink: 0;
+}
+
+/* ============ Quick actions block ============ */
+.ui-quick-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.ui-quick-actions .ui-btn {
+  width: 100%;
+  justify-content: flex-start;
+}
+
+/* ============ Hub section (compat con existente) ============ */
+.hub-section.ui-v2 .hub-tabs,
+.ui-tabs.hub-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: var(--ui-section-gap);
+}
+
+.hub-section.ui-v2 .hub-tabs__item,
+.ui-tab.hub-tabs__item {
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--text-sm);
+  font-weight: var(--fw-medium);
+  color: var(--text-muted);
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color var(--ui-transition), border-color var(--ui-transition);
+}
+
+.hub-section.ui-v2 .hub-tabs__item:hover,
+.ui-tab.hub-tabs__item:hover {
+  color: var(--text);
+}
+
+.hub-section.ui-v2 .hub-tabs__item--active,
+.ui-tab.is-active.hub-tabs__item {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}

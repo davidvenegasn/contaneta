@@ -1,0 +1,59 @@
+{% extends "base_admin.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+  <h1>Panel Admin</h1>
+
+  <div class="card">
+    <h2>Resumen</h2>
+    <div class="stats">
+      <div class="stat"><span class="n">{{ count_users }}</span><span class="label">Usuarios</span></div>
+      <div class="stat"><span class="n">{{ count_issuers }}</span><span class="label">Issuers</span></div>
+      <div class="stat"><span class="n">{{ count_memberships }}</span><span class="label">Memberships</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>CFDI este mes (por dirección)</h2>
+    <div class="stats">
+      {% for row in sat_cfdi_by_direction %}
+      <div class="stat"><span class="n">{{ row.n }}</span><span class="label">{{ row.direction }}</span></div>
+      {% else %}
+      <p style="margin:0;color:#64748b;">Sin datos para el mes actual.</p>
+      {% endfor %}
+    </div>
+  </div>
+
+  {% if sat_requests_by_status %}
+  <div class="card">
+    <h2>Sat requests por estado</h2>
+    <div class="stats">
+      {% for row in sat_requests_by_status %}
+      <div class="stat"><span class="n">{{ row.n }}</span><span class="label">{{ row.status }}</span></div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="card">
+    <h2>Últimos 20 eventos (audit_log)</h2>
+    {% if audit_events %}
+    <table>
+      <thead><tr><th>Fecha</th><th>Acción</th><th>user_id</th><th>issuer_id</th><th>target_issuer_id</th><th>Detalles</th></tr></thead>
+      <tbody>
+      {% for e in audit_events %}
+      <tr>
+        <td>{{ e.created_at or '-' }}</td>
+        <td>{{ e.action or '-' }}</td>
+        <td>{{ e.user_id if e.user_id is not none else '-' }}</td>
+        <td>{{ e.issuer_id if e.issuer_id is not none else '-' }}</td>
+        <td>{{ e.target_issuer_id if e.target_issuer_id is not none else '-' }}</td>
+        <td>{{ (e.details or '')[:80] }}{% if e.details and e.details|length > 80 %}…{% endif %}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p style="margin:0;color:#64748b;">No hay eventos recientes.</p>
+    {% endif %}
+  </div>
+{% endblock %}

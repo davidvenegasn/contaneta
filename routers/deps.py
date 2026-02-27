@@ -2,7 +2,6 @@
 import logging
 
 from fastapi import Request, HTTPException
-from fastapi.responses import RedirectResponse
 
 from config import ALLOW_DEMO_PORTAL, DEV_MODE, DEV_TOKEN
 from services import issuers, session, users
@@ -91,4 +90,4 @@ def get_portal_issuer(request: Request) -> dict:
 
     if is_api:
         raise HTTPException(status_code=401, detail="No autorizado")
-    return RedirectResponse(url="/login", status_code=302)
+    raise HTTPException(status_code=401, detail="No autorizado - redirigir a /login")

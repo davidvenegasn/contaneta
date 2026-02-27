@@ -604,86 +604,98 @@ def api_invoices_quick(
     if not subscription_service.can_issuer_use_sync_and_timbrado(issuer.get("id"), user_id):
         raise HTTPException(status_code=402, detail="Actualiza tu plan para emitir facturas.")
     customer_id = payload.get("customer_id")
+    items_in = payload.get("items")
     product_id = payload.get("product_id")
-    if not customer_id or not product_id:
-        raise HTTPException(status_code=400, detail="customer_id y product_id son requeridos.")
+    has_items = isinstance(items_in, list) and len(items_in) > 0
+    if not customer_id:
+        raise HTTPException(status_code=400, detail="customer_id es requerido.")
+    if not has_items and not product_id:
+        raise HTTPException(status_code=400, detail="product_id es requerido (o envía items).")
     try:
         customer_id = int(customer_id)
-        product_id = int(product_id)
+        if not has_items:
+            product_id = int(product_id)
     except (TypeError, ValueError):
-        raise HTTPException(status_code=400, detail="customer_id y product_id deben ser numéricos.")
-    quantity = float(payload.get("quantity", 1))
-    if quantity <= 0 or quantity > 999999:
-        raise HTTPException(status_code=400, detail="Cantidad inválida.")
-    unit_price_override = payload.get("unit_price")
-    if unit_price_override is not None:
-        try:
-            unit_price_override = float(unit_price_override)
-            if unit_price_override < 0:
-                raise HTTPException(status_code=400, detail="Precio unitario no puede ser negativo.")
-        except (TypeError, ValueError):
-            raise HTTPException(status_code=400, detail="Precio unitario inválido.")
+        raise HTTPException(status_code=400, detail="customer_id/product_id inválidos.")
+
+    # Single-item mode legacy fields
+    quantity = None
+    unit_price_override = None
+    if not has_items:
+        quantity = float(payload.get("quantity", 1))
+        if quantity <= 0 or quantity > 999999:
+            raise HTTPException(status_code=400, detail="Cantidad inválida.")
+        unit_price_override = payload.get("unit_price")
+        if unit_price_override is not None:
+            try:
+                unit_price_override = float(unit_price_override)
+                if unit_price_override < 0:
+                    raise HTTPException(status_code=400, detail="Precio unitario no puede ser negativo.")
+            except (TypeError, ValueError):
+                raise HTTPException(status_code=400, detail="Precio unitario inválido.")
 
     issuer_id = issuer["id"]
     cust = db_rows(
         "SELECT id, rfc, legal_name, zip, tax_system, email FROM customer_profiles WHERE issuer_id = ? AND id = ? LIMIT 1",
         (issuer_id, customer_id),
     )
-    prod = db_rows(
-        "SELECT id, description, product_key, unit_key, unit_price, iva_rate FROM issuer_products WHERE issuer_id = ? AND id = ? LIMIT 1",
-        (issuer_id, product_id),
-    )
-    # Si el producto viene de la tabla "products" (página Productos), resolver desde ahí
-    if not prod:
+    if not cust:
+        raise HTTPException(status_code=404, detail="Cliente no encontrado.")
+    c = cust[0]
+
+    def _resolve_product(pid: int) -> dict:
+        """Resolver producto desde issuer_products o products."""
+        rows = db_rows(
+            "SELECT id, description, product_key, unit_key, unit_price, iva_rate FROM issuer_products WHERE issuer_id = ? AND id = ? LIMIT 1",
+            (issuer_id, pid),
+        )
+        if rows:
+            return rows[0]
         _conn = db()
         try:
             if table_exists(_conn, "products"):
                 row = _conn.execute(
                     "SELECT id, name, clave_prod_serv, clave_unidad, default_unit_price FROM products WHERE issuer_id = ? AND id = ? LIMIT 1",
-                    (issuer_id, product_id),
+                    (issuer_id, pid),
                 ).fetchone()
                 if row:
                     row = dict(row)
-                    prod = [{
+                    return {
                         "id": row["id"],
                         "description": row.get("name") or "",
                         "product_key": row.get("clave_prod_serv") or "",
                         "unit_key": row.get("clave_unidad") or "E48",
                         "unit_price": float(row.get("default_unit_price") or 0),
                         "iva_rate": 0.16,
-                    }]
+                    }
         finally:
             _conn.close()
-    if not cust or not prod:
-        raise HTTPException(status_code=404, detail="Cliente o producto no encontrado.")
-    c = cust[0]
-    p = prod[0]
+        raise HTTPException(status_code=404, detail=f"Producto no encontrado: {pid}")
+
+    p = _resolve_product(int(product_id)) if not has_items else None
     # ----- Overrides (desde Home precálculo editable) -----
     customer_rfc = (c.get("rfc") or "").strip().upper()
-    customer_legal_name = (payload.get("customer_legal_name") or c.get("legal_name") or "").strip() or (c.get("legal_name") or "").strip()
+    customer_legal_name = (
+        (payload.get("customer_legal_name") or payload.get("customer_name") or c.get("legal_name") or "").strip()
+        or (c.get("legal_name") or "").strip()
+    )
     customer_zip = (payload.get("customer_zip") if payload.get("customer_zip") is not None else (c.get("zip") or "")).strip() or "00000"
     customer_tax_system = (payload.get("customer_tax_system") if payload.get("customer_tax_system") is not None else (c.get("tax_system") or "")).strip() or "616"
     customer_email_raw = (payload.get("customer_email") if payload.get("customer_email") is not None else (c.get("email") or "")).strip()
     customer_email = customer_email_raw or None
 
-    description = (payload.get("description") or p.get("description") or "").strip() or (p.get("description") or "").strip()
-    product_key = (payload.get("product_key") or p.get("product_key") or "").strip() or "84111500"
-    unit_key = (payload.get("unit_key") or p.get("unit_key") or "").strip() or "E48"
-
-    unit_price = float(unit_price_override if unit_price_override is not None else (p.get("unit_price") or 0))
-
-    iva_rate_override = payload.get("iva_rate")
-    if iva_rate_override is not None and iva_rate_override != "":
+    def _parse_iva_rate(val, default_val: float) -> tuple[float, bool]:
+        """Devuelve (iva_rate, iva_exempt). Acepta 'EXENTO'."""
+        if val is None or val == "":
+            return (max(0.0, min(1.0, float(default_val))), False)
+        if isinstance(val, str) and val.strip().upper() == "EXENTO":
+            return (0.0, True)
         try:
-            iva_rate = float(iva_rate_override)
+            n = float(val)
         except (TypeError, ValueError):
             raise HTTPException(status_code=400, detail="IVA rate inválido.")
-    else:
-        iva_rate = float(p.get("iva_rate") or 0.16)
-    iva_rate = max(0.0, min(1.0, iva_rate))
-    iva_exempt = bool(payload.get("iva_exempt")) is True
-    if iva_exempt:
-        iva_rate = 0.0
+        n = max(0.0, min(1.0, n))
+        return (n, False)
 
     def _parse_rate(name: str, default: float = 0.0) -> float:
         v = payload.get(name)
@@ -698,7 +710,7 @@ def api_invoices_quick(
     isr_ret_rate = _parse_rate("isr_ret_rate", 0.0)
     iva_ret_rate = _parse_rate("iva_ret_rate", 0.0)
 
-    cfdi_use = (payload.get("cfdi_use") or "G03").strip().upper() or "G03"
+    cfdi_use = (payload.get("cfdi_use") or payload.get("uso_cfdi") or "G03").strip().upper() or "G03"
     payment_form = (payload.get("payment_form") or "03").strip() or "03"
     payment_method = (payload.get("payment_method") or "PUE").strip().upper() or "PUE"
     currency = (payload.get("currency") or "MXN").strip().upper() or "MXN"
@@ -707,31 +719,118 @@ def api_invoices_quick(
     cust_errors = validate_customer(customer_rfc, customer_legal_name, customer_zip, customer_tax_system, customer_email)
     if cust_errors:
         raise HTTPException(status_code=400, detail="; ".join(cust_errors))
-    prod_errors = validate_product(description, product_key, unit_key, unit_price)
-    if prod_errors:
-        raise HTTPException(status_code=400, detail="; ".join(prod_errors))
+    items_fact = []
+    items_meta = []  # para DB invoice_items + sat_cfdi (multi-item)
+    if has_items:
+        for it in items_in:
+            if not isinstance(it, dict):
+                raise HTTPException(status_code=400, detail="items inválidos.")
+            pid = it.get("product_id")
+            if not pid:
+                raise HTTPException(status_code=400, detail="Cada item requiere product_id.")
+            try:
+                pid = int(pid)
+            except (TypeError, ValueError):
+                raise HTTPException(status_code=400, detail="product_id inválido en items.")
+            qty = float(it.get("quantity", 1))
+            if qty <= 0 or qty > 999999:
+                raise HTTPException(status_code=400, detail="Cantidad inválida en items.")
+            base_p = _resolve_product(pid)
+            description = (it.get("description") or base_p.get("description") or "").strip() or (base_p.get("description") or "").strip()
+            product_key = (it.get("product_key") or base_p.get("product_key") or "").strip() or "84111500"
+            unit_key = (it.get("unit_key") or base_p.get("unit_key") or "").strip() or "E48"
+            up_override = it.get("unit_price")
+            if up_override is not None and up_override != "":
+                try:
+                    up_override = float(up_override)
+                    if up_override < 0:
+                        raise HTTPException(status_code=400, detail="Precio unitario no puede ser negativo.")
+                except (TypeError, ValueError):
+                    raise HTTPException(status_code=400, detail="Precio unitario inválido.")
+            unit_price = float(up_override if up_override is not None and up_override != "" else (base_p.get("unit_price") or 0))
+            iva_rate, iva_exempt = _parse_iva_rate(it.get("iva_rate"), float(base_p.get("iva_rate") or 0.16))
 
-    # Facturapi espera price con impuestos incluidos si tax_included=True
-    price_to_send = unit_price * (1.0 + iva_rate) if iva_rate else unit_price
-    taxes = []
-    if not iva_exempt:
-        taxes.append({"type": "IVA", "rate": iva_rate})
-    if isr_ret_rate > 0:
-        taxes.append({"type": "ISR", "rate": isr_ret_rate, "withholding": True})
-    if iva_ret_rate > 0:
-        taxes.append({"type": "IVA", "rate": iva_ret_rate, "withholding": True})
-    item = {
-        "quantity": quantity,
-        "discount": 0.0,
-        "product": {
-            "description": description,
-            "product_key": product_key,
-            "price": round(price_to_send, 2),
-            "tax_included": True,
-            "taxes": taxes,
-            "unit_key": unit_key,
-        },
-    }
+            prod_errors = validate_product(description, product_key, unit_key, unit_price)
+            if prod_errors:
+                raise HTTPException(status_code=400, detail="; ".join(prod_errors))
+
+            price_to_send = unit_price * (1.0 + iva_rate) if iva_rate else unit_price
+            taxes = []
+            if not iva_exempt:
+                taxes.append({"type": "IVA", "rate": iva_rate})
+            if isr_ret_rate > 0:
+                taxes.append({"type": "ISR", "rate": isr_ret_rate, "withholding": True})
+            if iva_ret_rate > 0:
+                taxes.append({"type": "IVA", "rate": iva_ret_rate, "withholding": True})
+            items_fact.append(
+                {
+                    "quantity": qty,
+                    "discount": 0.0,
+                    "product": {
+                        "description": description,
+                        "product_key": product_key,
+                        "price": round(price_to_send, 2),
+                        "tax_included": True,
+                        "taxes": taxes,
+                        "unit_key": unit_key,
+                    },
+                }
+            )
+            items_meta.append(
+                {
+                    "quantity": qty,
+                    "description": description,
+                    "product_key": product_key,
+                    "unit_key": unit_key,
+                    "unit_price": unit_price,  # sin IVA
+                    "iva_rate": iva_rate,
+                    "price_to_send": round(price_to_send, 2),  # con IVA si aplica
+                }
+            )
+    else:
+        description = (payload.get("description") or p.get("description") or "").strip() or (p.get("description") or "").strip()
+        product_key = (payload.get("product_key") or p.get("product_key") or "").strip() or "84111500"
+        unit_key = (payload.get("unit_key") or p.get("unit_key") or "").strip() or "E48"
+        unit_price = float(unit_price_override if unit_price_override is not None else (p.get("unit_price") or 0))
+        iva_rate, iva_exempt = _parse_iva_rate(payload.get("iva_rate"), float(p.get("iva_rate") or 0.16))
+
+        prod_errors = validate_product(description, product_key, unit_key, unit_price)
+        if prod_errors:
+            raise HTTPException(status_code=400, detail="; ".join(prod_errors))
+
+        price_to_send = unit_price * (1.0 + iva_rate) if iva_rate else unit_price
+        taxes = []
+        if not iva_exempt:
+            taxes.append({"type": "IVA", "rate": iva_rate})
+        if isr_ret_rate > 0:
+            taxes.append({"type": "ISR", "rate": isr_ret_rate, "withholding": True})
+        if iva_ret_rate > 0:
+            taxes.append({"type": "IVA", "rate": iva_ret_rate, "withholding": True})
+        items_fact.append(
+            {
+                "quantity": quantity,
+                "discount": 0.0,
+                "product": {
+                    "description": description,
+                    "product_key": product_key,
+                    "price": round(price_to_send, 2),
+                    "tax_included": True,
+                    "taxes": taxes,
+                    "unit_key": unit_key,
+                },
+            }
+        )
+        items_meta.append(
+            {
+                "quantity": quantity,
+                "description": description,
+                "product_key": product_key,
+                "unit_key": unit_key,
+                "unit_price": unit_price,
+                "iva_rate": iva_rate,
+                "price_to_send": round(price_to_send, 2),
+            }
+        )
     payload_fact = {
         "type": "I",
         "export": "01",
@@ -742,7 +841,7 @@ def api_invoices_quick(
             "tax_system": customer_tax_system,
             "address": {"zip": customer_zip},
         },
-        "items": [item],
+        "items": items_fact,
         "use": cfdi_use,
         "payment_form": payment_form,
         "payment_method": payment_method,
@@ -784,26 +883,28 @@ def api_invoices_quick(
         )
         cols = {r[1] for r in conn.execute("PRAGMA table_info(invoice_items)").fetchall()}
         base_cols = ["invoice_id", "quantity", "description", "product_key", "unit_price", "iva_rate"]
-        base_vals = [
-            invoice_local_id,
-            quantity,
-            description,
-            product_key,
-            price_to_send,
-            iva_rate,
-        ]
-        extra = {}
-        if "unit_key" in cols:
-            extra["unit_key"] = unit_key
-        if "discount" in cols:
-            extra["discount"] = 0.0
-        insert_cols = base_cols + list(extra.keys())
-        insert_vals = base_vals + list(extra.values())
+        has_unit_key = "unit_key" in cols
+        has_discount = "discount" in cols
+        insert_cols = base_cols + (["unit_key"] if has_unit_key else []) + (["discount"] if has_discount else [])
         placeholders = ", ".join(["?"] * len(insert_cols))
-        conn.execute(
-            f"INSERT INTO invoice_items ({', '.join(insert_cols)}) VALUES ({placeholders})",
-            tuple(insert_vals),
-        )
+        for it in items_meta:
+            base_vals = [
+                invoice_local_id,
+                float(it["quantity"]),
+                it["description"],
+                it["product_key"],
+                float(it["price_to_send"]),
+                float(it["iva_rate"]),
+            ]
+            extra_vals = []
+            if has_unit_key:
+                extra_vals.append(it.get("unit_key") or "E48")
+            if has_discount:
+                extra_vals.append(0.0)
+            conn.execute(
+                f"INSERT INTO invoice_items ({', '.join(insert_cols)}) VALUES ({placeholders})",
+                tuple(base_vals + extra_vals),
+            )
         conn.commit()
     except Exception as e:
         conn.close()
@@ -845,11 +946,16 @@ def api_invoices_quick(
                     f.write(xml_bytes)
                 xml_sha256 = hashlib.sha256(xml_bytes).hexdigest()
 
-                subtotal = float(quantity) * float(unit_price)
-                iva_amt = subtotal * float(iva_rate)
+                subtotal = sum(float(it["quantity"]) * float(it["unit_price"]) for it in items_meta)
+                iva_amt = sum(float(it["quantity"]) * float(it["unit_price"]) * float(it["iva_rate"]) for it in items_meta)
                 ret_isr_amt = subtotal * float(isr_ret_rate)
                 ret_iva_amt = iva_amt * float(iva_ret_rate)
                 ret_total = ret_isr_amt + ret_iva_amt
+                concepto_txt = (
+                    (items_meta[0]["description"] or "")[:220]
+                    if len(items_meta) == 1
+                    else f"{len(items_meta)} conceptos"
+                )
 
                 conn2 = db()
                 conn2.execute(
@@ -898,7 +1004,7 @@ def api_invoices_quick(
                         float(subtotal),
                         float(iva_amt),
                         float(ret_total),
-                        (description or "")[:220],
+                        concepto_txt,
                         payment_method,
                         payment_form,
                         xml_sha256,
@@ -911,6 +1017,124 @@ def api_invoices_quick(
 
     log_action(request, "invoice_created", issuer_id=issuer["id"], invoice_id=fact_id, uuid=(uuid or "")[:36])
     return {"ok": True, "uuid": uuid, "total": total}
+
+
+@router.post("/invoices/bulk_issue")
+def api_invoices_bulk_issue(
+    request: Request,
+    payload: dict = Body(...),
+    issuer: dict = Depends(get_portal_issuer),
+):
+    """Emite N facturas (una por cliente) con 1 producto.
+
+    Fase 1: simplificado (sin retenciones por cliente).
+    """
+    csrf_service.verify_api_csrf(request)
+    user_id = getattr(request.state, "user_id", 0) or 0
+    if not subscription_service.can_issuer_use_sync_and_timbrado(issuer.get("id"), user_id):
+        raise HTTPException(status_code=402, detail="Actualiza tu plan para emitir facturas.")
+
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=400, detail="Payload inválido.")
+
+    customer_ids = payload.get("customer_ids") or payload.get("client_ids") or []
+    product_id = payload.get("product_id")
+    qty = payload.get("qty", payload.get("quantity", 1))
+    unit_price_override = payload.get("unit_price")
+
+    if not isinstance(customer_ids, list) or not customer_ids:
+        raise HTTPException(status_code=400, detail="customer_ids es requerido.")
+    if not product_id:
+        raise HTTPException(status_code=400, detail="product_id es requerido.")
+    try:
+        product_id = int(product_id)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="product_id inválido.")
+    try:
+        qty = float(qty)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="qty inválido.")
+    if qty <= 0 or qty > 999999:
+        raise HTTPException(status_code=400, detail="qty inválido.")
+    if unit_price_override is not None and unit_price_override != "":
+        try:
+            unit_price_override = float(unit_price_override)
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=400, detail="unit_price inválido.")
+
+    issuer_id = int(issuer.get("id") or 0)
+    if issuer_id <= 0:
+        raise HTTPException(status_code=401, detail="Sesión inválida.")
+
+    results = []
+    conn = db()
+    try:
+        for cid in customer_ids:
+            try:
+                client_id = int(cid)
+            except (TypeError, ValueError):
+                results.append({"customer_id": cid, "ok": False, "error": "ID inválido"})
+                continue
+
+            row = conn.execute(
+                "SELECT id, rfc, name, cp, regimen_fiscal, email FROM clients WHERE issuer_id = ? AND id = ? LIMIT 1",
+                (issuer_id, client_id),
+            ).fetchone()
+            if not row:
+                results.append({"customer_id": client_id, "ok": False, "error": "Cliente no encontrado"})
+                continue
+            row = dict(row)
+            rfc = (row.get("rfc") or "").strip().upper()
+            legal_name = (row.get("name") or "").strip() or rfc
+            zip_code = (row.get("cp") or "").strip() or "00000"
+            tax_system = (row.get("regimen_fiscal") or "").strip() or "616"
+            email = (row.get("email") or "").strip() or None
+
+            if not rfc:
+                results.append({"customer_id": client_id, "ok": False, "error": "RFC vacío"})
+                continue
+
+            # Asegurar customer_profile por RFC (reusa validación existente)
+            cust_row = conn.execute(
+                "SELECT id FROM customer_profiles WHERE issuer_id = ? AND rfc = ? LIMIT 1",
+                (issuer_id, rfc),
+            ).fetchone()
+            if cust_row:
+                customer_profile_id = int(cust_row["id"])
+            else:
+                cust_errors = validate_customer(rfc, legal_name, zip_code, tax_system, email)
+                if cust_errors:
+                    results.append({"customer_id": client_id, "ok": False, "error": "; ".join(cust_errors)})
+                    continue
+                cur = conn.execute(
+                    """
+                    INSERT INTO customer_profiles (issuer_id, rfc, legal_name, zip, tax_system, email, alias, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, NULL, datetime('now'), datetime('now'))
+                    """,
+                    (issuer_id, rfc, legal_name, zip_code, tax_system, email),
+                )
+                customer_profile_id = int(cur.lastrowid)
+                conn.commit()
+
+            try:
+                quick_payload = {
+                    "customer_id": customer_profile_id,
+                    "product_id": product_id,
+                    "quantity": qty,
+                }
+                if unit_price_override is not None and unit_price_override != "":
+                    quick_payload["unit_price"] = unit_price_override
+                r = api_invoices_quick(request, payload=quick_payload, issuer=issuer)
+                results.append({"customer_id": client_id, "ok": True, "uuid": r.get("uuid"), "total": r.get("total")})
+            except HTTPException as he:
+                results.append({"customer_id": client_id, "ok": False, "error": he.detail})
+            except Exception as e:
+                logger.warning("bulk_issue: error emitiendo a client_id=%s: %s", client_id, e, exc_info=True)
+                results.append({"customer_id": client_id, "ok": False, "error": "No se pudo emitir."})
+    finally:
+        conn.close()
+
+    return ok({"results": results})
 
 
 # ----- Quotations -----

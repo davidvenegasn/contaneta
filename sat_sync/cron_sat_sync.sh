@@ -7,6 +7,7 @@
 #   2. Solicitudes XML
 #   3. Descarga de paquetes
 #   4. Parseo (subtotal, IVA, etc.)
+#   4.5) Backfill clientes: guardar receptores de facturas emitidas en tabla clients
 #   5. Verificación de cancelaciones
 #
 # Crontab recomendado (cada 15 min):
@@ -69,6 +70,15 @@ run_timeout 180 $PHP sat_sync/verify_requests.php --limit=20 2>/dev/null || true
 # 4) PARSE: extraer subtotal, IVA, fecha, emisor/receptor del XML
 log "Parse XML..."
 $PHP sat_sync/parse_xml.php --limit=300 2>/dev/null || true
+
+# 4.5) BACKFILL CLIENTES: guardar clientes desde receptores de facturas emitidas (tabla clients)
+log "Backfill clientes desde facturas emitidas..."
+PYTHON="${PYTHON:-python3}"
+if command -v "$PYTHON" >/dev/null 2>&1; then
+  run_timeout 120 "$PYTHON" scripts/backfill_clients_from_sat.py 2>/dev/null || true
+else
+  log "Python no encontrado; omitiendo backfill de clientes."
+fi
 
 # 5) CANCELACIONES: actualizar estado de facturas canceladas (una vez por corrida)
 for IID in $ISSUERS; do

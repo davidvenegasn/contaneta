@@ -145,6 +145,7 @@ $updateStmt = $pdo->prepare("
         tipo_comprobante = COALESCE(:tipo_comprobante, tipo_comprobante),
         concepto = :concepto,
         xml_status = :xml_status,
+        status = COALESCE(NULLIF(TRIM(COALESCE(status, '')), ''), 'V'),
         parsed_at = datetime('now'),
         updated_at = datetime('now')
     WHERE id = :id

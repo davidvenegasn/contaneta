@@ -1,10 +1,12 @@
 # Checklist Lanzamiento MVP — Conta_Invoicing
 
+> **Checklist de producción (ENV=prod, DEV_MODE=0, SESSION_SECRET, COOKIE_SECURE=1) y operación diaria:** ver **[OPERATIONS.md](OPERATIONS.md)** — un solo lugar para operar (backup, restore, cron SAT, health).
+
 **Objetivo:** Beta cerrada con seguridad mínima, migraciones aplicadas, respaldos y flujos críticos funcionando.
 
 **Fecha objetivo:** _______________
 
-**Documentos relacionados:** `QA_STEPS.md` (pruebas rápidas 15 min), `ROLLBACK.md` (volver atrás con git tags), `SECURITY_NOTES.md`, `env.example` / `.env.example`.
+**Documentos relacionados:** `OPERATIONS.md` (operación y checklist prod), `QA_STEPS.md` (pruebas rápidas 15 min), `ROLLBACK.md` (volver atrás con git tags), `SECURITY_NOTES.md`, `env.example` / `.env.example`.
 
 ---
 
@@ -23,10 +25,11 @@ Ver **ROLLBACK.md** para revertir a este tag si algo falla.
 ### 2. Copiar y configurar variables de entorno
 ```bash
 cp .env.example .env
-# Editar .env: ENV=prod, DEV_MODE=0, SESSION_SECRET (obligatorio en prod; si falta, la app emite log CRITICAL al arrancar), COOKIE_SECURE=1 si usas HTTPS
+# Editar .env: ENV=prod, DEV_MODE=0, SESSION_SECRET (obligatorio en prod; si falta, la app NO arranca), COOKIE_SECURE=1 si usas HTTPS, SITE_URL si usas billing/OAuth
 python3 -c "import secrets; print('SESSION_SECRET=' + secrets.token_hex(32))"
 # Pegar la línea que imprime dentro de .env
 ```
+**Variables críticas en prod:** `SESSION_SECRET` es obligatorio; sin él la aplicación lanza `RuntimeError` y no inicia. `SITE_URL` (ej. `https://tudominio.com`) se usa en redirects de login, billing (Stripe) y OAuth; debe coincidir con la URL real del sitio. Al arrancar, la app ejecuta un **checklist de startup** (SESSION_SECRET, SITE_URL, PHP si SAT, storage) e imprime cada ítem en log; en prod falla y no inicia si falta algo crítico (menos sorpresas en deploy).
 
 ### 3. Instalar dependencias y aplicar migraciones
 ```bash
@@ -59,7 +62,7 @@ Seguir **QA_STEPS.md** sección "Pruebas rápidas (15 min)": registro, login, po
 .venv/bin/pip install gunicorn
 .venv/bin/gunicorn app:app -w 2 -k uvicorn.workers.UvicornWorker --bind 127.0.0.1:8000
 ```
-(O usar systemd/supervisor con ese comando; ver DEPLOY_GUIDE.md.)
+(O usar systemd/supervisor con ese comando; ver OPERATIONS.md.)
 
 ### 8. Comprobar health desde fuera
 ```bash
@@ -85,20 +88,23 @@ Ver pasos detallados en **QA_STEPS.md**.
 ## 1. Seguridad mínima
 
 ### 1.1 Variables de entorno críticas
-- [ ] **DEV_MODE=0** en `.env` de producción (por defecto es "1", debe estar OFF)
-- [ ] **SESSION_SECRET** configurado con valor aleatorio fuerte (32+ caracteres hex)
+- [ ] **ENV=prod** en `.env` de producción.
+- [ ] **DEV_MODE=0** en `.env` de producción (por defecto en dev es "1", debe estar OFF en prod).
+- [ ] **SESSION_SECRET** configurado con valor aleatorio fuerte (32+ caracteres hex). **En prod la aplicación no arranca si falta** (RuntimeError al importar config).
 - [ ] **COOKIE_SECURE=1** si se usa HTTPS (obligatorio en producción con HTTPS; con 0 la cookie se envía por HTTP y puede ser interceptada). Ver **SECURITY_NOTES.md** (sección Cookies).
-- [ ] **APP_DB_PATH** apunta a ruta absoluta de `invoicing.db` (no relativa)
-- [ ] **FACTURAPI_SECRET_KEY** configurado y válido para timbrado real
+- [ ] **APP_DB_PATH** apunta a ruta absoluta de `invoicing.db` (no relativa).
+- [ ] **SITE_URL** (ej. `https://tudominio.com`) si usas Stripe, OAuth o redirects post-login; debe ser la URL base real del sitio.
+- [ ] **FACTURAPI_SECRET_KEY** configurado y válido para timbrado real.
 
 **Verificación:**
 ```bash
 # En servidor de producción
-grep DEV_MODE .env  # Debe mostrar DEV_MODE=0
-grep SESSION_SECRET .env  # Debe existir y tener valor largo
+grep ENV .env        # Debe mostrar ENV=prod
+grep DEV_MODE .env   # Debe mostrar DEV_MODE=0
+grep SESSION_SECRET .env  # Debe existir y tener valor largo (sin esto la app no inicia en prod)
 ```
 
-**Riesgo si falla:** Acceso sin autenticación (DEV_MODE), sesiones predecibles, timbrado fallido.
+**Riesgo si falla:** Sin SESSION_SECRET en prod la app no arranca. Sin DEV_MODE=0: acceso no deseado. Sin SITE_URL correcto: redirects de billing/login pueden fallar.
 
 - [ ] **Rate limiting login:** Máx. 5 intentos por IP en 60 s (ya implementado en `POST /login`). Ver **SECURITY_NOTES.md**.
 

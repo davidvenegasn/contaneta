@@ -1,0 +1,20 @@
+{# SEO: meta description, Open Graph, Twitter Card. Requiere seo_title y seo_description (o title). Opcional: canonical_url, og_image. #}
+<meta name="description" content="{{ (seo_description or seo_title or 'ContaNeta') | truncate(160) }}">
+{% set _canonical = canonical_url or ((site_url or '') + (request.url.path if request is defined and request else '')) %}
+{% if _canonical and _canonical.startswith('http') %}
+<link rel="canonical" href="{{ _canonical }}">
+{% endif %}
+<meta property="og:type" content="website">
+<meta property="og:title" content="{{ seo_title or title or 'ContaNeta' }}">
+<meta property="og:description" content="{{ (seo_description or seo_title or 'ContaNeta') | truncate(200) }}">
+<meta property="og:url" content="{{ _canonical or (site_url or '') }}">
+<meta property="og:locale" content="es_MX">
+{% if og_image %}
+<meta property="og:image" content="{{ og_image }}">
+{% endif %}
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{{ seo_title or title or 'ContaNeta' }}">
+<meta name="twitter:description" content="{{ (seo_description or seo_title or 'ContaNeta') | truncate(200) }}">
+{% if og_image %}
+<meta name="twitter:image" content="{{ og_image }}">
+{% endif %}

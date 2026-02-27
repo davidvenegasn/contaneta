@@ -1,0 +1,25 @@
+{# schema.org SoftwareApplication (JSON-LD) para que Google entienda el producto. #}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "ContaNeta",
+  "applicationCategory": "BusinessApplication",
+  "operatingSystem": "Web",
+  "description": "Facturación electrónica CFDI y sincronización con el SAT. Emite facturas, descarga XML y PDF, gestiona clientes, productos y cotizaciones. Prueba gratis 14 días.",
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "MXN",
+    "description": "14 días de prueba gratis al registrarte"
+  },
+  "featureList": [
+    "Facturación electrónica CFDI",
+    "Sincronización SAT (emitidas y recibidas)",
+    "Descarga XML y PDF",
+    "Clientes, productos y cotizaciones",
+    "Integración FIEL"
+  ]
+  {% if site_url %}, "url": "{{ site_url }}"{% endif %}
+}
+</script>

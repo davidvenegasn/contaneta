@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Confirma tu información · ContaNeta</title>
+  <link rel="stylesheet" href="/static/css/form.css">
+  <style>
+    body { max-width: 420px; margin: 2rem auto; padding: 0 1rem; }
+    .auth-card { padding: 1.5rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card-bg); box-shadow: var(--shadow); }
+    .auth-card h1 { margin: 0 0 0.5rem; font-size: 1.25rem; }
+    .auth-card .muted { margin-bottom: 1rem; }
+    .auth-card label { display: block; font-size: 12px; font-weight: 700; margin-bottom: 0.25rem; }
+    .auth-card input { width: 100%; padding: 0.5rem 0.75rem; margin-bottom: 1rem; border-radius: 12px; border: 1px solid var(--border-strong); }
+    .auth-card input[readonly] { background: var(--bg); color: var(--muted); }
+    .auth-card button[type="submit"] { width: 100%; padding: 0.6rem; }
+  </style>
+</head>
+<body>
+  <div class="auth-card">
+    <h1>Confirma tu información</h1>
+    <p class="muted">Revisa o completa tu nombre y datos. Luego podrás ver el portal y más adelante agregar tu información fiscal.</p>
+    {% if error %}
+      <p class="danger">{{ error }}</p>
+    {% endif %}
+    <form method="post" action="/confirmar-perfil">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token or '' }}" />
+      <label for="name">Nombre (opcional)</label>
+      <input type="text" name="name" id="name" placeholder="Tu nombre o razón social" value="{{ user.name or '' }}" autocomplete="name" />
+      <label for="email">Correo</label>
+      <input type="email" name="email" id="email" value="{{ user.email or '' }}" readonly />
+      <label for="phone">Teléfono</label>
+      <input type="tel" name="phone" id="phone" placeholder="Si tienes teléfono" value="{{ user.phone or '' }}" autocomplete="tel" />
+      <button type="submit" class="btn btn-primary">Entrar al portal</button>
+    </form>
+  </div>
+</body>
+</html>

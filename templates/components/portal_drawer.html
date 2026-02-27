@@ -1,0 +1,18 @@
+<aside class="portal-drawer" id="portalDrawer" aria-label="Menú detallado">
+  <div class="portal-drawer__inner">
+    <div class="portal-drawer__head">
+      <span class="portal-drawer__brand">ContaNeta</span>
+    </div>
+    <div class="portal-drawer__links">
+      <a class="drawer-link {{ 'drawer-link--active' if (active_page == 'create' or (nav_is_active is defined and nav_is_active('/portal/create'))) else '' }}" href="/portal/create">Nueva factura</a>
+      <a class="drawer-link {{ 'drawer-link--active' if (active_page == 'home' or (nav_is_active is defined and nav_is_active('/portal/home'))) else '' }}" href="/portal/home">Inicio</a>
+      <a class="drawer-link {{ 'drawer-link--active' if (active_page == 'bank_movements' or (nav_is_active is defined and nav_is_active('/portal/movimientos'))) else '' }}" href="/portal/movimientos">Movimientos</a>
+      <a class="drawer-link {{ 'drawer-link--active' if (active_page in ['facturas_hub','issued','received'] or (nav_is_active is defined and (nav_is_active('/portal/facturas') or nav_is_active('/portal/invoices')))) else '' }}" href="/portal/facturas">Facturas</a>
+      <a class="drawer-link {{ 'drawer-link--active' if (active_page in ['contactos_hub','clients','providers'] or (nav_is_active is defined and (nav_is_active('/portal/contactos') or nav_is_active('/portal/clients') or nav_is_active('/portal/providers')))) else '' }}" href="/portal/contactos">Clientes</a>
+      <a class="drawer-link {{ 'drawer-link--active' if (active_page in ['products','product_suggestions'] or (nav_is_active is defined and nav_is_active('/portal/products'))) else '' }}" href="/portal/products">Productos</a>
+      <a class="drawer-link {{ 'drawer-link--active' if (active_page == 'quotations' or (nav_is_active is defined and nav_is_active('/portal/cotizaciones'))) else '' }}" href="/portal/cotizaciones">Cotizaciones</a>
+      <a class="drawer-link {{ 'drawer-link--active' if (active_page == 'convertir_edo_cuenta' or (nav_is_active is defined and nav_is_active('/portal/convertir-edo-cuenta'))) else '' }}" href="/portal/convertir-edo-cuenta">Convertir estado de cuenta</a>
+      <a class="drawer-link {{ 'drawer-link--active' if (active_page == 'summary' or (nav_is_active is defined and nav_is_active('/portal/summary'))) else '' }}" href="/portal/summary">Resumen</a>
+    </div>
+  </div>
+</aside>

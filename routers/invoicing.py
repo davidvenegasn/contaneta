@@ -1,25 +1,34 @@
 # Rutas de facturación: submit del formulario y descargas (XML/PDF desde sat_cfdi o Facturapi)
+import logging
 import os
 from typing import Optional, List
 
+logger = logging.getLogger(__name__)
+
 from fastapi import APIRouter, Request, Form, Depends, HTTPException
-from fastapi.responses import HTMLResponse, Response
+from fastapi.responses import HTMLResponse, Response, RedirectResponse
+
+from fastapi import Request
 
 from config import BASE_DIR
 from database import db, table_exists, safe_update
 from facturapi_client import create_invoice, download_invoice, FacturapiError
 from validators import validate_customer
 from services.form_parse import parse_items_from_form, parse_payments_from_form
+from services import csrf as csrf_service, audit, subscription as subscription_service
+from services.action_log import log_action
 from routers.deps import get_portal_issuer
-from services import csrf as csrf_service
 
 
 def _safe_abs_path(path_like: str) -> str:
     """Resuelve ruta guardada a ruta absoluta bajo BASE_DIR (evita path traversal)."""
     if not path_like:
         raise ValueError("XML no disponible")
+    path_like = (path_like or "").strip()
+    if not path_like:
+        raise ValueError("XML no disponible")
     p = path_like if os.path.isabs(path_like) else os.path.join(BASE_DIR, path_like)
-    abs_p = os.path.abspath(p)
+    abs_p = os.path.normpath(os.path.abspath(p))
     base = os.path.abspath(BASE_DIR)
     if not abs_p.startswith(base + os.sep):
         raise ValueError("Ruta XML inválida")
@@ -50,21 +59,34 @@ def get_invoicing_router(templates):
         try:
             form = await request.form()
             csrf_token = form.get("csrf_token") if isinstance(form.get("csrf_token"), str) else None
-            if not csrf_service.verify_csrf_token(csrf_token):
+            token_val = (csrf_token or request.headers.get("X-CSRF-Token") or "").strip()
+            if not csrf_service.verify_csrf_token(token_val):
                 return HTMLResponse("<h3>Error</h3><p>Token de seguridad inválido o expirado. Recarga la página e intenta de nuevo.</p>", status_code=400)
             return _submit_impl(templates, request, issuer, form)
+        except HTTPException:
+            raise
         except FacturapiError as fe:
-            return HTMLResponse(f"<h3>Error Facturapi</h3><p>{str(fe)}</p>", status_code=400)
-        except Exception as e:
-            return HTMLResponse(f"<h3>Error</h3><p>{str(e)}</p>", status_code=400)
+            return HTMLResponse(
+                "<h3>Error al timbrar</h3><p>No pudimos completar la facturación. Revisa los datos e intenta de nuevo.</p>",
+                status_code=400,
+            )
+        except Exception:
+            logger.exception("invoicing submit: issuer_id=%s", issuer.get("id"))
+            return HTMLResponse(
+                "<h3>Error</h3><p>No pudimos completar la acción. Intenta de nuevo.</p>",
+                status_code=500,
+            )
 
     @router.get("/download/xml/{uuid}")
-    def download_xml(uuid: str, issuer: dict = Depends(get_portal_issuer)):
+    def download_xml(request: Request, uuid: str, issuer: dict = Depends(get_portal_issuer)):
+        uuid_clean = (uuid or "").strip().split()[0] if uuid else ""
+        if not uuid_clean:
+            raise HTTPException(status_code=404, detail="UUID no válido")
         try:
             conn = db()
             row = conn.execute(
-                "SELECT xml_path, uuid FROM sat_cfdi WHERE issuer_id = ? AND uuid = ? LIMIT 1",
-                (issuer["id"], (uuid or "").strip()),
+                "SELECT xml_path, uuid FROM sat_cfdi WHERE issuer_id = ? AND LOWER(TRIM(uuid)) = LOWER(?) LIMIT 1",
+                (issuer["id"], uuid_clean),
             ).fetchone()
             conn.close()
             if not row or not row["xml_path"]:
@@ -72,6 +94,16 @@ def get_invoicing_router(templates):
             abs_path = _safe_abs_path(row["xml_path"])
             if not os.path.exists(abs_path):
                 raise HTTPException(status_code=404, detail="Archivo XML no existe en disco")
+            audit.log(
+                action="download_xml",
+                user_id=getattr(request.state, "user_id", None),
+                issuer_id=issuer["id"],
+                details=f"uuid={uuid_clean[:36]}",
+                request=request,
+                entity="cfdi",
+                entity_id=uuid_clean,
+            )
+            log_action(request, "download_xml", issuer_id=issuer["id"], entity_id=uuid_clean[:36])
             with open(abs_path, "rb") as f:
                 xml_bytes = f.read()
             return Response(
@@ -81,18 +113,19 @@ def get_invoicing_router(templates):
             )
         except HTTPException:
             raise
-        except ValueError as e:
-            raise HTTPException(status_code=404, detail=str(e))
+        except ValueError:
+            logger.exception("download_xml: uuid=%s issuer_id=%s", uuid_clean[:36], issuer.get("id"))
+            raise HTTPException(status_code=404, detail="Recurso no encontrado")
 
     @router.get("/download/pdf/{uuid}")
-    def download_pdf(uuid: str, issuer: dict = Depends(get_portal_issuer), dl: int = 0):
+    def download_pdf(request: Request, uuid: str, issuer: dict = Depends(get_portal_issuer), dl: int = 0):
+        uuid_clean = (uuid or "").strip().split()[0] if uuid else ""
+        if not uuid_clean:
+            raise HTTPException(status_code=404, detail="UUID no válido")
         try:
-            uuid_clean = (uuid or "").strip().split()[0] if uuid else ""
-            if not uuid_clean:
-                raise HTTPException(status_code=404, detail="UUID no válido")
             conn = db()
             row = conn.execute(
-                "SELECT xml_path, uuid FROM sat_cfdi WHERE issuer_id = ? AND uuid = ? LIMIT 1",
+                "SELECT xml_path, uuid FROM sat_cfdi WHERE issuer_id = ? AND LOWER(TRIM(uuid)) = LOWER(?) LIMIT 1",
                 (issuer["id"], uuid_clean),
             ).fetchone()
             conn.close()
@@ -101,6 +134,16 @@ def get_invoicing_router(templates):
             abs_path = _safe_abs_path(row["xml_path"])
             if not os.path.exists(abs_path):
                 raise HTTPException(status_code=404, detail="Archivo XML no existe en disco")
+            audit.log(
+                action="download_pdf",
+                user_id=getattr(request.state, "user_id", None),
+                issuer_id=issuer["id"],
+                details=f"uuid={uuid_clean[:36]}",
+                request=request,
+                entity="cfdi",
+                entity_id=uuid_clean,
+            )
+            log_action(request, "download_pdf", issuer_id=issuer["id"], entity_id=uuid_clean[:36])
             from cfdi_pdf import parse_cfdi_xml, build_pdf
             data = parse_cfdi_xml(abs_path)
             pdf_bytes = build_pdf(data)
@@ -118,32 +161,67 @@ def get_invoicing_router(templates):
             )
         except HTTPException:
             raise
-        except ValueError as e:
-            raise HTTPException(status_code=404, detail=str(e))
+        except ValueError:
+            logger.exception("download_pdf: uuid=%s issuer_id=%s", uuid_clean[:36], issuer.get("id"))
+            raise HTTPException(status_code=404, detail="Recurso no encontrado")
 
     @router.get("/download/{fmt}/{invoice_id}")
-    def download_fmt(fmt: str, invoice_id: str, issuer: dict = Depends(get_portal_issuer)):
+    def download_fmt(
+        request: Request,
+        fmt: str,
+        invoice_id: str,
+        issuer: dict = Depends(get_portal_issuer),
+    ):
         fmt = fmt.lower()
         if fmt not in ("pdf", "xml", "zip"):
             return HTMLResponse("Formato inválido", status_code=400)
+        invoice_id_clean = (invoice_id or "").strip()
+        if not invoice_id_clean:
+            raise HTTPException(status_code=404, detail="Identificador de factura no válido")
         try:
             if issuer.get("facturapi_org_id") in (None, "", 0) or issuer.get("id") == -1:
                 raise ValueError("DEV_MODE activo: no hay issuer real para descargar. Usa token real.")
-            blob = download_invoice(issuer["facturapi_org_id"], invoice_id, fmt)
+            conn = db()
+            row = conn.execute(
+                "SELECT 1 FROM invoices WHERE issuer_id = ? AND facturapi_invoice_id = ? LIMIT 1",
+                (issuer["id"], invoice_id_clean),
+            ).fetchone()
+            conn.close()
+            if not row:
+                audit.log(
+                    action="facturapi_download_tenant_denied",
+                    user_id=getattr(request.state, "user_id", None),
+                    issuer_id=issuer["id"],
+                    details=f"fmt={fmt} invoice_id={invoice_id_clean[:64]}",
+                    request=request,
+                    entity="invoices",
+                    entity_id=invoice_id_clean,
+                )
+                raise HTTPException(status_code=404, detail="Factura no encontrada")
+            blob = download_invoice(issuer["facturapi_org_id"], invoice_id_clean, fmt)
             media = {"pdf": "application/pdf", "xml": "application/xml", "zip": "application/zip"}[fmt]
-            filename = f"invoice_{invoice_id}.{fmt}"
+            filename = f"invoice_{invoice_id_clean}.{fmt}"
             return Response(
                 content=blob,
                 media_type=media,
                 headers={"Content-Disposition": f'attachment; filename="{filename}"'},
             )
-        except Exception as e:
-            return HTMLResponse(f"Error descargando: {str(e)}", status_code=400)
+        except HTTPException:
+            raise
+        except Exception:
+            logger.exception("invoicing download_fmt: issuer_id=%s fmt=%s invoice_id=%s", issuer.get("id"), fmt, invoice_id)
+            return HTMLResponse(
+                "No pudimos completar la descarga. Intenta de nuevo.",
+                status_code=500,
+            )
 
     return router
 
 
 def _submit_impl(templates, request: Request, issuer: dict, form):
+    user_id = getattr(request.state, "user_id", 0) or 0
+    if not subscription_service.can_issuer_use_sync_and_timbrado(issuer.get("id"), user_id):
+        return RedirectResponse(url="/pricing?reason=trial_expired", status_code=302)
     export_code = (form.get("exportacion") or "01").strip()
     tipo_comprobante = (form.get("tipo_comprobante") or "I").strip().upper()
     payments_payload = None
@@ -361,6 +439,8 @@ def _submit_impl(templates, request: Request, issuer: dict, form):
     conn.commit()
     conn.close()
 
+    log_action(request, "invoice_created", issuer_id=issuer["id"], invoice_id=fact_id, uuid=(uuid or "")[:36])
+
     return templates.TemplateResponse(
         "success.html",
         {
@@ -369,5 +449,7 @@ def _submit_impl(templates, request: Request, issuer: dict, form):
             "facturapi_invoice_id": fact_id,
             "uuid": uuid,
             "total": total,
+            "issuer_alias": issuer.get("alias") or issuer.get("legal_name") or "ContaNeta",
+            "issuer_rfc": issuer.get("rfc") or "",
         },
     )

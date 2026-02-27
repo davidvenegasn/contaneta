@@ -1,0 +1,54 @@
+{# Rail: un solo botón que al abrir se mueve al otro extremo y gira (expandir/cerrar). #}
+<nav class="portal-rail" aria-label="Navegación">
+  <span class="rail-align-spacer" aria-hidden="true"></span>
+  <button type="button" class="rail-item rail-toggle-btn" data-drawer-toggle aria-label="Expandir menú" title="Expandir">
+    <span class="rail-toggle-btn__icon" aria-hidden="true">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </span>
+    <span class="rail-tooltip">Expandir</span>
+  </button>
+  <a class="rail-item {{ 'is-active' if (active_page == 'create' or (nav_is_active is defined and nav_is_active('/portal/create'))) else '' }}" href="/portal/create" aria-label="Nueva factura">
+    <span class="icon" aria-hidden="true">
+      <svg class="icon-solid" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="3" y="3" width="18" height="18" rx="5" fill="currentColor"/>
+        <path d="M12 7.25v9.5" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/>
+        <path d="M7.25 12h9.5" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/>
+      </svg>
+    </span>
+    <span class="rail-tooltip">Nueva factura</span>
+  </a>
+  <a class="rail-item {{ 'is-active' if (active_page == 'home' or (nav_is_active is defined and nav_is_active('/portal/home'))) else '' }}" href="/portal/home" aria-label="Inicio">
+    <span class="icon" aria-hidden="true">{{ icon_home() }}</span>
+    <span class="rail-tooltip">Inicio</span>
+  </a>
+  <a class="rail-item rail-item--movements {{ 'is-active' if (active_page == 'bank_movements' or (nav_is_active is defined and nav_is_active('/portal/movimientos'))) else '' }}" href="/portal/movimientos" aria-label="Movimientos">
+    <span class="icon" aria-hidden="true">{{ icon_movements() }}</span>
+    <span class="rail-tooltip">Movimientos</span>
+  </a>
+  <a class="rail-item {{ 'is-active' if (active_page == 'facturas_hub' or active_page == 'issued' or active_page == 'received' or (nav_is_active is defined and (nav_is_active('/portal/facturas') or nav_is_active('/portal/invoices'))) ) else '' }}" href="/portal/facturas" aria-label="Facturas">
+    <span class="icon" aria-hidden="true">{{ icon_issued() }}</span>
+    <span class="rail-tooltip">Facturas</span>
+  </a>
+  <a class="rail-item {{ 'is-active' if (active_page == 'contactos_hub' or active_page == 'clients' or active_page == 'providers' or (nav_is_active is defined and (nav_is_active('/portal/contactos') or nav_is_active('/portal/clients') or nav_is_active('/portal/providers'))) ) else '' }}" href="/portal/contactos" aria-label="Clientes">
+    <span class="icon" aria-hidden="true">{{ icon_clients() }}</span>
+    <span class="rail-tooltip">Clientes</span>
+  </a>
+  <a class="rail-item {{ 'is-active' if (active_page == 'products' or active_page == 'product_suggestions' or (nav_is_active is defined and nav_is_active('/portal/products'))) else '' }}" href="/portal/products" aria-label="Productos">
+    <span class="icon" aria-hidden="true">{{ icon_products() }}</span>
+    <span class="rail-tooltip">Productos</span>
+  </a>
+  <a class="rail-item {{ 'is-active' if (active_page == 'quotations' or (nav_is_active is defined and nav_is_active('/portal/cotizaciones'))) else '' }}" href="/portal/cotizaciones" aria-label="Cotizaciones">
+    <span class="icon" aria-hidden="true">{{ icon_quotations() }}</span>
+    <span class="rail-tooltip">Cotizaciones</span>
+  </a>
+  <a class="rail-item {{ 'is-active' if (active_page == 'convertir_edo_cuenta' or (nav_is_active is defined and nav_is_active('/portal/convertir-edo-cuenta')) ) else '' }}" href="/portal/convertir-edo-cuenta" aria-label="Convertir estado de cuenta">
+    <span class="icon" aria-hidden="true">{{ icon_bank() }}</span>
+    <span class="rail-tooltip">Convertir estado de cuenta</span>
+  </a>
+  <a class="rail-item {{ 'is-active' if (active_page == 'summary' or (nav_is_active is defined and nav_is_active('/portal/summary'))) else '' }}" href="/portal/summary" aria-label="Resumen">
+    <span class="icon" aria-hidden="true">{{ icon_summary() }}</span>
+    <span class="rail-tooltip">Resumen</span>
+  </a>
+</nav>

@@ -1,0 +1,55 @@
+<details class="card" id="extrasCard">
+  <summary style="cursor:pointer; font-weight:700; list-style:none;">
+    Extras (opcional)
+    <span class="muted" style="font-weight:400; margin-left:8px;">(click para abrir)</span>
+  </summary>
+
+  <div style="margin-top:12px;"></div>
+
+  <div class="row">
+    <div>
+      <label>Exportación (CFDI 4.0)</label>
+      <select name="exportacion" id="exportacion" required>
+        <option value="01" selected>01 — No aplica</option>
+        <option value="02">02 — Definitiva</option>
+        <option value="03">03 — Temporal</option>
+      </select>
+    </div>
+    <div>
+      <label>Tipo de comprobante</label>
+      <select name="tipo_comprobante" id="tipo_comprobante" required>
+        <option value="I" selected>I — Ingreso</option>
+        <option value="E">E — Egreso</option>
+        <option value="P">P — Pago</option>
+      </select>
+      <p class="muted" style="margin:6px 0 0;">Por ahora el flujo está pensado para Ingreso. E/P se habilitan después.</p>
+    </div>
+  </div>
+
+  <div class="row">
+    <div>
+      <label>Serie (si aplica)</label>
+      <input name="serie" placeholder="Ej. A" />
+    </div>
+    <div>
+      <label>Folio (si aplica)</label>
+      <input name="folio" placeholder="Ej. 123" inputmode="numeric" />
+    </div>
+  </div>
+
+  <div class="row">
+    <div>
+      <label>Referencia / Orden de compra</label>
+      <input name="order_ref" placeholder="Ej. OC-4451" />
+    </div>
+    <div>
+      <label>Fecha de emisión (opcional)</label>
+      <input name="issue_date" type="datetime-local" />
+    </div>
+  </div>
+
+  <div>
+    <label>Notas / Observaciones</label>
+    <textarea name="notes" rows="3" placeholder="Información adicional para el cliente (opcional)"></textarea>
+  </div>
+</details>

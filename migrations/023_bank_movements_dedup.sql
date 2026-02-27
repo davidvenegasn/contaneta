@@ -1,0 +1,3 @@
+-- Deduplicación de movimientos bancarios: columna movement_hash y limpieza de duplicados.
+-- La lógica (añadir columna, rellenar hash, borrar duplicados, índice único) se aplica en migrations_runner._apply_023_bank_movements_dedup()
+-- Este archivo se ejecuta como migración; el runner detecta la versión 023 y ejecuta la función Python.

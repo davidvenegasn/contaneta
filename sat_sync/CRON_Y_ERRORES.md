@@ -41,6 +41,24 @@
   ```
   Opcionalmente por emisor: `php sat_sync/parse_xml.php --issuer=1 --force`
 
+### 8. Muchas facturas muestran "Sin estatus"
+- **Causa**: El estatus (Vigente/Cancelada) viene de la metadata del SAT (sync.php). Las filas creadas solo al descargar XML (verify_requests) o que no tenían estatus en la metadata quedan con `status` NULL.
+- **Solución** (una vez, para datos ya existentes):
+  ```bash
+  sqlite3 invoicing.db "UPDATE sat_cfdi SET status = 'V' WHERE status IS NULL OR TRIM(COALESCE(status, '')) = '';"
+  ```
+  Luego ejecutar **check_cancellations** para marcar como canceladas las que lo estén:
+  ```bash
+  php sat_sync/check_cancellations.php <issuer_id> --days=365
+  ```
+  Para todos los issuers con credenciales:
+  ```bash
+  for i in $(sqlite3 invoicing.db "SELECT issuer_id FROM sat_credentials"); do
+    php sat_sync/check_cancellations.php "$i" --days=365
+  done
+  ```
+- **De ahora en adelante**: verify_requests y parse_xml rellenan `status = 'V'` cuando falta; check_cancellations actualiza a "Cancelado" cuando corresponde.
+
 ---
 
 ## Configuración de Cron (todos los clientes)
@@ -99,3 +117,45 @@ tail -f /tmp/sat_sync.log
 ## Nota sobre fecha en macOS
 
 El script usa `date -v-1m` (macOS). En Linux usa `date -d "1 month ago"`. Si falla, ajusta la línea `YM_PREV` en `cron_sat_sync.sh`.
+
+---
+
+## Worker desde cola (sat_worker.py) — Sync iniciado desde la UI
+
+Cuando el usuario pulsa **"Sincronizar SAT"** en el portal, se encolan jobs en `sat_jobs`. El script `scripts/sat_worker.py` procesa esa cola: toma jobs con `status = 'queued'`, ejecuta `php sat_sync/sync.php <issuer_id> issued` y `received`, y actualiza el estado a `ok` o `error`.
+
+### Ejecución manual
+
+```bash
+cd /ruta/al/proyecto
+APP_DB_PATH=/ruta/al/proyecto/invoicing.db python3 scripts/sat_worker.py
+```
+
+Variables de entorno opcionales:
+- `APP_DB_PATH`: ruta a `invoicing.db` (por defecto: `./invoicing.db`)
+- `PHP_BIN`: ejecutable PHP (por defecto: `php`)
+- `SAT_SYNC_BACKFILL_DAYS`: días de backfill para sync.php (default: 7)
+- `SAT_SYNC_WINDOW_HOURS`: ventana en horas (default: 6)
+
+### Cron en producción (cada 15 min)
+
+Ejemplo para procesar la cola cada 15 minutos:
+
+```bash
+crontab -e
+```
+
+Añadir (ajustar rutas y venv si aplica):
+
+```
+# Worker SAT: procesa jobs encolados desde la UI (Sincronizar SAT)
+*/15 * * * * cd /var/www/conta-invoicing && .venv/bin/python scripts/sat_worker.py >> /var/log/conta/sat_worker.log 2>&1
+```
+
+O sin venv:
+
+```
+*/15 * * * * cd /var/www/conta-invoicing && APP_DB_PATH=/var/www/conta-invoicing/invoicing.db python3 scripts/sat_worker.py >> /var/log/conta/sat_worker.log 2>&1
+```
+
+El worker es idempotente y seguro ejecutarlo cada X minutos: solo toma jobs `queued`, los marca `running`, ejecuta el PHP y actualiza el estado. Usa `PRAGMA busy_timeout` y WAL para reducir locks en SQLite.

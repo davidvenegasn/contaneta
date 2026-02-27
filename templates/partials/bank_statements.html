@@ -1,0 +1,52 @@
+{# Listado de estados de cuenta. Usar en /portal/bank/statements o en hub /portal/bancos?tab=estados_guardados. #}
+<section class="page-section page-section--bank-statements">
+  <div class="card ui-card">
+    <div class="card-header ui-card__header">
+      <h3 class="section-title">Estados de cuenta</h3>
+      <p class="muted u-m0">Estados de cuenta subidos y convertidos desde PDF. Cada uno tiene movimientos asociados que puedes ver y filtrar.</p>
+    </div>
+
+    <div class="card-list-sep">
+      {% if not statements or statements|length == 0 %}
+        <div class="empty-state empty-state--empty">
+          <div class="empty-state__title">Aún no hay estados de cuenta</div>
+          <div class="empty-state__desc">Sube un PDF en <a href="{{ hub_base|default('/portal/bank/pdf-to-excel') }}{% if hub_base %}?tab=subir_pdf{% endif %}">Convertir Edo. de Cuenta</a> para ver aquí el listado y sus movimientos.</div>
+          <a href="{{ hub_base|default('/portal/bank/pdf-to-excel') }}{% if hub_base %}?tab=subir_pdf{% endif %}" class="btn btn-primary">Ir a convertir PDF</a>
+        </div>
+      {% else %}
+      <div class="table-wrap">
+        <table class="table ui-table ui-table--zebra">
+          <thead>
+            <tr>
+              <th>Periodo</th>
+              <th>Banco</th>
+              <th>Cuenta (últimos 4)</th>
+              <th>Fecha subida</th>
+              <th>Movimientos</th>
+              <th>Total ingresos</th>
+              <th>Total gastos</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for s in statements %}
+            <tr>
+              <td class="muted">{{ s.period_label }}</td>
+              <td>{{ s.bank_name }}</td>
+              <td><code>{{ s.account_last4 }}</code></td>
+              <td class="muted u-text-12">{{ s.created_at[:16] if s.created_at else '—' }}</td>
+              <td>{{ s.movements_count | default(0) }}</td>
+              <td class="amount-positive">${{ "%.2f"|format((s.total_ingresos | default(0)) | float) }}</td>
+              <td class="amount-negative">${{ "%.2f"|format((s.total_gastos | default(0)) | float) }}</td>
+              <td>
+                <a href="/portal/movimientos?statement_id={{ s.statement_key|urlencode }}" class="btn btn--sm btn--secondary">Ver movimientos</a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</section>

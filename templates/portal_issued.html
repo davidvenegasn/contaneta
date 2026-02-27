@@ -4,12 +4,18 @@
 {% set page_icon = '<svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 2v5a1 1 0 0 0 1 1h5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 12v6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/><path d="m15 15-3-3-3 3" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>' %}
 
 {% block content %}
-  <div class="card ym-card">
-    <div class="ym-selector">
-      {{ month_picker('/portal/invoices/issued', token, ym, ym_label) }}
+  <div class="card ym-card ym-card--collapsible" data-resumen-key="portal_resumen_collapsed">
+    <div class="ym-card__head">
+      <div class="ym-selector">
+        {{ month_picker('/portal/invoices/issued', token, ym, ym_label) }}
+      </div>
+      <button type="button" class="ym-card__toggle btn btn--sm btn--ghost" aria-label="Ocultar totales" title="Ocultar totales (proteger tu información)">
+        <span class="ym-card__toggle-icon" aria-hidden="true">−</span>
+        <span class="ym-card__toggle-label">Ocultar totales</span>
+      </button>
     </div>
     {% set mt = month_totals|default({}) %}
-    <div class="dashboard-metrics">
+    <div class="ym-card__resumen dashboard-metrics">
       <div class="card metric-card">
         <div class="metric-label">Total ingresos</div>
         <div class="metric-value">${{ '{:,.2f}'.format(mt.total_base|default(0)) }}</div>
@@ -109,33 +115,16 @@
         </div>
       </div>
 
-      <!-- Error de carga (solo si falla la petición; vacío => emptyState) -->
-      <div class="empty-state empty-state--error" id="loadErrorState" hidden aria-live="polite">
-        <div class="empty-state__title">No pudimos cargar esto ahora.</div>
-        <p class="empty-state__desc" id="loadErrorStateMsg">Puedes intentar de nuevo.</p>
-        <button type="button" class="btn btn--secondary" id="loadErrorStateRetry">Reintentar</button>
-      </div>
-      <!-- Empty state (0 facturas este mes) -->
-      <div class="empty-state empty-state--empty" id="emptyState" hidden>
-        <div class="empty-state__icon" aria-hidden="true">
-          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/>
-            <path d="M14 2v5a1 1 0 0 0 1 1h5"/>
-            <path d="M12 12v6"/>
-            <path d="m15 15-3-3-3 3"/>
-          </svg>
-        </div>
-        <div class="empty-state__title">No hay facturas emitidas este mes</div>
-        <div class="empty-state__desc">Crea una factura nueva para empezar a facturar.</div>
-        <div class="empty-state__actions">
-          <a href="/portal/create" class="btn btn--primary ui-btn ui-btn--primary" style="text-decoration: none;">Generar factura</a>
-        </div>
-      </div>
+      {% from 'portal/_ui_components.html' import portal_empty_state, portal_load_error %}
+      {{ portal_load_error('loadErrorState') }}
+      {% call portal_empty_state('No hay facturas emitidas este mes', 'Crea una factura nueva para empezar a facturar.', id='emptyState') %}
+        <a href="/portal/create" class="btn btn--primary ui-btn ui-btn--primary">Generar factura</a>
+      {% endcall %}
     </div>
   </div>
 
   <!-- P41: Drawer detalle CFDI — click fila/card o "Detalle" abre sin recargar; ESC, overlay, scroll interno -->
-  <div class="ui-overlay cfdi-drawer-overlay" id="cfdiDrawerOverlay" hidden aria-hidden="true">
+  <div class="ui-overlay cfdi-drawer-overlay" id="cfdiDrawerOverlay" aria-label="Detalle CFDI" hidden aria-hidden="true">
     <div class="ui-overlay__backdrop" id="cfdiDrawerBackdrop"></div>
     <div class="ui-drawer cfdi-drawer" role="dialog" aria-labelledby="cfdiDrawerTitle" aria-modal="true">
       <div class="cfdi-drawer__header">
@@ -154,9 +143,9 @@
       </div>
       <div class="cfdi-drawer__footer">
         <button type="button" class="btn btn--sm btn--ghost" id="cfdiDrawerCopyUuid">Copiar UUID</button>
-        <a id="cfdiDrawerXml" href="#" target="_blank" rel="noopener" class="btn btn--sm" style="text-decoration:none; display:none;">XML</a>
-        <button type="button" class="btn btn--sm" id="cfdiDrawerPdf" data-pdf-url="" style="display:none;">PDF</button>
-        <a id="cfdiDrawerFullPage" href="#" class="btn btn--sm btn--ghost" style="text-decoration:none;">Ver página completa</a>
+        <a id="cfdiDrawerXml" href="#" target="_blank" rel="noopener" class="btn btn--sm link-none u-hidden">XML</a>
+        <button type="button" class="btn btn--sm u-hidden" id="cfdiDrawerPdf" data-pdf-url="">PDF</button>
+        <a id="cfdiDrawerFullPage" href="#" class="btn btn--sm btn--ghost link-none">Ver página completa</a>
       </div>
     </div>
   </div>
@@ -248,10 +237,10 @@
     const emptyState = document.getElementById('emptyState');
     const pagination = document.getElementById('pagination');
     
-    tableBody.innerHTML = (window.uiSkeletonTableRows && window.uiSkeletonTableRows(9, 5)) || '<tr><td colspan="9"><div class="skeleton" style="height: 46px; border-radius: 14px;"></div></td></tr>'.repeat(5);
+    tableBody.innerHTML = (window.uiSkeletonTableRows && window.uiSkeletonTableRows(9, 5)) || '<tr><td colspan="9"><div class="skeleton skeleton-line"></div></td></tr>'.repeat(5);
     tableWrap.style.display = '';
     var mobileList = document.getElementById('invoiceListMobile');
-    if (mobileList) mobileList.innerHTML = (window.uiSkeletonCards && window.uiSkeletonCards(3)) || '<div class="invoice-card-mobile"><div class="skeleton" style="height:72px;border-radius:12px;"></div></div>'.repeat(3);
+    if (mobileList) mobileList.innerHTML = (window.uiSkeletonCards && window.uiSkeletonCards(3)) || '<div class="invoice-card-mobile"><div class="skeleton skeleton-card"></div></div>'.repeat(3);
     emptyState.hidden = true;
     var loadErr0 = document.getElementById('loadErrorState');
     if (loadErr0) loadErr0.hidden = true;
@@ -313,8 +302,9 @@
       renderPagination(r.data.pagination);
       updateURL();
     } catch (err) {
-      const fallbackMsg = 'Revisa tu conexión e intenta de nuevo.';
+      const fallbackMsg = (err && err.message) ? err.message : 'Revisa tu conexión e intenta de nuevo.';
       tableWrap.style.display = 'none';
+      if (tableBody) tableBody.innerHTML = '';
       var mobileList = document.getElementById('invoiceListMobile');
       if (mobileList) mobileList.innerHTML = '';
       emptyState.hidden = true;
@@ -349,7 +339,7 @@
       const uuidCopyBtn = row.uuid ? `<button type="button" class="uuid-copy-btn" data-copy-uuid="${escapeHtml(row.uuid)}" aria-label="Copiar UUID" title="Copiar UUID"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>` : '';
       const total = formatMoney(row.total, row.moneda);
       const iva = formatMoney((row.impuestos || 0) - (row.retenciones || 0), row.moneda);
-      const metodoPago = row.metodo_pago ? `<span class="badge badge--neutral" style="font-size: 11px;">${escapeHtml(row.metodo_pago)}</span>` : '<span class="muted">—</span>';
+      const metodoPago = row.metodo_pago ? `<span class="badge badge--neutral badge--xs">${escapeHtml(row.metodo_pago)}</span>` : '<span class="muted">—</span>';
       const status = renderStatus(row.status);
       const hasXML = row.xml_path && row.xml_path.trim();
       const detailUrl = `/portal/cfdi/issued/${row.uuid}`;
@@ -357,16 +347,16 @@
       const pdfUrl = hasXML ? `/portal/sat/pdf/${row.uuid}` : null;
       temp.innerHTML = `<tr data-row-index="${i}">
         <td class="muted">${fecha}</td>
-        <td><div style="font-weight: var(--fw-semibold);">${receptor}</div><div class="muted" style="font-size: var(--text-xs); font-family: ui-monospace, monospace;">${rfc}</div></td>
+        <td><div class="u-fw-semibold">${receptor}</div><div class="muted u-text-xs font-mono">${rfc}</div></td>
         <td class="concepto-cell">${concepto}</td>
         <td><div class="uuid-copy-wrap"><span class="uuid-copy-wrap__text">${uuid}</span>${uuidCopyBtn}</div></td>
-        <td style="font-weight: var(--fw-semibold);">${total}</td>
+        <td class="u-fw-semibold">${total}</td>
         <td class="muted">${iva}</td>
         <td>${metodoPago}</td>
         <td>${status}</td>
-        <td style="text-align: right;"><div style="display: flex; gap: var(--space-1); justify-content: flex-end; flex-wrap: wrap;">
-          <a href="${detailUrl}" class="btn btn--sm btn--ghost cfdi-detail-link" style="text-decoration: none;">Detalle</a>
-          ${xmlUrl ? `<a href="${xmlUrl}" target="_blank" rel="noopener" class="btn btn--sm" style="text-decoration: none;">XML</a>` : ''}
+        <td class="text-right"><div class="u-flex u-gap-1 u-justify-end u-flex-wrap">
+          <a href="${detailUrl}" class="btn btn--sm btn--ghost cfdi-detail-link link-none">Detalle</a>
+          ${xmlUrl ? `<a href="${xmlUrl}" target="_blank" rel="noopener" class="btn btn--sm link-none">XML</a>` : ''}
           ${pdfUrl ? `<button type="button" class="btn btn--sm" data-pdf-url="${pdfUrl}">PDF</button>` : ''}
         </div></td>
       </tr>`;
@@ -374,8 +364,8 @@
 
       if (mobileEl) {
         const actions = [
-          '<a href="' + detailUrl + '" class="btn btn--sm btn--ghost cfdi-detail-link" style="text-decoration:none;" data-row-index="' + i + '">Detalle</a>',
-          xmlUrl ? '<a href="' + xmlUrl + '" target="_blank" rel="noopener" class="btn btn--sm btn--secondary" style="text-decoration:none;">XML</a>' : '',
+          '<a href="' + detailUrl + '" class="btn btn--sm btn--ghost cfdi-detail-link link-none" data-row-index="' + i + '">Detalle</a>',
+          xmlUrl ? '<a href="' + xmlUrl + '" target="_blank" rel="noopener" class="btn btn--sm btn--secondary link-none">XML</a>' : '',
           pdfUrl ? '<button type="button" class="btn btn--sm btn--secondary" data-pdf-url="' + escapeHtml(pdfUrl) + '">PDF</button>' : ''
         ].filter(Boolean).join('');
         const mobileUuidCopy = row.uuid ? '<button type="button" class="uuid-copy-btn" data-copy-uuid="' + escapeHtml(row.uuid) + '" aria-label="Copiar UUID" title="Copiar UUID"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>' : '';
@@ -384,7 +374,7 @@
             '<div class="invoice-card-mobile__main">' +
               '<div class="invoice-card-mobile__title">' + receptor + '</div>' +
               '<div class="invoice-card-mobile__meta muted">' + fecha + (rfc ? ' · ' + rfc : '') + '</div>' +
-              '<div class="invoice-card-mobile__uuid uuid-copy-wrap" style="margin-top:4px;">' +
+              '<div class="invoice-card-mobile__uuid uuid-copy-wrap u-mt-1">' +
                 '<span class="uuid-copy-wrap__text">' + uuid + '</span>' + mobileUuidCopy +
               '</div>' +
               '<div class="invoice-card-mobile__concept" title="' + escapeHtml(row.concepto || '') + '">' + concepto + '</div>' +
@@ -410,8 +400,10 @@
     pagination.hidden = false;
     document.getElementById('prevPageBtn').disabled = pag.page <= 1;
     document.getElementById('nextPageBtn').disabled = pag.page >= pag.pages;
+    var from = (pag.page - 1) * pag.per_page + 1;
+    var to = Math.min(pag.page * pag.per_page, pag.total);
     document.querySelector('.pagination__info').textContent = 
-      `Mostrando ${(pag.page - 1) * pag.per_page + 1}-${Math.min(pag.page * pag.per_page, pag.total)} de ${pag.total}`;
+      pag.page === 1 ? 'Mostrando los primeros ' + to + ' de ' + pag.total : 'Mostrando ' + from + '-' + to + ' de ' + pag.total;
     document.querySelector('.pagination__page').textContent = `Página ${pag.page} de ${pag.pages}`;
   }
 
@@ -528,7 +520,7 @@
 
     if (partyLabel) partyLabel.textContent = 'Receptor';
     if (uuidEl) uuidEl.textContent = row.uuid || '—';
-    if (partyValue) partyValue.innerHTML = (row.nombre_receptor ? escapeHtml(row.nombre_receptor) : '—') + (row.rfc_receptor ? '<div class="muted" style="font-size: var(--text-xs); font-family: ui-monospace;">' + escapeHtml(row.rfc_receptor) + '</div>' : '');
+    if (partyValue) partyValue.innerHTML = (row.nombre_receptor ? escapeHtml(row.nombre_receptor) : '—') + (row.rfc_receptor ? '<div class="muted u-text-xs font-mono">' + escapeHtml(row.rfc_receptor) + '</div>' : '');
     if (conceptoEl) conceptoEl.textContent = row.concepto || '—';
     if (totalEl) totalEl.textContent = formatMoney(row.total, row.moneda);
     if (ivaEl) ivaEl.textContent = formatMoney((row.impuestos || 0) - (row.retenciones || 0), row.moneda);
@@ -536,11 +528,11 @@
 
     const hasXML = row.xml_path && row.xml_path.trim();
     if (xmlLink) {
-      xmlLink.style.display = hasXML ? '' : 'none';
+      if (hasXML) xmlLink.classList.remove('u-hidden'); else xmlLink.classList.add('u-hidden');
       xmlLink.href = hasXML ? '/portal/sat/xml/' + row.uuid : '#';
     }
     if (pdfBtn) {
-      pdfBtn.style.display = hasXML ? '' : 'none';
+      if (hasXML) pdfBtn.classList.remove('u-hidden'); else pdfBtn.classList.add('u-hidden');
       pdfBtn.setAttribute('data-pdf-url', hasXML ? '/portal/sat/pdf/' + row.uuid : '');
     }
     if (fullPageLink) fullPageLink.href = '/portal/cfdi/issued/' + (row.uuid || '');
@@ -560,10 +552,14 @@
     cfdiDrawerOverlay.classList.add('is-open');
     cfdiDrawerOverlay.setAttribute('aria-hidden', 'false');
     document.body.classList.add('no-scroll');
+    window._cfdiDrawerRemoveEscape = (typeof window.uiCloseOnEscape === 'function') ? window.uiCloseOnEscape(cfdiDrawerOverlay, closeCfdiDrawer) : null;
+    if (typeof window.uiTrapFocus === 'function') window.uiTrapFocus(cfdiDrawerOverlay);
   }
 
   function closeCfdiDrawer() {
     if (!cfdiDrawerOverlay) return;
+    if (typeof window.uiReleaseFocusTrap === 'function') window.uiReleaseFocusTrap();
+    if (window._cfdiDrawerRemoveEscape) { window._cfdiDrawerRemoveEscape(); window._cfdiDrawerRemoveEscape = null; }
     cfdiDrawerOverlay.hidden = true;
     cfdiDrawerOverlay.classList.remove('is-open');
     cfdiDrawerOverlay.setAttribute('aria-hidden', 'true');
@@ -572,9 +568,6 @@
 
   if (cfdiDrawerBackdrop) cfdiDrawerBackdrop.addEventListener('click', closeCfdiDrawer);
   if (cfdiDrawerClose) cfdiDrawerClose.addEventListener('click', closeCfdiDrawer);
-  document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape' && cfdiDrawerOverlay && cfdiDrawerOverlay.classList.contains('is-open')) closeCfdiDrawer();
-  });
 
   // P49: one-click copy UUID (tabla y móvil)
   document.addEventListener('click', function(e) {

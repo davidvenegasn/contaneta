@@ -1,0 +1,48 @@
+{% extends "base_portal.html" %}
+{% set title = 'QA (solo dev)' %}
+{% block content %}
+<div class="ui-page-wrap">
+  <header class="app-header" style="margin-bottom: var(--ui-section-gap);">
+    <h1 class="app-header__title" style="margin: 0; font-size: var(--text-2xl); font-weight: 700;">QA — Comprobaciones rápidas</h1>
+    <p class="muted u-m0 u-mt-1" style="font-size: var(--text-sm);">Solo visible en desarrollo (DEV_MODE=1 o ENV=dev). Sin datos sensibles.</p>
+  </header>
+
+  <div class="ui-card" style="margin-bottom: var(--ui-section-gap);">
+    <div class="ui-card__header">
+      <h2 class="ui-card__title" style="margin: 0;">Checks del mes ({{ ym_label|default(ym) }})</h2>
+    </div>
+    <div class="ui-card__body">
+      <ul class="u-m0" style="list-style: none; padding: 0;">
+        <li style="padding: 6px 0; border-bottom: 1px solid var(--border);"><strong>Facturas emitidas (mes):</strong> {{ count_issued|default(0) }}</li>
+        <li style="padding: 6px 0; border-bottom: 1px solid var(--border);"><strong>Facturas recibidas (mes):</strong> {{ count_received|default(0) }}</li>
+        <li style="padding: 6px 0;">
+          <strong>Sync SAT:</strong>
+          {% if sat_last_sync %}
+            último sync {{ sat_last_sync }}
+            {% if sat_status %}({{ sat_status }}){% endif %}
+          {% else %}
+            sin sync reciente
+          {% endif %}
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="ui-card">
+    <div class="ui-card__header">
+      <h2 class="ui-card__title" style="margin: 0;">Navegación rápida</h2>
+    </div>
+    <div class="ui-card__body">
+      <ul class="u-m0" style="list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 12px;">
+        <li><a href="/portal/home" class="ui-btn ui-btn--secondary">Inicio</a></li>
+        <li><a href="/portal/facturas" class="ui-btn ui-btn--secondary">Facturas (sync SAT desde aquí)</a></li>
+        <li><a href="/portal/movimientos" class="ui-btn ui-btn--secondary">Movimientos</a></li>
+        <li><a href="/portal/bancos" class="ui-btn ui-btn--secondary">Bancos</a></li>
+        <li><a href="/portal/summary" class="ui-btn ui-btn--secondary">Resumen</a></li>
+        <li><a href="/portal/contactos" class="ui-btn ui-btn--secondary">Contactos</a></li>
+        <li><a href="/portal/create" class="ui-btn ui-btn--primary">Nueva factura</a></li>
+      </ul>
+    </div>
+  </div>
+</div>
+{% endblock %}

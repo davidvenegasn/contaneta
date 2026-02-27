@@ -1,0 +1,127 @@
+<div class="card conceptos-card">
+  <div class="card-title-row mb-14">
+    <h3 class="section-title">03 — Conceptos</h3>
+    <span class="pill" id="itemsCounter">1 concepto</span>
+  </div>
+
+  <p class="muted m-0">Agrega conceptos conforme los necesites. ProdServ y Unidad tienen autocomplete con catálogos SAT.</p>
+
+  <div class="items items--cards">
+    {% for i in range(1,2) %}
+    <div class="item item-row concept-block" data-item-row="{{i}}">
+      <div class="item-row-top concept-block__inner">
+        <div class="row">
+          <div>
+            <label>Cantidad</label>
+            <input name="qty_{{i}}" placeholder="1" inputmode="decimal" />
+          </div>
+          <div>
+            <label>Descripción</label>
+            <input name="desc_{{i}}" placeholder="Descripción del concepto" value="{{ concept_prefill.description | e if concept_prefill and i == 1 else '' }}" />
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label>Precio unitario</label>
+            <div class="price-wrap">
+              <span class="price-prefix">$</span>
+              <input name="price_{{i}}" placeholder="0.00" inputmode="decimal" value="{{ concept_prefill.unit_price | e if concept_prefill and i == 1 else '' }}" />
+            </div>
+          </div>
+          <div>
+            <label>Desc. %</label>
+            <input name="disc_{{i}}" class="disc" data-i="{{i}}" placeholder="0" inputmode="decimal" />
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label>Clave ProdServ</label>
+            <div class="prodserv-wrap prodserv-wrap--inline">
+              <div class="prodserv-input">
+                <input name="key_{{i}}" class="prodserv" data-i="{{i}}"
+                       placeholder="Ej. 81112100"
+                       list="prodserv_list_{{i}}"
+                       autocomplete="off"
+                       value="{{ concept_prefill.product_key | e if concept_prefill and i == 1 else '' }}" />
+                <button type="button" class="prodservBtn" data-i="{{i}}" aria-label="Buscar ProdServ" title="Buscar ProdServ">
+                  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <circle cx="11" cy="11" r="7"></circle>
+                    <path d="M20 20l-3.5-3.5"></path>
+                  </svg>
+                </button>
+              </div>
+              <datalist id="prodserv_list_{{i}}"></datalist>
+            </div>
+          </div>
+          <div>
+            <label>Unidad</label>
+            <div class="unit-wrap" data-unit-wrap="{{i}}" data-prefill-unit="{{ concept_prefill.unit_key | e if concept_prefill and i == 1 else '' }}">
+              <select class="unitCommon" id="unit_select_{{i}}" data-i="{{i}}">
+                <option value="E48" selected>E48 — Unidad de servicio</option>
+                <option value="H87">H87 — Pieza</option>
+                <option value="ACT">ACT — Actividad</option>
+                <option value="HUR">HUR — Hora</option>
+                <option value="DAY">DAY — Día</option>
+                <option value="KGM">KGM — Kilogramo</option>
+                <option value="LTR">LTR — Litro</option>
+                <option value="XBX">XBX — Caja</option>
+                <option value="__MORE__">Mostrar más opciones…</option>
+              </select>
+              <input type="hidden" name="unit_{{i}}" id="unit_{{i}}" value="E48" />
+              <input class="unitOther" id="unit_other_{{i}}" data-i="{{i}}"
+                     placeholder="Buscar unidad SAT…"
+                     list="unidad_list_{{i}}"
+                     autocomplete="off"
+                     style="display:none;" />
+              <a href="#" class="unit-back" id="unit_back_{{i}}" data-i="{{i}}" style="display:none;">Volver a comunes</a>
+              <datalist id="unidad_list_{{i}}"></datalist>
+            </div>
+          </div>
+        </div>
+        <div class="row concept-block__row-actions">
+          <div></div>
+          <div style="display:flex; justify-content:flex-end;">
+            <button type="button" class="removeItemBtn btn-remove-concept" aria-label="Quitar concepto" title="Eliminar">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M18 6L6 18"></path>
+                <path d="M6 6l12 12"></path>
+              </svg>
+              <span class="btn-remove-concept__label">Eliminar</span>
+            </button>
+          </div>
+        </div>
+        <input type="hidden" name="iva_{{i}}" class="ivaHidden" data-i="{{i}}" value="{{ concept_prefill.iva_rate | e if concept_prefill and i == 1 else '0.16' }}" />
+        <input type="hidden" name="isr_ret_{{i}}" class="isrRetHidden" data-i="{{i}}" value="0" />
+        <input type="hidden" name="iva_ret_{{i}}" class="ivaRetHidden" data-i="{{i}}" value="0" />
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div id="prodservModal" class="form-modal" style="display:none;" aria-hidden="true">
+    <div class="form-modal__backdrop" data-close="1"></div>
+    <div class="form-modal__panel" role="dialog" aria-modal="true" aria-labelledby="prodservModalTitle">
+      <div class="form-modal__head">
+        <div>
+          <div id="prodservModalTitle" class="form-modal__title">Buscar Clave ProdServ</div>
+          <div class="muted" style="margin-top:4px;">Escribe una palabra común (ej. asesoría, contabilidad, renta) o una clave.</div>
+        </div>
+        <button type="button" class="form-modal__close" data-close="1" aria-label="Cerrar">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M18 6L6 18"></path>
+            <path d="M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+      <div class="form-modal__body">
+        <input id="prodservModalInput" class="form-modal__input" placeholder="Buscar…" autocomplete="off" />
+        <div id="prodservModalResults" class="form-modal__results"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="conceptos-actions">
+    <button type="button" class="btn-secondary" id="addItemBtn">+ Agregar concepto</button>
+    <span class="muted" id="itemsHint">Puedes agregar los que necesites.</span>
+  </div>
+</div>

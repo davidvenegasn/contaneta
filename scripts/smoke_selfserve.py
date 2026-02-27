@@ -6,6 +6,8 @@ y verificación de que los datos aparecen (Factura rápida dropdowns se llenan v
 Uso:
   - Con servidor ya corriendo: python3 scripts/smoke_selfserve.py
   - BASE_URL=http://127.0.0.1:8000 PORTAL_SMOKE_TOKEN=demo python3 scripts/smoke_selfserve.py
+
+Requisito: PORTAL_SMOKE_TOKEN (o DEV_TOKEN) debe ser un token de issuer_tokens que apunte a un issuer existente.
 """
 import os
 import sys
@@ -66,11 +68,12 @@ def main():
     if r.status_code != 200:
         _fail(step, "200", r)
     try:
-        customers = r.json()
+        raw = r.json()
+        customers = raw.get("items", raw) if isinstance(raw, dict) else raw
     except Exception:
-        _fail(step, "JSON array", r, "Respuesta no es JSON válido.")
+        _fail(step, "JSON válido", r, "Respuesta no es JSON válido.")
     if not isinstance(customers, list):
-        _fail(step, "JSON array", r, f"Tipo recibido: {type(customers)}")
+        _fail(step, "items o array", r, f"Tipo recibido: {type(customers)}")
 
     # --- 4. GET /api/products ---
     step = "4. GET /api/products"
@@ -78,11 +81,12 @@ def main():
     if r.status_code != 200:
         _fail(step, "200", r)
     try:
-        products = r.json()
+        raw = r.json()
+        products = raw.get("items", raw) if isinstance(raw, dict) else raw
     except Exception:
-        _fail(step, "JSON array", r, "Respuesta no es JSON válido.")
+        _fail(step, "JSON válido", r, "Respuesta no es JSON válido.")
     if not isinstance(products, list):
-        _fail(step, "JSON array", r, f"Tipo recibido: {type(products)}")
+        _fail(step, "items o array", r, f"Tipo recibido: {type(products)}")
 
     # --- 5. POST /api/customers/create ---
     step = "5. POST /api/customers/create"
@@ -132,7 +136,8 @@ def main():
     r = session.get(f"{base_url}/api/customers", timeout=10)
     if r.status_code != 200:
         _fail(step, "200", r)
-    customers_after = r.json() if isinstance(r.json(), list) else []
+    raw = r.json()
+    customers_after = raw.get("items", raw) if isinstance(raw, dict) else (raw if isinstance(raw, list) else [])
     if not any((c.get("rfc") or "").upper() == "SMO960101XXX" for c in customers_after):
         _fail(step, "Al menos un cliente con RFC SMO960101XXX", r, f"Clientes: {[c.get('rfc') for c in customers_after]}")
 
@@ -140,7 +145,8 @@ def main():
     r = session.get(f"{base_url}/api/products", timeout=10)
     if r.status_code != 200:
         _fail(step, "200", r)
-    products_after = r.json() if isinstance(r.json(), list) else []
+    raw = r.json()
+    products_after = raw.get("items", raw) if isinstance(raw, dict) else (raw if isinstance(raw, list) else [])
     if not any("Smoke test producto" in (p.get("description") or "") for p in products_after):
         _fail(step, "Al menos un producto con descripción 'Smoke test producto'", r, f"Productos: {[p.get('description') for p in products_after]}")
 

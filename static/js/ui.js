@@ -203,6 +203,134 @@
   };
 
   /**
+   * Modal manager único para el portal.
+   * - Compatible con `.modal` (portal_shell.css) y con modales que usan `hidden`/`aria-hidden`.
+   * - Cierre por backdrop `[data-close]`, botón `[data-close]` y Escape.
+   * - Toggle de `body.no-scroll` y focus trap básico.
+   *
+   * API:
+   *   openPortalModal('#myModal') / openPortalModal(el) / openPortalModal('myModal')
+   *   closePortalModal(...)
+   */
+  function _resolveEl(idOrEl) {
+    if (!idOrEl) return null;
+    if (typeof idOrEl === 'string') {
+      var s = String(idOrEl);
+      if (s[0] === '#') return document.querySelector(s);
+      // Si te pasan "myModal" lo interpretamos como id.
+      var byId = document.getElementById(s);
+      if (byId) return byId;
+      // Si te pasan un selector cualquiera.
+      try { return document.querySelector(s); } catch (_) { return null; }
+    }
+    if (idOrEl && idOrEl.nodeType === 1) return idOrEl;
+    return null;
+  }
+
+  function _firstFocusable(container) {
+    if (!container) return null;
+    var el = container.querySelector('input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])');
+    return el || null;
+  }
+
+  window.openPortalModal = function (idOrEl, opts) {
+    var modalEl = _resolveEl(idOrEl);
+    if (!modalEl) return;
+    var o = opts || {};
+
+    // Guardar foco anterior para restaurarlo al cerrar (si se puede).
+    try { modalEl.__portalReturnFocusEl = o.returnFocusEl || document.activeElement; } catch (_) {}
+    // Hook opcional al cerrar (ej. flush de borradores).
+    try { modalEl.__portalOnClose = (typeof o.onClose === 'function') ? o.onClose : null; } catch (_) {}
+
+    // Mostrar modal
+    try {
+      modalEl.hidden = false;
+      modalEl.classList.add('is-open');
+      modalEl.setAttribute('aria-hidden', 'false');
+    } catch (_) {}
+
+    try { document.body.classList.add('no-scroll'); } catch (_) {}
+
+    // Click backdrop / close buttons
+    var clickHandler = function (e) {
+      var t = e.target;
+      if (!t) return;
+      // Cerrar si el click cae en algo con data-close (backdrop o botón).
+      var closeNode = t.closest ? t.closest('[data-close]') : null;
+      if (closeNode) {
+        e.preventDefault();
+        window.closePortalModal(modalEl);
+        return;
+      }
+      // Cerrar si el click fue directamente en el backdrop estándar.
+      if (t.classList && (t.classList.contains('modal__backdrop') || t.classList.contains('form-modal__backdrop'))) {
+        e.preventDefault();
+        window.closePortalModal(modalEl);
+      }
+    };
+    modalEl.addEventListener('click', clickHandler);
+
+    // Escape
+    var removeEscape = function () {};
+    try {
+      removeEscape = window.uiCloseOnEscape(modalEl, function () { window.closePortalModal(modalEl); });
+    } catch (_) {}
+
+    // Focus trap
+    try {
+      if (typeof window.uiTrapFocus === 'function') window.uiTrapFocus(modalEl);
+      else {
+        var ff = _firstFocusable(modalEl);
+        if (ff) ff.focus();
+      }
+    } catch (_) {}
+
+    // Cleanup hook
+    modalEl.__portalModalCleanup = function () {
+      try { modalEl.removeEventListener('click', clickHandler); } catch (_) {}
+      try { removeEscape(); } catch (_) {}
+    };
+  };
+
+  window.closePortalModal = function (idOrEl) {
+    var modalEl = _resolveEl(idOrEl);
+    if (!modalEl) return;
+
+    // onClose hook (una sola vez por cierre)
+    try {
+      if (typeof modalEl.__portalOnClose === 'function') modalEl.__portalOnClose();
+    } catch (_) {}
+    try { modalEl.__portalOnClose = null; } catch (_) {}
+
+    try { if (modalEl.__portalModalCleanup) modalEl.__portalModalCleanup(); } catch (_) {}
+    try { modalEl.__portalModalCleanup = null; } catch (_) {}
+
+    try { if (typeof window.uiReleaseFocusTrap === 'function') window.uiReleaseFocusTrap(); } catch (_) {}
+
+    try {
+      modalEl.hidden = true;
+      modalEl.classList.remove('is-open');
+      modalEl.setAttribute('aria-hidden', 'true');
+    } catch (_) {}
+
+    // Si ya no hay modales abiertos, restaurar scroll.
+    try {
+      var anyOpen = document.querySelector('.modal.is-open, .form-modal.is-open, .modal:not([hidden]), .form-modal[aria-hidden="false"]');
+      if (!anyOpen) document.body.classList.remove('no-scroll');
+    } catch (_) {
+      try { document.body.classList.remove('no-scroll'); } catch (_) {}
+    }
+
+    // Restaurar foco
+    try {
+      var ret = modalEl.__portalReturnFocusEl;
+      modalEl.__portalReturnFocusEl = null;
+      if (ret && typeof ret.focus === 'function') ret.focus();
+    } catch (_) {}
+  };
+
+  /**
    * Cierra overlays/drawers/modales y limpia estados loading para evitar UI rota.
    * Usar antes de mostrar modal "Sesión expirada" (401).
    */
@@ -395,7 +523,7 @@
         }
 
         if (!res.ok) {
-          var detail = (parsed && (parsed.detail || parsed.message)) || res.statusText || ('Error ' + status);
+          var detail = (parsed && (parsed.error && parsed.error.message || parsed.detail || parsed.message)) || res.statusText || ('Error ' + status);
           if (typeof detail !== 'string') detail = Array.isArray(detail) ? detail.join('; ') : ('Error ' + status);
           return { ok: false, status: status, error: 'http', detail: detail };
         }

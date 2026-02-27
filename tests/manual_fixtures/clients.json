@@ -1,0 +1,32 @@
+{
+  "items": [
+    {
+      "id": 1,
+      "rfc": "XAXX010101000",
+      "legal_name": "PUBLICO GENERAL",
+      "zip": "06000",
+      "tax_system": "616",
+      "email": "contacto@ejemplo.com",
+      "alias": "Público"
+    },
+    {
+      "id": 2,
+      "rfc": "EKU9003173V8",
+      "legal_name": "ACME SA DE CV",
+      "zip": "03100",
+      "tax_system": "601",
+      "email": "facturacion@acme.mx",
+      "alias": "ACME"
+    },
+    {
+      "id": 3,
+      "rfc": "OCC9901012A1",
+      "legal_name": "OFICINA CONTABLE EJEMPLO",
+      "zip": "06600",
+      "tax_system": "612",
+      "email": null,
+      "alias": null
+    }
+  ],
+  "total": 3
+}

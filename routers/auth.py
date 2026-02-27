@@ -9,73 +9,54 @@ from fastapi import APIRouter, Request, Form, Query
 from fastapi.responses import HTMLResponse, RedirectResponse
 import httpx
 
-from config import _env_path
+from config import _env_path, DEV_MODE
 from database import db
-from services import issuers, session, users, audit, csrf as csrf_service
+from services import issuers, session, users, audit, csrf as csrf_service, action_log
+from services.action_log import log_action
+from services import rate_limit as rate_limit_service
 from services import sanitize as sanitize_service
 from services import verification as verification_service
 from services import email_sender
 
 logger = logging.getLogger(__name__)
 
-# Rate-limit login: por IP, máx 5 intentos por ventana de 60 s
-_LOGIN_ATTEMPTS: dict[str, list[float]] = defaultdict(list)
-_LOGIN_WINDOW = 60.0
-_LOGIN_MAX_ATTEMPTS = 5
-
-# Rate-limit registro/signup: por IP, máx 3 intentos por ventana de 60 s
-_REGISTER_ATTEMPTS: dict[str, list[float]] = defaultdict(list)
-_REGISTER_WINDOW = 60.0
-_REGISTER_MAX_ATTEMPTS = 3
-
-# Rate-limit forgot password: por IP, máx 3 por 60 s
-_FORGOT_ATTEMPTS: dict[str, list[float]] = defaultdict(list)
-_FORGOT_WINDOW = 60.0
-_FORGOT_MAX_ATTEMPTS = 3
+# Cooldown por email: desactivado (no bloquear por intentos fallidos)
+_LOGIN_FAILURES_BY_EMAIL: dict[str, list[float]] = defaultdict(list)
+_EMAIL_FAILURES_WINDOW = 900.0
+_EMAIL_MAX_FAILURES = 99999  # efectivamente desactivado
+_EMAIL_COOLDOWN_SECONDS = 0
+_EMAIL_COOLDOWN_UNTIL: dict[str, float] = {}
 
 
-def _client_ip(request: Request) -> str:
-    return (request.headers.get("x-forwarded-for") or request.headers.get("x-real-ip") or request.client.host or "").split(",")[0].strip() or "unknown"
-
-
-def _login_rate_limit(request: Request) -> bool:
-    """True si se debe bloquear (rate limit excedido). Si no, registra intento y devuelve False."""
-    ip = _client_ip(request)
+def _login_email_cooldown(email: str | None) -> bool:
+    """True si el email está en cooldown tras 5 fallos de login."""
+    if not email or not email.strip():
+        return False
+    e = (email or "").strip().lower()
     now = time.time()
-    _LOGIN_ATTEMPTS[ip] = [t for t in _LOGIN_ATTEMPTS[ip] if now - t < _LOGIN_WINDOW]
-    if len(_LOGIN_ATTEMPTS[ip]) >= _LOGIN_MAX_ATTEMPTS:
+    if now < _EMAIL_COOLDOWN_UNTIL.get(e, 0):
         return True
-    _LOGIN_ATTEMPTS[ip].append(now)
     return False
 
 
-def _register_rate_limit(request: Request) -> bool:
-    """True si se debe bloquear registro por IP (rate limit excedido)."""
-    ip = _client_ip(request)
+def _record_login_failure(email: str | None) -> None:
+    """Registra un fallo de login para el email; si llega a 5, activa cooldown."""
+    if not email or not email.strip():
+        return
+    e = (email or "").strip().lower()
     now = time.time()
-    _REGISTER_ATTEMPTS[ip] = [t for t in _REGISTER_ATTEMPTS[ip] if now - t < _REGISTER_WINDOW]
-    if len(_REGISTER_ATTEMPTS[ip]) >= _REGISTER_MAX_ATTEMPTS:
-        return True
-    _REGISTER_ATTEMPTS[ip].append(now)
-    return False
-
-
-def _forgot_rate_limit(request: Request) -> bool:
-    """True si se debe bloquear forgot por IP."""
-    ip = _client_ip(request)
-    now = time.time()
-    _FORGOT_ATTEMPTS[ip] = [t for t in _FORGOT_ATTEMPTS[ip] if now - t < _FORGOT_WINDOW]
-    if len(_FORGOT_ATTEMPTS[ip]) >= _FORGOT_MAX_ATTEMPTS:
-        return True
-    _FORGOT_ATTEMPTS[ip].append(now)
-    return False
+    _LOGIN_FAILURES_BY_EMAIL[e] = [t for t in _LOGIN_FAILURES_BY_EMAIL[e] if now - t < _EMAIL_FAILURES_WINDOW]
+    _LOGIN_FAILURES_BY_EMAIL[e].append(now)
+    if len(_LOGIN_FAILURES_BY_EMAIL[e]) >= _EMAIL_MAX_FAILURES:
+        _EMAIL_COOLDOWN_UNTIL[e] = now + _EMAIL_COOLDOWN_SECONDS
 
 
 def _login_error_message(code: str | None) -> str | None:
     # Mensajes genéricos: no revelar "email existe" / "email no existe"
     msgs = {
         "invalid": "Datos inválidos. Intenta de nuevo.",
-        "email_or_phone": "Datos inválidos. Intenta de nuevo.",
+        "csrf": "La sesión de la página expiró. Recarga la página (F5) e intenta de nuevo.",
+        "email_or_phone": "Indica tu correo o teléfono.",
         "bad_credentials": "Datos inválidos. Intenta de nuevo.",
         "oauth": "No se pudo iniciar sesión con la red social. Intenta de nuevo.",
         "oauth_config": "Inicio de sesión con red social no configurado.",
@@ -200,55 +181,75 @@ def get_auth_router(templates):
         password: str = Form(...),
         csrf_token: str | None = Form(None),
     ):
-        if not csrf_service.verify_csrf_token(csrf_token):
-            return RedirectResponse(url="/login?error=invalid", status_code=302)
-        if _login_rate_limit(request):
-            time.sleep(2)
-            return RedirectResponse(url="/login?error=invalid", status_code=302)
-        if login_type != "credentials" or not password:
-            return RedirectResponse(url="/login?error=invalid", status_code=302)
-        email = (email or "").strip().lower() or None
-        phone = (phone or "").strip() or None
-        if cred_type == "phone":
-            email = None
-        else:
-            phone = None
-        if not email and not phone:
-            return RedirectResponse(url="/login?error=email_or_phone", status_code=302)
-        user = users.get_user_by_email_or_phone(email or phone)
-        if not user:
-            return RedirectResponse(url="/login?error=bad_credentials", status_code=302)
-        hashed = users.get_user_password_hash(user["id"])
-        if not hashed or not users.verify_password(password, hashed):
-            return RedirectResponse(url="/login?error=bad_credentials", status_code=302)
-        memberships = users.get_memberships_for_user(user["id"])
-        if not memberships:
+        try:
+            token_val = (csrf_token or request.headers.get("X-CSRF-Token") or "").strip()
+            if not DEV_MODE and not csrf_service.verify_csrf_token(token_val, max_age_seconds=14400):
+                return RedirectResponse(url="/login?error=csrf", status_code=302)
+            if login_type != "credentials" or not password:
+                return RedirectResponse(url="/login?error=invalid", status_code=302)
+            email = (email or "").strip().lower() or None
+            phone = (phone or "").strip() or None
+            if cred_type == "phone":
+                email = None
+            else:
+                phone = None
+            if not email and not phone:
+                logger.warning("Login: falta email o teléfono")
+                return RedirectResponse(url="/login?error=email_or_phone", status_code=302)
+            user = users.get_user_by_email_or_phone(email or phone)
+            if not user:
+                logger.warning("Login: usuario no encontrado para email=%s", email)
+                if _login_email_cooldown(email):
+                    time.sleep(2)
+                    return RedirectResponse(url="/login?error=invalid", status_code=302)
+                _record_login_failure(email)
+                return RedirectResponse(url="/login?error=bad_credentials", status_code=302)
+            hashed = users.get_user_password_hash(user["id"])
+            if not hashed or not users.verify_password(password, hashed):
+                logger.warning("Login: contraseña incorrecta para user_id=%s email=%s", user["id"], email)
+                if _login_email_cooldown(email):
+                    time.sleep(2)
+                    return RedirectResponse(url="/login?error=invalid", status_code=302)
+                _record_login_failure(email)
+                return RedirectResponse(url="/login?error=bad_credentials", status_code=302)
+            # Login correcto: quitar cooldown de este email para que no quede bloqueado
+            if email:
+                _EMAIL_COOLDOWN_UNTIL.pop(email, None)
+                _LOGIN_FAILURES_BY_EMAIL.pop(email, None)
+            memberships = users.get_memberships_for_user(user["id"])
+            if not memberships:
+                audit.log(action="login", user_id=user["id"], issuer_id=0, details="credentials", request=request)
+                log_action(request, "login", user_id=user["id"], issuer_id=0)
+                resp = RedirectResponse(url="/confirmar-perfil", status_code=302)
+                resp.set_cookie(
+                    cookie_name,
+                    session.sign_session(user["id"], 0),
+                    **session.session_cookie_params(request),
+                )
+                return resp
+            if len(memberships) == 1:
+                issuer_id = memberships[0]["issuer_id"]
+                audit.log(action="login", user_id=user["id"], issuer_id=issuer_id, details="credentials", request=request)
+                log_action(request, "login", user_id=user["id"], issuer_id=issuer_id)
+                resp = RedirectResponse(url="/portal/home", status_code=302)
+                resp.set_cookie(
+                    cookie_name,
+                    session.sign_session(user["id"], issuer_id),
+                    **session.session_cookie_params(request),
+                )
+                return resp
             audit.log(action="login", user_id=user["id"], issuer_id=0, details="credentials", request=request)
-            resp = RedirectResponse(url="/confirmar-perfil", status_code=302)
+            log_action(request, "login", user_id=user["id"], issuer_id=0)
+            resp = RedirectResponse(url="/choose-issuer", status_code=302)
             resp.set_cookie(
                 cookie_name,
                 session.sign_session(user["id"], 0),
                 **session.session_cookie_params(request),
             )
             return resp
-        if len(memberships) == 1:
-            issuer_id = memberships[0]["issuer_id"]
-            audit.log(action="login", user_id=user["id"], issuer_id=issuer_id, details="credentials", request=request)
-            resp = RedirectResponse(url="/portal/home", status_code=302)
-            resp.set_cookie(
-                cookie_name,
-                session.sign_session(user["id"], issuer_id),
-                **session.session_cookie_params(request),
-            )
-            return resp
-        audit.log(action="login", user_id=user["id"], issuer_id=0, details="credentials", request=request)
-        resp = RedirectResponse(url="/choose-issuer", status_code=302)
-        resp.set_cookie(
-            cookie_name,
-            session.sign_session(user["id"], 0),
-            **session.session_cookie_params(request),
-        )
-        return resp
+        except Exception as e:
+            logger.exception("Login error: %s", e)
+            return RedirectResponse(url="/login?error=invalid", status_code=302)
 
     @router.get("/register", response_class=RedirectResponse)
     def register_redirect(request: Request):
@@ -272,9 +273,10 @@ def get_auth_router(templates):
         cp: str | None = Form(None),
         csrf_token: str | None = Form(None),
     ):
-        if not csrf_service.verify_csrf_token(csrf_token):
+        token_val = (csrf_token or request.headers.get("X-CSRF-Token") or "").strip()
+        if not csrf_service.verify_csrf_token(token_val):
             return RedirectResponse(url="/signup?error=error", status_code=302)
-        if _register_rate_limit(request):
+        if rate_limit_service.is_rate_limited(request, "register"):
             time.sleep(2)
             return RedirectResponse(url="/signup?error=error", status_code=302)
         email = sanitize_service.sanitize_email(email)
@@ -343,9 +345,10 @@ def get_auth_router(templates):
         cp: str | None = Form(None),
         csrf_token: str | None = Form(None),
     ):
-        if not csrf_service.verify_csrf_token(csrf_token):
+        token_val = (csrf_token or request.headers.get("X-CSRF-Token") or "").strip()
+        if not csrf_service.verify_csrf_token(token_val):
             return RedirectResponse(url="/signup?error=error", status_code=302)
-        if _register_rate_limit(request):
+        if rate_limit_service.is_rate_limited(request, "register"):
             time.sleep(2)
             return RedirectResponse(url="/signup?error=error", status_code=302)
         email = sanitize_service.sanitize_email(email)
@@ -419,9 +422,10 @@ def get_auth_router(templates):
 
     @router.post("/forgot", response_class=RedirectResponse)
     def forgot_submit(request: Request, email: str = Form(""), csrf_token: str | None = Form(None)):
-        if not csrf_service.verify_csrf_token(csrf_token):
+        token_val = (csrf_token or request.headers.get("X-CSRF-Token") or "").strip()
+        if not csrf_service.verify_csrf_token(token_val):
             return RedirectResponse(url="/forgot?error=error", status_code=302)
-        if _forgot_rate_limit(request):
+        if rate_limit_service.is_rate_limited(request, "forgot"):
             time.sleep(2)
             return RedirectResponse(url="/forgot?error=error", status_code=302)
         email = sanitize_service.sanitize_email(email)
@@ -453,8 +457,13 @@ def get_auth_router(templates):
         password_confirm: str = Form(""),
         csrf_token: str | None = Form(None),
     ):
-        if not csrf_service.verify_csrf_token(csrf_token):
+        token_val = (csrf_token or request.headers.get("X-CSRF-Token") or "").strip()
+        if not csrf_service.verify_csrf_token(token_val):
             return RedirectResponse(url="/reset-password?error=error", status_code=302)
+        if rate_limit_service.is_rate_limited(request, "reset"):
+            time.sleep(2)
+            url = f"/reset-password?token={token}&error=error" if token else "/reset-password?error=error"
+            return RedirectResponse(url=url, status_code=302)
         if not token:
             return RedirectResponse(url="/login?error=invalid", status_code=302)
         user_id = verification_service.consume_password_reset_token(token)
@@ -496,7 +505,8 @@ def get_auth_router(templates):
         session_data = session.verify_session(cookie_val)
         if not session_data or session_data[0] == 0:
             return RedirectResponse(url="/login", status_code=302)
-        if not csrf_service.verify_csrf_token(csrf_token):
+        token_val = (csrf_token or request.headers.get("X-CSRF-Token") or "").strip()
+        if not csrf_service.verify_csrf_token(token_val):
             return RedirectResponse(url="/choose-issuer", status_code=302)
         user_id = session_data[0]
         mem = users.get_membership(user_id, issuer_id)
@@ -516,15 +526,24 @@ def get_auth_router(templates):
         cookie_val = request.cookies.get(cookie_name)
         session_data = session.verify_session(cookie_val)
         if session_data and len(session_data) >= 2:
+            uid, iid = session_data[0], session_data[1]
             audit.log(
                 action="logout",
-                user_id=session_data[0] if session_data[0] else None,
-                issuer_id=session_data[1] if session_data[1] else None,
+                user_id=uid if uid else None,
+                issuer_id=iid if iid else None,
                 details="",
                 request=request,
             )
-        resp = RedirectResponse(url="/", status_code=302)
-        resp.delete_cookie(cookie_name, path="/")
+            log_action(request, "logout", user_id=uid, issuer_id=iid)
+        resp = RedirectResponse(url="/login", status_code=302)
+        # Borrar cookie con los mismos parámetros que se usaron al crearla
+        cookie_params = session.session_cookie_params(request)
+        resp.delete_cookie(
+            cookie_name,
+            path=cookie_params.get("path", "/"),
+            samesite=cookie_params.get("samesite", "lax"),
+            secure=cookie_params.get("secure", False),
+        )
         return resp
 
     @router.get("/auth/google/callback", response_class=RedirectResponse)
@@ -718,6 +737,7 @@ def get_auth_router(templates):
             {
                 "request": request,
                 "error": _signup_error_message(error),
+                "csrf_token": csrf_service.generate_csrf_token(),
                 "google_login_url": _google_login_url(request) or "#",
                 "facebook_login_url": _facebook_login_url(request) or "#",
                 "google_oauth_configured": bool(os.getenv("GOOGLE_CLIENT_ID", "").strip()),
@@ -735,7 +755,14 @@ def get_auth_router(templates):
         password_confirm: str | None = Form(None),
         accept_terms: str | None = Form(None),
         authorize_firm: str | None = Form(None),
+        csrf_token: str | None = Form(None),
     ):
+        token_val = (csrf_token or request.headers.get("X-CSRF-Token") or "").strip()
+        if not csrf_service.verify_csrf_token(token_val):
+            return RedirectResponse(url="/signup?error=terms", status_code=302)
+        if rate_limit_service.is_rate_limited(request, "register"):
+            time.sleep(2)
+            return RedirectResponse(url="/signup?error=error", status_code=302)
         if accept_terms != "on":
             return RedirectResponse(url="/signup?error=terms", status_code=302)
         email = (email or "").strip().lower() or None
@@ -782,11 +809,14 @@ def get_auth_router(templates):
             return RedirectResponse(url="/portal/home", status_code=302)
         return templates.TemplateResponse(
             "confirmar_perfil.html",
-            {"request": request, "user": user, "error": request.query_params.get("error")},
+            {"request": request, "user": user, "error": request.query_params.get("error"), "csrf_token": csrf_service.generate_csrf_token()},
         )
 
     @router.post("/confirmar-perfil", response_class=RedirectResponse)
-    def confirmar_perfil_submit(request: Request, name: str | None = Form(None)):
+    def confirmar_perfil_submit(request: Request, name: str | None = Form(None), csrf_token: str | None = Form(None)):
+        token_val = (csrf_token or request.headers.get("X-CSRF-Token") or "").strip()
+        if not csrf_service.verify_csrf_token(token_val):
+            return RedirectResponse(url="/confirmar-perfil?error=invalid", status_code=302)
         cookie_val = request.cookies.get(cookie_name)
         session_data = session.verify_session(cookie_val)
         if not session_data or session_data[0] == 0:
@@ -832,7 +862,7 @@ def get_auth_router(templates):
             return RedirectResponse(url="/confirmar-perfil", status_code=302)
         return templates.TemplateResponse(
             "onboarding.html",
-            {"request": request, "error": request.query_params.get("error"), "issuer": issuer},
+            {"request": request, "error": request.query_params.get("error"), "issuer": issuer, "csrf_token": csrf_service.generate_csrf_token()},
         )
 
     @router.post("/onboarding", response_class=RedirectResponse)
@@ -843,7 +873,11 @@ def get_auth_router(templates):
         regimen_fiscal: str = Form("616"),
         cp: str | None = Form(None),
         authorize_firm: str | None = Form(None),
+        csrf_token: str | None = Form(None),
     ):
+        token_val = (csrf_token or request.headers.get("X-CSRF-Token") or "").strip()
+        if not csrf_service.verify_csrf_token(token_val):
+            return RedirectResponse(url="/onboarding?error=invalid", status_code=302)
         cookie_val = request.cookies.get(cookie_name)
         session_data = session.verify_session(cookie_val)
         if not session_data or session_data[0] == 0:

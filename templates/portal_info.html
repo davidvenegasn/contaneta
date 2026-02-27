@@ -1,0 +1,28 @@
+{% extends "base_portal.html" %}
+
+{% block content %}
+  <header class="app-header" style="margin-bottom:14px;">
+    <div class="app-header__left">
+      <div class="app-title">Seguridad e información</div>
+      <div class="app-subtitle muted">Cómo protegemos tu sesión y tus datos.</div>
+    </div>
+  </header>
+
+  <div class="card" style="margin-bottom:14px;">
+    <h2 style="margin:0 0 10px; font-size:1rem;">Sesión y cookies</h2>
+    <p style="margin:0; font-size:14px; line-height:1.5; color:var(--muted, #64748b);">
+      Tu sesión se protege con cookies firmadas (HttpOnly cuando está disponible). No compartas tu acceso con nadie.
+    </p>
+  </div>
+
+  <div class="card" style="margin-bottom:14px;">
+    <h2 style="margin:0 0 10px; font-size:1rem;">Contraseña</h2>
+    <p style="margin:0; font-size:14px; line-height:1.5; color:var(--muted, #64748b);">
+      Tu contraseña no se guarda en texto legible; usamos hash solo para verificar tu acceso al iniciar sesión.
+    </p>
+  </div>
+
+  <p style="font-size:13px; color:var(--muted);">
+    <a href="/portal/home">Volver al inicio</a>
+  </p>
+{% endblock %}

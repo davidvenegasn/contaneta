@@ -1,0 +1,303 @@
+{# Reusable Quick Invoice modals + pickers (shared across pages). #}
+
+<!-- Modal factura rápida: precálculo editable + Timbrar -->
+<div id="quickInvoiceModal" class="quick-invoice-modal" role="dialog" aria-modal="true" aria-labelledby="quickInvoiceModalTitle" aria-describedby="quickInvoiceModalDesc" aria-label="Factura rápida" hidden>
+  <div class="quick-invoice-modal__backdrop" id="quickInvoiceModalBackdrop"></div>
+  <div class="quick-invoice-modal__panel quick-invoice-modal__panel--precalc" id="quickInvoiceModalPanel" tabindex="-1">
+    <div class="quick-invoice-modal__header">
+      <h2 id="quickInvoiceModalTitle" class="quick-invoice-modal__title">Factura rápida</h2>
+      <button type="button" class="quick-invoice-modal__close" id="quickInvoiceModalClose" aria-label="Cerrar">&times;</button>
+    </div>
+    <p id="quickInvoiceModalDesc" class="quick-invoice-modal__desc muted">Precálculo editable. Puedes ajustar receptor, concepto e impuestos antes de timbrar.</p>
+    <div class="quick-invoice-modal__body">
+      <div class="quick-invoice-modal__section">
+        <div class="quick-invoice-modal__section-title">Receptor</div>
+        <div class="quick-invoice-modal__row">
+          <span id="quickModalCustomerRfc" class="muted u-text-12"></span>
+        </div>
+        <div class="quick-form-grid">
+          <div class="quick-form-field quick-form-field--full">
+            <label for="quickModalCustomerName" class="label">Razón social</label>
+            <input id="quickModalCustomerName" class="input" autocomplete="off" />
+          </div>
+          <div class="quick-form-field">
+            <label for="quickModalCustomerZip" class="label">CP</label>
+            <input id="quickModalCustomerZip" class="input" autocomplete="off" />
+          </div>
+          <div class="quick-form-field">
+            <label for="quickModalCustomerTaxSystem" class="label">Régimen</label>
+            <select id="quickModalCustomerTaxSystem" class="input" aria-label="Régimen fiscal receptor">
+              <option value="">Cargando…</option>
+            </select>
+          </div>
+          <div class="quick-form-field quick-form-field--full">
+            <label for="quickModalCustomerEmail" class="label">Email</label>
+            <input id="quickModalCustomerEmail" class="input" type="email" autocomplete="off" />
+          </div>
+          <div class="quick-form-field quick-form-field--full">
+            <label class="u-flex u-items-center u-gap-2" style="font-size: 13px;">
+              <input type="checkbox" id="quickModalAutoEmail" />
+              <span>Enviar factura automáticamente al cliente</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="quick-invoice-modal__section">
+        <div class="quick-invoice-modal__section-title">Concepto</div>
+        <div id="quickModalItemsSummary" class="qi-items-summary" hidden></div>
+        <div id="quickModalSingleConcept">
+        <div class="quick-form-grid">
+          <div class="quick-form-field quick-form-field--full">
+            <label for="quickModalProductDesc" class="label">Descripción</label>
+            <input id="quickModalProductDesc" class="input" autocomplete="off" />
+          </div>
+          <div class="quick-form-field">
+            <label for="quickModalProductKey" class="label">Clave ProdServ</label>
+            <div class="u-flex u-gap-2 u-items-center">
+              <input id="quickModalProductKey" class="input u-flex-1" autocomplete="off" placeholder="Ej. 84111500" />
+              <button type="button" class="btn btn--sm btn--secondary" id="quickModalProdservBtn" aria-label="Buscar ProdServ" title="Buscar ProdServ">Buscar</button>
+            </div>
+          </div>
+          <div class="quick-form-field">
+            <label for="quickModalUnitKey" class="label">Clave unidad</label>
+            <input id="quickModalUnitKey" class="input" autocomplete="off" placeholder="E48" list="quickUnidadList" />
+            <datalist id="quickUnidadList"></datalist>
+          </div>
+          <div class="quick-form-field">
+            <label for="quickModalQty" class="label">Cantidad</label>
+            <input type="text" id="quickModalQty" class="input" inputmode="decimal" value="1" aria-label="Cantidad" />
+          </div>
+          <div class="quick-form-field">
+            <label for="quickModalUnitPrice" class="label">Precio unitario sin IVA</label>
+            <div class="u-flex u-items-center u-gap-2">
+              <span class="muted" aria-hidden="true">$</span>
+              <input type="text" id="quickModalUnitPrice" class="input u-flex-1" inputmode="decimal" aria-label="Precio unitario sin IVA" placeholder="0.00" />
+            </div>
+          </div>
+          <div class="quick-form-field">
+            <label for="quickModalIvaRate" class="label">IVA</label>
+            <select id="quickModalIvaRate" class="input" aria-label="IVA">
+              <option value="0.16" selected>16%</option>
+              <option value="0.08">8%</option>
+              <option value="0.00">0%</option>
+              <option value="EXENTO">Exento</option>
+            </select>
+          </div>
+          <div class="quick-form-field" hidden>
+            <label for="quickModalIsrRetRate" class="label">Ret ISR rate</label>
+            <input type="number" id="quickModalIsrRetRate" class="input" min="0" max="1" step="0.01" value="0" />
+          </div>
+          <div class="quick-form-field" hidden>
+            <label for="quickModalIvaRetRate" class="label">Ret IVA rate</label>
+            <input type="number" id="quickModalIvaRetRate" class="input" min="0" max="1" step="0.01" value="0" />
+          </div>
+        </div>
+        </div>
+        <p class="muted u-mt-2 u-text-12">Tip: si necesitas retenciones, usa “Facturación completa”.</p>
+      </div>
+
+      <div class="quick-invoice-modal__section">
+        <div class="quick-invoice-modal__section-title">Comprobante</div>
+        <div class="quick-form-grid">
+          <div class="quick-form-field">
+            <label for="quickModalCurrency" class="label">Moneda</label>
+            <select id="quickModalCurrency" class="input" aria-label="Moneda">
+              <option value="MXN" selected>MXN</option>
+            </select>
+          </div>
+          <div class="quick-form-field">
+            <label for="quickModalCfdiUse" class="label">Uso CFDI</label>
+            <select id="quickModalCfdiUse" class="input" aria-label="Uso CFDI">
+              <option value="">Cargando…</option>
+            </select>
+          </div>
+          <div class="quick-form-field">
+            <label for="quickModalPaymentForm" class="label">Forma de pago</label>
+            <select id="quickModalPaymentForm" class="input" aria-label="Forma de pago">
+              <option value="">Cargando…</option>
+            </select>
+          </div>
+          <div class="quick-form-field">
+            <label for="quickModalPaymentMethod" class="label">Método</label>
+            <select id="quickModalPaymentMethod" class="input" aria-label="Método de pago">
+              <option value="">Cargando…</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="quick-invoice-modal__totals">
+        <div class="quick-invoice-modal__total-row"><span>Subtotal</span><span id="quickModalSubtotal">$0.00</span></div>
+        <div class="quick-invoice-modal__total-row"><span>IVA</span><span id="quickModalIva">$0.00</span></div>
+        <div class="quick-invoice-modal__total-row" hidden><span>Retenciones</span><span id="quickModalRetenciones">$0.00</span></div>
+        <div class="quick-invoice-modal__total-row quick-invoice-modal__total-row--final"><span>Total</span><span id="quickModalTotal">$0.00</span></div>
+      </div>
+    </div>
+    <div id="quickInvoiceModalError" class="quick-invoice-modal__error" hidden role="alert"></div>
+    <div class="quick-invoice-modal__footer">
+      <button type="button" id="quickInvoiceModalCancel" class="btn btn-ghost">Cancelar</button>
+      <button type="button" id="quickInvoiceModalSubmit" class="btn btn-primary">Timbrar factura</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: añadir cliente -->
+<div id="quickAddCustomerModal" class="quick-invoice-modal" role="dialog" aria-modal="true" aria-labelledby="quickAddCustomerTitle" aria-label="Añadir cliente" hidden>
+  <div class="quick-invoice-modal__backdrop" id="quickAddCustomerBackdrop"></div>
+  <div class="quick-invoice-modal__panel" id="quickAddCustomerPanel" tabindex="-1">
+    <div class="quick-invoice-modal__header">
+      <h2 id="quickAddCustomerTitle" class="quick-invoice-modal__title">Añadir cliente</h2>
+      <button type="button" class="quick-invoice-modal__close" id="quickAddCustomerClose" aria-label="Cerrar">&times;</button>
+    </div>
+    <div class="quick-invoice-modal__body">
+      <div class="quick-form-grid">
+        <div class="quick-form-field">
+          <label for="quickCustomerRfc" class="label">RFC *</label>
+          <input id="quickCustomerRfc" class="input" autocomplete="off" placeholder="XAXX010101000" />
+        </div>
+        <div class="quick-form-field">
+          <label for="quickCustomerName" class="label">Razón social *</label>
+          <input id="quickCustomerName" class="input" autocomplete="off" placeholder="Cliente SA de CV" />
+        </div>
+        <div class="quick-form-field">
+          <label for="quickCustomerZip" class="label">CP</label>
+          <input id="quickCustomerZip" class="input" autocomplete="off" placeholder="64000" />
+        </div>
+        <div class="quick-form-field">
+          <label for="quickCustomerTaxSystem" class="label">Régimen fiscal</label>
+          <select id="quickCustomerTaxSystem" class="input" aria-label="Régimen fiscal">
+            <option value="">Cargando…</option>
+          </select>
+        </div>
+        <div class="quick-form-field">
+          <label for="quickCustomerUsoCfdi" class="label">Uso CFDI</label>
+          <select id="quickCustomerUsoCfdi" class="input" aria-label="Uso CFDI">
+            <option value="">Cargando…</option>
+          </select>
+        </div>
+        <div class="quick-form-field quick-form-field--full">
+          <label for="quickCustomerEmail" class="label">Email</label>
+          <input id="quickCustomerEmail" class="input" type="email" autocomplete="off" placeholder="cliente@dominio.com" />
+        </div>
+        <div class="quick-form-field quick-form-field--full">
+          <label for="quickCustomerAlias" class="label">Alias</label>
+          <input id="quickCustomerAlias" class="input" autocomplete="off" placeholder="(opcional) Ej: OXXO" />
+        </div>
+      </div>
+    </div>
+    <div id="quickAddCustomerError" class="quick-invoice-modal__error" hidden role="alert"></div>
+    <div class="quick-invoice-modal__footer">
+      <button type="button" id="quickAddCustomerCancel" class="btn btn-ghost">Cancelar</button>
+      <button type="button" id="quickAddCustomerSave" class="btn btn-primary">Guardar cliente</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: añadir producto -->
+<div id="quickAddProductModal" class="quick-invoice-modal" role="dialog" aria-modal="true" aria-labelledby="quickAddProductTitle" aria-label="Añadir producto" hidden>
+  <div class="quick-invoice-modal__backdrop" id="quickAddProductBackdrop"></div>
+  <div class="quick-invoice-modal__panel" id="quickAddProductPanel" tabindex="-1">
+    <div class="quick-invoice-modal__header">
+      <h2 id="quickAddProductTitle" class="quick-invoice-modal__title">Añadir producto</h2>
+      <button type="button" class="quick-invoice-modal__close" id="quickAddProductClose" aria-label="Cerrar">&times;</button>
+    </div>
+    <div class="quick-invoice-modal__body">
+      <div class="quick-form-grid">
+        <div class="quick-form-field quick-form-field--full">
+          <label for="quickProductDesc" class="label">Descripción *</label>
+          <input id="quickProductDesc" class="input" autocomplete="off" placeholder="Servicio / producto" />
+        </div>
+        <div class="quick-form-field quick-form-field--full">
+          <label for="quickProductKey" class="label">Clave ProdServ *</label>
+          <div class="u-flex u-gap-2 u-items-center">
+            <input id="quickProductKey" class="input u-flex-1" autocomplete="off" placeholder="Ej: 84111500" />
+            <button type="button" class="btn btn--sm btn--secondary" id="quickProductProdservBtn">Buscar</button>
+          </div>
+          <p class="muted u-mt-1 u-text-12">Tip: usa la misma clave que en “Generar tu factura”.</p>
+        </div>
+        <div class="quick-form-field">
+          <label for="quickProductUnitKey" class="label">Unidad</label>
+          <input id="quickProductUnitKey" class="input" autocomplete="off" value="E48" list="quickUnidadList" />
+        </div>
+        <div class="quick-form-field">
+          <label for="quickProductUnitPrice" class="label">Precio unitario sin IVA *</label>
+          <div class="u-flex u-items-center u-gap-2">
+            <span class="muted" aria-hidden="true">$</span>
+            <input id="quickProductUnitPrice" class="input u-flex-1" inputmode="decimal" placeholder="0.00" />
+          </div>
+        </div>
+        <div class="quick-form-field">
+          <label for="quickProductIvaRate" class="label">IVA</label>
+          <select id="quickProductIvaRate" class="input" aria-label="IVA">
+            <option value="0.16" selected>16%</option>
+            <option value="0.08">8%</option>
+            <option value="0.00">0%</option>
+            <option value="EXENTO">Exento</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div id="quickAddProductError" class="quick-invoice-modal__error" hidden role="alert"></div>
+    <div class="quick-invoice-modal__footer">
+      <button type="button" id="quickAddProductCancel" class="btn btn-ghost">Cancelar</button>
+      <button type="button" id="quickAddProductSave" class="btn btn-primary">Guardar producto</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: buscar Clave ProdServ (reusa endpoint SAT /api/catalogs/prodserv) -->
+<div id="quickProdservModal" class="form-modal" style="display:none;" aria-hidden="true">
+  <div class="form-modal__backdrop" data-close="1"></div>
+  <div class="form-modal__panel" role="dialog" aria-modal="true" aria-labelledby="quickProdservModalTitle">
+    <div class="form-modal__head">
+      <div>
+        <div id="quickProdservModalTitle" class="form-modal__title">Buscar Clave ProdServ</div>
+        <div class="muted" style="margin-top:4px;">Escribe una palabra (ej. contabilidad, asesoría, renta) o una clave.</div>
+      </div>
+      <button type="button" class="form-modal__close" data-close="1" aria-label="Cerrar">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M18 6L6 18"></path>
+          <path d="M6 6l12 12"></path>
+        </svg>
+      </button>
+    </div>
+    <div class="form-modal__body">
+      <input id="quickProdservModalInput" class="form-modal__input" placeholder="Buscar…" autocomplete="off" />
+      <div id="quickProdservModalResults" class="form-modal__results"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal picker: seleccionar cliente (lupita) -->
+<div id="qiClientPickerModal" class="quick-invoice-modal" role="dialog" aria-modal="true" aria-labelledby="qiClientPickerTitle" aria-label="Seleccionar cliente" hidden>
+  <div class="quick-invoice-modal__backdrop" id="qiClientPickerBackdrop"></div>
+  <div class="quick-invoice-modal__panel qi-picker-modal__panel" id="qiClientPickerPanel" tabindex="-1">
+    <div class="quick-invoice-modal__header">
+      <h2 id="qiClientPickerTitle" class="quick-invoice-modal__title">Seleccionar cliente</h2>
+      <button type="button" class="quick-invoice-modal__close" id="qiClientPickerClose" aria-label="Cerrar">&times;</button>
+    </div>
+    <div class="quick-invoice-modal__body">
+      <input id="qiClientPickerSearch" class="input" placeholder="Buscar por razón social o RFC…" autocomplete="off" />
+      <div id="qiClientPickerCount" class="muted u-mt-2 u-text-12"></div>
+      <div id="qiClientPickerList" class="qi-picker-list" role="listbox" aria-label="Clientes"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal picker: seleccionar producto (lupita) -->
+<div id="qiProductPickerModal" class="quick-invoice-modal" role="dialog" aria-modal="true" aria-labelledby="qiProductPickerTitle" aria-label="Seleccionar producto" hidden>
+  <div class="quick-invoice-modal__backdrop" id="qiProductPickerBackdrop"></div>
+  <div class="quick-invoice-modal__panel qi-picker-modal__panel" id="qiProductPickerPanel" tabindex="-1">
+    <div class="quick-invoice-modal__header">
+      <h2 id="qiProductPickerTitle" class="quick-invoice-modal__title">Seleccionar producto</h2>
+      <button type="button" class="quick-invoice-modal__close" id="qiProductPickerClose" aria-label="Cerrar">&times;</button>
+    </div>
+    <div class="quick-invoice-modal__body">
+      <input id="qiProductPickerSearch" class="input" placeholder="Buscar producto…" autocomplete="off" />
+      <div id="qiProductPickerCount" class="muted u-mt-2 u-text-12"></div>
+      <div id="qiProductPickerList" class="qi-picker-list" role="listbox" aria-label="Productos"></div>
+    </div>
+  </div>
+</div>
+

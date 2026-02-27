@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="csrf-token" content="{{ csrf_token|default('') }}" />
-    <meta name="theme-color" content="#f0fdf9" />
+    <meta name="theme-color" content="#ffffff" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
@@ -12,10 +12,17 @@
     <script>if(localStorage.getItem('portal_nightmode')==='1')document.documentElement.classList.add('nightmode');</script>
     <!-- P35: cache GET catalogs/customers/products (TTL 10 min); debe cargar antes del content para prefetch en Home -->
     <script src="/static/js/catalog-cache.js"></script>
-    <link rel="stylesheet" href="/static/css/form.css">
     <link rel="stylesheet" href="/static/css/portal_tokens.css">
     <link rel="stylesheet" href="/static/css/components.css">
+    <link rel="stylesheet" href="/static/css/portal_components.css">
+    <link rel="stylesheet" href="/static/css/portal_shell.css">
+    {% if portal_shell_v2|default(false) %}
+    <link rel="stylesheet" href="/static/css/portal_shell_v2.css">
+    {% endif %}
+    <link rel="stylesheet" href="/static/css/portal_ui_v2.css">
+    <link rel="stylesheet" href="/static/css/portal_rail.css">
     <link rel="stylesheet" href="/static/css/portal.css">
+    <link rel="stylesheet" href="/static/css/form.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
@@ -104,7 +111,7 @@
         <span class="impersonation-banner__text"><span class="impersonation-banner__badge">Modo soporte</span> Viendo como <strong>{{ issuer_alias or issuer_rfc or 'Issuer' }}</strong></span>
         <span class="impersonation-banner__sub">No eres el titular de esta cuenta.</span>
       </div>
-      <form method="post" action="/admin/stop-impersonate" style="display:inline;">
+      <form method="post" action="/admin/stop-impersonate" class="u-d-inline">
         <input type="hidden" name="csrf_token" value="{{ csrf_token|default('') }}" />
         <button type="submit" class="btn impersonation-banner__btn">Salir de impersonación</button>
       </form>
@@ -219,6 +226,15 @@
 </svg>
 {% endmacro %}
 
+{% macro icon_movements() %}
+<svg class="icon icon--movements" xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true">
+  <path d="M7 16V6" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+  <path d="M4 9L7 6L10 9" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M21 12V22" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+  <path d="M18 19L21 22L24 19" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
+{% endmacro %}
+
 {% macro month_picker(base_url, token, ym, ym_label) %}
 <div class="month-picker" data-base-url="{{ base_url }}" data-ym="{{ ym }}" data-ym-label="{{ ym_label }}">
   <div class="month-picker__trigger-wrap">
@@ -240,127 +256,16 @@
 {% endmacro %}
     <div id="pageLoadingBar" class="page-loading-bar" aria-hidden="true"></div>
     <div id="topProgress" class="top-progress" aria-hidden="true"></div>
+    <div class="portal-shell-wrap" data-portal-shell>
+    <div class="portal-sidebar-unified">
+      {% include 'components/portal_rail.html' %}
+      {% include 'components/portal_drawer.html' %}
+    </div>
+    <div class="portal-main">
     <div class="portal-shell">
-      <aside id="sidebar" class="sidebar sidebar-drawer" aria-hidden="true" aria-label="Menú de navegación">
-        <div class="sidebar-top">
-          <div class="brand">
-            <div class="brand-dot"></div>
-            <div class="brand-name">ContaNeta</div>
-          </div>
-
-          <button type="button" class="sidebar-close" id="sidebarClose" aria-label="Cerrar menú" title="Cerrar menú">
-                <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                  <path d="M19 12H5M12 19l-7-7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
-              </button>
-        </div>
-
-        <nav class="nav">
-          <!-- Sección: Principal -->
-          <div class="nav-section">
-            <div class="nav-section__header">Principal</div>
-            <div class="nav-section__items">
-              <a class="nav-item {{ 'active' if active_page=='home' else '' }}" href="/portal/home" data-tip="Inicio">
-                <span class="nav-icon" aria-hidden="true">{{ icon_home() }}</span>
-                <span class="nav-label">Inicio</span>
-              </a>
-              <a class="nav-item {{ 'active' if active_page=='create' else '' }}" href="/portal/create" data-tip="Genera tu factura">
-                <span class="nav-icon" aria-hidden="true">{{ icon_create() }}</span>
-                <span class="nav-label">Genera tu factura</span>
-              </a>
-            </div>
-          </div>
-
-          <!-- Sección: Facturas -->
-          <div class="nav-section">
-            <div class="nav-section__header">Facturas</div>
-            <div class="nav-section__items">
-              <a class="nav-item {{ 'active' if active_page=='issued' else '' }}" href="/portal/invoices/issued" data-tip="Facts. emitidas">
-                <span class="nav-icon" aria-hidden="true">{{ icon_issued() }}</span>
-                <span class="nav-label">Emitidas</span>
-              </a>
-              <a class="nav-item {{ 'active' if active_page=='received' else '' }}" href="/portal/invoices/received" data-tip="Facts. recibidas">
-                <span class="nav-icon" aria-hidden="true">{{ icon_received() }}</span>
-                <span class="nav-label">Recibidas</span>
-              </a>
-              {% if has_nomina %}
-              <a class="nav-item {{ 'active' if active_page=='nomina' else '' }}" href="/portal/invoices/nomina" data-tip="Nómina recibida">
-                <span class="nav-icon" aria-hidden="true">{{ icon_received() }}</span>
-                <span class="nav-label">Nómina</span>
-              </a>
-              {% endif %}
-            </div>
-          </div>
-
-          <!-- Sección: Catálogos -->
-          <div class="nav-section">
-            <div class="nav-section__header">Catálogos</div>
-            <div class="nav-section__items">
-              <a class="nav-item {{ 'active' if active_page=='clients' else '' }}" href="/portal/clients" data-tip="Clientes">
-                <span class="nav-icon" aria-hidden="true">{{ icon_clients() }}</span>
-                <span class="nav-label">Clientes</span>
-              </a>
-              <a class="nav-item {{ 'active' if active_page=='providers' else '' }}" href="/portal/providers" data-tip="Proveedores">
-                <span class="nav-icon" aria-hidden="true">{{ icon_providers() }}</span>
-                <span class="nav-label">Proveedores</span>
-              </a>
-              <a class="nav-item {{ 'active' if active_page=='product_suggestions' else '' }}" href="/portal/products/suggestions" data-tip="Productos sugeridos">
-                <span class="nav-icon" aria-hidden="true">{{ icon_products() }}</span>
-                <span class="nav-label">Productos sugeridos</span>
-              </a>
-              <a class="nav-item {{ 'active' if active_page=='products' else '' }}" href="/portal/products" data-tip="Productos">
-                <span class="nav-icon" aria-hidden="true">{{ icon_products() }}</span>
-                <span class="nav-label">Productos</span>
-              </a>
-            </div>
-          </div>
-
-          <!-- Sección: Otros -->
-          <div class="nav-section">
-            <div class="nav-section__header">Otros</div>
-            <div class="nav-section__items">
-              <a class="nav-item {{ 'active' if active_page=='quotations' else '' }}" href="/portal/cotizaciones" data-tip="Cotizaciones">
-                <span class="nav-icon" aria-hidden="true">{{ icon_quotations() }}</span>
-                <span class="nav-label">Cotizaciones</span>
-              </a>
-              <a class="nav-item {{ 'active' if active_page=='summary' else '' }}" href="/portal/summary" data-tip="Resumen">
-                <span class="nav-icon" aria-hidden="true">{{ icon_summary() }}</span>
-                <span class="nav-label">Resumen</span>
-              </a>
-              <a class="nav-item {{ 'active' if active_page=='bank_pdf_to_excel' else '' }}" href="/portal/bank/pdf-to-excel" data-tip="Convertir Edo. de Cuenta">
-                <span class="nav-icon" aria-hidden="true">{{ icon_bank() }}</span>
-                <span class="nav-label">Convertir Edo. de Cuenta</span>
-              </a>
-              <a class="nav-item {{ 'active' if active_page=='plan' else '' }}" href="/portal/plan" data-tip="Mi plan">
-                <span class="nav-icon" aria-hidden="true">{{ icon_summary() }}</span>
-                <span class="nav-label">Mi plan</span>
-              </a>
-            </div>
-          </div>
-        </nav>
-
-        <div class="sidebar-bottom muted">
-          MVP • sin WhatsApp todavía
-        </div>
-      </aside>
-      <div id="sidebarBackdrop" class="sidebar-backdrop" aria-hidden="true" hidden></div>
-
       <!-- Barra superior fija en todas las páginas (fuera de main para que el scroll no la mueva) -->
       <header class="portal-topbar" role="banner">
         <div class="portal-topbar__left">
-          <button type="button"
-                  class="sidebar-toggle"
-                  id="sidebarToggle"
-                  aria-label="Abrir menú"
-                  aria-controls="sidebar"
-                  aria-expanded="false">
-            <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path d="M4 5h16" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
-              <path d="M4 12h16" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
-              <path d="M4 19h16" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
-            </svg>
-          </button>
-
           <!-- Issuer info -->
           <div class="portal-topbar__issuer">
             <div class="portal-topbar__issuer-name">{{ issuer_alias or 'ContaNeta' }}</div>
@@ -370,52 +275,7 @@
           </div>
 
           <!-- Breadcrumb -->
-          <nav class="portal-topbar__breadcrumb" aria-label="Breadcrumb">
-            <a href="/portal/home" class="portal-topbar__breadcrumb-item">Inicio</a>
-            {% if active_page == 'issued' %}
-              <span class="portal-topbar__breadcrumb-sep" aria-hidden="true">›</span>
-              <span class="portal-topbar__breadcrumb-item portal-topbar__breadcrumb-item--current">Emitidas</span>
-            {% elif active_page == 'received' %}
-              <span class="portal-topbar__breadcrumb-sep" aria-hidden="true">›</span>
-              <span class="portal-topbar__breadcrumb-item portal-topbar__breadcrumb-item--current">Recibidas</span>
-            {% elif active_page == 'nomina' %}
-              <span class="portal-topbar__breadcrumb-sep" aria-hidden="true">›</span>
-              <span class="portal-topbar__breadcrumb-item portal-topbar__breadcrumb-item--current">Nómina</span>
-            {% elif active_page == 'quotations' %}
-              <span class="portal-topbar__breadcrumb-sep" aria-hidden="true">›</span>
-              <span class="portal-topbar__breadcrumb-item portal-topbar__breadcrumb-item--current">Cotizaciones</span>
-            {% elif active_page == 'create' %}
-              <span class="portal-topbar__breadcrumb-sep" aria-hidden="true">›</span>
-              <span class="portal-topbar__breadcrumb-item portal-topbar__breadcrumb-item--current">Generar factura</span>
-            {% elif active_page == 'clients' %}
-              <span class="portal-topbar__breadcrumb-sep" aria-hidden="true">›</span>
-              <span class="portal-topbar__breadcrumb-item portal-topbar__breadcrumb-item--current">Clientes</span>
-            {% elif active_page == 'providers' %}
-              <span class="portal-topbar__breadcrumb-sep" aria-hidden="true">›</span>
-              <span class="portal-topbar__breadcrumb-item portal-topbar__breadcrumb-item--current">Proveedores</span>
-            {% elif active_page == 'products' %}
-              <span class="portal-topbar__breadcrumb-sep" aria-hidden="true">›</span>
-              <span class="portal-topbar__breadcrumb-item portal-topbar__breadcrumb-item--current">Productos</span>
-            {% elif active_page == 'product_suggestions' %}
-              <span class="portal-topbar__breadcrumb-sep" aria-hidden="true">›</span>
-              <span class="portal-topbar__breadcrumb-item portal-topbar__breadcrumb-item--current">Productos sugeridos</span>
-            {% elif active_page == 'summary' %}
-              <span class="portal-topbar__breadcrumb-sep" aria-hidden="true">›</span>
-              <span class="portal-topbar__breadcrumb-item portal-topbar__breadcrumb-item--current">Resumen</span>
-            {% elif active_page == 'bank_pdf_to_excel' %}
-              <span class="portal-topbar__breadcrumb-sep" aria-hidden="true">›</span>
-              <span class="portal-topbar__breadcrumb-item portal-topbar__breadcrumb-item--current">Convertir Edo. de Cuenta</span>
-            {% elif active_page == 'plan' %}
-              <span class="portal-topbar__breadcrumb-sep" aria-hidden="true">›</span>
-              <span class="portal-topbar__breadcrumb-item portal-topbar__breadcrumb-item--current">Mi plan</span>
-            {% elif active_page == 'config_sat' %}
-              <span class="portal-topbar__breadcrumb-sep" aria-hidden="true">›</span>
-              <span class="portal-topbar__breadcrumb-item portal-topbar__breadcrumb-item--current">FIEL SAT</span>
-            {% elif active_page == 'datos_fiscales' %}
-              <span class="portal-topbar__breadcrumb-sep" aria-hidden="true">›</span>
-              <span class="portal-topbar__breadcrumb-item portal-topbar__breadcrumb-item--current">Datos fiscales</span>
-            {% endif %}
-          </nav>
+          {% include 'components/breadcrumbs.html' %}
         </div>
 
         <div class="portal-topbar__center">
@@ -425,16 +285,17 @@
             {% if not page_icon %}
               {% if active_page=='home' %}{% set _auto_icon = icon_home() %}
               {% elif active_page=='create' %}{% set _auto_icon = icon_create() %}
-              {% elif active_page=='issued' %}{% set _auto_icon = icon_issued() %}
+              {% elif active_page=='issued' or active_page=='facturas_hub' %}{% set _auto_icon = icon_issued() %}
               {% elif active_page=='received' %}{% set _auto_icon = icon_received() %}
               {% elif active_page=='nomina' %}{% set _auto_icon = icon_received() %}
-              {% elif active_page=='clients' %}{% set _auto_icon = icon_clients() %}
+              {% elif active_page=='clients' or active_page=='contactos_hub' %}{% set _auto_icon = icon_clients() %}
               {% elif active_page=='providers' %}{% set _auto_icon = icon_providers() %}
               {% elif active_page=='products' %}{% set _auto_icon = icon_products() %}
               {% elif active_page=='product_suggestions' %}{% set _auto_icon = icon_products() %}
               {% elif active_page=='quotations' %}{% set _auto_icon = icon_quotations() %}
               {% elif active_page=='summary' %}{% set _auto_icon = icon_summary() %}
-              {% elif active_page=='bank_pdf_to_excel' %}{% set _auto_icon = icon_bank() %}
+              {% elif active_page=='bank_movements' %}{% set _auto_icon = icon_movements() %}
+              {% elif active_page=='bank_pdf_to_excel' or active_page=='bank_statements' or active_page=='bancos_hub' or active_page=='convertir_edo_cuenta' %}{% set _auto_icon = icon_bank() %}
               {% elif active_page=='config_sat' %}{% set _auto_icon = icon_summary() %}
               {% elif active_page=='datos_fiscales' %}{% set _auto_icon = icon_summary() %}
               {% endif %}
@@ -456,11 +317,11 @@
           <div class="topbar-status-chips" id="topbarStatusChips" aria-label="Estado de cuenta" hidden>
             <a href="/portal/config/sat" class="topbar-status-chip topbar-status-chip--sat" id="topbarChipSat" title="FIEL SAT" data-status="none">SAT</a>
             <a href="/portal/config/sat" class="topbar-status-chip topbar-status-chip--sync" id="topbarChipSync" title="Sincronización SAT" data-status="ok">—</a>
-            <a href="/portal/plan" class="topbar-status-chip topbar-status-chip--plan" id="topbarChipPlan" title="Mi plan" style="display:none;" data-plan="">Plan</a>
+            <a href="/portal/plan" class="topbar-status-chip topbar-status-chip--plan u-hidden" id="topbarChipPlan" title="Mi plan" data-plan="">Plan</a>
           </div>
 
-          <!-- Menú usuario -->
-          <div class="user-menu-wrap">
+          <!-- Menú usuario (en shell v2 el trigger está en el rail; aquí solo el panel) -->
+          <div class="user-menu-wrap {% if portal_shell_v2|default(false) %}user-menu-wrap--rail-only{% endif %}">
             <button type="button" class="topbar-user{% if is_impersonating|default(false) %} topbar-user--impersonating{% endif %}" id="userMenuBtn" aria-haspopup="menu" aria-expanded="false" title="{{ issuer_alias }}">
               {% if is_impersonating|default(false) %}<span class="topbar-user__pill" aria-hidden="true">Soporte</span>{% endif %}
               <span class="topbar-user__dot" aria-hidden="true"></span>
@@ -498,7 +359,7 @@
               <div class="account-checklist" id="accountChecklist" aria-label="Mi cuenta — activación">
                 <div class="account-checklist__title">Mi cuenta</div>
                 <div id="accountChecklistContent">
-                  <span class="muted" style="font-size:12px;">Cargando…</span>
+                  <span class="muted u-text-12">Cargando…</span>
                 </div>
               </div>
               <div class="user-menu__sep" aria-hidden="true"></div>
@@ -517,6 +378,10 @@
                 <span class="user-menu__item-icon" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M3 10.5 12 3l9 7.5"/><path d="M5.5 10.5V21h13V10.5"/><path d="M10 21v-6h4v6"/></svg></span>
                 Inicio
               </a>
+              <a class="user-menu__item user-menu__item--with-icon" href="/portal/plan" role="menuitem">
+                <span class="user-menu__item-icon" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M21 12a9 9 0 1 1-9-9" stroke-linecap="round"/><path d="M21 3v6h-6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                Mi plan
+              </a>
               <div class="user-menu__sep" aria-hidden="true"></div>
               <div class="nightmode-wrap">
                 <button type="button" class="nightmode-toggle" id="nightModeBtn" role="switch" aria-checked="false" aria-label="Modo noche" title="Modo día / Modo noche">
@@ -531,7 +396,7 @@
                 </button>
               </div>
               <div class="user-menu__sep" aria-hidden="true"></div>
-              <form method="get" action="/logout" class="user-menu__logout-form user-menu__logout-form--prominent" style="margin:0; padding:0;">
+              <form method="get" action="/logout" class="user-menu__logout-form user-menu__logout-form--prominent form-reset">
                 <button type="submit" class="user-menu__item user-menu__item--logout" role="menuitem">Cerrar sesión</button>
               </form>
             </div>
@@ -539,7 +404,7 @@
         </div>
       </header>
 
-      <main class="main">
+      <main class="main" id="portalMain">
         <div id="pageContent" class="page-enter">
         <div class="main-inner page">
           {% if is_impersonating|default(false) %}
@@ -556,6 +421,8 @@
             <a href="/portal/exit-demo-view" class="demo-banner__link">Volver a mi portal</a>
           </div>
           {% endif %}
+          <!-- Banners persistentes: éxito / aviso / error (no se ocultan solos; usar toasts para feedback inmediato) -->
+          <div id="portalBanners" class="portal-banners" aria-live="polite" aria-relevant="additions"></div>
           <!-- P25: contenedor único para toasts (success/error/info); máx 3 visibles; no usar en carga de listas -->
           <div id="toastStack" class="toast-stack" aria-live="polite" aria-relevant="additions"></div>
 
@@ -569,17 +436,27 @@
 
           <!-- Cargar ui.js antes del content para que las listas (productos, clientes, emitidas, etc.) tengan uiFetchJSON en la primera carga -->
           <script src="/static/js/ui.js"></script>
+          <script src="/static/js/portal_drawer.js" defer></script>
+          <script src="/static/js/portal_resumen_collapse.js" defer></script>
+          {% if portal_shell_v2|default(false) %}
+          <script src="/static/js/portal_shell_v2.js"></script>
+          {% endif %}
+          <div class="portal-container">
           {% block content %}{% endblock %}
           <footer class="portal-footer" role="contentinfo">
             Tu sesión está protegida. No compartas tu acceso.
             <a href="/seguridad">Seguridad</a>
           </footer>
+          </div>
         </div>
         </div>
       </main>
+    </div>
+    </div>
+    </div>
 
       <!-- Modal de confirmación para acciones irreversibles (movido a body por script de modales) -->
-      <div id="portalConfirmModal" class="modal confirm-modal" role="dialog" aria-modal="true" aria-labelledby="portalConfirmTitle" hidden>
+      <div id="portalConfirmModal" class="modal confirm-modal" role="dialog" aria-modal="true" aria-labelledby="portalConfirmTitle" aria-label="Confirmar acción" hidden>
         <div class="confirm-modal__card">
           <h2 id="portalConfirmTitle" class="confirm-modal__title"></h2>
           <p id="portalConfirmText" class="confirm-modal__text"></p>
@@ -591,12 +468,12 @@
       </div>
 
       <!-- P45: Modal sesión expirada (401) -->
-      <div id="sessionExpiredModal" class="modal confirm-modal session-expired-modal" role="dialog" aria-modal="true" aria-labelledby="sessionExpiredTitle" aria-live="assertive" hidden>
+      <div id="sessionExpiredModal" class="modal confirm-modal session-expired-modal" role="dialog" aria-modal="true" aria-labelledby="sessionExpiredTitle" aria-label="Sesión expirada" hidden>
         <div class="confirm-modal__card">
           <h2 id="sessionExpiredTitle" class="confirm-modal__title">Sesión expirada</h2>
           <p class="confirm-modal__text">Tu sesión ha expirado. Inicia sesión para continuar.</p>
           <div class="confirm-modal__actions">
-            <a href="/login" class="btn btn--primary" id="sessionExpiredLoginBtn" style="text-decoration:none;">Iniciar sesión</a>
+            <a href="/login" class="btn btn--primary link-none" id="sessionExpiredLoginBtn">Iniciar sesión</a>
           </div>
         </div>
       </div>
@@ -616,14 +493,14 @@
       </div>
       {% endif %}
 
-      <div id="pdfModal" class="pdf-modal" aria-hidden="true" role="dialog" aria-labelledby="pdfModalTitle">
+      <div id="pdfModal" class="pdf-modal" aria-hidden="true" role="dialog" aria-labelledby="pdfModalTitle" aria-label="Vista previa CFDI">
         <div class="pdf-modal__backdrop" id="pdfModalBackdrop"></div>
         <div class="pdf-modal__container">
           <div class="pdf-modal__header">
             <h2 id="pdfModalTitle" class="pdf-modal__title">Vista previa CFDI</h2>
             <div class="pdf-modal__actions">
               <a id="pdfModalDownload" class="btn btn--secondary" href="#" download target="_blank" rel="noopener">Descargar</a>
-              <a id="pdfModalNewTab" class="btn btn--secondary" href="#" target="_blank" rel="noopener" style="display:none;">Ver en otra pestaña</a>
+              <a id="pdfModalNewTab" class="btn btn--secondary u-hidden" href="#" target="_blank" rel="noopener">Ver en otra pestaña</a>
               <button type="button" class="btn btn--primary" id="pdfModalClose">Cerrar</button>
             </div>
           </div>
@@ -651,18 +528,26 @@
 })();
     </script>
     <script>
-// Mover modales al final de body para que position:fixed use el viewport y no se escondan (evita ancestros con transform/overflow)
+// Mover modales y overlays al final de body para que position:fixed use el viewport (centrado correcto, evita ancestros con transform/overflow)
 (function () {
-  document.addEventListener('DOMContentLoaded', function () {
-    document.querySelectorAll('.modal, .form-modal').forEach(function (el) {
+  function moveModalsToBody() {
+    document.querySelectorAll('.modal, .form-modal, .quick-invoice-modal, .ui-overlay').forEach(function (el) {
       if (el.parentNode && el.parentNode !== document.body) document.body.appendChild(el);
     });
-  });
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function () {
+      moveModalsToBody();
+      requestAnimationFrame(moveModalsToBody);
+    });
+  } else {
+    moveModalsToBody();
+    requestAnimationFrame(moveModalsToBody);
+  }
 })();
     </script>
     <script>
-// P37: Modal de confirmación reutilizable (uiConfirm/portalConfirm). Sin alert/confirm nativo.
-// Uso: await portalConfirm({ title, message, confirmLabel, cancelLabel }); retorna Promise<boolean>
+// P37: Modal de confirmación reutilizable (uiConfirm/portalConfirm). Foco atrapado, ESC cierra.
 (function () {
   const modal = document.getElementById('portalConfirmModal');
   const titleEl = document.getElementById('portalConfirmTitle');
@@ -670,8 +555,10 @@
   const cancelBtn = document.getElementById('portalConfirmCancel');
   const okBtn = document.getElementById('portalConfirmOk');
   if (!modal || !titleEl || !textEl || !cancelBtn || !okBtn) return;
-  var resolvePromise, onConfirmCb;
+  var resolvePromise, onConfirmCb, removeEscape;
   function close(ok) {
+    if (typeof window.uiReleaseFocusTrap === 'function') window.uiReleaseFocusTrap();
+    if (removeEscape) { removeEscape(); removeEscape = null; }
     modal.hidden = true;
     modal.setAttribute('aria-hidden', 'true');
     document.body.style.overflow = '';
@@ -683,7 +570,6 @@
   cancelBtn.addEventListener('click', function () { close(false); });
   okBtn.addEventListener('click', function () { close(true); });
   modal.addEventListener('click', function (e) { if (e.target === modal) close(false); });
-  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !modal.hidden) close(false); });
   window.portalConfirm = function (opts) {
     var o = opts || {};
     titleEl.textContent = o.title || 'Confirmar';
@@ -694,7 +580,9 @@
     modal.removeAttribute('aria-hidden');
     document.body.style.overflow = 'hidden';
     onConfirmCb = typeof o.onConfirm === 'function' ? o.onConfirm : null;
-    requestAnimationFrame(function () { cancelBtn.focus(); });
+    removeEscape = (typeof window.uiCloseOnEscape === 'function') ? window.uiCloseOnEscape(modal, close) : function () {};
+    if (typeof window.uiTrapFocus === 'function') window.uiTrapFocus(modal);
+    else requestAnimationFrame(function () { cancelBtn.focus(); });
     return new Promise(function (resolve) {
       resolvePromise = resolve;
     });
@@ -703,52 +591,7 @@
     </script>
     <script>
 (function () {
-  const btn = document.getElementById('sidebarToggle');
-  const closeBtn = document.getElementById('sidebarClose');
-  const sidebar = document.getElementById('sidebar');
-  const backdrop = document.getElementById('sidebarBackdrop');
-  if (!btn || !sidebar || !backdrop) return;
-
-  const setOpen = (open) => {
-    document.body.classList.toggle('sidebar-open', open);
-    document.documentElement.classList.toggle('sidebar-open', open);
-    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
-    sidebar.setAttribute('aria-hidden', open ? 'false' : 'true');
-    // Backdrop should not take clicks when closed
-    backdrop.hidden = !open;
-    // Bloquear scroll de la página: solo el menú lateral puede hacer scroll
-    document.body.classList.toggle('no-scroll', open);
-  };
-
-  btn.addEventListener('click', () => {
-    const open = !document.body.classList.contains('sidebar-open');
-    setOpen(open);
-  });
-
-  if (closeBtn) closeBtn.addEventListener('click', () => setOpen(false));
-  backdrop.addEventListener('click', () => setOpen(false));
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') setOpen(false); });
-
-  // Close drawer smoothly before navigating (prevents the "snap" close on route change)
-  sidebar.addEventListener('click', (e) => {
-    const a = e.target && e.target.closest ? e.target.closest('a') : null;
-    if (!a) return;
-
-    const isOpen = document.body.classList.contains('sidebar-open');
-    if (!isOpen) return;
-
-    const href = (a.getAttribute('href') || '').trim();
-    if (!href || href.startsWith('#') || href.startsWith('javascript:')) return;
-    if (a.target && a.target !== '_self') return;
-
-    // Portal link: solo cerrar drawer; la transición y navegación las maneja P23 (ui.js)
-    setOpen(false);
-  });
-
-  // Ensure closed on first paint
   document.body.classList.add('sidebar-ready');
-  setOpen(false);
-
   // Page enter animation (all pages)
   requestAnimationFrame(() => {
     document.body.classList.add('page-enter');
@@ -842,8 +685,9 @@
 
     const el = document.createElement('div');
     el.className = `toast toast--${type}`;
-    el.setAttribute('role', 'status');
-    el.setAttribute('aria-live', 'polite');
+    const isAssertive = type === 'danger';
+    el.setAttribute('role', isAssertive ? 'alert' : 'status');
+    el.setAttribute('aria-live', isAssertive ? 'assertive' : 'polite');
     el.style.opacity = '0';
     el.style.transform = 'translateY(8px)';
     el.style.transition = 'opacity 200ms ease, transform 200ms ease';
@@ -868,13 +712,52 @@
     }, ttl);
   };
 
+  // ============ Banners persistentes (éxito / aviso / error) — un solo sistema con toasts ============
+  // Toasts = feedback inmediato que se oculta solo. Banners = avisos importantes que permanecen hasta cerrar o navegar.
+  const portalBannersEl = document.getElementById('portalBanners');
+  window.portalBanner = function(opts) {
+    if (!portalBannersEl) return;
+    const o = opts || {};
+    const type = (o.type === 'success' || o.type === 'warning' || o.type === 'error') ? o.type : 'warning';
+    const title = o.title || (type === 'error' ? 'Error' : type === 'warning' ? 'Aviso' : 'Listo');
+    const message = o.message || '';
+    const id = o.id || null;
+    const dismissible = o.dismissible !== false;
+    if (id) {
+      const existing = portalBannersEl.querySelector('[data-banner-id="' + id + '"]');
+      if (existing) existing.remove();
+    }
+    const escape = (s) => { const d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; };
+    const banner = document.createElement('div');
+    banner.className = 'portal-banner portal-banner--' + type;
+    banner.setAttribute('role', type === 'error' ? 'alert' : 'status');
+    banner.setAttribute('aria-live', type === 'error' ? 'assertive' : 'polite');
+    if (id) banner.setAttribute('data-banner-id', id);
+    banner.innerHTML = '<div class="portal-banner__content"><p class="portal-banner__title">' + escape(title) + '</p>' +
+      (message ? '<p class="portal-banner__msg">' + escape(message) + '</p>' : '') + '</div>' +
+      (dismissible ? '<button type="button" class="portal-banner__dismiss" aria-label="Cerrar aviso">×</button>' : '');
+    if (dismissible) {
+      const btn = banner.querySelector('.portal-banner__dismiss');
+      if (btn) btn.addEventListener('click', function() { banner.remove(); });
+    }
+    portalBannersEl.appendChild(banner);
+  };
+  window.portalBannerClear = function(id) {
+    if (!portalBannersEl || !id) return;
+    const el = portalBannersEl.querySelector('[data-banner-id="' + id + '"]');
+    if (el) el.remove();
+  };
+
   // ============ User menu dropdown ============
   const userBtn = document.getElementById('userMenuBtn');
   const userMenu = document.getElementById('userMenu');
   const closeUserMenu = () => {
-    if (!userBtn || !userMenu) return;
+    if (!userMenu) return;
     userMenu.hidden = true;
-    userBtn.setAttribute('aria-expanded', 'false');
+    if (userBtn) userBtn.setAttribute('aria-expanded', 'false');
+    const railBtn = document.getElementById('userMenuBtnRail');
+    if (railBtn) railBtn.setAttribute('aria-expanded', 'false');
+    userMenu.classList.remove('user-menu--from-rail');
   };
   const openUserMenu = () => {
     if (!userBtn || !userMenu) return;
@@ -907,7 +790,7 @@
       .then(function(r) { return (r && r.ok) ? r.data : null; })
       .then(function(data) {
         if (!data || typeof data.completed !== 'number') {
-          if (el) el.innerHTML = '<span class="muted" style="font-size:12px;">No pudimos cargar</span>';
+          if (el) el.innerHTML = '<span class="muted u-text-12">No pudimos cargar</span>';
           return;
         }
         var completed = data.completed;
@@ -958,18 +841,18 @@
           }
           chipSync.href = '/portal/config/sat';
           if (chipPlan && data.plan_label) {
-            chipPlan.style.display = '';
+            chipPlan.classList.remove('u-hidden');
             chipPlan.textContent = data.plan_label;
             chipPlan.setAttribute('data-plan', (data.plan_label || '').toLowerCase());
             chipPlan.title = 'Mi plan: ' + data.plan_label;
             chipPlan.href = '/portal/plan';
           } else if (chipPlan) {
-            chipPlan.style.display = 'none';
+            chipPlan.classList.add('u-hidden');
           }
         }
       })
       .catch(function() {
-        if (el) el.innerHTML = '<span class="muted" style="font-size:12px;">No pudimos cargar</span>';
+        if (el) el.innerHTML = '<span class="muted u-text-12">No pudimos cargar</span>';
       });
   };
 
@@ -1140,6 +1023,7 @@
 
   var currentPdfUrl = '';
   var currentPdfBlobUrl = null;
+  var removeEscapePdf = null;
 
   function setPdfModalError(msg) {
     if (pdfModalError) {
@@ -1166,10 +1050,12 @@
     currentPdfUrl = fullUrl;
     pdfModalDownload.href = fullUrl + (fullUrl.indexOf('?') >= 0 ? '&' : '?') + 'dl=1';
     var newTabBtn = document.getElementById('pdfModalNewTab');
-    if (newTabBtn) { newTabBtn.href = fullUrl; newTabBtn.style.display = ''; }
+    if (newTabBtn) { newTabBtn.href = fullUrl; newTabBtn.classList.remove('u-hidden'); }
     pdfModal.setAttribute('aria-hidden', 'false');
     pdfModal.classList.add('pdf-modal--open');
     document.body.classList.add('no-scroll');
+    removeEscapePdf = (typeof window.uiCloseOnEscape === 'function') ? window.uiCloseOnEscape(pdfModal, closePdfModal) : function () {};
+    if (typeof window.uiTrapFocus === 'function') window.uiTrapFocus(pdfModal);
 
     (window.portalFetchWithTimeout ? window.portalFetchWithTimeout(fullUrl, { credentials: 'same-origin' }, 45000) : fetch(fullUrl, { credentials: 'same-origin' }))
       .then(function(res) {
@@ -1187,6 +1073,7 @@
         pdfModalFrame.src = currentPdfBlobUrl;
       })
       .catch(function(err) {
+        if (err && err.type === 'unauthorized') return;
         var msg = (err && err.message) ? err.message : '';
         if (/rechazó la conexión|failed to fetch|NetworkError|Load failed/i.test(msg)) {
           msg = 'No pudimos cargar el PDF. Usa «Ver en otra pestaña» o «Descargar» si el problema continúa.';
@@ -1217,23 +1104,20 @@
 
   const closePdfModal = () => {
     if (!pdfModal || !pdfModalFrame) return;
+    if (typeof window.uiReleaseFocusTrap === 'function') window.uiReleaseFocusTrap();
+    if (removeEscapePdf) { removeEscapePdf(); removeEscapePdf = null; }
     pdfModal.classList.remove('pdf-modal--open');
     pdfModal.setAttribute('aria-hidden', 'true');
     document.body.classList.remove('no-scroll');
     clearPdfModalError();
     var newTabBtn = document.getElementById('pdfModalNewTab');
-    if (newTabBtn) newTabBtn.style.display = 'none';
+    if (newTabBtn) newTabBtn.classList.add('u-hidden');
     if (currentPdfBlobUrl) { URL.revokeObjectURL(currentPdfBlobUrl); currentPdfBlobUrl = null; }
     setTimeout(() => { pdfModalFrame.src = 'about:blank'; }, 300);
   };
 
   if (pdfModalClose) pdfModalClose.addEventListener('click', closePdfModal);
   if (pdfModalBackdrop) pdfModalBackdrop.addEventListener('click', closePdfModal);
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && pdfModal && pdfModal.classList.contains('pdf-modal--open')) {
-      closePdfModal();
-    }
-  });
 
   document.addEventListener('click', (e) => {
     const btn = e.target && e.target.closest ? e.target.closest('[data-pdf-url]') : null;
@@ -1329,18 +1213,6 @@
         if (menuBtn && menuBtn.getAttribute('aria-expanded') === 'true') menuBtn.click();
         return true;
       }
-      var sidebarOpen = document.body.classList.contains('sidebar-open');
-      if (sidebarOpen) {
-        document.body.classList.remove('sidebar-open');
-        document.documentElement.classList.remove('sidebar-open');
-        var sidebar = document.getElementById('sidebar');
-        var sidebarBackdrop = document.getElementById('sidebarBackdrop');
-        if (sidebar) sidebar.setAttribute('aria-hidden', 'true');
-        if (sidebarBackdrop) { sidebarBackdrop.hidden = true; }
-        var sbBtn = document.getElementById('sidebarToggle');
-        if (sbBtn) sbBtn.setAttribute('aria-expanded', 'false');
-        return true;
-      }
       return false;
     }
 
@@ -1399,14 +1271,28 @@
   })();
 </script>
 <script>
-  // P45: Sesión expirada (401) — modal "Sesión expirada" + botón Iniciar sesión; cerrar drawers/overlays para no dejar UI rota
+  // P45: Sesión expirada (401) — modal "Sesión expirada"; foco atrapado, ESC cierra.
+  var _sessionExpiredRemoveEscape = null;
   window.showSessionExpiredModal = function () {
-    var modal = document.getElementById('sessionExpiredModal');
     if (typeof window.uiCloseAllOverlays === 'function') window.uiCloseAllOverlays();
+    var modal = document.getElementById('sessionExpiredModal');
     if (modal) {
       modal.hidden = false;
       modal.setAttribute('aria-hidden', 'false');
       document.body.classList.add('no-scroll');
+      function closeSessionModal() {
+        modal.hidden = true;
+        modal.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('no-scroll');
+        if (typeof window.uiReleaseFocusTrap === 'function') window.uiReleaseFocusTrap();
+        if (_sessionExpiredRemoveEscape) { _sessionExpiredRemoveEscape(); _sessionExpiredRemoveEscape = null; }
+      }
+      _sessionExpiredRemoveEscape = (typeof window.uiCloseOnEscape === 'function') ? window.uiCloseOnEscape(modal, closeSessionModal) : function () {};
+      if (typeof window.uiTrapFocus === 'function') window.uiTrapFocus(modal);
+      else {
+        var loginBtn = document.getElementById('sessionExpiredLoginBtn');
+        if (loginBtn) requestAnimationFrame(function () { try { loginBtn.focus(); } catch (_) {} });
+      }
     }
   };
 </script>
@@ -1459,7 +1345,6 @@
   // Keep layout CSS vars in sync (used by form.css for the fixed bottom action bar)
   (function () {
     const root = document.documentElement;
-    const sidebar = document.getElementById('sidebar');
     const mainInner = document.querySelector('.main-inner');
 
     const readPx = (v) => {
@@ -1468,10 +1353,6 @@
     };
 
     const sync = () => {
-      if (sidebar) {
-        const w = sidebar.getBoundingClientRect().width;
-        if (w > 0) root.style.setProperty('--sidebar-w', `${Math.round(w)}px`);
-      }
       if (mainInner) {
         const cs = getComputedStyle(mainInner);
         const pad = readPx(cs.paddingLeft);
@@ -1479,15 +1360,8 @@
       }
     };
 
-    // initial + on resize
     sync();
     window.addEventListener('resize', sync);
-
-    // also sync when sidebar open/close toggles (mobile)
-    const btn = document.getElementById('sidebarToggle');
-    if (btn) btn.addEventListener('click', () => setTimeout(sync, 0));
-    const closeBtn = document.getElementById('sidebarClose');
-    if (closeBtn) closeBtn.addEventListener('click', () => setTimeout(sync, 0));
   })();
 </script>
 <script>
@@ -1583,6 +1457,7 @@
           if (data && data.ok) {
             fetchStatus();
             updateUI({ status: 'running', last_sync_at: null });
+            if (window.portalBanner) window.portalBanner({ id: 'sync-warning', type: 'warning', title: 'Sync SAT', message: 'Puede tardar unos minutos. Los CFDI se descargan en segundo plano.', dismissible: true });
             if (window.uiSuccessOverlay) window.uiSuccessOverlay({ title: 'Sincronización iniciada', message: 'Los CFDI se están descargando en segundo plano. Puedes seguir usando el portal.', actions: [{ label: 'Entendido', onClick: function () { if (window.uiSuccessOverlayClose) window.uiSuccessOverlayClose(); } }] });
             else if (window.portalToast) window.portalToast({ type: 'info', title: 'Sync iniciado', message: 'Los CFDI se descargan en segundo plano.' });
           } else if (data && !data.ok) {
@@ -1591,6 +1466,7 @@
             if (metaEl) metaEl.removeAttribute('aria-hidden');
             if (chipEl) { chipEl.textContent = 'Error'; chipEl.title = errMsg; }
             if (listBar) listBar.setAttribute('data-status', 'error');
+            if (window.portalBanner) window.portalBanner({ id: 'sync-error', type: 'error', title: 'Sync SAT', message: errMsg, dismissible: true });
             if (window.portalToast) window.portalToast({ type: 'error', title: 'Sync', message: errMsg });
             else if (window.uiSuccessOverlay) window.uiSuccessOverlay({ title: 'No se pudo sincronizar', message: errMsg, actions: [{ label: 'Entendido', onClick: function () { if (window.uiSuccessOverlayClose) window.uiSuccessOverlayClose(); } }] });
           }
@@ -1599,6 +1475,7 @@
           if (metaEl) metaEl.textContent = 'Error de conexión.';
           if (chipEl) { chipEl.textContent = 'Error'; chipEl.title = 'Error de conexión.'; }
           if (listBar) listBar.setAttribute('data-status', 'error');
+          if (window.portalBanner) window.portalBanner({ id: 'sync-error', type: 'error', title: 'Sync SAT', message: 'Error de conexión. Revisa tu red e intenta de nuevo.', dismissible: true });
         })
         .finally(function () {
           syncBtn.disabled = false;

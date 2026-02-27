@@ -53,6 +53,7 @@ Variables que suele inyectar el backend en `_render_portal`:
 - `portal/_ui_components.html` — Componentes reutilizables del portal.
 - `partials/` — Listas (issued_list, received_list, clients_list, providers_list, bank_upload, etc.).
 - `components/portal_drawer.html`, `components/portal_rail.html` — Drawer y rail.
+- `components/breadcrumbs.html` — Breadcrumb del topbar (requiere `active_page` del contexto).
 
 **Regla:** No usar nombres de template dinámicos desde variables de usuario. Siempre literales (evita TemplateNotFound y riesgos de path traversal).
 
@@ -75,7 +76,7 @@ Variables que suele inyectar el backend en `_render_portal`:
 1. `form.css`
 2. `portal_tokens.css` — **Tokens (fuente de verdad): tipografía, colores, spacing, radius, sombras.**
 3. `components.css` — Componentes UI (.ui-input, .ui-btn, .ui-card, .ui-table, etc.).
-4. `portal.css` — Layout portal, sidebar, topbar, tablas, estados.
+4. `portal.css` — Entrada principal: importa internamente `portal_shell.css`, `portal_components.css`, `portal_pages.css` y contiene el resto de reglas (topbar, páginas, responsive). Ver `docs/CSS_ARCHITECTURE.md`.
 5. `portal_ui_v2.css`, `portal_rail.css`
 6. `portal_shell_v2.css` — Solo si `portal_shell_v2` es true.
 

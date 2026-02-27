@@ -1,7 +1,7 @@
 {% extends "base_portal.html" %}
 
 {% set title = 'Nómina recibida' %}
-{% set page_icon = '<svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 2v5a1 1 0 0 0 1 1h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 18v-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="m9 15 3 3 3-3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>' %}
+{% set page_icon = '<svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 2v5a1 1 0 0 0 1 1h5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 18v-6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/><path d="m9 15 3 3 3-3" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>' %}
 
 {% macro short_uuid(u) %}
   {% if u %}{{ u[:8] }}…{{ u[-4:] }}{% else %}-{% endif %}
@@ -88,8 +88,11 @@
                   {% endif %}
                 </td>
                 <td>
-                  <div style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; font-size:12px;">
-                    {{ short_uuid(r.uuid) }}
+                  <div class="uuid-copy-wrap">
+                    <span class="uuid-copy-wrap__text" style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; font-size:12px;">{{ short_uuid(r.uuid) }}</span>
+                    {% if r.uuid %}
+                    <button type="button" class="uuid-copy-btn" data-copy-uuid="{{ r.uuid | e }}" aria-label="Copiar UUID" title="Copiar UUID"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+                    {% endif %}
                   </div>
                 </td>
                 <td class="muted">{{ money(r.subtotal, r.moneda) }}</td>
@@ -123,11 +126,44 @@
             {% endfor %}
           {% else %}
             <tr>
-              <td class="muted" colspan="10">No hay CFDI de nómina recibidos para <strong>{{ ym_label }}</strong>.</td>
+              <td colspan="10" style="padding: 0; vertical-align: middle;">
+                <div class="empty-state" style="padding: var(--space-8) var(--space-5);">
+                  <div class="empty-state__icon" aria-hidden="true">
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/>
+                      <path d="M14 2v5a1 1 0 0 0 1 1h5"/>
+                      <path d="M12 18v-6"/>
+                      <path d="m9 15 3 3 3-3"/>
+                    </svg>
+                  </div>
+                  <p class="empty-state__title" style="margin: 0;">Aún no hay recibos de nómina este mes</p>
+                  <p class="empty-state__desc" style="margin: 0;">No hay CFDI de nómina recibidos para {{ ym_label }}. Revisa facturas recibidas.</p>
+                  <div class="empty-state__actions">
+                    <a href="/portal/invoices/received" class="btn btn--primary" style="text-decoration: none;">Ver facturas recibidas</a>
+                  </div>
+                </div>
+              </td>
             </tr>
           {% endif %}
         </tbody>
       </table>
     </div>
   </div>
+
+  <script>
+  (function() {
+    document.addEventListener('click', function(e) {
+      var btn = e.target && e.target.closest ? e.target.closest('[data-copy-uuid]') : null;
+      if (!btn) return;
+      e.preventDefault();
+      e.stopPropagation();
+      var uuid = (btn.getAttribute('data-copy-uuid') || '').trim();
+      if (!uuid || !navigator.clipboard || !navigator.clipboard.writeText) return;
+      navigator.clipboard.writeText(uuid).then(function() {
+        var toast = window.uiToast || window.portalToast;
+        if (toast) toast({ type: 'success', title: 'Copiado', message: '', timeout: 2000 });
+      }).catch(function() {});
+    });
+  })();
+  </script>
 {% endblock %}

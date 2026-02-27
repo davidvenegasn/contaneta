@@ -1,0 +1,1547 @@
+<div class="page-wrap">
+  <div class="card p-20">
+    <div class="card-title-row mb-14">
+      <h2 class="section-title">Convertir Edo. de Cuenta</h2>
+    </div>
+    <p class="muted u-m0 u-mb-14">
+      Arrastra todos los edos. de cuenta en PDF para ver tus movimientos consolidados.
+    </p>
+
+    <form id="previewForm" class="u-hidden" method="post" action="/portal/bank/pdf-to-excel/upload" enctype="multipart/form-data" hidden>
+      <input type="hidden" name="preview" value="1" />
+      <input id="previewFileInput" type="file" name="file" accept="application/pdf,.pdf" />
+    </form>
+
+    <div class="dropzone" id="pdfDropzone" role="button" tabindex="0" aria-label="Arrastra tus estados de cuenta PDF aquí o haz click para seleccionar">
+      <div class="dropzone__icon" aria-hidden="true">PDF</div>
+      <div class="dropzone__title">Arrastra todos tus edo. de cuenta</div>
+      <div class="dropzone__hint muted">o click para seleccionar</div>
+      <div class="dropzone__file muted" id="pdfFileMeta" hidden></div>
+      <input id="pdfFileInput" type="file" accept="application/pdf,.pdf" multiple hidden />
+    </div>
+    <div id="pdfFileListWrap" class="u-mt-4" hidden>
+      <p class="u-mb-2 muted u-text-xs"><strong>Archivos seleccionados:</strong></p>
+      <ul id="pdfFileList" class="bank-pdf-list list-reset u-mb-4"></ul>
+      <button type="button" class="btn btn-primary" id="processPdfBtn">Procesar estados de cuenta</button>
+    </div>
+    <p class="muted u-mt-2 u-text-xs">
+      <button type="button" class="btn btn--secondary btn--sm" id="previewBtn">Vista previa (Banorte)</button>
+      <span class="muted"> — Sin guardar en DB. Luego puedes «Convertir y descargar» para generar el Excel.</span>
+    </p>
+
+    <section class="bank-accounts-block card p-20 u-mt-14 u-mb-14" id="bankAccountsBlock" aria-labelledby="bankAccountsTitle">
+      <h3 class="section-title" id="bankAccountsTitle">Mis cuentas bancarias</h3>
+      <p class="muted u-m0 u-mb-10">
+        Agrega tus cuentas para identificar transferencias entre tus propias cuentas y no contarlas como ingreso o gasto real.
+      </p>
+      <button type="button" class="btn btn-primary" id="bankAccountAddBtn">+ Agregar cuenta</button>
+      <div id="bankAccountsList" class="bank-accounts-list u-mt-10"></div>
+      <p class="u-text-xs muted u-mt-6" id="bankAccountsTip" hidden>
+        Tip: agrega tus cuentas para detectar traspasos entre cuentas propias.
+      </p>
+    </section>
+
+    </div>
+
+    <div id="bank-multi-wrap" class="bank-preview-block card card--invoice-list ui-card p-20 u-mt-6">
+      <div id="bankMultiFileErrors" class="bank-convert-status__error u-mb-4" hidden></div>
+      <div class="table-wrap ui-table-wrap">
+        <table class="table table--zebra ui-table ui-table--zebra" id="bankMultiTable" aria-label="Movimientos del estado de cuenta">
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Concepto</th>
+              <th>Tipo</th>
+              <th class="text-right">Monto</th>
+              <th class="text-right">Saldo</th>
+              <th>Categoría</th>
+              <th class="text-right">Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="bankMultiBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="bank-convert-status" aria-live="polite">
+      <div class="bank-result" id="resultPanel" hidden>
+        <div class="bank-result__grid">
+          <div class="bank-result__metric">
+            <div class="bank-result__k">Movimientos detectados</div>
+            <div class="bank-result__v" id="mDetected">—</div>
+          </div>
+          <div class="bank-result__metric">
+            <div class="bank-result__k">Total ingresos</div>
+            <div class="bank-result__v" id="mIngresos">—</div>
+          </div>
+          <div class="bank-result__metric">
+            <div class="bank-result__k">Total gastos</div>
+            <div class="bank-result__v" id="mGastos">—</div>
+          </div>
+          <div class="bank-result__metric">
+            <div class="bank-result__k">Movimientos sin parsear</div>
+            <div class="bank-result__v" id="mLow">—</div>
+          </div>
+        </div>
+        <div class="bank-result__note muted" id="parseMessage" hidden></div>
+      </div>
+
+      <div class="bank-quality" id="qualityPanel" hidden>
+        <div class="bank-quality__title">Calidad de extracción</div>
+        <ul class="bank-quality__list">
+          <li><b>Si ves movimientos partidos</b> o faltantes, usa la hoja <b>RAW</b> del Excel.</li>
+          <li>Si el PDF fuera <b>escaneado</b>, necesitará <b>OCR (v2)</b>.</li>
+        </ul>
+      </div>
+      <div class="bank-convert-status__error" id="uploadError" hidden role="alert"></div>
+      <div class="bank-convert-status__actions">
+        <a class="btn btn-primary" id="downloadBtn" href="#" hidden>Descargar Excel contable</a>
+        <button type="button" class="btn btn-ghost" id="resetBtn" hidden>Convertir otro PDF</button>
+      </div>
+    </div>
+
+    <!-- Modal agregar/editar cuenta bancaria -->
+    <div id="bankAccountModal" class="bank-why-modal" hidden aria-hidden="true">
+      <div class="bank-why-modal__backdrop" data-close-bank-account-modal="true"></div>
+      <div class="bank-why-modal__panel" role="dialog" aria-labelledby="bankAccountModalTitle">
+        <div class="bank-why-modal__head">
+          <h4 class="bank-why-modal__title" id="bankAccountModalTitle">Agregar cuenta</h4>
+          <button type="button" class="bank-why-modal__close" data-close-bank-account-modal="true" aria-label="Cerrar">&times;</button>
+        </div>
+        <div class="bank-why-modal__body">
+          <div class="bank-edit-form">
+            <label class="bank-edit-form__label">Alias <span class="muted">(ej. Nu personal)</span></label>
+            <input type="text" id="bankAccountAlias" class="input input--block" placeholder="Ej. Banorte principal" required />
+            <label class="bank-edit-form__label">Banco</label>
+            <input type="text" id="bankAccountBankName" class="input input--block" placeholder="Ej. BANORTE" />
+            <label class="bank-edit-form__label">CLABE <span class="muted">(18 dígitos, opcional)</span></label>
+            <input type="text" id="bankAccountClabe" class="input input--block" placeholder="18 dígitos" maxlength="18" />
+            <label class="bank-edit-form__label">Últimos 4 dígitos de cuenta</label>
+            <input type="text" id="bankAccountLast4" class="input input--block" placeholder="Ej. 9875" maxlength="4" />
+            <label class="bank-edit-form__label">Titular <span class="muted">(opcional)</span></label>
+            <input type="text" id="bankAccountHolder" class="input input--block" placeholder="Nombre tal como en el estado de cuenta (para reconocer traspasos a esta cuenta)" />
+            <label class="bank-edit-form__label">RFC titular <span class="muted">(opcional)</span></label>
+            <input type="text" id="bankAccountRfc" class="input input--block" placeholder="RFC" />
+            <label class="bank-edit-form__label"><input type="checkbox" id="bankAccountActive" checked /> Activa</label>
+            <div class="bank-edit-form__actions u-mt-6">
+              <button type="button" class="btn btn--ghost" data-close-bank-account-modal="true">Cancelar</button>
+              <button type="button" class="btn btn-primary" id="bankAccountModalSave">Guardar</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="bank-preview-wrap" class="bank-preview-block card card--invoice-list ui-card p-20 u-mt-6" {% if not (preview_movements is defined and preview_movements) %}hidden{% endif %}>
+      <h3 class="section-title">Movimientos del estado de cuenta</h3>
+      {% set sum = preview_summary|default({}) %}
+      {% if sum.get('error') %}
+      <p class="bank-convert-status__error">{{ sum.get('error') }}</p>
+      {% endif %}
+      <div class="bank-preview-kpis" id="bankPreviewKpis">
+        <div class="bank-preview-kpi bank-preview-kpi--ingresos">
+          <span class="bank-preview-kpi__label">Ingresos</span>
+          <span class="bank-preview-kpi__value" id="kpiIngresos">$0.00</span>
+        </div>
+        <div class="bank-preview-kpi bank-preview-kpi--ingresos-reales">
+          <span class="bank-preview-kpi__label">Ingresos reales</span>
+          <span class="bank-preview-kpi__value" id="kpiIngresosReales" title="Sin transferencias propias ni disposiciones">$0.00</span>
+        </div>
+        <div class="bank-preview-kpi bank-preview-kpi--gastos">
+          <span class="bank-preview-kpi__label">Gastos</span>
+          <span class="bank-preview-kpi__value" id="kpiGastos">$0.00</span>
+        </div>
+        <div class="bank-preview-kpi bank-preview-kpi--gastos-reales">
+          <span class="bank-preview-kpi__label">Gastos reales</span>
+          <span class="bank-preview-kpi__value" id="kpiGastosReales" title="Sin pagos de tarjeta ni transferencias propias">$0.00</span>
+        </div>
+        <div class="bank-preview-kpi bank-preview-kpi--financiero">
+          <span class="bank-preview-kpi__label">Financiero</span>
+          <span class="bank-preview-kpi__value" id="kpiFinanciero">0</span>
+        </div>
+        <div class="bank-preview-kpi bank-preview-kpi--review">
+          <span class="bank-preview-kpi__label">Revisar</span>
+          <span class="bank-preview-kpi__value" id="kpiNeedsReview">0</span>
+        </div>
+        <div class="bank-preview-kpi" id="bankPreviewSaldoFinalWrap">
+          <span class="bank-preview-kpi__label">Saldo final</span>
+          <span class="bank-preview-kpi__value" id="kpiSaldoFinal">—</span>
+        </div>
+      </div>
+      <p class="u-text-xs muted u-mt-2" id="bankPreviewRealesHint">Ingresos/gastos reales excluyen transferencias entre cuentas propias y pagos de tarjeta de crédito.</p>
+      <div class="bank-preview-toolbar">
+        <div class="bank-preview-filters" role="group" aria-label="Filtros">
+          <button type="button" class="bank-preview-filter active" data-filter="all">Todos</button>
+          <button type="button" class="bank-preview-filter" data-filter="needs_review">Revisar</button>
+          <button type="button" class="bank-preview-filter" data-filter="financiero">Financiero</button>
+          <button type="button" class="bank-preview-filter" data-filter="cuenta_propia">Cuenta propia</button>
+          <button type="button" class="bank-preview-filter" data-filter="duplicados">Duplicados</button>
+          <button type="button" class="bank-preview-filter" data-filter="IN">Ingresos</button>
+          <button type="button" class="bank-preview-filter" data-filter="OUT">Gastos</button>
+        </div>
+        <div class="bank-preview-preset" role="group" aria-label="Preset de clasificación">
+          <span class="bank-preview-preset__label muted">Clasificación:</span>
+          <button type="button" class="bank-preview-preset-btn active" data-preset="conservative" id="presetConservative">Modo conservador</button>
+          <button type="button" class="bank-preview-preset-btn" data-preset="aggressive" id="presetAggressive">Modo agresivo</button>
+        </div>
+        <button type="button" class="btn btn-primary" id="bankPreviewExportBtn">Exportar Excel (con mis ediciones)</button>
+      </div>
+      <div class="card__body ui-card__body">
+        <div class="table-wrap ui-table-wrap">
+          <table class="table table--zebra ui-table ui-table--zebra" id="bankMovementsTable">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Concepto</th>
+                <th>Tipo</th>
+                <th class="text-right">Monto</th>
+                <th class="text-right">Saldo</th>
+                <th>Categoría</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="bankMovementsBody"></tbody>
+          </table>
+        </div>
+      </div>
+      <!-- Modal editar movimiento -->
+      <div id="bankMovementEditModal" class="bank-why-modal" hidden aria-hidden="true">
+        <div class="bank-why-modal__backdrop" data-close-edit="true"></div>
+        <div class="bank-why-modal__panel" role="dialog" aria-labelledby="bankEditModalTitle">
+          <div class="bank-why-modal__head">
+            <h4 class="bank-why-modal__title" id="bankEditModalTitle">Editar movimiento</h4>
+            <button type="button" class="bank-why-modal__close" data-close-edit="true" aria-label="Cerrar">&times;</button>
+          </div>
+          <div class="bank-why-modal__body">
+            <div class="bank-edit-form">
+              <label class="bank-edit-form__label">Concepto</label>
+              <input type="text" id="bankEditConcept" class="input input--block" placeholder="Concepto" />
+              <label class="bank-edit-form__label">Categoría</label>
+              <select id="bankEditCategory" class="input select input--block"></select>
+              <label class="bank-edit-form__label"><input type="checkbox" id="bankEditNeedsReview" /> Marcar para revisar</label>
+              <label class="bank-edit-form__label">Notas</label>
+              <textarea id="bankEditNotes" class="input input--block" rows="2" placeholder="Notas..."></textarea>
+              <div class="bank-edit-form__actions u-mt-6">
+                <button type="button" class="btn btn--ghost" id="bankEditWhyBtn">Ver por qué se clasificó</button>
+                <button type="button" class="btn btn-primary" id="bankEditSaveBtn">Guardar</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div id="bankWhyModal" class="bank-why-modal" hidden aria-hidden="true">
+        <div class="bank-why-modal__backdrop" data-close="true"></div>
+        <div class="bank-why-modal__panel" role="dialog" aria-labelledby="bankWhyModalTitle">
+          <div class="bank-why-modal__head">
+            <h4 class="bank-why-modal__title" id="bankWhyModalTitle">Por qué se clasificó así</h4>
+            <button type="button" class="bank-why-modal__close" data-close="true" aria-label="Cerrar">&times;</button>
+          </div>
+          <div class="bank-why-modal__body">
+            <div class="bank-why-modal__section">
+              <div class="bank-why-modal__label">Reglas que aplicaron</div>
+              <ul id="bankWhyRuleHits" class="bank-why-modal__list"></ul>
+            </div>
+            <div class="bank-why-modal__section">
+              <div class="bank-why-modal__label">Confianza (desglose)</div>
+              <ul id="bankWhyConfBreakdown" class="bank-why-modal__list"></ul>
+            </div>
+            <div class="bank-why-modal__section">
+              <div class="bank-why-modal__label">Campos extraídos</div>
+              <dl id="bankWhyExtracted" class="bank-why-modal__dl"></dl>
+            </div>
+            <div class="bank-why-modal__section" id="bankWhyWarningsWrap">
+              <div class="bank-why-modal__label">Avisos</div>
+              <ul id="bankWhyWarnings" class="bank-why-modal__list"></ul>
+            </div>
+          </div>
+        </div>
+      </div>
+      <script>
+        window.__PREVIEW_MOVEMENTS = {{ preview_movements|default([])|tojson }};
+        window.__PREVIEW_SUMMARY = {{ preview_summary|default({})|tojson }};
+      </script>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var dropzone = document.getElementById('pdfDropzone');
+  var input = document.getElementById('pdfFileInput');
+  var meta = document.getElementById('pdfFileMeta');
+  var resultPanel = document.getElementById('resultPanel');
+  var qualityPanel = document.getElementById('qualityPanel');
+  var mDetected = document.getElementById('mDetected');
+  var mIngresos = document.getElementById('mIngresos');
+  var mGastos = document.getElementById('mGastos');
+  var mLow = document.getElementById('mLow');
+  var parseMessage = document.getElementById('parseMessage');
+  var errorEl = document.getElementById('uploadError');
+  var downloadBtn = document.getElementById('downloadBtn');
+  var resetBtn = document.getElementById('resetBtn');
+
+  var uploading = false;
+  var MAX_MB = 15;
+  var MAX_BYTES = MAX_MB * 1024 * 1024;
+  var MAX_FILES = 10;
+  var pdfFileListWrap = document.getElementById('pdfFileListWrap');
+  var pdfFileList = document.getElementById('pdfFileList');
+  var processPdfBtn = document.getElementById('processPdfBtn');
+
+  function setError(msg) {
+    if (errorEl) {
+      errorEl.textContent = msg || 'No se pudo procesar el archivo.';
+      errorEl.hidden = false;
+    }
+  }
+  function clearError() {
+    if (errorEl) { errorEl.hidden = true; errorEl.textContent = ''; }
+  }
+  function setStatus(msg) {}
+  function setSummary(text) {}
+  function resetUi() {
+    uploading = false;
+    clearError();
+    setSummary('');
+    if (resultPanel) resultPanel.hidden = true;
+    if (qualityPanel) qualityPanel.hidden = true;
+    if (parseMessage) { parseMessage.hidden = true; parseMessage.textContent = ''; }
+    if (downloadBtn) { downloadBtn.hidden = true; downloadBtn.href = '#'; }
+    if (resetBtn) resetBtn.hidden = true;
+    if (meta) { meta.hidden = true; meta.textContent = ''; }
+    if (input) input.value = '';
+  }
+
+  function fmtSize(n) {
+    if (!Number.isFinite(n)) return '';
+    var mb = n / (1024 * 1024);
+    return mb.toFixed(mb >= 10 ? 0 : 1) + ' MB';
+  }
+  function fmtMoney(n) {
+    var x = Number(n);
+    if (!Number.isFinite(x)) return '—';
+    try {
+      return x.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' });
+    } catch (_) {
+      return '$' + x.toFixed(2);
+    }
+  }
+
+  async function uploadFile(file) {
+    if (!file) return;
+    if (uploading) return;
+    resetUi();
+    clearError();
+
+    var name = String(file.name || '').toLowerCase();
+    if (!name.endsWith('.pdf')) {
+      setError('El archivo debe ser .pdf');
+      return;
+    }
+    if (file.size > MAX_BYTES) {
+      setError('El PDF excede el máximo de ' + MAX_MB + 'MB.');
+      return;
+    }
+    if (meta) {
+      meta.hidden = false;
+      meta.textContent = (file.name || 'archivo.pdf') + ' • ' + fmtSize(file.size);
+    }
+
+    uploading = true;
+    setStatus('Procesando PDF…');
+
+    try {
+      var form = new FormData();
+      form.append('file', file, file.name || 'estado_cuenta.pdf');
+
+      var res = await (window.portalFetchWithTimeout
+        ? window.portalFetchWithTimeout('/portal/bank/pdf-to-excel/preview-json', {
+            method: 'POST',
+            credentials: 'same-origin',
+            body: form
+          }, 60000)
+        : fetch('/portal/bank/pdf-to-excel/preview-json', { method: 'POST', credentials: 'same-origin', body: form })
+      );
+
+      if (res && res.status === 401) {
+        if (typeof window.uiCloseAllOverlays === 'function') window.uiCloseAllOverlays();
+        if (typeof window.showSessionExpiredModal === 'function') window.showSessionExpiredModal();
+        uploading = false;
+        return;
+      }
+
+      var json = null;
+      try { json = await res.json(); } catch (_) {}
+      if (!res || !res.ok || !json || !json.ok) {
+        var detail = (json && (json.detail || json.error || json.message)) ? String(json.detail || json.error || json.message) : '';
+        setError(detail || ('No se pudo procesar el PDF (HTTP ' + (res ? res.status : '0') + ').'));
+        setStatus('Error');
+        uploading = false;
+        return;
+      }
+
+      var movements = Array.isArray(json.movements) ? json.movements : [];
+      var summary = json.summary || {};
+      setStatus('Listo • ' + movements.length + ' movimientos');
+      setSummary(movements.length + ' movimientos. Revisa y clasifica abajo. Aún no se guardan.');
+
+      function normalizeToMulti(movs, fileName) {
+        return movs.map(function (m, i) {
+          var dir = (m.direction || '').toUpperCase();
+          var tipo = dir === 'IN' ? 'INGRESO' : (dir === 'OUT' ? 'GASTO' : 'INFO');
+          return {
+            _global_idx: i + 1,
+            fecha: m.date,
+            monto_deposito: m.deposit || 0,
+            monto_retiro: m.withdraw || 0,
+            tipo_movimiento: tipo,
+            concepto_resumen: m.description_short || m.concepto_resumen || '',
+            categoria_sugerida: m.category || m.categoria_sugerida || '—',
+            bank_name: summary.bank_name || '',
+            source_file_name: fileName || '',
+            account_hint: m.account_hint || '',
+            impacta_contabilidad: !(m.bucket === 'FINANCIERO' || m.es_transferencia_propia_probable),
+            requiere_revision: m.needs_review || m.requiere_revision,
+            es_movimiento_financiero: m.bucket === 'FINANCIERO' || m.es_movimiento_financiero,
+            es_transferencia_propia_probable: m.es_transferencia_propia_probable,
+            posible_duplicado: m.posible_duplicado,
+            raw_text_original: m.description_raw || m.raw_text_original,
+            contraparte_nombre: (m.extracted && m.extracted.counterparty) || m.contraparte_nombre,
+            rfc_detectado: (m.extracted && m.extracted.rfc) || m.rfc_detectado,
+            referencia: (m.extracted && m.extracted.reference) || m.referencia,
+            cve_rastreo: (m.extracted && m.extracted.tracking) || m.cve_rastreo,
+            confianza_clasificacion: m.confidence || m.confianza_clasificacion,
+            warnings: m.warnings || [],
+            saldo: m.balance
+          };
+        });
+      }
+      var normalized = normalizeToMulti(movements, (file && file.name) ? file.name : '');
+      var gs = {
+        files_processed: 1,
+        files_with_errors: 0,
+        total_movements: normalized.length,
+        total_ingresos: (summary.total_deposito != null ? summary.total_deposito : movements.reduce(function (s, m) { return s + (Number(m.deposit) || 0); }, 0)),
+        total_gastos: (summary.total_retiro != null ? summary.total_retiro : movements.reduce(function (s, m) { return s + (Number(m.withdraw) || 0); }, 0)),
+        total_ingresos_que_impactan: normalized.filter(function (m) { return m.impacta_contabilidad !== false && m.tipo_movimiento === 'INGRESO'; }).reduce(function (s, m) { return s + (m.monto_deposito || 0); }, 0),
+        total_gastos_que_impactan: normalized.filter(function (m) { return m.impacta_contabilidad !== false && m.tipo_movimiento === 'GASTO'; }).reduce(function (s, m) { return s + (m.monto_retiro || 0); }, 0),
+        count_ingreso: normalized.filter(function (m) { return m.tipo_movimiento === 'INGRESO'; }).length,
+        count_gasto: normalized.filter(function (m) { return m.tipo_movimiento === 'GASTO'; }).length,
+        count_info: normalized.filter(function (m) { return m.tipo_movimiento === 'INFO'; }).length,
+        count_financiero: normalized.filter(function (m) { return m.es_movimiento_financiero; }).length,
+        count_low_confidence: normalized.filter(function (m) { return (m.confianza_clasificacion || 0) < 60; }).length,
+        count_requiere_revision: normalized.filter(function (m) { return m.requiere_revision; }).length,
+        count_duplicados: normalized.filter(function (m) { return m.posible_duplicado; }).length
+      };
+      var multiWrap = document.getElementById('bank-multi-wrap');
+      var previewWrap = document.getElementById('bank-preview-wrap');
+      if (multiWrap && typeof window.initBankPreviewMulti === 'function') {
+        multiWrap.hidden = false;
+        if (previewWrap) previewWrap.hidden = true;
+        window.initBankPreviewMulti({
+          movements: normalized,
+          global_summary: gs,
+          file_errors: [],
+          file_warnings: [],
+          files_summary: [{ file_name: (file && file.name) || 'estado_cuenta.pdf', bank_name: summary.bank_name || '', movements_count: normalized.length }]
+        });
+        multiWrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+      if (window.uiToast) window.uiToast({ type: 'success', title: 'Listado listo', message: 'Revisa y clasifica los movimientos. Aún no se guardan.' });
+      uploading = false;
+    } catch (err) {
+      uploading = false;
+      if (err && err.type === 'unauthorized') return;
+      setStatus('Error');
+      var msg = (err && err.name === 'AbortError') ? 'La conversión tardó demasiado. Intenta de nuevo.' : ((err && err.message) || 'Error de conexión. Intenta de nuevo.');
+      setError(msg);
+    }
+  }
+
+  if (resetBtn) resetBtn.addEventListener('click', function () { resetUi(); });
+
+  var previewForm = document.getElementById('previewForm');
+  var previewFileInput = document.getElementById('previewFileInput');
+  var previewBtn = document.getElementById('previewBtn');
+  if (previewBtn && previewForm && previewFileInput) {
+    previewBtn.addEventListener('click', function () {
+      var f = input.files && input.files[0];
+      if (!f) {
+        if (window.uiToast) window.uiToast({ type: 'info', title: 'Sin archivo', message: 'Selecciona o arrastra un PDF primero.' });
+        return;
+      }
+      var dt = new DataTransfer();
+      dt.items.add(f);
+      previewFileInput.files = dt.files;
+      previewForm.submit();
+    });
+  }
+
+  if (dropzone && input) {
+    dropzone.addEventListener('click', function () { if (!uploading) input.click(); });
+    dropzone.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (!uploading) input.click(); }
+    });
+    input.addEventListener('change', function () {
+      var files = input.files && Array.from(input.files);
+      if (!files || files.length === 0) return;
+      if (files.length === 1) {
+        uploadFile(files[0]);
+        return;
+      }
+      if (files.length > MAX_FILES) {
+        setError('Máximo ' + MAX_FILES + ' archivos por carga.');
+        return;
+      }
+      if (pdfFileList) {
+        pdfFileList.innerHTML = '';
+        files.forEach(function (f, i) {
+          var li = document.createElement('li');
+          li.className = 'u-mb-2';
+          var sizeStr = '';
+          if (f.size != null) {
+            var mb = f.size / (1024 * 1024);
+            sizeStr = ' • ' + (mb >= 10 ? mb.toFixed(0) : mb.toFixed(1)) + ' MB';
+          }
+          li.textContent = (f.name || 'archivo.pdf') + sizeStr;
+          pdfFileList.appendChild(li);
+        });
+      }
+      if (pdfFileListWrap) pdfFileListWrap.hidden = false;
+    });
+
+    ['dragenter', 'dragover'].forEach(function (evt) {
+      dropzone.addEventListener(evt, function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!uploading) dropzone.classList.add('dropzone--active');
+      });
+    });
+    ['dragleave', 'drop'].forEach(function (evt) {
+      dropzone.addEventListener(evt, function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        dropzone.classList.remove('dropzone--active');
+      });
+    });
+    dropzone.addEventListener('drop', function (e) {
+      if (uploading) return;
+      var all = e.dataTransfer && e.dataTransfer.files;
+      if (!all || all.length === 0) return;
+      if (all.length === 1) {
+        var dt = new DataTransfer();
+        dt.items.add(all[0]);
+        input.files = dt.files;
+        uploadFile(all[0]);
+        return;
+      }
+      var dt2 = new DataTransfer();
+      for (var i = 0; i < all.length; i++) dt2.items.add(all[i]);
+      input.files = dt2.files;
+      input.dispatchEvent(new Event('change'));
+    });
+  }
+
+  if (processPdfBtn && input) {
+    processPdfBtn.addEventListener('click', function () {
+      var files = input.files && Array.from(input.files);
+      if (!files || files.length === 0) {
+        if (window.uiToast) window.uiToast({ type: 'info', title: 'Sin archivos', message: 'Selecciona uno o más PDF.' });
+        return;
+      }
+      if (files.length === 1) {
+        uploadFile(files[0]);
+        return;
+      }
+      uploadFilesMulti(files);
+    });
+  }
+
+  async function uploadFilesMulti(files) {
+    if (uploading || !files || files.length === 0) return;
+    resetUi();
+    clearError();
+    uploading = true;
+    setStatus('Procesando ' + files.length + ' archivos…');
+    var form = new FormData();
+    files.forEach(function (f) {
+      if ((f.name || '').toLowerCase().endsWith('.pdf') && f.size <= MAX_BYTES) form.append('files', f, f.name || 'estado_cuenta.pdf');
+    });
+    if (form.getAll('files').length === 0) {
+      setError('Ningún archivo PDF válido.');
+      uploading = false;
+      return;
+    }
+    try {
+      var res = await (window.portalFetchWithTimeout
+        ? window.portalFetchWithTimeout('/portal/bank/pdf-to-excel/preview-multi', { method: 'POST', credentials: 'same-origin', body: form }, 120000)
+        : fetch('/portal/bank/pdf-to-excel/preview-multi', { method: 'POST', credentials: 'same-origin', body: form }));
+      if (res && res.status === 401) {
+        if (typeof window.showSessionExpiredModal === 'function') window.showSessionExpiredModal();
+        uploading = false;
+        return;
+      }
+      var json = null;
+      try { json = await res.json(); } catch (_) {}
+      if (!res || !res.ok || !json || !json.ok) {
+        setError((json && (json.detail || json.message)) || 'Error al procesar.');
+        setStatus('Error');
+        uploading = false;
+        return;
+      }
+      setStatus('Listo • ' + (json.movements && json.movements.length) + ' movimientos');
+      var multiWrap = document.getElementById('bank-multi-wrap');
+      if (multiWrap && typeof window.initBankPreviewMulti === 'function') {
+        multiWrap.hidden = false;
+        window.initBankPreviewMulti(json);
+        multiWrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+      var wrap = document.getElementById('bank-preview-wrap');
+      if (wrap) wrap.hidden = true;
+      uploading = false;
+    } catch (err) {
+      uploading = false;
+      setStatus('Error');
+      setError((err && err.message) || 'Error de conexión.');
+    }
+  }
+})();
+</script>
+
+<script>
+(function () {
+  var listEl = document.getElementById('bankAccountsList');
+  var tipEl = document.getElementById('bankAccountsTip');
+  var addBtn = document.getElementById('bankAccountAddBtn');
+  var modal = document.getElementById('bankAccountModal');
+  var modalTitle = document.getElementById('bankAccountModalTitle');
+  var saveBtn = document.getElementById('bankAccountModalSave');
+  var editingId = null;
+
+  function maskClabe(clabe) {
+    if (!clabe || clabe.length < 8) return clabe ? clabe.replace(/\d/g, '*') : '—';
+    return clabe.substring(0, 4) + '********' + clabe.substring(clabe.length - 4);
+  }
+  function escapeHtml(s) {
+    return String(s || '').replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] || c; });
+  }
+
+  function renderAccounts(accounts) {
+    var ingestSel = document.getElementById('ingestAccountId');
+    if (!listEl) return;
+    if (!accounts || accounts.length === 0) {
+      listEl.innerHTML = '<p class="muted u-text-sm">Aún no tienes cuentas registradas.</p>';
+      if (tipEl) { tipEl.hidden = false; }
+      if (ingestSel) ingestSel.innerHTML = '<option value="">— Selecciona una cuenta —</option>';
+      return;
+    }
+    if (tipEl) tipEl.hidden = true;
+    listEl.innerHTML = accounts.map(function (a) {
+      var clabeStr = a.clabe ? maskClabe(a.clabe) : '—';
+      var activeStr = a.is_active ? 'Sí' : 'No';
+      return '<div class="bank-account-card card p-10 u-mb-6" data-id="' + escapeHtml(String(a.id)) + '">' +
+        '<div class="bank-account-card__row"><strong>' + escapeHtml(a.alias || '—') + '</strong> <span class="muted">' + escapeHtml(a.bank_name || '') + '</span></div>' +
+        '<div class="bank-account-card__row u-text-sm">Últimos 4: ' + escapeHtml(a.account_last4 || '—') + ' · CLABE: ' + escapeHtml(clabeStr) + '</div>' +
+        (a.holder_name ? '<div class="bank-account-card__row u-text-sm muted">Titular: ' + escapeHtml(a.holder_name) + '</div>' : '') +
+        '<div class="bank-account-card__row u-text-xs">Activa: ' + activeStr + '</div>' +
+        '<div class="bank-account-card__actions u-mt-4">' +
+        '<button type="button" class="btn btn--sm btn--ghost bank-account-edit" data-id="' + a.id + '">Editar</button> ' +
+        '<button type="button" class="btn btn--sm btn--ghost bank-account-delete" data-id="' + a.id + '">Eliminar</button></div></div>';
+    }).join('');
+
+    listEl.querySelectorAll('.bank-account-edit').forEach(function (btn) {
+      btn.addEventListener('click', function () { openModal(Number(btn.getAttribute('data-id'))); });
+    });
+    listEl.querySelectorAll('.bank-account-delete').forEach(function (btn) {
+      btn.addEventListener('click', function () { deleteAccount(Number(btn.getAttribute('data-id'))); });
+    });
+    if (ingestSel) {
+      var opts = accounts.filter(function (a) { return a.is_active; }).map(function (a) {
+        return '<option value="' + escapeHtml(String(a.id)) + '">' + escapeHtml((a.alias || '') + ' · ' + (a.bank_name || '') + (a.account_last4 ? ' ****' + a.account_last4 : '')) + '</option>';
+      });
+      ingestSel.innerHTML = '<option value="">— Selecciona una cuenta —</option>' + opts.join('');
+    }
+    var previewCommitSel = document.getElementById('previewCommitAccountId');
+    if (previewCommitSel) {
+      var optsCommit = accounts.filter(function (a) { return a.is_active; }).map(function (a) {
+        return '<option value="' + escapeHtml(String(a.id)) + '">' + escapeHtml((a.alias || '') + ' · ' + (a.bank_name || '') + (a.account_last4 ? ' ****' + a.account_last4 : '')) + '</option>';
+      });
+      previewCommitSel.innerHTML = '<option value="">— Selecciona una cuenta —</option>' + optsCommit.join('');
+    }
+  }
+
+  function loadAccounts() {
+    var fn = window.portalFetchWithTimeout || fetch;
+    fn('/portal/bank/accounts', { credentials: 'same-origin' }).then(function (r) {
+      if (r.status === 401 && window.showSessionExpiredModal) window.showSessionExpiredModal();
+      return r.ok ? r.json() : null;
+    }).then(function (data) {
+      if (data && data.ok && Array.isArray(data.accounts)) renderAccounts(data.accounts);
+      else renderAccounts([]);
+    }).catch(function () { renderAccounts([]); });
+  }
+
+  function openModal(accountId) {
+    editingId = accountId;
+    modalTitle.textContent = accountId ? 'Editar cuenta' : 'Agregar cuenta';
+    document.getElementById('bankAccountAlias').value = '';
+    document.getElementById('bankAccountBankName').value = '';
+    document.getElementById('bankAccountClabe').value = '';
+    document.getElementById('bankAccountLast4').value = '';
+    document.getElementById('bankAccountHolder').value = '';
+    document.getElementById('bankAccountRfc').value = '';
+    document.getElementById('bankAccountActive').checked = true;
+    if (accountId && window.__bankAccountsList) {
+      var a = window.__bankAccountsList.find(function (x) { return x.id === accountId; });
+      if (a) {
+        document.getElementById('bankAccountAlias').value = a.alias || '';
+        document.getElementById('bankAccountBankName').value = a.bank_name || '';
+        document.getElementById('bankAccountClabe').value = a.clabe || '';
+        document.getElementById('bankAccountLast4').value = a.account_last4 || '';
+        document.getElementById('bankAccountHolder').value = a.holder_name || '';
+        document.getElementById('bankAccountRfc').value = a.rfc_titular || '';
+        document.getElementById('bankAccountActive').checked = a.is_active !== 0;
+      }
+    }
+    if (modal) { modal.hidden = false; modal.setAttribute('aria-hidden', 'false'); }
+  }
+  function closeModal() {
+    editingId = null;
+    if (modal) { modal.hidden = true; modal.setAttribute('aria-hidden', 'true'); }
+  }
+  function saveAccount() {
+    var alias = (document.getElementById('bankAccountAlias').value || '').trim();
+    if (!alias) {
+      if (window.uiToast) window.uiToast({ type: 'warning', title: 'Falta alias', message: 'El alias es obligatorio.' });
+      return;
+    }
+    var payload = {
+      alias: alias,
+      bank_name: (document.getElementById('bankAccountBankName').value || '').trim() || 'Otro',
+      clabe: (document.getElementById('bankAccountClabe').value || '').trim() || null,
+      account_last4: (document.getElementById('bankAccountLast4').value || '').trim().substring(0, 4) || null,
+      holder_name: (document.getElementById('bankAccountHolder').value || '').trim() || null,
+      rfc_titular: (document.getElementById('bankAccountRfc').value || '').trim() || null,
+      is_active: document.getElementById('bankAccountActive').checked
+    };
+    var url = '/portal/bank/accounts';
+    var method = 'POST';
+    if (editingId) { url = '/portal/bank/accounts/' + editingId; method = 'PUT'; }
+    var fn = window.portalFetchWithTimeout || fetch;
+    fn(url, {
+      method: method,
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }).then(function (r) {
+      if (r.status === 401 && window.showSessionExpiredModal) window.showSessionExpiredModal();
+      return r.json();
+    }).then(function (data) {
+      if (data && data.ok) {
+        closeModal();
+        loadAccounts();
+        if (window.uiToast) window.uiToast({ type: 'success', title: 'Guardado', message: editingId ? 'Cuenta actualizada.' : 'Cuenta agregada.' });
+      } else {
+        if (window.uiToast) window.uiToast({ type: 'error', title: 'Error', message: (data && data.detail) || 'No se pudo guardar.' });
+      }
+    }).catch(function () {
+      if (window.uiToast) window.uiToast({ type: 'error', title: 'Error', message: 'Error de conexión.' });
+    });
+  }
+  function deleteAccount(id) {
+    if (!confirm('¿Eliminar esta cuenta?')) return;
+    var fn = window.portalFetchWithTimeout || fetch;
+    fn('/portal/bank/accounts/' + id, { method: 'DELETE', credentials: 'same-origin' }).then(function (r) {
+      if (r.status === 401 && window.showSessionExpiredModal) window.showSessionExpiredModal();
+      if (r.ok) {
+        loadAccounts();
+        if (window.uiToast) window.uiToast({ type: 'success', title: 'Eliminada', message: 'Cuenta eliminada.' });
+      }
+    });
+  }
+
+  if (addBtn) addBtn.addEventListener('click', function () { openModal(null); });
+  if (saveBtn) saveBtn.addEventListener('click', saveAccount);
+  if (modal) {
+    modal.querySelectorAll('[data-close-bank-account-modal="true"]').forEach(function (el) {
+      el.addEventListener('click', closeModal);
+    });
+  }
+  function load() {
+    var fn = window.portalFetchWithTimeout || fetch;
+    fn('/portal/bank/accounts', { credentials: 'same-origin' }).then(function (r) {
+      if (r.status === 401 && window.showSessionExpiredModal) window.showSessionExpiredModal();
+      return r.ok ? r.json() : null;
+    }).then(function (data) {
+      window.__bankAccountsList = (data && data.ok && Array.isArray(data.accounts)) ? data.accounts : [];
+      renderAccounts(window.__bankAccountsList);
+    }).catch(function () { window.__bankAccountsList = []; renderAccounts([]); });
+  }
+  loadAccounts = load;
+  load();
+
+  var ingestForm = document.getElementById('ingestForm');
+  var ingestMessage = document.getElementById('ingestMessage');
+  var ingestSubmitBtn = document.getElementById('ingestSubmitBtn');
+  if (ingestForm) {
+    ingestForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var accountId = document.getElementById('ingestAccountId');
+      var fileInput = document.getElementById('ingestFile');
+      if (!accountId || !accountId.value || !fileInput || !fileInput.files || !fileInput.files[0]) {
+        if (ingestMessage) { ingestMessage.hidden = false; ingestMessage.textContent = 'Selecciona una cuenta y un archivo PDF.'; ingestMessage.className = 'muted u-mt-4 u-text-xs'; }
+        return;
+      }
+      var fd = new FormData();
+      fd.append('bank_account_id', accountId.value);
+      fd.append('file', fileInput.files[0]);
+      if (ingestSubmitBtn) ingestSubmitBtn.disabled = true;
+      if (ingestMessage) { ingestMessage.hidden = false; ingestMessage.textContent = 'Guardando…'; ingestMessage.className = 'muted u-mt-4 u-text-xs'; }
+      var fn = window.portalFetchWithTimeout || fetch;
+      fn('/portal/bank/statements/ingest', { method: 'POST', body: fd, credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(function (r) { return r.json().then(function (data) { return { ok: r.ok, data: data }; }); })
+        .then(function (res) {
+          if (ingestSubmitBtn) ingestSubmitBtn.disabled = false;
+          if (!ingestMessage) return;
+          ingestMessage.hidden = false;
+          if (res.ok && res.data && res.data.ok) {
+            ingestMessage.className = 'u-mt-4 u-text-xs';
+            ingestMessage.style.color = '';
+            var txt = 'Guardado: ' + (res.data.movements_count || 0) + ' movimientos. ' + (res.data.duplicate ? '(Ya existía este PDF.)' : '');
+            if (res.data.statement_id) txt += ' <a href="/portal/bank/movements?statement_id=stmt_' + res.data.statement_id + '">Ver movimientos</a>';
+            ingestMessage.innerHTML = txt;
+            fileInput.value = '';
+          } else {
+            ingestMessage.className = 'u-mt-4 u-text-xs';
+            ingestMessage.style.color = 'var(--danger, #b91c1c)';
+            ingestMessage.textContent = (res.data && res.data.rejection_reason) ? res.data.rejection_reason : 'Error al guardar.';
+          }
+        })
+        .catch(function () {
+          if (ingestSubmitBtn) ingestSubmitBtn.disabled = false;
+          if (ingestMessage) { ingestMessage.hidden = false; ingestMessage.className = 'u-mt-4 u-text-xs'; ingestMessage.style.color = 'var(--danger, #b91c1c)'; ingestMessage.textContent = 'Error de red.'; }
+        });
+    });
+  }
+})();
+</script>
+
+<script>
+(function () {
+  var movements = window.__PREVIEW_MOVEMENTS;
+  var summary = window.__PREVIEW_SUMMARY || {};
+  if (!Array.isArray(movements)) movements = [];
+
+  var CATEGORIES = ['FINANCIERO_PAGO_TARJETA', 'TRANSFERENCIA', 'ALIMENTOS', 'IMPUESTOS', 'COMISION_BANCARIA', 'EFECTIVO', 'NOMINA', 'SUSCRIPCION', 'SERVICIOS', 'SALUD', 'EDUCACION', 'TRANSPORTE', 'OTROS'];
+  var BUCKETS = ['NEGOCIO', 'PERSONAL', 'FINANCIERO', 'DESCONOCIDO'];
+  var DEDUCIBLE = ['SI', 'NO', 'DEPENDE'];
+
+  var state = movements.length ? movements.map(function (m) {
+    return Object.assign({}, m, { concept: m.concept !== undefined ? m.concept : (m.description_short || ''), notes: m.notes || '' });
+  }) : [];
+  var currentFilter = 'all';
+  var currentPreset = 'conservative';
+
+  function fmtMoney(n) {
+    var x = Number(n);
+    if (!Number.isFinite(x)) return '—';
+    return '$' + x.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function confidenceClass(c) {
+    c = Number(c);
+    if (c >= 80) return 'badge--success';
+    if (c >= 60) return 'badge--warn';
+    return 'badge--danger';
+  }
+
+  function updateKpis() {
+    var totalDep = 0, totalWd = 0, totalDepReales = 0, totalWdReales = 0, financiero = 0, needsReview = 0;
+    state.forEach(function (m) {
+      var dep = Number(m.deposit) || 0;
+      var wd = Number(m.withdraw) || 0;
+      totalDep += dep;
+      totalWd += wd;
+      var impacta = m.impacta_contabilidad !== false;
+      if (impacta && m.direction === 'IN') totalDepReales += dep;
+      if (impacta && m.direction === 'OUT') totalWdReales += wd;
+      if (m.bucket === 'FINANCIERO' || m.category === 'FINANCIERO_PAGO_TARJETA') financiero++;
+      if (m.needs_review) needsReview++;
+    });
+    var kpiIng = document.getElementById('kpiIngresos');
+    var kpiGas = document.getElementById('kpiGastos');
+    var kpiIngReales = document.getElementById('kpiIngresosReales');
+    var kpiGasReales = document.getElementById('kpiGastosReales');
+    var kpiFin = document.getElementById('kpiFinanciero');
+    var kpiRev = document.getElementById('kpiNeedsReview');
+    var kpiSaldo = document.getElementById('kpiSaldoFinal');
+    if (kpiIng) kpiIng.textContent = fmtMoney(totalDep);
+    if (kpiGas) kpiGas.textContent = fmtMoney(totalWd);
+    if (kpiIngReales) kpiIngReales.textContent = fmtMoney(totalDepReales);
+    if (kpiGasReales) kpiGasReales.textContent = fmtMoney(totalWdReales);
+    if (kpiFin) kpiFin.textContent = String(financiero);
+    if (kpiRev) kpiRev.textContent = String(needsReview);
+    var saldoFinal = null;
+    for (var i = state.length - 1; i >= 0; i--) {
+      if (state[i].balance != null && Number(state[i].balance) === state[i].balance) {
+        saldoFinal = state[i].balance;
+        break;
+      }
+    }
+    if (kpiSaldo) kpiSaldo.textContent = saldoFinal != null ? fmtMoney(saldoFinal) : '—';
+  }
+
+  function filteredList() {
+    var base = state.filter(function (m) { return m.direction !== 'INFO'; });
+    if (currentFilter === 'all') return base;
+    if (currentFilter === 'needs_review') return base.filter(function (m) { return m.needs_review || m.requiere_revision; });
+    if (currentFilter === 'financiero') return base.filter(function (m) { return m.bucket === 'FINANCIERO' || m.category === 'FINANCIERO_PAGO_TARJETA' || m.es_movimiento_financiero; });
+    if (currentFilter === 'cuenta_propia') return base.filter(function (m) { return m.es_cuenta_propia || m.es_transferencia_propia_probable; });
+    if (currentFilter === 'duplicados') return base.filter(function (m) { return m.posible_duplicado; });
+    if (currentFilter === 'IN') return base.filter(function (m) { return m.direction === 'IN'; });
+    if (currentFilter === 'OUT') return base.filter(function (m) { return m.direction === 'OUT'; });
+    return base;
+  }
+
+  function escapeHtml(s) {
+    return String(s || '').replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] || c; });
+  }
+  function truncate(txt, maxLen) {
+    txt = String(txt || '');
+    return txt.length > maxLen ? txt.substring(0, maxLen) + '…' : (txt || '—');
+  }
+
+  function fillWhyModal(mov) {
+    var ruleHits = document.getElementById('bankWhyRuleHits');
+    var confBreakdown = document.getElementById('bankWhyConfBreakdown');
+    var extracted = document.getElementById('bankWhyExtracted');
+    var warnings = document.getElementById('bankWhyWarnings');
+    var warningsWrap = document.getElementById('bankWhyWarningsWrap');
+    if (ruleHits) ruleHits.innerHTML = (mov.rule_hits || []).length ? (mov.rule_hits || []).map(function (r) { return '<li><code>' + escapeHtml(String(r)) + '</code></li>'; }).join('') : '<li class="muted">—</li>';
+    if (confBreakdown) confBreakdown.innerHTML = (mov.confidence_breakdown || []).length ? (mov.confidence_breakdown || []).map(function (c) { return '<li><code>' + escapeHtml(String(c)) + '</code></li>'; }).join('') : '<li class="muted">—</li>';
+    var ext = mov.extracted || {};
+    if (extracted) extracted.innerHTML = '<dt>RFC</dt><dd>' + escapeHtml(ext.rfc || '—') + '</dd><dt>Referencia</dt><dd>' + escapeHtml(ext.reference || '—') + '</dd><dt>Rastreo</dt><dd>' + escapeHtml(ext.tracking || '—') + '</dd><dt>Contraparte</dt><dd>' + escapeHtml(ext.counterparty || '—') + '</dd><dt>CLABE</dt><dd>' + escapeHtml(ext.clabe || '—') + '</dd>';
+    var w = mov.warnings || [];
+    if (warningsWrap) warningsWrap.hidden = !w.length;
+    if (warnings) warnings.innerHTML = w.length ? w.map(function (x) { return '<li class="muted">' + escapeHtml(String(x)) + '</li>'; }).join('') : '';
+  }
+
+  var currentEditIdx = null;
+
+  function renderTable() {
+    var tbody = document.getElementById('bankMovementsBody');
+    if (!tbody) return;
+    var list = filteredList();
+    var fragment = document.createDocumentFragment();
+    list.forEach(function (m) {
+      var concept = (m.concept !== undefined ? m.concept : m.description_short) || '';
+      var conceptDisplay = truncate(concept || '—', 50);
+      var tipoLabel = m.es_transferencia_propia_probable ? 'Traspaso a cuenta propia' : (m.direction === 'IN' ? 'Ingreso' : (m.direction === 'OUT' ? 'Gasto' : '—'));
+      var tipoBadge = m.es_transferencia_propia_probable ? '<span class="badge bank-badge-traspaso" title="No es ingreso ni gasto">Traspaso propio</span>' : (m.direction === 'IN' ? '<span class="badge badge--success">Ingreso</span>' : (m.direction === 'OUT' ? '<span class="badge badge--warn">Gasto</span>' : '<span class="badge badge--neutral">—</span>'));
+      var montoVal = m.direction === 'IN' ? (m.deposit || 0) : (m.direction === 'OUT' ? (m.withdraw || 0) : 0);
+      var montoStr = m.es_transferencia_propia_probable ? '(' + fmtMoney(m.direction === 'OUT' ? (m.withdraw || 0) : (m.deposit || 0)) + ')' : (m.direction === 'IN' ? '+' + fmtMoney(montoVal) : (m.direction === 'OUT' ? '−' + fmtMoney(montoVal) : '—'));
+      var montoClass = m.es_transferencia_propia_probable ? 'bank-monto-traspaso' : (m.direction === 'IN' ? 'bank-monto-ingreso' : (m.direction === 'OUT' ? 'bank-monto-gasto' : ''));
+      var saldo = m.balance != null ? fmtMoney(m.balance) : '—';
+      var catLabel = m.category || '—';
+      var editIcon = '<svg class="icon icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>';
+      var tr = document.createElement('tr');
+      tr.dataset.idx = String(m.idx);
+      tr.className = m.es_transferencia_propia_probable ? 'bank-row-traspaso-propio' : (m.direction === 'IN' ? 'bank-row-ingreso' : (m.direction === 'OUT' ? 'bank-row-gasto' : ''));
+      tr.innerHTML = '<td class="muted">' + escapeHtml(m.date || '—') + '</td>' +
+        '<td class="concepto-cell bank-concept-editable" data-idx="' + m.idx + '" title="Clic para editar">' + escapeHtml(conceptDisplay) + '</td>' +
+        '<td>' + tipoBadge + '</td>' +
+        '<td class="text-right ' + montoClass + '">' + montoStr + '</td>' +
+        '<td class="text-right muted">' + saldo + '</td>' +
+        '<td class="bank-category-cell bank-category-editable" data-idx="' + m.idx + '" data-category="' + escapeHtml(catLabel) + '" title="Clic para cambiar categoría">' +
+        '<span class="badge badge--neutral">' + escapeHtml(catLabel) + '</span></td>' +
+        '<td class="text-right"><button type="button" class="btn btn--sm btn--ghost bank-movement-edit-btn" data-idx="' + m.idx + '" aria-label="Editar">' + editIcon + '</button></td>';
+      fragment.appendChild(tr);
+    });
+    tbody.replaceChildren(fragment);
+
+    tbody.querySelectorAll('.bank-concept-editable').forEach(function (cell) {
+      cell.addEventListener('click', function (e) {
+        if (cell.querySelector('input')) return;
+        var idx = Number(cell.dataset.idx);
+        var mov = state.find(function (m) { return m.idx === idx; });
+        if (!mov) return;
+        var concept = (mov.concept !== undefined ? mov.concept : mov.description_short) || '';
+        var input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'input input--sm';
+        input.value = concept;
+        input.style.width = '100%';
+        cell.textContent = '';
+        cell.appendChild(input);
+        input.focus();
+        input.select();
+        function saveConcept() {
+          mov.concept = input.value.trim();
+          cell.removeChild(input);
+          cell.textContent = truncate(mov.concept || '—', 50);
+          cell.title = 'Clic para editar';
+        }
+        input.addEventListener('blur', saveConcept);
+        input.addEventListener('keydown', function (ev) {
+          if (ev.key === 'Enter') { input.blur(); }
+          if (ev.key === 'Escape') { mov.concept = concept; cell.removeChild(input); cell.textContent = truncate(concept || '—', 50); input.removeEventListener('blur', saveConcept); }
+        });
+      });
+    });
+
+    tbody.querySelectorAll('.bank-category-editable').forEach(function (cell) {
+      cell.addEventListener('click', function (e) {
+        if (e.target.tagName === 'SELECT' || cell.querySelector('select')) return;
+        var idx = Number(cell.dataset.idx);
+        var mov = state.find(function (m) { return m.idx === idx; });
+        if (!mov) return;
+        var select = document.createElement('select');
+        select.className = 'input select input--sm';
+        CATEGORIES.forEach(function (c) {
+          var opt = document.createElement('option');
+          opt.value = c;
+          opt.textContent = c;
+          if (c === (mov.category || '')) opt.selected = true;
+          select.appendChild(opt);
+        });
+        if (mov.category && CATEGORIES.indexOf(mov.category) < 0) {
+          var o = document.createElement('option');
+          o.value = mov.category;
+          o.textContent = mov.category;
+          o.selected = true;
+          select.appendChild(o);
+        }
+        cell.innerHTML = '';
+        cell.appendChild(select);
+        select.focus();
+        function closeCategory() {
+          mov.category = select.value || mov.category;
+          cell.innerHTML = '<span class="badge badge--neutral">' + escapeHtml(mov.category || '—') + '</span>';
+          cell.dataset.category = mov.category || '';
+        }
+        select.addEventListener('change', closeCategory);
+        select.addEventListener('blur', closeCategory);
+      });
+    });
+
+    document.querySelectorAll('.bank-movement-edit-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var idx = Number(btn.dataset.idx);
+        var mov = state.find(function (m) { return m.idx === idx; });
+        if (mov) openEditModal(mov);
+      });
+    });
+  }
+
+  function openEditModal(mov) {
+    currentEditIdx = mov.idx;
+    document.getElementById('bankEditConcept').value = (mov.concept !== undefined ? mov.concept : mov.description_short) || '';
+    var catSel = document.getElementById('bankEditCategory');
+    if (catSel) {
+      if (mov.category && CATEGORIES.indexOf(mov.category) < 0) {
+        var hasOther = false;
+        for (var j = 0; j < catSel.options.length; j++) { if (catSel.options[j].value === mov.category) { hasOther = true; break; } }
+        if (!hasOther) { var o = document.createElement('option'); o.value = mov.category; o.textContent = mov.category; catSel.appendChild(o); }
+      }
+      catSel.value = mov.category || '';
+    }
+    document.getElementById('bankEditNeedsReview').checked = !!mov.needs_review;
+    document.getElementById('bankEditNotes').value = mov.notes || '';
+    var modal = document.getElementById('bankMovementEditModal');
+    if (modal) { modal.hidden = false; modal.setAttribute('aria-hidden', 'false'); }
+  }
+
+  function closeEditModal() {
+    currentEditIdx = null;
+    var modal = document.getElementById('bankMovementEditModal');
+    if (modal) { modal.hidden = true; modal.setAttribute('aria-hidden', 'true'); }
+  }
+
+  function saveEditModal() {
+    if (currentEditIdx == null) return;
+    var i = state.findIndex(function (m) { return m.idx === currentEditIdx; });
+    if (i < 0) return;
+    state[i].concept = document.getElementById('bankEditConcept').value.trim();
+    state[i].category = document.getElementById('bankEditCategory').value || state[i].category;
+    state[i].needs_review = document.getElementById('bankEditNeedsReview').checked;
+    state[i].notes = document.getElementById('bankEditNotes').value.trim();
+    updateKpis();
+    renderTable();
+    closeEditModal();
+    if (window.uiToast) window.uiToast({ type: 'success', title: 'Guardado', message: 'Cambios aplicados.' });
+  }
+
+  (function initEditModalSelects() {
+    var catSel = document.getElementById('bankEditCategory');
+    if (catSel) CATEGORIES.forEach(function (c) { var o = document.createElement('option'); o.value = c; o.textContent = c; catSel.appendChild(o); });
+  })();
+
+  var editModal = document.getElementById('bankMovementEditModal');
+  if (editModal) {
+    editModal.querySelectorAll('[data-close-edit="true"]').forEach(function (el) {
+      el.addEventListener('click', closeEditModal);
+    });
+  }
+  var bankEditSaveBtn = document.getElementById('bankEditSaveBtn');
+  if (bankEditSaveBtn) bankEditSaveBtn.addEventListener('click', saveEditModal);
+  var bankEditWhyBtn = document.getElementById('bankEditWhyBtn');
+  if (bankEditWhyBtn) {
+    bankEditWhyBtn.addEventListener('click', function () {
+      if (currentEditIdx == null) return;
+      var mov = state.find(function (m) { return m.idx === currentEditIdx; });
+      if (mov) {
+        fillWhyModal(mov);
+        var whyModal = document.getElementById('bankWhyModal');
+        if (whyModal) { whyModal.hidden = false; whyModal.setAttribute('aria-hidden', 'false'); }
+      }
+    });
+  }
+
+  function renderCards() {
+    renderTable();
+  }
+
+  window.initBankPreview = function (movs, sum) {
+    if (!Array.isArray(movs)) movs = [];
+    state = movs.length ? movs.map(function (m) {
+      return Object.assign({}, m, { concept: m.concept !== undefined ? m.concept : (m.description_short || ''), notes: m.notes || '' });
+    }) : [];
+    currentFilter = 'all';
+    currentPreset = 'conservative';
+    document.querySelectorAll('.bank-preview-filter').forEach(function (b) { b.classList.remove('active'); });
+    var allBtn = document.querySelector('.bank-preview-filter[data-filter="all"]');
+    if (allBtn) allBtn.classList.add('active');
+    document.querySelectorAll('.bank-preview-preset-btn').forEach(function (b) { b.classList.remove('active'); });
+    var consBtn = document.getElementById('presetConservative');
+    if (consBtn) consBtn.classList.add('active');
+    updateKpis();
+    renderCards();
+  };
+
+  var whyModal = document.getElementById('bankWhyModal');
+  if (whyModal) {
+    function closeWhyModal() { whyModal.hidden = true; whyModal.setAttribute('aria-hidden', 'true'); }
+    whyModal.querySelectorAll('[data-close="true"]').forEach(function (el) { el.addEventListener('click', closeWhyModal); });
+  }
+
+  document.querySelectorAll('.bank-preview-preset-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var preset = (btn.dataset.preset || 'conservative');
+      if (preset === currentPreset) return;
+      currentPreset = preset;
+      document.querySelectorAll('.bank-preview-preset-btn').forEach(function (b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      var payload = JSON.stringify({ movements: state, preset: preset });
+      var opts = { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: payload };
+      (window.portalFetchWithTimeout || fetch)('/portal/bank/preview/reclassify', opts, 30000).then(function (res) {
+        if (res.status === 401 && window.showSessionExpiredModal) window.showSessionExpiredModal();
+        if (!res.ok) return;
+        return res.json();
+      }).then(function (data) {
+        if (!data || !Array.isArray(data.movements)) return;
+        var byIdx = {};
+        state.forEach(function (m) { byIdx[m.idx] = { concept: m.concept, notes: m.notes }; });
+        state = data.movements.map(function (m) {
+          var prev = byIdx[m.idx];
+          return Object.assign({}, m, { concept: prev ? prev.concept : m.description_short, notes: prev ? prev.notes : m.notes });
+        });
+        updateKpis();
+        renderCards();
+        if (window.uiToast) window.uiToast({ type: 'success', title: 'Re-clasificado', message: 'Modo ' + (preset === 'aggressive' ? 'agresivo' : 'conservador') + ' aplicado.' });
+      });
+    });
+  });
+
+  document.querySelectorAll('.bank-preview-filter').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('.bank-preview-filter').forEach(function (b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      currentFilter = btn.dataset.filter || 'all';
+      renderCards();
+    });
+  });
+
+  var exportBtn = document.getElementById('bankPreviewExportBtn');
+  if (exportBtn) {
+    exportBtn.addEventListener('click', function () {
+      var payload = JSON.stringify({ movements: state });
+      var opts = { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: payload };
+      var fn = window.portalFetchWithTimeout || fetch;
+      fn('/portal/bank/preview/export', opts, 60000).then(function (res) {
+        if (res.status === 401) {
+          if (window.showSessionExpiredModal) window.showSessionExpiredModal();
+          return;
+        }
+        if (!res.ok) return res.json().then(function (j) { if (window.uiToast) window.uiToast({ type: 'error', title: 'Error', message: j.detail || 'Error al exportar' }); });
+        return res.blob();
+      }).then(function (blob) {
+        if (!blob) return;
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'movimientos_preview.xlsx';
+        a.click();
+        URL.revokeObjectURL(a.href);
+        if (window.uiToast) window.uiToast({ type: 'success', title: 'Exportado', message: 'Excel descargado.' });
+      });
+    });
+  }
+
+  if (window.__PREVIEW_MOVEMENTS && Array.isArray(window.__PREVIEW_MOVEMENTS) && window.__PREVIEW_MOVEMENTS.length > 0) {
+    var movs = window.__PREVIEW_MOVEMENTS;
+    var sum = window.__PREVIEW_SUMMARY || {};
+    var norm = movs.map(function (m, i) {
+      var dir = (m.direction || m.tipo_movimiento || '').toUpperCase();
+      var tipo = dir === 'IN' ? 'INGRESO' : (dir === 'OUT' ? 'GASTO' : 'INFO');
+      return {
+        _global_idx: i + 1,
+        fecha: m.date || m.fecha,
+        monto_deposito: m.deposit != null ? m.deposit : (m.monto_deposito || 0),
+        monto_retiro: m.withdraw != null ? m.withdraw : (m.monto_retiro || 0),
+        tipo_movimiento: tipo,
+        concepto_resumen: m.description_short || m.concepto_resumen || '',
+        categoria_sugerida: m.category || m.categoria_sugerida || '—',
+        bank_name: sum.bank_name || m.bank_name || '',
+        source_file_name: m.source_file_name || '',
+        account_hint: m.account_hint || '',
+        impacta_contabilidad: (m.impacta_contabilidad !== false) && !m.es_transferencia_propia_probable && m.bucket !== 'FINANCIERO' && !m.es_movimiento_financiero,
+        requiere_revision: m.needs_review || m.requiere_revision,
+        es_movimiento_financiero: m.bucket === 'FINANCIERO' || m.es_movimiento_financiero,
+        es_transferencia_propia_probable: m.es_transferencia_propia_probable,
+        posible_duplicado: m.posible_duplicado,
+        raw_text_original: m.description_raw || m.raw_text_original,
+        contraparte_nombre: (m.extracted && m.extracted.counterparty) || m.contraparte_nombre,
+        rfc_detectado: (m.extracted && m.extracted.rfc) || m.rfc_detectado,
+        referencia: (m.extracted && m.extracted.reference) || m.referencia,
+        cve_rastreo: (m.extracted && m.extracted.tracking) || m.cve_rastreo,
+        confianza_clasificacion: m.confidence != null ? m.confidence : m.confianza_clasificacion,
+        warnings: m.warnings || [],
+        saldo: m.balance != null ? m.balance : m.saldo
+      };
+    });
+    var gs = {
+      files_processed: 1,
+      total_movements: norm.length,
+      total_ingresos: norm.reduce(function (s, m) { return s + (Number(m.monto_deposito) || 0); }, 0),
+      total_gastos: norm.reduce(function (s, m) { return s + (Number(m.monto_retiro) || 0); }, 0),
+      total_ingresos_que_impactan: norm.filter(function (m) { return m.impacta_contabilidad !== false && m.tipo_movimiento === 'INGRESO'; }).reduce(function (s, m) { return s + (m.monto_deposito || 0); }, 0),
+      total_gastos_que_impactan: norm.filter(function (m) { return m.impacta_contabilidad !== false && m.tipo_movimiento === 'GASTO'; }).reduce(function (s, m) { return s + (m.monto_retiro || 0); }, 0),
+      count_ingreso: norm.filter(function (m) { return m.tipo_movimiento === 'INGRESO'; }).length,
+      count_gasto: norm.filter(function (m) { return m.tipo_movimiento === 'GASTO'; }).length,
+      count_info: norm.filter(function (m) { return m.tipo_movimiento === 'INFO'; }).length,
+      count_financiero: norm.filter(function (m) { return m.es_movimiento_financiero; }).length,
+      count_requiere_revision: norm.filter(function (m) { return m.requiere_revision; }).length,
+      count_duplicados: norm.filter(function (m) { return m.posible_duplicado; }).length
+    };
+    var multiWrap = document.getElementById('bank-multi-wrap');
+    var previewWrap = document.getElementById('bank-preview-wrap');
+    if (multiWrap && typeof window.initBankPreviewMulti === 'function') {
+      multiWrap.hidden = false;
+      if (previewWrap) previewWrap.hidden = true;
+      window.initBankPreviewMulti({ movements: norm, global_summary: gs, file_errors: [], file_warnings: [], files_summary: [] });
+    }
+  } else {
+    updateKpis();
+    renderCards();
+  }
+
+  window.initBankPreviewMulti = function (data) {
+    var movements = data.movements || [];
+    var globalSummary = data.global_summary || {};
+    var fileErrors = data.file_errors || [];
+    var filesSummary = data.files_summary || [];
+    window.__bankMultiMovements = movements;
+    window.__bankMultiFilter = window.__bankMultiFilter || 'all';
+    function fmtMoney(n) {
+      var x = Number(n);
+      if (!Number.isFinite(x)) return '—';
+      return '$' + x.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+    function escapeHtml(s) {
+      return String(s || '').replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] || c; });
+    }
+    var gsEl = document.getElementById('bankMultiGlobalSummary');
+    if (gsEl) {
+      var saldoFinal = null;
+      for (var i = movements.length - 1; i >= 0; i--) {
+        if (movements[i].saldo != null && Number(movements[i].saldo) === movements[i].saldo) {
+          saldoFinal = movements[i].saldo;
+          break;
+        }
+      }
+      var saldoStr = saldoFinal != null ? fmtMoney(saldoFinal) : '—';
+      gsEl.innerHTML = '<div class="bank-preview-kpis">' +
+        '<div class="bank-preview-kpi"><span class="bank-preview-kpi__label">Saldo final</span><span class="bank-preview-kpi__value">' + saldoStr + '</span></div>' +
+        '<div class="bank-preview-kpi"><span class="bank-preview-kpi__label">Archivos</span><span class="bank-preview-kpi__value">' + (globalSummary.files_processed || 0) + '</span></div>' +
+        '<div class="bank-preview-kpi"><span class="bank-preview-kpi__label">Movimientos</span><span class="bank-preview-kpi__value">' + (globalSummary.total_movements || 0) + '</span></div>' +
+        '<div class="bank-preview-kpi bank-preview-kpi--ingresos"><span class="bank-preview-kpi__label">Ingresos</span><span class="bank-preview-kpi__value">' + fmtMoney(globalSummary.total_ingresos) + '</span></div>' +
+        '<div class="bank-preview-kpi bank-preview-kpi--ingresos-reales"><span class="bank-preview-kpi__label">Ingresos reales</span><span class="bank-preview-kpi__value" title="Sin transferencias propias ni disposiciones">' + fmtMoney(globalSummary.total_ingresos_que_impactan != null ? globalSummary.total_ingresos_que_impactan : globalSummary.total_ingresos) + '</span></div>' +
+        '<div class="bank-preview-kpi bank-preview-kpi--gastos"><span class="bank-preview-kpi__label">Gastos</span><span class="bank-preview-kpi__value">' + fmtMoney(globalSummary.total_gastos) + '</span></div>' +
+        '<div class="bank-preview-kpi bank-preview-kpi--gastos-reales"><span class="bank-preview-kpi__label">Gastos reales</span><span class="bank-preview-kpi__value" title="Sin pagos de tarjeta ni transferencias propias">' + fmtMoney(globalSummary.total_gastos_que_impactan != null ? globalSummary.total_gastos_que_impactan : globalSummary.total_gastos) + '</span></div>' +
+        '<div class="bank-preview-kpi"><span class="bank-preview-kpi__label">Financiero</span><span class="bank-preview-kpi__value">' + (globalSummary.count_financiero || 0) + '</span></div>' +
+        '<div class="bank-preview-kpi bank-preview-kpi--review"><span class="bank-preview-kpi__label">Revisar</span><span class="bank-preview-kpi__value">' + (globalSummary.count_requiere_revision != null ? globalSummary.count_requiere_revision : globalSummary.count_low_confidence || 0) + '</span></div>' +
+        '<div class="bank-preview-kpi"><span class="bank-preview-kpi__label">Duplicados</span><span class="bank-preview-kpi__value">' + (globalSummary.count_duplicados || 0) + '</span></div>' +
+        '</div>' +
+        '<p class="u-text-xs muted u-mt-2">Ingresos y gastos reales excluyen transferencias entre cuentas propias, pagos de tarjeta y disposiciones.</p>';
+    }
+    var errEl = document.getElementById('bankMultiFileErrors');
+    if (errEl) {
+      if (fileErrors.length) {
+        errEl.hidden = false;
+        errEl.innerHTML = '<strong>Errores por archivo:</strong><ul class="list-reset u-mt-2">' + fileErrors.map(function (e) {
+          return '<li>' + escapeHtml(e.file_name || '') + ': ' + escapeHtml(e.error || '') + '</li>';
+        }).join('') + '</ul>';
+      } else {
+        errEl.hidden = true;
+        errEl.innerHTML = '';
+      }
+    }
+    var fsEl = document.getElementById('bankMultiFilesSummary');
+    if (fsEl && filesSummary.length) {
+      fsEl.hidden = false;
+      fsEl.innerHTML = '<p class="u-text-xs muted"><strong>Por archivo:</strong></p><ul class="list-reset u-text-xs">' + filesSummary.map(function (fs) {
+        var err = fs.error ? ' <span class="muted">(' + escapeHtml(fs.error) + ')</span>' : '';
+        return '<li>' + escapeHtml(fs.file_name || '') + ' — ' + (fs.bank_name || '—') + ', ' + (fs.movements_count || 0) + ' mov., ' + fmtMoney(fs.total_deposito) + ' / ' + fmtMoney(fs.total_retiro) + err + '</li>';
+      }).join('') + '</ul>';
+    } else if (fsEl) fsEl.hidden = true;
+    var MULTI_CATEGORIES = ['CUENTA_PROPIA', 'FINANCIERO_PAGO_TARJETA', 'TRANSFERENCIA', 'ALIMENTOS', 'IMPUESTOS', 'COMISION_BANCARIA', 'EFECTIVO', 'NOMINA', 'TARJETAS_CREDITO', 'SERVICIOS', 'OTROS'];
+
+    function filterMultiList(list, f) {
+      var base = list.filter(function (m) { return (m.tipo_movimiento || '').toUpperCase() !== 'INFO'; });
+      if (f === 'all') return base;
+      if (f === 'needs_review') return base.filter(function (m) { return m.requiere_revision; });
+      if (f === 'financiero') return base.filter(function (m) { return m.es_movimiento_financiero; });
+      if (f === 'cuenta_propia') return base.filter(function (m) { return m.es_transferencia_propia_probable; });
+      if (f === 'duplicados') return base.filter(function (m) { return m.posible_duplicado; });
+      if (f === 'IN') return base.filter(function (m) { return (m.tipo_movimiento || '').toUpperCase() === 'INGRESO'; });
+      if (f === 'OUT') return base.filter(function (m) { return (m.tipo_movimiento || '').toUpperCase() === 'GASTO'; });
+      return base;
+    }
+
+    function renderBankMultiTable() {
+      var displayList = filterMultiList(movements, window.__bankMultiFilter);
+      var tbody = document.getElementById('bankMultiBody');
+      if (!tbody) return;
+      tbody.innerHTML = '';
+      displayList.forEach(function (m) {
+        var tipo = (m.tipo_movimiento || '').toUpperCase();
+        var tipoBadge = m.es_transferencia_propia_probable ? '<span class="badge bank-badge-traspaso" title="No es ingreso ni gasto">Traspaso propio</span>' : (tipo === 'INGRESO' ? '<span class="badge badge--success">Ingreso</span>' : (tipo === 'GASTO' ? '<span class="badge badge--warn">Gasto</span>' : '<span class="badge badge--neutral">—</span>'));
+        var montoVal = tipo === 'INGRESO' ? (m.monto_deposito || 0) : (tipo === 'GASTO' ? (m.monto_retiro || 0) : 0);
+        var montoStr = m.es_transferencia_propia_probable ? '(' + fmtMoney(montoVal) + ')' : (tipo === 'INGRESO' ? '+' + fmtMoney(montoVal) : (tipo === 'GASTO' ? '−' + fmtMoney(montoVal) : '—'));
+        var montoClass = m.es_transferencia_propia_probable ? 'bank-monto-traspaso' : (tipo === 'INGRESO' ? 'bank-monto-ingreso' : (tipo === 'GASTO' ? 'bank-monto-gasto' : ''));
+        var concept = (m.concepto_resumen || '').trim() || '';
+        var conceptDisplay = concept.length > 50 ? concept.substring(0, 50) + '…' : (concept || '—');
+        var bankDisplay = (m.bank_name || '').trim();
+        if (m.account_hint) bankDisplay += (bankDisplay ? ' ' : '') + m.account_hint;
+        if (!bankDisplay) bankDisplay = '—';
+        var catLabel = m.categoria_sugerida || '—';
+        var chips = [];
+        if (m.es_transferencia_propia_probable) chips.push('<span class="bank-chip bank-chip--propia" title="Traspaso entre tus cuentas; no cuenta como ingreso ni gasto">Cuenta propia</span>');
+        if (m.es_movimiento_financiero) chips.push('<span class="bank-chip bank-chip--financiero">Financiero</span>');
+        if (m.requiere_revision) chips.push('<span class="bank-chip bank-chip--revisar">Revisar</span>');
+        if (m.posible_duplicado) chips.push('<span class="bank-chip bank-chip--duplicado">Duplicado</span>');
+        var estadoHtml = chips.length ? chips.join(' ') : '<span class="muted">—</span>';
+        var previewId = m.preview_id || ('m' + (m._global_idx != null ? m._global_idx : m.idx || 0));
+
+        var tr = document.createElement('tr');
+        tr.dataset.idx = String(m._global_idx != null ? m._global_idx : m.idx || 0);
+        tr.dataset.previewId = previewId;
+        tr.className = m.es_transferencia_propia_probable ? 'bank-row-traspaso-propio' : (tipo === 'INGRESO' ? 'bank-row-ingreso' : (tipo === 'GASTO' ? 'bank-row-gasto' : ''));
+        tr.innerHTML = '<td class="muted">' + escapeHtml(m.fecha || '—') + '</td>' +
+          '<td class="concepto-cell bank-multi-concept-editable" title="Clic para editar">' + escapeHtml(conceptDisplay) + '</td>' +
+          '<td>' + tipoBadge + '</td>' +
+          '<td class="text-right ' + montoClass + '">' + montoStr + '</td>' +
+          '<td class="muted u-text-xs">' + escapeHtml(bankDisplay) + '</td>' +
+          '<td class="bank-multi-category-editable" title="Clic para cambiar categoría"><span class="badge badge--neutral">' + escapeHtml(catLabel) + '</span></td>' +
+          '<td class="bank-multi-estado">' + estadoHtml + '</td>' +
+          '<td class="text-right"><button type="button" class="btn btn--sm btn--ghost bank-multi-detail-btn" data-preview-id="' + escapeHtml(previewId) + '" aria-label="Ver detalle">Ver detalle</button></td>';
+        tbody.appendChild(tr);
+
+        var detailRow = document.createElement('tr');
+        detailRow.className = 'bank-multi-detail-row';
+        detailRow.dataset.detailFor = previewId;
+        detailRow.hidden = true;
+        var rawShort = (m.raw_text_original || '').length > 300 ? (m.raw_text_original || '').substring(0, 300) + '…' : (m.raw_text_original || '—');
+        var catLabel = m.categoria_sugerida || '—';
+        var cuentaPropiaNote = m.es_transferencia_propia_probable ? '<p class="u-mb-2 u-text-sm" style="color:var(--muted,#6b7280)"><strong>Traspaso entre tus cuentas</strong> (CLABE o cuenta registrada). No se considera ingreso ni gasto.</p>' : '';
+        detailRow.innerHTML = '<td colspan="8" class="bank-multi-detail-cell u-p-4 u-text-xs"><dl class="bank-detail-dl">' +
+          cuentaPropiaNote +
+          '<dt>Banco</dt><dd>' + escapeHtml(m.bank_name || '—') + '</dd>' +
+          '<dt>Archivo</dt><dd>' + escapeHtml(m.source_file_name || '—') + '</dd>' +
+          '<dt>Categoría</dt><dd>' + escapeHtml(catLabel) + '</dd>' +
+          '<dt>Contraparte</dt><dd>' + escapeHtml(m.contraparte_nombre || '—') + '</dd>' +
+          '<dt>RFC</dt><dd>' + escapeHtml(m.rfc_detectado || '—') + '</dd>' +
+          '<dt>Referencia</dt><dd>' + escapeHtml(m.referencia || '—') + '</dd>' +
+          '<dt>CVE rastreo</dt><dd>' + escapeHtml(m.cve_rastreo || '—') + '</dd>' +
+          '<dt>Confianza</dt><dd>' + (m.confianza_clasificacion != null ? m.confianza_clasificacion + '%' : '—') + '</dd>' +
+          '<dt>Texto original</dt><dd class="u-break-word">' + escapeHtml(rawShort) + '</dd>' +
+          (m.warnings && m.warnings.length ? '<dt>Warnings</dt><dd><ul class="list-reset">' + m.warnings.map(function (w) { return '<li>' + escapeHtml(w) + '</li>'; }).join('') + '</ul></dd>' : '') +
+          '</dl></td>';
+        tbody.appendChild(detailRow);
+
+        function toggleDetail() {
+          detailRow.hidden = !detailRow.hidden;
+        }
+        var detailBtn = tr.querySelector('.bank-multi-detail-btn');
+        if (detailBtn) detailBtn.addEventListener('click', toggleDetail);
+
+        var conceptCell = tr.querySelector('.bank-multi-concept-editable');
+        var categoryCell = tr.querySelector('.bank-multi-category-editable');
+        if (conceptCell) {
+          conceptCell.addEventListener('click', function () {
+            if (conceptCell.querySelector('input')) return;
+            var input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'input input--sm';
+            input.value = concept;
+            input.style.width = '100%';
+            conceptCell.textContent = '';
+            conceptCell.appendChild(input);
+            input.focus();
+            input.select();
+            input.addEventListener('blur', function () {
+              m.concepto_resumen = input.value.trim();
+              conceptCell.textContent = (m.concepto_resumen || '').length > 50 ? m.concepto_resumen.substring(0, 50) + '…' : (m.concepto_resumen || '—');
+              conceptCell.title = 'Clic para editar';
+            });
+            input.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') input.blur(); });
+          });
+        }
+        if (categoryCell) {
+          categoryCell.addEventListener('click', function (e) {
+            if (e.target.tagName === 'SELECT' || categoryCell.querySelector('select')) return;
+            var select = document.createElement('select');
+            select.className = 'input select input--sm';
+            MULTI_CATEGORIES.forEach(function (c) {
+              var opt = document.createElement('option');
+              opt.value = c;
+              opt.textContent = c;
+              if (c === (m.categoria_sugerida || '')) opt.selected = true;
+              select.appendChild(opt);
+            });
+            if (m.categoria_sugerida && MULTI_CATEGORIES.indexOf(m.categoria_sugerida) < 0) {
+              var o = document.createElement('option');
+              o.value = m.categoria_sugerida;
+              o.textContent = m.categoria_sugerida;
+              o.selected = true;
+              select.appendChild(o);
+            }
+            categoryCell.innerHTML = '';
+            categoryCell.appendChild(select);
+            select.focus();
+            select.addEventListener('change', function () {
+              m.categoria_sugerida = select.value || m.categoria_sugerida;
+              categoryCell.innerHTML = '<span class="badge badge--neutral">' + escapeHtml(m.categoria_sugerida || '—') + '</span>';
+            });
+            select.addEventListener('blur', function () {
+              m.categoria_sugerida = select.value || m.categoria_sugerida;
+              categoryCell.innerHTML = '<span class="badge badge--neutral">' + escapeHtml(m.categoria_sugerida || '—') + '</span>';
+            });
+          });
+        }
+      });
+    }
+    window.renderBankMultiTable = renderBankMultiTable;
+    renderBankMultiTable();
+    document.querySelectorAll('.bank-multi-filters .bank-preview-filter').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        window.__bankMultiFilter = btn.getAttribute('data-multi-filter') || 'all';
+        document.querySelectorAll('.bank-multi-filters .bank-preview-filter').forEach(function (b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+        if (window.renderBankMultiTable) window.renderBankMultiTable();
+      });
+    });
+
+    function updatePreviewCommitButton() {
+      var btn = document.getElementById('previewCommitBtn');
+      var sel = document.getElementById('previewCommitAccountId');
+      var hasMovements = (window.__bankMultiMovements && window.__bankMultiMovements.length > 0);
+      var hasAccount = sel && sel.value && sel.value.trim() !== '';
+      if (btn) btn.disabled = !(hasMovements && hasAccount);
+    }
+    updatePreviewCommitButton();
+    var previewCommitSel = document.getElementById('previewCommitAccountId');
+    if (previewCommitSel) previewCommitSel.addEventListener('change', updatePreviewCommitButton);
+
+    var previewCommitBtn = document.getElementById('previewCommitBtn');
+    var previewCommitMessage = document.getElementById('previewCommitMessage');
+    if (previewCommitBtn) {
+      previewCommitBtn.addEventListener('click', function () {
+        var movs = window.__bankMultiMovements;
+        var sel = document.getElementById('previewCommitAccountId');
+        if (!movs || movs.length === 0 || !sel || !sel.value) {
+          if (window.uiToast) window.uiToast({ type: 'warning', title: 'Datos incompletos', message: 'Selecciona una cuenta y asegúrate de tener movimientos en el preview.' });
+          return;
+        }
+        if (!confirm('Se guardarán los movimientos para consultarlos en la página Movimientos. ¿Continuar?')) return;
+        var byFile = {};
+        movs.forEach(function (m) {
+          var key = m.source_file_name || 'preview';
+          if (!byFile[key]) byFile[key] = [];
+          byFile[key].push(m);
+        });
+        var files = [];
+        Object.keys(byFile).forEach(function (fileName) {
+          var group = byFile[fileName];
+          var totalDep = 0, totalRet = 0;
+          group.forEach(function (m) {
+            totalDep += Number(m.monto_deposito) || 0;
+            totalRet += Number(m.monto_retiro) || 0;
+          });
+          var first = group[0];
+          files.push({
+            file_summary: {
+              source_file_name: fileName,
+              bank_name: first.bank_name || '',
+              movements_count: group.length,
+              total_deposito: totalDep,
+              total_retiro: totalRet
+            },
+            movements: group
+          });
+        });
+        previewCommitBtn.disabled = true;
+        if (previewCommitMessage) { previewCommitMessage.hidden = false; previewCommitMessage.textContent = 'Guardando…'; previewCommitMessage.className = 'u-mt-2 u-text-xs muted'; }
+        var fn = window.portalFetchWithTimeout || fetch;
+        fn('/portal/bank/preview/commit', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ bank_account_id: Number(sel.value), files: files })
+        }).then(function (r) {
+          if (r.status === 401 && window.showSessionExpiredModal) window.showSessionExpiredModal();
+          return r.json().then(function (data) { return { ok: r.ok, data: data }; });
+        }).then(function (res) {
+          previewCommitBtn.disabled = false;
+          if (!previewCommitMessage) return;
+          previewCommitMessage.hidden = false;
+          if (res.ok && res.data && res.data.ok) {
+            previewCommitMessage.className = 'u-mt-2 u-text-xs';
+            previewCommitMessage.style.color = '';
+            var inserted = res.data.inserted_count || 0;
+            var dup = res.data.duplicate_movements_count || 0;
+            var month = res.data.period_month || '';
+            var msg = 'Guardados ' + inserted + ' movimientos.';
+            if (dup > 0) msg += ' ' + dup + ' ya existían (duplicados).';
+            msg += ' <a href="/portal/bank/movements' + (month ? '?period_month=' + month : '') + '">Ver movimientos guardados</a>';
+            previewCommitMessage.innerHTML = msg;
+            if (window.uiToast) window.uiToast({ type: 'success', title: 'Listo', message: inserted + ' movimientos guardados.' });
+          } else {
+            previewCommitMessage.className = 'u-mt-2 u-text-xs';
+            previewCommitMessage.style.color = 'var(--danger, #b91c1c)';
+            previewCommitMessage.textContent = (res.data && res.data.rejection_reason) ? res.data.rejection_reason : 'Error al guardar.';
+          }
+        }).catch(function () {
+          previewCommitBtn.disabled = false;
+          if (previewCommitMessage) {
+            previewCommitMessage.hidden = false;
+            previewCommitMessage.className = 'u-mt-2 u-text-xs';
+            previewCommitMessage.style.color = 'var(--danger, #b91c1c)';
+            previewCommitMessage.textContent = 'Error de red.';
+          }
+        });
+      });
+    }
+  };
+})();
+</script>
+{% endblock %}

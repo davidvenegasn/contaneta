@@ -59,12 +59,12 @@
             {% for r in rows %}
             <tr>
               <td class="muted"><code>{{ r.clave_prod_serv or '—' }}</code></td>
-              <td style="font-weight:650;">{{ r.raw_description }}</td>
+              <td class="u-fw-650">{{ r.raw_description }}</td>
               <td class="muted"><code>{{ r.clave_unidad or '—' }}</code></td>
               <td class="muted">{{ r.unidad or '—' }}</td>
               <td>{{ '$' ~ ('{:,.2f}'.format(r.unit_price_hint|float)) if r.unit_price_hint is not none else '—' }}{% if r.currency %} <span class="muted">{{ r.currency }}</span>{% endif %}</td>
               <td><span class="chip">{{ r.times_seen }}</span></td>
-              <td class="muted" style="font-size:12px;">{{ r.last_seen_at or '—' }}</td>
+              <td class="muted u-text-12">{{ r.last_seen_at or '—' }}</td>
               <td>
                 <button
                   type="button"
