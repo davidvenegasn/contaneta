@@ -7,7 +7,6 @@ import os
 import re
 import secrets
 import stat
-import subprocess
 from services.errors import ExternalServiceError
 from services.subprocess_utils import run_php
 from datetime import datetime, date, timezone

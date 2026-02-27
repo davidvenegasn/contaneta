@@ -1,3 +1,12 @@
+## Migraciones (SQLite)
+
+La documentación principal de migraciones vive en `MIGRATIONS.md` (raíz del repo).
+
+Este archivo existe para mantener el índice de docs consistente bajo `docs/`.
+
+### Enlaces
+- `MIGRATIONS.md`: cómo funciona `migrations_runner.py`, cómo crear/probar migraciones, y listado de migraciones.
+
 # Migraciones (SQLite)
 
 Este proyecto usa migraciones SQL en `migrations/*.sql` aplicadas automáticamente al arrancar el servidor (startup).
