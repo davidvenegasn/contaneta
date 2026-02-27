@@ -40,6 +40,11 @@ def scalar(conn: sqlite3.Connection, sql: str, params: Sequence[Any] = ()) -> An
     row = cur.fetchone()
     if row is None:
         return None
-    # sqlite3.Row soporta índices
+    # `database.db()` usa row_factory dict; otros callers pueden usar sqlite3.Row/tuple.
+    if isinstance(row, dict):
+        try:
+            return next(iter(row.values()))
+        except StopIteration:
+            return None
     return row[0]
 
