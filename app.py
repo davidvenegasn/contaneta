@@ -690,12 +690,21 @@ def health():
 def ready():
     """Readiness: 200 solo si migraciones aplicadas (para balanceadores/K8s). 503 si no está listo. No exponer secretos."""
     checks = _health_checks()
-    if checks["migrations_applied"] and checks["db_readable"]:
+    if checks["migrations_applied"] and checks["db_readable"] and checks.get("storage_exists") and checks.get("storage_writable"):
         versions = checks.get("migrations_versions") or []
         return {"ready": True, "migration_version": versions[-1] if versions else None}
     from fastapi.responses import JSONResponse
+    reason = "unknown"
+    if not checks["db_readable"]:
+        reason = "db_not_readable"
+    elif not checks["migrations_applied"]:
+        reason = "migrations_not_applied"
+    elif not checks.get("storage_exists"):
+        reason = "storage_missing"
+    elif not checks.get("storage_writable"):
+        reason = "storage_not_writable"
     return JSONResponse(
-        {"ready": False, "reason": "migrations_not_applied" if not checks["migrations_applied"] else "db_not_readable"},
+        {"ready": False, "reason": reason},
         status_code=503,
     )
 

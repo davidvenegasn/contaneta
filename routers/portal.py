@@ -225,6 +225,15 @@ def _safe_abs_path(path_like: str) -> str:
     base = os.path.abspath(BASE_DIR)
     if not abs_p.startswith(base + os.sep):
         raise ValueError("Ruta XML inválida")
+    # Guardrail: nunca servir llaves/certs ni credenciales aunque alguien logre inyectar un path.
+    blocked = [
+        os.path.join(base, "keys"),
+        os.path.join(base, "storage", "credentials"),
+    ]
+    for b in blocked:
+        b_abs = os.path.normpath(os.path.abspath(b))
+        if abs_p == b_abs or abs_p.startswith(b_abs + os.sep):
+            raise ValueError("Ruta XML inválida")
     return abs_p
 
 

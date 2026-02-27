@@ -185,6 +185,9 @@ def get_auth_router(templates):
             token_val = (csrf_token or request.headers.get("X-CSRF-Token") or "").strip()
             if not DEV_MODE and not csrf_service.verify_csrf_token(token_val, max_age_seconds=14400):
                 return RedirectResponse(url="/login?error=csrf", status_code=302)
+            if rate_limit_service.is_rate_limited(request, "login"):
+                time.sleep(2)
+                return RedirectResponse(url="/login?error=invalid", status_code=302)
             if login_type != "credentials" or not password:
                 return RedirectResponse(url="/login?error=invalid", status_code=302)
             email = (email or "").strip().lower() or None
