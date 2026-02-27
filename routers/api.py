@@ -37,6 +37,7 @@ from services.http import ok, ok_list
 from services.schemas import ClientCreate, ProductCreate
 from services import clients_service, products_service
 from services import jobs as jobs_service
+from services import invoices_service
 
 router = APIRouter(prefix="/api")
 
@@ -831,22 +832,23 @@ def api_invoices_quick(
                 "price_to_send": round(price_to_send, 2),
             }
         )
-    payload_fact = {
-        "type": "I",
-        "export": "01",
-        "customer": {
-            "legal_name": customer_legal_name,
-            "email": customer_email,
-            "tax_id": customer_rfc,
-            "tax_system": customer_tax_system,
-            "address": {"zip": customer_zip},
-        },
-        "items": items_fact,
-        "use": cfdi_use,
-        "payment_form": payment_form,
-        "payment_method": payment_method,
-        "currency": currency,
-    }
+    payload_fact = invoices_service.build_invoice_payload(
+        invoice_type="I",
+        export_code="01",
+        customer=invoices_service.build_customer(
+            rfc=customer_rfc,
+            legal_name=customer_legal_name,
+            zip_code=customer_zip,
+            tax_system=customer_tax_system,
+            email=customer_email,
+        ),
+        items=items_fact,
+        payments=None,
+        cfdi_use=cfdi_use,
+        payment_form=payment_form,
+        payment_method=payment_method,
+        currency=currency,
+    )
     if issuer.get("facturapi_org_id") in (None, "", 0) or issuer.get("id") == -1:
         raise HTTPException(status_code=400, detail="Configuración de facturación no disponible.")
     conn = db()

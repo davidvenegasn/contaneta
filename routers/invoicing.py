@@ -17,6 +17,7 @@ from validators import validate_customer
 from services.form_parse import parse_items_from_form, parse_payments_from_form
 from services import csrf as csrf_service, audit, subscription as subscription_service
 from services.action_log import log_action
+from services import invoices_service
 from routers.deps import get_portal_issuer
 
 
@@ -371,35 +372,29 @@ def _submit_impl(templates, request: Request, issuer: dict, form):
             except Exception as e:
                 print(f"[submit] save_customer failed: {e}")
 
-    payload = {
-        "type": tipo_comprobante,
-        "export": export_code or "01",
-        "customer": {
-            "legal_name": customer_legal_name,
-            "email": customer_email or None,
-            "tax_id": customer_rfc.upper(),
-            "tax_system": customer_tax_system,
-            "address": {"zip": customer_zip},
-        },
-        **({"items": items} if items is not None else {}),
-        **({"payments": payments_payload} if payments_payload is not None else {}),
-        "use": cfdi_use_val,
-        "payment_form": payment_form,
-        "payment_method": payment_method,
-        "currency": currency.upper(),
-    }
-    if serie:
-        payload["series"] = serie
-    if folio_number is not None:
-        payload["folio_number"] = folio_number
-    if issue_date:
-        payload["date"] = issue_date
-    if order_ref:
-        payload["external_id"] = order_ref
-    if notes:
-        payload["conditions"] = notes
-    if exchange is not None:
-        payload["exchange"] = exchange
+    payload = invoices_service.build_invoice_payload(
+        invoice_type=tipo_comprobante,
+        export_code=export_code or "01",
+        customer=invoices_service.build_customer(
+            rfc=customer_rfc,
+            legal_name=customer_legal_name,
+            zip_code=customer_zip,
+            tax_system=customer_tax_system,
+            email=customer_email or None,
+        ),
+        items=items if items is not None else None,
+        payments=payments_payload if payments_payload is not None else None,
+        cfdi_use=cfdi_use_val,
+        payment_form=payment_form,
+        payment_method=payment_method,
+        currency=currency.upper(),
+        series=serie or None,
+        folio_number=folio_number,
+        issue_date=issue_date or None,
+        order_ref=order_ref or None,
+        notes=notes or None,
+        exchange=exchange,
+    )
 
     if issuer.get("facturapi_org_id") in (None, "", 0) or issuer.get("id") == -1:
         raise ValueError("DEV_MODE activo: token de prueba. Configura un token real/issuer para timbrar.")
