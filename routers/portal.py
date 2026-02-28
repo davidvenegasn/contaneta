@@ -2119,8 +2119,30 @@ def get_portal_router(templates):
                 "csrf_token": csrf_service.generate_csrf_token(),
                 "has_acuse": has_acuse,
                 "has_opinion": has_opinion,
+                "month_status": month_close_service.get_month_status_enum(issuer_id, ym_val),
             },
         )
+
+    @router.post("/month-close/status", response_class=RedirectResponse)
+    def portal_month_close_status(
+        request: Request,
+        issuer: dict = Depends(get_portal_issuer),
+        ym: str = Form(...),
+        status: str = Form(...),
+        csrf_token: str | None = Form(None),
+    ):
+        token_val = (csrf_token or request.headers.get("X-CSRF-Token") or "").strip()
+        if not csrf_service.verify_csrf_token(token_val):
+            raise HTTPException(status_code=403, detail="Token CSRF inválido o expirado")
+        issuer_id = int(issuer.get("id") or 0)
+        from services import month_close as month_close_service
+
+        try:
+            month_close_service.save_month_close(issuer_id, ym, status=status)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        log_action(request, "month_close_status_change", issuer_id=issuer_id, ym=ym, status=status)
+        return RedirectResponse(url=f"/portal/month-close?ym={ym}", status_code=302)
 
     @router.post("/month-close/override", response_class=RedirectResponse)
     def portal_month_close_override(

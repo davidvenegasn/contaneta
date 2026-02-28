@@ -19,12 +19,38 @@
   <div class="card" style="margin-top:14px;">
     <h2 style="margin-top:0;">Estado</h2>
     <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
-      {% if status.closed %}
+      {% if month_status == 'confirmed' %}
+        <span class="badge badge--success">Confirmado</span>
+      {% elif month_status == 'submitted' %}
+        <span class="badge badge--warning">Enviado</span>
+      {% elif status.closed %}
         <span class="badge badge--success">Mes marcado como cerrado</span>
       {% else %}
-        <span class="badge badge--neutral">Pendiente</span>
+        <span class="badge badge--neutral">Borrador</span>
       {% endif %}
       <span class="muted">IVA estimado a pagar: <strong>{{ "%.2f"|format(iva_est.iva_estimado_a_pagar) }}</strong></span>
+    </div>
+    <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;">
+      <form method="post" action="/portal/month-close/status" style="display:inline;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+        <input type="hidden" name="ym" value="{{ ym }}" />
+        <input type="hidden" name="status" value="submitted" />
+        <button class="btn btn-secondary btn-sm" type="submit" {% if month_status == 'confirmed' %}disabled{% endif %}>Marcar como enviado</button>
+      </form>
+      <form method="post" action="/portal/month-close/status" style="display:inline;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+        <input type="hidden" name="ym" value="{{ ym }}" />
+        <input type="hidden" name="status" value="confirmed" />
+        <button class="btn btn-primary btn-sm" type="submit">Confirmar cierre</button>
+      </form>
+      {% if month_status != 'draft' %}
+      <form method="post" action="/portal/month-close/status" style="display:inline;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+        <input type="hidden" name="ym" value="{{ ym }}" />
+        <input type="hidden" name="status" value="draft" />
+        <button class="btn btn-secondary btn-sm" type="submit">Reabrir</button>
+      </form>
+      {% endif %}
     </div>
   </div>
 
@@ -75,7 +101,7 @@
         {% if it.key == 'opinion' %}
           <div style="margin-top:12px;">
             {% if has_opinion %}
-              <a class="btn btn-secondary btn-sm" href="/portal/month-close/download/{{ ym }}/opinion?dl=1">Descargar opinión</a>
+              <a class="btn btn-secondary btn-sm" href="/portal/month-close/download/{{ ym }}/opinion?dl=1">Descargar opinion</a>
             {% endif %}
             <form method="post" action="/portal/month-close/upload" enctype="multipart/form-data" style="margin-top:10px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
               <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
@@ -91,4 +117,3 @@
     </div>
   </div>
 {% endblock %}
-

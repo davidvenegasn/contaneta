@@ -2182,3 +2182,94 @@ def api_unidad(q: str = Query(..., min_length=1), limit: int = Query(20, ge=1, l
             if q_lower in v.lower() or q_lower in k.lower()
         ]
         return ok(items[: int(limit)])
+
+
+# ---------- Month Close API ----------
+
+@router.get("/month-close")
+def api_month_close_get(
+    request: Request,
+    issuer: dict = Depends(get_portal_issuer),
+    ym: str = Query(..., min_length=7, max_length=7),
+):
+    from services import month_close as mc
+    issuer_id = int(issuer.get("id") or 0)
+    if issuer_id <= 0:
+        raise HTTPException(status_code=401, detail="Sesión inválida")
+    try:
+        data = mc.get_full_month_close(issuer_id, ym)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return ok(data)
+
+
+@router.post("/month-close")
+def api_month_close_post(
+    request: Request,
+    issuer: dict = Depends(get_portal_issuer),
+    body: dict = Body(...),
+):
+    from services import month_close as mc
+    issuer_id = int(issuer.get("id") or 0)
+    if issuer_id <= 0:
+        raise HTTPException(status_code=401, detail="Sesión inválida")
+    ym = (body.get("ym") or "").strip()
+    status = body.get("status")
+    checklist = body.get("checklist")
+    try:
+        data = mc.save_month_close(issuer_id, ym, status=status, checklist=checklist)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    log_action(request, "month_close_save", issuer_id=issuer_id, ym=ym)
+    return ok(data)
+
+
+# ---------- Matching Preview API ----------
+
+@router.get("/matching/preview")
+def api_matching_preview(
+    request: Request,
+    issuer: dict = Depends(get_portal_issuer),
+    ym: str = Query(..., min_length=7, max_length=7),
+):
+    from services.bank_cfdi_matching import refresh_suggestions_for_month
+    issuer_id = int(issuer.get("id") or 0)
+    if issuer_id <= 0:
+        raise HTTPException(status_code=401, detail="Sesión inválida")
+    try:
+        result = refresh_suggestions_for_month(issuer_id, ym)
+    except Exception as e:
+        logger.warning("matching preview error: %s", e)
+        return ok({"ok": False, "message": str(e)})
+    return ok(result)
+
+
+# ---------- Notifications API ----------
+
+@router.get("/notifications")
+def api_notifications_list(
+    request: Request,
+    issuer: dict = Depends(get_portal_issuer),
+    unread_only: bool = Query(True),
+    limit: int = Query(10, ge=1, le=50),
+):
+    from services import notifications as notif_service
+    issuer_id = int(issuer.get("id") or 0)
+    if issuer_id <= 0:
+        raise HTTPException(status_code=401, detail="Sesión inválida")
+    items = notif_service.list_notifications(issuer_id, unread_only=unread_only, limit=limit)
+    return ok_list(items, len(items))
+
+
+@router.post("/notifications/{notification_id}/read")
+def api_notification_mark_read(
+    request: Request,
+    notification_id: int,
+    issuer: dict = Depends(get_portal_issuer),
+):
+    from services import notifications as notif_service
+    issuer_id = int(issuer.get("id") or 0)
+    if issuer_id <= 0:
+        raise HTTPException(status_code=401, detail="Sesión inválida")
+    success = notif_service.mark_read(issuer_id, notification_id)
+    return ok({"marked": success})
