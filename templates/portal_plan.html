@@ -4,13 +4,13 @@
   <header class="app-header app-header--mb-14">
     <div class="app-header__left">
       <div class="app-title">Mi plan</div>
-      <div class="app-subtitle muted">Estado de tu suscripción y opciones para actualizar a Pro.</div>
+      <div class="app-subtitle muted">Estado de tu suscripcion, limites y opciones para cambiar de plan.</div>
     </div>
   </header>
 
   {% if success %}
   <div class="card u-mb-14 card--success-bg">
-    <p class="u-m0">Pago completado. Tu plan Pro está activo.</p>
+    <p class="u-m0">Pago completado. Tu plan Pro esta activo.</p>
   </div>
   {% endif %}
   {% if canceled %}
@@ -20,52 +20,145 @@
   {% endif %}
 
   <div class="card u-mb-14">
-    <h2 class="u-m0 u-mb-3 u-text-base">Estado actual</h2>
-    {% if subscription %}
-      <p><strong>Plan:</strong> {{ subscription.plan or 'free' }}</p>
-      <p><strong>Estado:</strong> {{ subscription.status or 'inactive' }}</p>
-      {% if subscription.current_period_end %}
-      <p class="muted"><strong>Próximo vencimiento:</strong> {{ subscription.current_period_end[:10] }}</p>
-      {% endif %}
+    <h2 class="u-m0 u-mb-3 u-text-base">Plan actual: <strong>{{ plan_summary.plan_label }}</strong></h2>
+    {% if plan_summary.price_mxn > 0 %}
+    <p class="muted">${{ plan_summary.price_mxn }} MXN/mes</p>
     {% else %}
-      <p>Plan gratuito. Descargas y PDF limitados.</p>
+    <p class="muted">Sin costo</p>
+    {% endif %}
+
+    {% if subscription %}
+      <p><strong>Suscripcion Stripe:</strong> {{ subscription.status or 'inactive' }}</p>
+      {% if subscription.current_period_end %}
+      <p class="muted"><strong>Proximo vencimiento:</strong> {{ subscription.current_period_end[:10] }}</p>
+      {% endif %}
     {% endif %}
   </div>
 
-  {% if not is_active %}
-  <div class="card">
-    <h2 class="u-m0 u-mb-3 u-text-base">Actualizar a Pro</h2>
-    <p class="u-m0 u-mb-14">Desbloquea descargas XML/PDF y más funciones.</p>
-    <button type="button" id="btnCheckout" class="btn btn-primary">Actualizar a Pro</button>
-    <p id="checkoutError" class="muted u-mt-2 u-hidden" hidden></p>
+  <div class="card u-mb-14">
+    <h2 class="u-m0 u-mb-3 u-text-base">Uso del mes</h2>
+    <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap:12px;">
+      {% set limits = plan_summary.limits %}
+
+      <div style="border:1px solid #e2e8f0; border-radius:10px; padding:12px;">
+        <div style="font-weight:600; font-size:14px;">Facturas</div>
+        <div style="margin-top:6px;">
+          <span style="font-size:20px; font-weight:700;">{{ limits.invoices.used }}</span>
+          <span class="muted">/ {{ limits.invoices.limit }}</span>
+        </div>
+        {% if limits.invoices.limit > 0 %}
+        <div style="margin-top:6px; background:#e2e8f0; border-radius:4px; height:6px; overflow:hidden;">
+          <div style="background:{{ '#ef4444' if limits.invoices.used >= limits.invoices.limit else '#22c55e' }}; height:100%; width:{{ [100, (limits.invoices.used / limits.invoices.limit * 100)|int]|min }}%;"></div>
+        </div>
+        {% endif %}
+      </div>
+
+      <div style="border:1px solid #e2e8f0; border-radius:10px; padding:12px;">
+        <div style="font-weight:600; font-size:14px;">Syncs SAT</div>
+        <div style="margin-top:6px;">
+          <span style="font-size:20px; font-weight:700;">{{ limits.sat_syncs.used }}</span>
+          <span class="muted">/ {{ limits.sat_syncs.limit }}</span>
+        </div>
+        {% if limits.sat_syncs.limit > 0 %}
+        <div style="margin-top:6px; background:#e2e8f0; border-radius:4px; height:6px; overflow:hidden;">
+          <div style="background:{{ '#ef4444' if limits.sat_syncs.used >= limits.sat_syncs.limit else '#22c55e' }}; height:100%; width:{{ [100, (limits.sat_syncs.used / limits.sat_syncs.limit * 100)|int]|min }}%;"></div>
+        </div>
+        {% else %}
+        <div class="muted u-text-xs" style="margin-top:4px;">No incluido en tu plan</div>
+        {% endif %}
+      </div>
+
+      <div style="border:1px solid #e2e8f0; border-radius:10px; padding:12px;">
+        <div style="font-weight:600; font-size:14px;">Importar bancos</div>
+        <div style="margin-top:6px;">
+          <span style="font-size:20px; font-weight:700;">{{ limits.bank_imports.used }}</span>
+          <span class="muted">/ {{ limits.bank_imports.limit }}</span>
+        </div>
+      </div>
+
+      <div style="border:1px solid #e2e8f0; border-radius:10px; padding:12px;">
+        <div style="font-weight:600; font-size:14px;">Cuentas bancarias</div>
+        <div style="margin-top:6px;">
+          <span class="muted">Limite: {{ limits.bank_accounts.limit }}</span>
+        </div>
+      </div>
+
+      <div style="border:1px solid #e2e8f0; border-radius:10px; padding:12px;">
+        <div style="font-weight:600; font-size:14px;">Cierre mensual</div>
+        <div style="margin-top:6px;">
+          {% if limits.month_close %}
+          <span class="badge badge--success">Incluido</span>
+          {% else %}
+          <span class="badge badge--neutral">No incluido</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div style="border:1px solid #e2e8f0; border-radius:10px; padding:12px;">
+        <div style="font-weight:600; font-size:14px;">Conciliacion</div>
+        <div style="margin-top:6px;">
+          {% if limits.matching %}
+          <span class="badge badge--success">Incluido</span>
+          {% else %}
+          <span class="badge badge--neutral">No incluido</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
   </div>
+
+  <div class="card">
+    <h2 class="u-m0 u-mb-3 u-text-base">Planes disponibles</h2>
+    <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap:14px;">
+      {% for key, p in plan_summary.all_plans.items() %}
+      <div style="border:{{ '2px solid #3b82f6' if key == plan_summary.plan else '1px solid #e2e8f0' }}; border-radius:14px; padding:16px; {% if key == plan_summary.plan %}background:#eff6ff;{% endif %}">
+        <div style="font-weight:700; font-size:16px;">{{ p.label }}</div>
+        <div style="margin-top:6px; font-size:20px; font-weight:700;">
+          {% if p.price_mxn > 0 %}${{ p.price_mxn }} <span class="muted" style="font-size:14px;">MXN/mes</span>{% else %}Gratis{% endif %}
+        </div>
+        <div class="muted" style="margin-top:8px; font-size:13px;">
+          {{ p.invoices }} facturas/mes<br>
+          {% if p.sat_syncs > 0 %}{{ p.sat_syncs }} syncs SAT{% else %}Sin sync SAT{% endif %}
+        </div>
+        {% if key == plan_summary.plan %}
+        <div style="margin-top:12px;">
+          <span class="badge badge--success">Plan actual</span>
+        </div>
+        {% elif key in ('basic', 'pro') %}
+        <div style="margin-top:12px;">
+          <button type="button" class="btn btn-primary btn-sm plan-upgrade-btn" data-plan="{{ key }}">Elegir {{ p.label }}</button>
+        </div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
   <script>
-    document.getElementById('btnCheckout').addEventListener('click', function() {
-      var btn = this;
+  document.querySelectorAll('.plan-upgrade-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var plan = btn.getAttribute('data-plan');
       btn.disabled = true;
-      var errEl = document.getElementById('checkoutError');
-      errEl.classList.add('u-hidden'); errEl.hidden = true;
-      (window.portalFetchJSON ? window.portalFetchJSON('/billing/checkout', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' } }, { timeoutMs: 30000, retry: 0 }) : Promise.resolve({ ok: false, status: 0, data: null, detail: 'Helper no disponible' }))
+      (window.portalFetchJSON ? window.portalFetchJSON('/billing/checkout', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan: plan })
+      }, { timeoutMs: 30000, retry: 0 }) : Promise.resolve({ ok: false }))
         .then(function(r) {
-          if (r && r.status === 401) return;
           if (r && r.ok && r.data && r.data.url) {
             window.location.href = r.data.url;
             return;
           }
           btn.disabled = false;
-          errEl.textContent = (r && r.data && r.data.detail) ? r.data.detail : ((r && r.detail) || 'No se pudo iniciar el pago.');
-          errEl.classList.remove('u-hidden'); errEl.hidden = false;
+          if (window.uiToast) window.uiToast({ type: 'danger', title: 'Error', message: (r && r.data && r.data.detail) || 'No se pudo iniciar el pago.' });
+          else alert('No se pudo iniciar el pago.');
         })
         .catch(function() {
           btn.disabled = false;
-          errEl.textContent = 'Error de conexión. Intenta de nuevo.';
-          errEl.classList.remove('u-hidden'); errEl.hidden = false;
+          alert('Error de conexion.');
         });
     });
+  });
   </script>
-  {% else %}
-  <div class="card card--success-bg">
-    <p class="u-m0">Tienes plan Pro activo. Gracias por tu suscripción.</p>
-  </div>
-  {% endif %}
 {% endblock %}

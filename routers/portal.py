@@ -2236,8 +2236,18 @@ def get_portal_router(templates):
     @router.get("/plan", response_class=HTMLResponse)
     def portal_plan(request: Request, issuer: dict = Depends(get_portal_issuer), success: str = Query(""), canceled: str = Query("")):
         user_id = getattr(request.state, "user_id", None) or 0
+        issuer_id = int(issuer.get("id") or 0)
         subscription = subscription_service.get_subscription_by_user_id(user_id) if user_id else None
         is_active = subscription_service.is_subscription_active(user_id)
+        from services import plans as plans_service
+        plan_summary = plans_service.get_plan_summary(issuer_id) if issuer_id > 0 else {
+            "plan": "free", "plan_label": "Gratis", "price_mxn": 0,
+            "limits": {"invoices": {"used": 0, "limit": 5}, "sat_syncs": {"used": 0, "limit": 0}, "bank_imports": {"used": 0, "limit": 2}, "bank_accounts": {"limit": 1}, "month_close": False, "matching": False},
+            "all_plans": plans_service.get_all_plans() if issuer_id > 0 else {},
+        }
+        # Ensure all_plans always has data
+        if not plan_summary.get("all_plans"):
+            plan_summary["all_plans"] = {k: {"label": v["label"], "price_mxn": v["price_mxn"], "invoices": v["invoices_per_month"], "sat_syncs": v["sat_syncs_per_month"]} for k, v in plans_service.PLANS.items()}
         return _render_portal(
             request,
             issuer=issuer,
@@ -2249,6 +2259,7 @@ def get_portal_router(templates):
                 "is_active": is_active,
                 "success": success == "1",
                 "canceled": canceled == "1",
+                "plan_summary": plan_summary,
             },
         )
 
