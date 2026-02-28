@@ -21,6 +21,7 @@ from routers.deps import get_portal_issuer
 from services import quotations as quotations_service, rate_limit as rate_limit_service, session as session_service, audit, subscription as subscription_service, csrf as csrf_service
 from services import file_access_log
 from services.action_log import log_action
+from services.redirects import safe_next_url
 from services.portal_errors import portal_error_type
 from services.pdf_to_excel import convert_pdf_to_xlsx, get_storage_root, safe_join, ensure_parent_dir
 from services.bank_parse_preview import parse_bank_pdf_to_movements_preview, reclassify_movements
@@ -538,12 +539,12 @@ def get_portal_router(templates):
             iva_pagado = tot_received["total_iva"]
             activities = db_rows(
                 """
-                SELECT direction, fecha_emision, nombre, total FROM (
-                  SELECT direction, fecha_emision, nombre_receptor AS nombre, total FROM sat_cfdi
+                SELECT direction, fecha_emision, nombre, total, uuid FROM (
+                  SELECT direction, fecha_emision, nombre_receptor AS nombre, total, uuid FROM sat_cfdi
                   WHERE issuer_id = ? AND direction = 'issued' AND fecha_emision IS NOT NULL
                     AND (total IS NULL OR total >= 0.01)
                   UNION ALL
-                  SELECT direction, fecha_emision, nombre_emisor AS nombre, total FROM sat_cfdi
+                  SELECT direction, fecha_emision, nombre_emisor AS nombre, total, uuid FROM sat_cfdi
                   WHERE issuer_id = ? AND direction = 'received' AND fecha_emision IS NOT NULL
                     AND total IS NOT NULL AND total >= 0.01
                     AND (tipo_comprobante IS NULL OR UPPER(TRIM(tipo_comprobante)) != 'N')
@@ -3995,7 +3996,7 @@ def get_portal_router(templates):
         from services import notifications as notifications_service
 
         notifications_service.mark_read(int(issuer_id), int(notification_id))
-        return RedirectResponse(url=next or "/portal/home", status_code=302)
+        return RedirectResponse(url=safe_next_url(next), status_code=302)
 
     # ---------- SAT credentials (FIEL) upload & validate ----------
     MAX_FIEL_SIZE = 2 * 1024 * 1024  # 2 MB
