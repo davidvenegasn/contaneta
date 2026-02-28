@@ -538,12 +538,12 @@ def get_portal_router(templates):
             iva_pagado = tot_received["total_iva"]
             activities = db_rows(
                 """
-                SELECT direction, fecha_emision, nombre FROM (
-                  SELECT direction, fecha_emision, nombre_receptor AS nombre FROM sat_cfdi
+                SELECT direction, fecha_emision, nombre, total FROM (
+                  SELECT direction, fecha_emision, nombre_receptor AS nombre, total FROM sat_cfdi
                   WHERE issuer_id = ? AND direction = 'issued' AND fecha_emision IS NOT NULL
                     AND (total IS NULL OR total >= 0.01)
                   UNION ALL
-                  SELECT direction, fecha_emision, nombre_emisor AS nombre FROM sat_cfdi
+                  SELECT direction, fecha_emision, nombre_emisor AS nombre, total FROM sat_cfdi
                   WHERE issuer_id = ? AND direction = 'received' AND fecha_emision IS NOT NULL
                     AND total IS NOT NULL AND total >= 0.01
                     AND (tipo_comprobante IS NULL OR UPPER(TRIM(tipo_comprobante)) != 'N')

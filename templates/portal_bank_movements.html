@@ -27,11 +27,19 @@
 
   <div class="card card--invoice-list ui-card">
     <div class="card__header card__header--row ui-card__header">
-      <h3 class="card__title section-title">Movimientos bancarios</h3>
-      <p class="muted u-m0 u-text-sm">Del estado de cuenta del mes seleccionado. Los movimientos se asocian al mes de su estado de cuenta.</p>
+      <div>
+        <h3 class="card__title section-title">Movimientos bancarios</h3>
+        <p class="muted u-m0 u-text-sm">Del estado de cuenta del mes seleccionado. Los movimientos se asocian al mes de su estado de cuenta.</p>
+      </div>
+      <div class="card__header-actions">
+        <button type="button" class="btn btn--sm btn--ghost filters-toggle" id="filtersToggleBtn" aria-expanded="false" aria-controls="movementsFiltersPanel">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true" width="18" height="18"><path d="M4 6h16M4 12h10M4 18h6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
+          <span>Filtros</span>
+        </button>
+      </div>
     </div>
 
-    <div class="filters-panel filters-panel--inline" id="movementsFiltersPanel">
+    <div class="filters-panel filters-panel--inline" id="movementsFiltersPanel" hidden aria-hidden="true">
       <form class="bank-movements-filters" method="get" action="/portal/movimientos">
         <input type="hidden" name="ym" value="{{ ym|default(period_month|default('')) }}" />
         <input type="hidden" name="limit" value="{{ limit }}" />
@@ -151,6 +159,19 @@
               else alert('No se pudieron borrar los movimientos.');
             });
         }
+      });
+    })();
+    </script>
+    <script>
+    (function () {
+      var btn = document.getElementById('filtersToggleBtn');
+      var panel = document.getElementById('movementsFiltersPanel');
+      if (!btn || !panel) return;
+      btn.addEventListener('click', function () {
+        var isOpen = !panel.hidden;
+        panel.hidden = !isOpen;
+        panel.setAttribute('aria-hidden', isOpen ? 'true' : 'false');
+        btn.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
       });
     })();
     </script>

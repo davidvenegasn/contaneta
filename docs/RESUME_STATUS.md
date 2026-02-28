@@ -32,6 +32,9 @@ c5cecf1 feat: robust jobs, crypto at-rest, notifications, month close, and match
 | **Home Layout (EXTRA A)** | static/css/portal.css, templates/portal_home.html | Fixed-height cards (520px), scroll in notifications, hidden scrollbar, 1100px responsive breakpoint |
 | **Clients Toolbar (EXTRA B)** | templates/portal_clients.html | Bulk select toggle, checkbox column, icon actions (edit/delete), bulk delete |
 | **Providers Toolbar (EXTRA B)** | templates/partials/providers_list.html | Bulk select toggle, checkbox column, icon actions (copy RFC/view invoices), bulk copy RFCs |
+| **Bootstrap Catalogs (FASE 1)** | routers/api.py (_load_bootstrap_catalogs) | `/api/quick-invoice/bootstrap` now returns `catalogs` with regimen_fiscal, uso_cfdi, forma_pago, metodo_pago, monedas + `exchange_rate` default |
+| **Quick Invoice UI (FASE 2)** | static/js/quick-invoice.js, templates/components/quick_invoice_modal.html | Dropdowns from bootstrap (1 HTTP call instead of 5), ProdServ description label, Unit description label, exchange rate field for non-MXN, fixed `/api/catalogs/monedas` → `/api/catalogs/moneda` bug |
+| **Modal Scroll Lock (FASE 4)** | static/css/portal.css, portal_components.css, portal_shell.css | `body.no-scroll` + `overscroll-behavior:none/contain`, sticky modal headers/footers, prevent background scroll on mobile |
 
 ### PRE-EXISTENTE (antes del mega-job)
 

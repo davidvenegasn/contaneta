@@ -205,9 +205,30 @@
               </form>
             </div>
           </div>
-          {% else %}
-          <p class="muted u-m0 u-text-sm">Sin pendientes. Todo al dia.</p>
           {% endfor %}
+          {% set acts = activities|default([]) %}
+          {% for a in acts %}
+          <div class="activity-row">
+            <div>
+              <div class="activity-title">
+                {% if a.direction == 'issued' %}
+                <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true" style="width:16px; height:16px; vertical-align:text-bottom; margin-right:4px;"><path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7z" stroke="currentColor" stroke-width="1.75"/><path d="M14 2v5h5" stroke="currentColor" stroke-width="1.75"/></svg>
+                Factura emitida{% if a.total %} (${{ '{:,.2f}'.format(a.total) }}){% endif %}
+                {% else %}
+                <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true" style="width:16px; height:16px; vertical-align:text-bottom; margin-right:4px;"><path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7z" stroke="currentColor" stroke-width="1.75"/><path d="M14 2v5h5" stroke="currentColor" stroke-width="1.75"/><path d="M9 15l2 2 4-4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                Factura recibida{% if a.total %} (${{ '{:,.2f}'.format(a.total) }}){% endif %}
+                {% endif %}
+              </div>
+              <div class="activity-sub">{{ a.nombre or 'Sin nombre' }}</div>
+            </div>
+            <div style="text-align:right; min-width:80px;">
+              <div class="activity-sub">{{ a.time_ago or '' }}</div>
+            </div>
+          </div>
+          {% endfor %}
+          {% if ns|length == 0 and acts|length == 0 %}
+          <p class="muted u-m0 u-text-sm">Sin pendientes. Todo al dia.</p>
+          {% endif %}
         </div>
       </div>
     </div>

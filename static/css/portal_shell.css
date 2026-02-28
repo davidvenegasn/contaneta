@@ -392,6 +392,7 @@ body.sidebar-open .sidebar{
   max-width: min(560px, calc(100vw - 40px));
   max-height: min(90vh, 90dvh);
   overflow: hidden;
+  overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
   background: var(--card-bg, #fff);

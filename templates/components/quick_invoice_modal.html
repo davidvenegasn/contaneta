@@ -58,11 +58,13 @@
               <input id="quickModalProductKey" class="input u-flex-1" autocomplete="off" placeholder="Ej. 84111500" />
               <button type="button" class="btn btn--sm btn--secondary" id="quickModalProdservBtn" aria-label="Buscar ProdServ" title="Buscar ProdServ">Buscar</button>
             </div>
+            <span id="quickModalProdservDesc" class="muted u-text-12"></span>
           </div>
           <div class="quick-form-field">
             <label for="quickModalUnitKey" class="label">Clave unidad</label>
             <input id="quickModalUnitKey" class="input" autocomplete="off" placeholder="E48" list="quickUnidadList" />
             <datalist id="quickUnidadList"></datalist>
+            <span id="quickModalUnitDesc" class="muted u-text-12"></span>
           </div>
           <div class="quick-form-field">
             <label for="quickModalQty" class="label">Cantidad</label>
@@ -105,6 +107,10 @@
             <select id="quickModalCurrency" class="input" aria-label="Moneda">
               <option value="MXN" selected>MXN</option>
             </select>
+          </div>
+          <div class="quick-form-field" id="quickModalExchangeRateWrap" hidden>
+            <label for="quickModalExchangeRate" class="label">Tipo de cambio</label>
+            <input type="text" id="quickModalExchangeRate" class="input" inputmode="decimal" value="1.0" aria-label="Tipo de cambio" placeholder="1.0" />
           </div>
           <div class="quick-form-field">
             <label for="quickModalCfdiUse" class="label">Uso CFDI</label>

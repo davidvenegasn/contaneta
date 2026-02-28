@@ -477,6 +477,37 @@ def api_products_delete(request: Request, payload: dict = Body(...), issuer: dic
 
 
 # ----- Quick invoice (Home: cliente + producto → timbrar sin salir) -----
+def _load_bootstrap_catalogs() -> dict:
+    """Load SAT catalogs for bootstrap. Returns dict with regimen_fiscal, uso_cfdi, forma_pago, metodo_pago, monedas."""
+    catalogs = {}
+    try:
+        catalogs["regimen_fiscal"] = list_catalog("cfdi_40_regimenes_fiscales")
+    except Exception:
+        reg = dict(REGIMEN_FISCAL)
+        reg.setdefault("616", "Sin obligaciones fiscales")
+        catalogs["regimen_fiscal"] = _catalog_list(reg)
+    try:
+        catalogs["uso_cfdi"] = list_catalog("cfdi_40_usos_cfdi")
+    except Exception:
+        catalogs["uso_cfdi"] = _catalog_list(USO_CFDI)
+    try:
+        catalogs["forma_pago"] = list_catalog("cfdi_40_formas_pago")
+    except Exception:
+        catalogs["forma_pago"] = _catalog_list(FORMA_PAGO)
+    try:
+        catalogs["metodo_pago"] = list_catalog("cfdi_40_metodos_pago")
+    except Exception:
+        catalogs["metodo_pago"] = [
+            {"key": "PUE", "label": "Pago en una sola exhibición"},
+            {"key": "PPD", "label": "Pago en parcialidades o diferido"},
+        ]
+    try:
+        catalogs["monedas"] = list_catalog("cfdi_40_monedas")
+    except Exception:
+        catalogs["monedas"] = _catalog_list(MONEDA_FALLBACK)
+    return catalogs
+
+
 @router.get("/quick-invoice/bootstrap")
 def api_quick_invoice_bootstrap(issuer: dict = Depends(get_portal_issuer)):
     """Devuelve clientes, productos, defaults y catálogos para el widget Factura rápida en Inicio."""
@@ -568,8 +599,10 @@ def api_quick_invoice_bootstrap(issuer: dict = Depends(get_portal_issuer)):
         payload = {
             "clients": clients,
             "products": products,
+            "catalogs": _load_bootstrap_catalogs(),
             "defaults": {
                 "currency": "MXN",
+                "exchange_rate": 1.0,
                 "payment_form": "03",
                 "payment_method": "PUE",
                 "uso_cfdi": "G03",

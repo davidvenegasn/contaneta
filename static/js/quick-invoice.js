@@ -46,11 +46,15 @@
   var modalIsrRetRate = document.getElementById('quickModalIsrRetRate');
   var modalIvaRetRate = document.getElementById('quickModalIvaRetRate');
   var modalCurrency = document.getElementById('quickModalCurrency');
+  var modalExchangeRate = document.getElementById('quickModalExchangeRate');
+  var modalExchangeRateWrap = document.getElementById('quickModalExchangeRateWrap');
   var modalCfdiUse = document.getElementById('quickModalCfdiUse');
   var modalPaymentForm = document.getElementById('quickModalPaymentForm');
   var modalPaymentMethod = document.getElementById('quickModalPaymentMethod');
   var modalItemsSummary = document.getElementById('quickModalItemsSummary');
   var modalSingleConcept = document.getElementById('quickModalSingleConcept');
+  var modalProdservDesc = document.getElementById('quickModalProdservDesc');
+  var modalUnitDesc = document.getElementById('quickModalUnitDesc');
 
   // Modales: crear cliente / producto (opcionales; usados en Home)
   var addCustomerBtn = document.getElementById('quickAddCustomerBtn');
@@ -298,40 +302,60 @@
     if (selected != null) selectEl.value = String(selected);
   }
 
+  function populateCatalogSelects(cats) {
+    if (!cats) return;
+    var regimen = cats.regimen_fiscal || [];
+    var uso = cats.uso_cfdi || [];
+    var forma = cats.forma_pago || [];
+    var metodo = cats.metodo_pago || [];
+    var monedas = cats.monedas || [];
+
+    fillSelect(modalCustomerTaxSystem, regimen, 'key', 'label', '');
+    fillSelect(addCustomerTaxSystem, regimen, 'key', 'label', '');
+    fillSelect(modalCfdiUse, uso, 'key', 'label', '');
+    fillSelect(addCustomerUsoCfdi, uso, 'key', 'label', '');
+    fillSelect(modalPaymentForm, forma, 'key', 'label', '');
+    fillSelect(modalCurrency, monedas, 'key', 'label', 'MXN');
+
+    if (metodo.length) {
+      fillSelect(modalPaymentMethod, metodo, 'key', 'label', 'PUE');
+    } else if (modalPaymentMethod) {
+      modalPaymentMethod.innerHTML = '';
+      [
+        { key: 'PUE', label: 'Pago en una sola exhibición (PUE)' },
+        { key: 'PPD', label: 'Pago en parcialidades o diferido (PPD)' }
+      ].forEach(function (it) {
+        var opt = document.createElement('option');
+        opt.value = it.key;
+        opt.textContent = it.label;
+        modalPaymentMethod.appendChild(opt);
+      });
+    }
+  }
+
   function ensureCatalogs() {
     if (state.catalogsPromise) return state.catalogsPromise;
 
+    // If bootstrap already loaded and has catalogs, use them directly
+    if (state.bootstrap && state.bootstrap.catalogs) {
+      populateCatalogSelects(state.bootstrap.catalogs);
+      return Promise.resolve();
+    }
+
+    // Fallback: load catalogs from individual endpoints if bootstrap didn't include them
     state.catalogsPromise = Promise.all([
       httpJson('/api/catalogs/regimen_fiscal', { credentials: 'same-origin' }, { timeoutMs: 20000, retry: 1 }),
       httpJson('/api/catalogs/uso_cfdi', { credentials: 'same-origin' }, { timeoutMs: 20000, retry: 1 }),
       httpJson('/api/catalogs/forma_pago', { credentials: 'same-origin' }, { timeoutMs: 20000, retry: 1 }),
-      httpJson('/api/catalogs/monedas', { credentials: 'same-origin' }, { timeoutMs: 20000, retry: 1 }),
+      httpJson('/api/catalogs/moneda', { credentials: 'same-origin' }, { timeoutMs: 20000, retry: 1 }),
     ])
       .then(function (all) {
-        var regimen = all[0] && all[0].data;
-        var uso = all[1] && all[1].data;
-        var forma = all[2] && all[2].data;
-        var monedas = all[3] && all[3].data;
-
-        fillSelect(modalCustomerTaxSystem, regimen, 'key', 'label', '');
-        fillSelect(addCustomerTaxSystem, regimen, 'key', 'label', '');
-        fillSelect(modalCfdiUse, uso, 'key', 'label', '');
-        fillSelect(addCustomerUsoCfdi, uso, 'key', 'label', '');
-        fillSelect(modalPaymentForm, forma, 'key', 'label', '');
-        fillSelect(modalCurrency, monedas, 'key', 'label', 'MXN');
-
-        if (modalPaymentMethod) {
-          modalPaymentMethod.innerHTML = '';
-          [
-            { key: 'PUE', label: 'Pago en una sola exhibición (PUE)' },
-            { key: 'PPD', label: 'Pago en parcialidades o diferido (PPD)' }
-          ].forEach(function (it) {
-            var opt = document.createElement('option');
-            opt.value = it.key;
-            opt.textContent = it.label;
-            modalPaymentMethod.appendChild(opt);
-          });
-        }
+        populateCatalogSelects({
+          regimen_fiscal: all[0] && all[0].data,
+          uso_cfdi: all[1] && all[1].data,
+          forma_pago: all[2] && all[2].data,
+          monedas: all[3] && all[3].data,
+        });
       })
       .catch(function () {
         // Fail-soft: el usuario aún puede editar manualmente.
@@ -523,15 +547,19 @@
     if (elTot) elTot.textContent = fmtMoney(total);
   }
 
+  // Cache unit search results so we can show descriptions
+  var _lastUnidadResults = [];
+
   var searchUnidadDebounced = debounce(function (term) {
     if (!unidadDatalist) return;
     var q = String(term || '').trim();
-    if (q.length < 1) { unidadDatalist.innerHTML = ''; return; }
+    if (q.length < 1) { unidadDatalist.innerHTML = ''; _lastUnidadResults = []; return; }
     httpJson('/api/catalogs/unidad?q=' + encodeURIComponent(q), { credentials: 'same-origin' }, { timeoutMs: 20000, retry: 0 })
       .then(function (res) {
         var list = (res && res.data) ? res.data : [];
+        _lastUnidadResults = Array.isArray(list) ? list : [];
         unidadDatalist.innerHTML = '';
-        (Array.isArray(list) ? list : []).forEach(function (it) {
+        _lastUnidadResults.forEach(function (it) {
           var opt = document.createElement('option');
           opt.value = String(it.key || '');
           opt.label = (it.key ? (String(it.key) + ' — ') : '') + String(it.label || '');
@@ -540,8 +568,17 @@
       })
       .catch(function () {
         unidadDatalist.innerHTML = '';
+        _lastUnidadResults = [];
       });
   }, 250);
+
+  function updateUnitDesc() {
+    if (!modalUnitDesc) return;
+    var val = modalUnitKey ? String(modalUnitKey.value || '').trim().toUpperCase() : '';
+    if (!val) { modalUnitDesc.textContent = ''; return; }
+    var match = _lastUnidadResults.find(function (it) { return String(it.key || '').toUpperCase() === val; });
+    modalUnitDesc.textContent = match ? String(match.label || '') : '';
+  }
 
   function openQuickProdservModal(targetInputId) {
     if (!prodservModal || !prodservModalInput || !prodservModalResults) return;
@@ -592,11 +629,16 @@
           b.innerHTML = '<span class="result-code">' + String(it.key || '') + '</span><span class="result-desc">' + String(it.label || '') + '</span>';
           b.addEventListener('click', function () {
             var key = String(it.key || '').trim();
+            var desc = String(it.label || '').trim();
             if (!key) return;
             var target = _prodservTargetInputId ? document.getElementById(_prodservTargetInputId) : null;
             if (target) {
               target.value = key;
               target.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+            // Show description label next to the ProdServ input
+            if (_prodservTargetInputId === 'quickModalProductKey' && modalProdservDesc) {
+              modalProdservDesc.textContent = desc;
             }
             closeQuickProdservModal();
           });
@@ -669,8 +711,16 @@
     if (modalIsrRetRate) modalIsrRetRate.value = '0';
     if (modalIvaRetRate) modalIvaRetRate.value = '0';
 
+    // Reset description labels
+    if (modalProdservDesc) modalProdservDesc.textContent = '';
+    if (modalUnitDesc) modalUnitDesc.textContent = '';
+
     var defs = state.defaults || window.__quickInvoiceDefaults || null;
     if (modalCurrency) modalCurrency.value = (defs && defs.currency) ? String(defs.currency) : 'MXN';
+    // Exchange rate: show/hide based on currency
+    var currVal = modalCurrency ? String(modalCurrency.value || '').toUpperCase() : 'MXN';
+    if (modalExchangeRateWrap) modalExchangeRateWrap.hidden = (currVal === 'MXN');
+    if (modalExchangeRate) modalExchangeRate.value = (defs && defs.exchange_rate != null) ? String(defs.exchange_rate) : '1.0';
     if (modalCfdiUse) modalCfdiUse.value = (defs && defs.uso_cfdi) ? String(defs.uso_cfdi) : 'G03';
     if (modalPaymentForm) modalPaymentForm.value = (defs && defs.payment_form) ? String(defs.payment_form) : '03';
     if (modalPaymentMethod) modalPaymentMethod.value = (defs && defs.payment_method) ? String(defs.payment_method) : 'PUE';
@@ -1002,8 +1052,20 @@
     });
     if (modalUnitPrice) modalUnitPrice.addEventListener('blur', function () { formatMoneyInput(modalUnitPrice); updateModalTotals(); });
     if (modalQty) modalQty.addEventListener('blur', function () { modalQty.value = String(parseNum(modalQty.value) || 0); updateModalTotals(); });
-    if (modalUnitKey) modalUnitKey.addEventListener('input', function () { searchUnidadDebounced(modalUnitKey.value); });
+    if (modalUnitKey) {
+      modalUnitKey.addEventListener('input', function () { searchUnidadDebounced(modalUnitKey.value); });
+      modalUnitKey.addEventListener('change', updateUnitDesc);
+    }
     if (modalProdservBtn) modalProdservBtn.addEventListener('click', function () { openQuickProdservModal('quickModalProductKey'); });
+
+    // Show/hide exchange rate field based on currency
+    if (modalCurrency) {
+      modalCurrency.addEventListener('change', function () {
+        var isMXN = String(modalCurrency.value || '').toUpperCase() === 'MXN';
+        if (modalExchangeRateWrap) modalExchangeRateWrap.hidden = isMXN;
+        if (isMXN && modalExchangeRate) modalExchangeRate.value = '1.0';
+      });
+    }
 
     // ProdServ modal events
     if (prodservModal) {
@@ -1134,6 +1196,8 @@
       var unitKey = (modalUnitKey && modalUnitKey.value || '').trim();
 
       var currency = (modalCurrency && modalCurrency.value || 'MXN').trim();
+      var exchangeRate = parseNum(modalExchangeRate && modalExchangeRate.value);
+      if (!Number.isFinite(exchangeRate) || exchangeRate <= 0) exchangeRate = 1.0;
       var usoCfdi = (modalCfdiUse && modalCfdiUse.value || '').trim();
       var paymentForm = (modalPaymentForm && modalPaymentForm.value || '').trim();
       var paymentMethod = (modalPaymentMethod && modalPaymentMethod.value || 'PUE').trim();
@@ -1153,6 +1217,7 @@
         customer_email: custEmail,
         auto_email: autoEmail,
         currency: currency,
+        exchange_rate: exchangeRate,
         uso_cfdi: usoCfdi,
         payment_form: paymentForm,
         payment_method: paymentMethod

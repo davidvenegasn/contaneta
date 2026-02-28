@@ -360,6 +360,8 @@ body.sidebar-open {
 
 body.no-scroll{
   overflow:hidden;
+  touch-action:none;
+  overscroll-behavior:none;
 }
 
 .sidebar-close{
@@ -3645,6 +3647,7 @@ html.nightmode .cust-sub {
 body.no-scroll {
   overflow: hidden;
   touch-action: none;
+  overscroll-behavior: none;
 }
 .ui-overlay__backdrop {
   position: absolute;
