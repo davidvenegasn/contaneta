@@ -54,6 +54,7 @@ def create_notification_if_missing(
     severity: str = SEVERITY_INFO,
     action_url: str = "",
     dedupe_parts: list[str] | None = None,
+    meta: dict | None = None,
 ) -> bool:
     ensure_notifications_table()
     issuer_id = int(issuer_id)
@@ -64,6 +65,7 @@ def create_notification_if_missing(
     if not type or not title:
         return False
     dk = _dedupe_key(*(dedupe_parts or [type, title, body, action_url]))
+    meta_json = json.dumps(meta, ensure_ascii=False) if meta else None
     conn = db()
     try:
         row = conn.execute(
@@ -72,13 +74,23 @@ def create_notification_if_missing(
         ).fetchone()
         if row:
             return False
-        conn.execute(
-            """
-            INSERT INTO notifications (issuer_id, type, title, body, severity, action_url, dedupe_key, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
-            """,
-            (issuer_id, type, title, body, severity, (action_url or "").strip() or None, dk),
-        )
+        try:
+            conn.execute(
+                """
+                INSERT INTO notifications (issuer_id, type, title, body, severity, action_url, dedupe_key, meta_json, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+                """,
+                (issuer_id, type, title, body, severity, (action_url or "").strip() or None, dk, meta_json),
+            )
+        except Exception:
+            # Fallback without meta_json if column doesn't exist yet
+            conn.execute(
+                """
+                INSERT INTO notifications (issuer_id, type, title, body, severity, action_url, dedupe_key, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+                """,
+                (issuer_id, type, title, body, severity, (action_url or "").strip() or None, dk),
+            )
         conn.commit()
         return True
     finally:

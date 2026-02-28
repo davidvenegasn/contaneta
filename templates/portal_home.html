@@ -170,19 +170,22 @@
     </div>
   </div>
 
-  <div class="ui-card notifications-card">
+  <div class="ui-card notifications-card" id="actionCenter">
     <div class="ui-card__header">
       <h3 class="ui-card__title" style="margin: 0;">
         <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/><path d="M13.73 21a2 2 0 0 1-3.46 0" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        Notificaciones
+        Centro de accion
       </h3>
+      {% set ns = notifications|default([]) %}
+      {% if ns|length > 0 %}
+      <span class="badge badge--danger badge--xs" style="margin-left:8px;">{{ ns|length }}</span>
+      {% endif %}
     </div>
     <div class="ui-card__body">
       <div class="activity-list-wrap activity-list-wrap--notifications" aria-live="polite">
         <div class="activity-list">
-          {% set ns = notifications|default([]) %}
           {% for n in ns %}
-          <div class="activity-row">
+          <div class="activity-row" style="border-left:3px solid {{ '#ef4444' if n.severity == 'danger' else ('#f59e0b' if n.severity == 'warning' else '#94a3b8') }}; padding-left:12px;">
             <div>
               <div class="activity-title">
                 <span class="badge badge--{{ 'danger' if n.severity == 'danger' else ('warn' if n.severity == 'warning' else 'neutral') }} badge--xs" style="margin-right:6px;">{{ (n.severity or 'info')|upper }}</span>
@@ -190,37 +193,43 @@
               </div>
               <div class="activity-sub">{{ n.body }}</div>
               {% if n.action_url %}
-                <div class="u-mt-1"><a class="muted u-text-12" href="{{ n.action_url }}">Abrir</a></div>
+                <div class="u-mt-1"><a class="btn btn--sm btn--secondary" href="{{ n.action_url }}">Ir a resolver</a></div>
               {% endif %}
             </div>
-            <div style="text-align:right;">
+            <div style="text-align:right; min-width:100px;">
               <div class="activity-sub">{{ (n.created_at or '')[:16] }}</div>
               <form method="post" action="/portal/notifications/{{ n.id }}/read" class="u-mt-1">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
                 <input type="hidden" name="next" value="/portal/home" />
-                <button type="submit" class="btn btn--sm btn--ghost">Marcar leído</button>
+                <button type="submit" class="btn btn--sm btn--ghost">Descartar</button>
               </form>
             </div>
           </div>
           {% else %}
-          <p class="muted u-m0 u-text-sm">No hay notificaciones por ahora.</p>
+          <p class="muted u-m0 u-text-sm">Sin pendientes. Todo al dia.</p>
           {% endfor %}
+        </div>
+      </div>
+
+      <div style="margin-top:16px; padding-top:14px; border-top:1px solid #e2e8f0;">
+        <h4 style="margin:0 0 10px; font-size:14px; font-weight:600; color:#334155;">Acciones sugeridas</h4>
+        <div class="ui-quick-actions" style="display:flex; gap:8px; flex-wrap:wrap;">
+          {% if not sat_sync_status.get('last_success') %}
+          <a href="/portal/config/sat" class="btn btn-primary btn-sm">Sincronizar con SAT</a>
+          {% endif %}
+          {% if onboarding and not onboarding.rfc_configured %}
+          <a href="/portal/datos-fiscales" class="btn btn-secondary btn-sm">Completar datos fiscales</a>
+          {% endif %}
+          {% if onboarding and onboarding.count_customers == 0 %}
+          <a href="/portal/clientes" class="btn btn-secondary btn-sm">Agregar primer cliente</a>
+          {% endif %}
+          <a href="/portal/movimientos" class="btn btn-secondary btn-sm">Revisar movimientos</a>
+          <a href="/portal/month-close" class="btn btn-secondary btn-sm">Cierre del mes</a>
+          <a href="/portal/bank/pdf-to-excel" class="btn btn-secondary btn-sm">Subir estado de cuenta</a>
         </div>
       </div>
     </div>
   </div>
-  <div class="ui-card quick-actions-card">
-      <div class="ui-card__header">
-        <h3 class="ui-card__title">Acciones rápidas</h3>
-      </div>
-      <div class="ui-card__body">
-        <div class="ui-quick-actions">
-          <a href="/portal/config/sat" class="ui-btn ui-btn--secondary">Sincronizar con SAT</a>
-          <a href="/portal/bancos?tab=subir_pdf" class="ui-btn ui-btn--secondary">Subir estado de cuenta</a>
-          <a href="/portal/facturas" class="ui-btn ui-btn--primary">Ver facturas</a>
-        </div>
-      </div>
-    </div>
   </div>
 
   {% include "components/quick_invoice_modal.html" %}
