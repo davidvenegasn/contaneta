@@ -3678,6 +3678,16 @@ def get_portal_router(templates):
                                AND COALESCE(bim.score,0) >= 80
                            )"""
                     )
+                elif mf == "revisar":
+                    where_clauses.append(
+                        """EXISTS (
+                             SELECT 1 FROM bank_invoice_matches bim
+                             WHERE bim.issuer_id = bank_movements.issuer_id
+                               AND bim.bank_movement_id = bank_movements.id
+                               AND bim.status IN ('suggested','confirmed')
+                               AND COALESCE(bim.score,0) BETWEEN 50 AND 79
+                           )"""
+                    )
                 elif mf == "none":
                     where_clauses.append(
                         """NOT EXISTS (

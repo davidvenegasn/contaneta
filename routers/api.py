@@ -2232,12 +2232,12 @@ def api_matching_preview(
     issuer: dict = Depends(get_portal_issuer),
     ym: str = Query(..., min_length=7, max_length=7),
 ):
-    from services.bank_cfdi_matching import refresh_suggestions_for_month
+    from services.matching import preview_month
     issuer_id = int(issuer.get("id") or 0)
     if issuer_id <= 0:
         raise HTTPException(status_code=401, detail="Sesión inválida")
     try:
-        result = refresh_suggestions_for_month(issuer_id, ym)
+        result = preview_month(issuer_id, ym)
     except Exception as e:
         logger.warning("matching preview error: %s", e)
         return ok({"ok": False, "message": str(e)})
