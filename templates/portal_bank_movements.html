@@ -71,6 +71,14 @@
           <div class="muted u-text-xs">Tarjeta, comisiones, cargos bancarios</div>
         </div>
         <div class="bank-movements-filters__row">
+          <label class="label">Solo gastos reales</label>
+          <label class="u-flex u-gap-2 u-items-center muted">
+            <input type="checkbox" name="only_real_expenses" value="1" {{ 'checked' if only_real_expenses else '' }} />
+            Activar
+          </label>
+          <div class="muted u-text-xs">Oculta traspasos, financieros y comisiones</div>
+        </div>
+        <div class="bank-movements-filters__row">
           <label class="label">Match CFDI</label>
           <select name="cfdi_match_status" class="input select">
             <option value="">Todos</option>
@@ -452,10 +460,10 @@
       {% set prev_offset = offset - limit %}
       <nav class="bank-movements-pagination u-mt-8" aria-label="Paginación">
         {% if offset > 0 %}
-        <a href="?ym={{ (ym|default(period_month|default('')))|urlencode }}&statement_id={{ statement_id|urlencode }}&tipo={{ tipo|urlencode }}&categoria={{ categoria|urlencode }}&cfdi_match_status={{ cfdi_match_status|urlencode }}&match_filter={{ match_filter|urlencode }}&min_confidence={{ min_confidence if min_confidence is not none else '' }}&search={{ search|urlencode }}&hide_own_transfers={{ '1' if hide_own_transfers else '' }}&hide_financial={{ '1' if hide_financial else '' }}&limit={{ limit }}&offset={{ prev_offset }}" class="btn btn--sm btn--secondary">Anterior</a>
+        <a href="?ym={{ (ym|default(period_month|default('')))|urlencode }}&statement_id={{ statement_id|urlencode }}&tipo={{ tipo|urlencode }}&categoria={{ categoria|urlencode }}&cfdi_match_status={{ cfdi_match_status|urlencode }}&match_filter={{ match_filter|urlencode }}&min_confidence={{ min_confidence if min_confidence is not none else '' }}&search={{ search|urlencode }}&hide_own_transfers={{ '1' if hide_own_transfers else '' }}&hide_financial={{ '1' if hide_financial else '' }}&only_real_expenses={{ '1' if only_real_expenses else '' }}&limit={{ limit }}&offset={{ prev_offset }}" class="btn btn--sm btn--secondary">Anterior</a>
         {% endif %}
         {% if next_offset < total_count %}
-        <a href="?ym={{ (ym|default(period_month|default('')))|urlencode }}&statement_id={{ statement_id|urlencode }}&tipo={{ tipo|urlencode }}&categoria={{ categoria|urlencode }}&cfdi_match_status={{ cfdi_match_status|urlencode }}&match_filter={{ match_filter|urlencode }}&min_confidence={{ min_confidence if min_confidence is not none else '' }}&search={{ search|urlencode }}&hide_own_transfers={{ '1' if hide_own_transfers else '' }}&hide_financial={{ '1' if hide_financial else '' }}&limit={{ limit }}&offset={{ next_offset }}" class="btn btn--sm btn--secondary">Siguiente</a>
+        <a href="?ym={{ (ym|default(period_month|default('')))|urlencode }}&statement_id={{ statement_id|urlencode }}&tipo={{ tipo|urlencode }}&categoria={{ categoria|urlencode }}&cfdi_match_status={{ cfdi_match_status|urlencode }}&match_filter={{ match_filter|urlencode }}&min_confidence={{ min_confidence if min_confidence is not none else '' }}&search={{ search|urlencode }}&hide_own_transfers={{ '1' if hide_own_transfers else '' }}&hide_financial={{ '1' if hide_financial else '' }}&only_real_expenses={{ '1' if only_real_expenses else '' }}&limit={{ limit }}&offset={{ next_offset }}" class="btn btn--sm btn--secondary">Siguiente</a>
         {% endif %}
       </nav>
       {% endif %}

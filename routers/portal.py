@@ -3607,6 +3607,7 @@ def get_portal_router(templates):
         search: Optional[str] = Query(None),
         hide_own_transfers: Optional[int] = Query(None, description="1 para ocultar traspasos propios"),
         hide_financial: Optional[int] = Query(None, description="1 para ocultar pagos/cargos financieros"),
+        only_real_expenses: Optional[int] = Query(None, description="1 para solo gastos reales"),
         limit: int = Query(200, ge=1, le=500),
         offset: int = Query(0, ge=0, le=MAX_LIST_OFFSET),
     ):
@@ -3663,6 +3664,10 @@ def get_portal_router(templates):
                 where_clauses.append("COALESCE(categoria,'') != 'CUENTA_PROPIA'")
             if hide_financial:
                 where_clauses.append("COALESCE(categoria,'') NOT IN ('FINANCIERO_PAGO_TARJETA','MOVIMIENTO_FINANCIERO','COMISIONES BANCARIAS','COMISIONES_BANCARIAS','COMISION_BANCARIA')")
+            if only_real_expenses:
+                where_clauses.append(
+                    "COALESCE(categoria,'') NOT IN ('CUENTA_PROPIA','FINANCIERO_PAGO_TARJETA','MOVIMIENTO_FINANCIERO','COMISIONES BANCARIAS','COMISIONES_BANCARIAS','COMISION_BANCARIA','TRASPASO_PROPIO')"
+                )
             if cfdi_match_status and has_column(conn, "bank_movements", "cfdi_match_status"):
                 where_clauses.append("cfdi_match_status = ?")
                 params.append(cfdi_match_status.strip().lower())
@@ -3927,6 +3932,7 @@ def get_portal_router(templates):
                 search=search or "",
                 hide_own_transfers=1 if hide_own_transfers else 0,
                 hide_financial=1 if hide_financial else 0,
+                only_real_expenses=1 if only_real_expenses else 0,
                 statements_opt=statements_opt,
                 csrf_token=csrf_service.generate_csrf_token(),
             )
