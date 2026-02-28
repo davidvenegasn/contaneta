@@ -47,8 +47,8 @@ fi
 # 1) METADATA: lista rápida (total, fecha, estado) - el SAT prepara metadata más rápido que XML
 for IID in $ISSUERS; do
   log "Sync metadata issuer=$IID"
-  run_timeout 120 $PHP sat_sync/sync.php "$IID" issued   --backfill=60 --window=168 --max-windows=5 2>/dev/null || true
-  run_timeout 120 $PHP sat_sync/sync.php "$IID" received --backfill=60 --window=168 --max-windows=5 2>/dev/null || true
+  run_timeout 140 python3 scripts/run_php_with_fiel.py sat_sync/sync.php "$IID" issued   --backfill=60 --window=168 --max-windows=5 2>/dev/null || true
+  run_timeout 140 python3 scripts/run_php_with_fiel.py sat_sync/sync.php "$IID" received --backfill=60 --window=168 --max-windows=5 2>/dev/null || true
 done
 
 # 2) XML: crear solicitudes para mes actual y anterior
@@ -57,10 +57,10 @@ YM_PREV=$(date -v-1m +%Y-%m 2>/dev/null || date -d "1 month ago" +%Y-%m 2>/dev/n
 
 for IID in $ISSUERS; do
   log "Sync XML issuer=$IID"
-  run_timeout 120 $PHP sat_sync/sync_xml.php "$IID" issued   --month="$YM" 2>/dev/null || true
-  run_timeout 120 $PHP sat_sync/sync_xml.php "$IID" issued   --month="$YM_PREV" 2>/dev/null || true
-  run_timeout 120 $PHP sat_sync/sync_xml.php "$IID" received --month="$YM" 2>/dev/null || true
-  run_timeout 120 $PHP sat_sync/sync_xml.php "$IID" received --month="$YM_PREV" 2>/dev/null || true
+  run_timeout 140 python3 scripts/run_php_with_fiel.py sat_sync/sync_xml.php "$IID" issued   --month="$YM" 2>/dev/null || true
+  run_timeout 140 python3 scripts/run_php_with_fiel.py sat_sync/sync_xml.php "$IID" issued   --month="$YM_PREV" 2>/dev/null || true
+  run_timeout 140 python3 scripts/run_php_with_fiel.py sat_sync/sync_xml.php "$IID" received --month="$YM" 2>/dev/null || true
+  run_timeout 140 python3 scripts/run_php_with_fiel.py sat_sync/sync_xml.php "$IID" received --month="$YM_PREV" 2>/dev/null || true
 done
 
 # 3) VERIFY: descargar paquetes XML cuando el SAT los tenga listos
@@ -82,7 +82,7 @@ fi
 
 # 5) CANCELACIONES: actualizar estado de facturas canceladas (una vez por corrida)
 for IID in $ISSUERS; do
-  run_timeout 120 $PHP sat_sync/check_cancellations.php "$IID" --days=30 2>/dev/null || true
+  run_timeout 140 python3 scripts/run_php_with_fiel.py sat_sync/check_cancellations.php "$IID" --days=30 2>/dev/null || true
 done
 
 log "=== Fin cron SAT sync ==="

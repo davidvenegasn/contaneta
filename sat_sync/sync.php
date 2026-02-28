@@ -133,23 +133,35 @@ $saveCheckpoint = function (DateTimeImmutable $from, DateTimeImmutable $to) use 
 };
 
 // === 1) Obtener credenciales SAT para el issuer ===
-$stmt = $pdo->prepare(
-    'SELECT fiel_cer_path, fiel_key_path, fiel_key_password
-     FROM sat_credentials
-     WHERE issuer_id = :issuer_id
-     LIMIT 1'
-);
-$stmt->execute([':issuer_id' => $issuerId]);
-$cred = $stmt->fetch(PDO::FETCH_ASSOC);
+// Override seguro: si el caller inyecta credenciales desencriptadas vía env,
+// usarlas en lugar de leer paths/password de la DB (por cifrado at-rest).
+$overrideCer = getenv('SAT_FIEL_CER_PATH') ?: '';
+$overrideKey = getenv('SAT_FIEL_KEY_PATH') ?: '';
+$overridePass = getenv('SAT_FIEL_PASSWORD') ?: '';
 
-if (! $cred) {
-    fwrite(STDERR, "No hay sat_credentials para issuer_id={$issuerId}\n");
-    exit(1);
+if ($overrideCer && $overrideKey) {
+    $cerPath = $overrideCer;
+    $keyPath = $overrideKey;
+    $pass = $overridePass;
+} else {
+    $stmt = $pdo->prepare(
+        'SELECT fiel_cer_path, fiel_key_path, fiel_key_password
+         FROM sat_credentials
+         WHERE issuer_id = :issuer_id
+         LIMIT 1'
+    );
+    $stmt->execute([':issuer_id' => $issuerId]);
+    $cred = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if (! $cred) {
+        fwrite(STDERR, "No hay sat_credentials para issuer_id={$issuerId}\n");
+        exit(1);
+    }
+
+    $cerPath = $baseDir . '/' . ltrim((string)$cred['fiel_cer_path'], '/');
+    $keyPath = $baseDir . '/' . ltrim((string)$cred['fiel_key_path'], '/');
+    $pass = (string)$cred['fiel_key_password'];
 }
-
-$cerPath = $baseDir . '/' . ltrim((string)$cred['fiel_cer_path'], '/');
-$keyPath = $baseDir . '/' . ltrim((string)$cred['fiel_key_path'], '/');
-$pass = (string)$cred['fiel_key_password'];
 
 if (! file_exists($cerPath)) {
     fwrite(STDERR, "No existe CER: {$cerPath}\n");

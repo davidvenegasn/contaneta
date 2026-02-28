@@ -19,6 +19,7 @@ if BASE_DIR not in sys.path:
 
 from services.errors import ExternalServiceError  # noqa: E402
 from services.subprocess_utils import run_php  # noqa: E402
+from services.sat_credentials_secure import decrypted_fiel_env  # noqa: E402
 
 DB_PATH = os.environ.get("APP_DB_PATH") or os.path.join(BASE_DIR, "invoicing.db")
 SAT_SYNC_DIR = os.path.join(BASE_DIR, "sat_sync")
@@ -84,19 +85,21 @@ def run_sync_php(issuer_id: int, direction: str) -> tuple[bool, str]:
     env = os.environ.copy()
     env["APP_DB_PATH"] = DB_PATH
     try:
-        stdout, _stderr = run_php(
-            [
-                PHP_SYNC,
-                str(issuer_id),
-                direction,
-                "--backfill=%d" % SYNC_BACKFILL_DAYS,
-                "--window=%d" % SYNC_WINDOW_HOURS,
-            ],
-            cwd=SAT_SYNC_DIR,
-            env=env,
-            timeout=600,
-            php_bin=PHP_BIN,
-        )
+        with decrypted_fiel_env(int(issuer_id)) as fiel_env:
+            env.update(fiel_env)
+            stdout, _stderr = run_php(
+                [
+                    PHP_SYNC,
+                    str(issuer_id),
+                    direction,
+                    "--backfill=%d" % SYNC_BACKFILL_DAYS,
+                    "--window=%d" % SYNC_WINDOW_HOURS,
+                ],
+                cwd=SAT_SYNC_DIR,
+                env=env,
+                timeout=600,
+                php_bin=PHP_BIN,
+            )
         return True, (stdout or "").strip()[:500]
     except ExternalServiceError as e:
         msg = (e.internal_message or e.public_message or "Error desconocido").strip()[:500]

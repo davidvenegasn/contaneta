@@ -62,9 +62,16 @@ foreach ($rows as $cred) {
     $rfc = $cred['rfc'] ?? '';
     $label = $rfc ? "{$rfc} (issuer_id={$issuerId})" : "issuer_id={$issuerId}";
 
-    $cerPath = $baseDir . '/' . ltrim((string) $cred['fiel_cer_path'], '/');
-    $keyPath = $baseDir . '/' . ltrim((string) $cred['fiel_key_path'], '/');
-    $pass = (string) $cred['fiel_key_password'];
+    // Override seguro: el caller puede inyectar credenciales desencriptadas vía env
+    // (SAT_FIEL_CER_PATH, SAT_FIEL_KEY_PATH, SAT_FIEL_PASSWORD). Útil cuando están cifradas at-rest.
+    $overrideCer = getenv('SAT_FIEL_CER_PATH') ?: '';
+    $overrideKey = getenv('SAT_FIEL_KEY_PATH') ?: '';
+    $overridePass = getenv('SAT_FIEL_PASSWORD') ?: '';
+    $useOverride = ($filterIssuerId !== null && $issuerId === (int) $filterIssuerId && $overrideCer && $overrideKey);
+
+    $cerPath = $useOverride ? $overrideCer : ($baseDir . '/' . ltrim((string) $cred['fiel_cer_path'], '/'));
+    $keyPath = $useOverride ? $overrideKey : ($baseDir . '/' . ltrim((string) $cred['fiel_key_path'], '/'));
+    $pass = $useOverride ? $overridePass : (string) $cred['fiel_key_password'];
 
     if (!file_exists($cerPath)) {
         fwrite(STDERR, "[{$label}] No existe archivo CER: {$cerPath}\n");
