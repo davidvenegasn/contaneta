@@ -28,7 +28,7 @@ from services.bank_parse_preview import parse_bank_pdf_to_movements_preview, rec
 from services.bank_preview_pipeline import parse_bank_statement_preview
 from services.bank_preview_models import compute_dedupe_fingerprint
 from services.catalog_from_cfdi import backfill_catalog_from_existing_cfdi
-from services.bank_accounts import list_active_accounts as bank_list_accounts, list_all_accounts as bank_list_all_accounts, get_account as bank_get_account, create_account as bank_create_account, update_account as bank_update_account, delete_account as bank_delete_account
+from services.bank_accounts import list_active_accounts as bank_list_accounts, list_active_accounts_raw as bank_list_accounts_raw, list_all_accounts as bank_list_all_accounts, get_account as bank_get_account, create_account as bank_create_account, update_account as bank_update_account, delete_account as bank_delete_account
 from services.bank_own_accounts import detect_own_account_transfer
 from services.bank_statement_ingest import ingest_bank_statement, extract_statement_metadata, validate_statement_ownership, commit_preview_to_db
 from services.bank_cfdi_matching import find_cfdi_candidates, save_suggested_matches, confirm_match as match_confirm, reject_match as match_reject
@@ -2624,7 +2624,7 @@ def get_portal_router(templates):
                     w.append("Posible duplicado en esta carga")
                 m["warnings"] = w
         issuer_id = int(issuer.get("id") or 0)
-        user_accounts = bank_list_accounts(issuer_id) if issuer_id > 0 else []
+        user_accounts = bank_list_accounts_raw(issuer_id) if issuer_id > 0 else []
         statement_owner_name = None
         statement_owner_rfc = None
         if files_summary:
@@ -3080,7 +3080,7 @@ def get_portal_router(templates):
             default_period = (upload_metadata.get("period_month") or (meta or {}).get("period_start") or "")[:7]
             mov_has_period = has_column(conn, "bank_movements", "period_month")
             mov_has_hash = has_column(conn, "bank_movements", "movement_hash")
-            user_accounts = bank_list_accounts(int(issuer_id)) if int(issuer_id) > 0 else []
+            user_accounts = bank_list_accounts_raw(int(issuer_id)) if int(issuer_id) > 0 else []
             statement_owner_name = (upload_metadata.get("detected_holder_name") or "").strip() or None
             statement_owner_rfc = (upload_metadata.get("detected_holder_rfc") or "").strip() or None
             for t in (meta or {}).get("transactions") or []:

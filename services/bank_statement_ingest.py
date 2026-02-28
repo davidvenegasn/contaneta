@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 from database import db, table_exists, has_column
-from services.bank_accounts import get_account as bank_get_account
+from services.bank_accounts import get_account_raw as bank_get_account
 from services.bank_preview_models import compute_dedupe_fingerprint
 
 logger = logging.getLogger(__name__)
