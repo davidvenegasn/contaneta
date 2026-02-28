@@ -170,11 +170,11 @@
     </div>
   </div>
 
-  <div class="ui-card notifications-card home-card" id="actionCenter">
+  <div class="ui-card notifications-card home-card" id="notificationsCard">
     <div class="ui-card__header">
       <h3 class="ui-card__title" style="margin: 0;">
         <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/><path d="M13.73 21a2 2 0 0 1-3.46 0" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        Centro de accion
+        Notificaciones
       </h3>
       {% set ns = notifications|default([]) %}
       {% if ns|length > 0 %}
@@ -210,23 +210,40 @@
           {% endfor %}
         </div>
       </div>
+    </div>
+  </div>
 
-      <div style="margin-top:16px; padding-top:14px; border-top:1px solid #e2e8f0;">
-        <h4 style="margin:0 0 10px; font-size:14px; font-weight:600; color:#334155;">Acciones sugeridas</h4>
-        <div class="ui-quick-actions" style="display:flex; gap:8px; flex-wrap:wrap;">
-          {% if not sat_sync_status.get('last_success') %}
-          <a href="/portal/config/sat" class="btn btn-primary btn-sm">Sincronizar con SAT</a>
-          {% endif %}
-          {% if onboarding and not onboarding.rfc_configured %}
-          <a href="/portal/datos-fiscales" class="btn btn-secondary btn-sm">Completar datos fiscales</a>
-          {% endif %}
-          {% if onboarding and onboarding.count_customers == 0 %}
-          <a href="/portal/clientes" class="btn btn-secondary btn-sm">Agregar primer cliente</a>
-          {% endif %}
-          <a href="/portal/movimientos" class="btn btn-secondary btn-sm">Revisar movimientos</a>
-          <a href="/portal/month-close" class="btn btn-secondary btn-sm">Cierre del mes</a>
-          <a href="/portal/bank/pdf-to-excel" class="btn btn-secondary btn-sm">Subir estado de cuenta</a>
-        </div>
+  <div class="ui-card quick-actions-card home-card">
+    <div class="ui-card__header">
+      <h3 class="ui-card__title" style="margin: 0;">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8Z" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Acciones rapidas
+      </h3>
+    </div>
+    <div class="ui-card__body">
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        <a href="/portal/facturas" class="btn btn--secondary btn-sm" style="justify-content:flex-start;">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true" style="width:16px; height:16px; margin-right:8px;"><path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7z" stroke="currentColor" stroke-width="1.75"/><path d="M14 2v5h5" stroke="currentColor" stroke-width="1.75"/></svg>
+          Ver facturas
+        </a>
+        <a href="/portal/bank/pdf-to-excel" class="btn btn--secondary btn-sm" style="justify-content:flex-start;">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true" style="width:16px; height:16px; margin-right:8px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/><path d="m7 10 5 5 5-5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 15V3" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
+          Subir estado de cuenta
+        </a>
+        <a href="/portal/movimientos" class="btn btn--secondary btn-sm" style="justify-content:flex-start;">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true" style="width:16px; height:16px; margin-right:8px;"><path d="M22 12h-4l-3 9L9 3l-3 9H2" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Ver movimientos
+        </a>
+        <a href="/portal/invoices/received" class="btn btn--secondary btn-sm" style="justify-content:flex-start;">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true" style="width:16px; height:16px; margin-right:8px;"><path d="M16 17l5-5-5-5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/><path d="M21 12H9" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/><path d="M3 21V3" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
+          Facturas recibidas
+        </a>
+        {% if not sat_sync_status.get('last_success') %}
+        <a href="/portal/config/sat" class="btn btn-primary btn-sm" style="justify-content:flex-start;">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true" style="width:16px; height:16px; margin-right:8px;"><path d="M21 12a9 9 0 1 1-9-9" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/><path d="M21 3v6h-6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Sincronizar con SAT
+        </a>
+        {% endif %}
       </div>
     </div>
   </div>

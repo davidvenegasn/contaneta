@@ -601,16 +601,21 @@ body.no-scroll{
 .home-card .ui-card__body{
   flex: 1;
   min-height: 0;
-  overflow: auto;
 }
 
-/* Hide grey scrollbar on notifications card */
+/* Scroll ONLY on notifications card */
 .home-card.notifications-card .ui-card__body{
+  overflow: auto;
   scrollbar-width: none;          /* Firefox */
   -ms-overflow-style: none;       /* IE/Edge */
 }
 .home-card.notifications-card .ui-card__body::-webkit-scrollbar{
   display: none;                  /* Chrome/Safari */
+}
+/* No scroll on factura rapida and acciones rapidas */
+.home-card.quick-invoice-card .ui-card__body,
+.home-card.quick-actions-card .ui-card__body{
+  overflow: visible;
 }
 
 .qi-section-head{
