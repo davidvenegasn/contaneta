@@ -21,7 +21,7 @@ Abre: `http://127.0.0.1:8000/`
 ### Smoke rápido
 
 ```bash
-bash scripts/smoke_api.sh || true
+bash scripts/check_all.sh
 ```
 
 ### Tests (tenant isolation)

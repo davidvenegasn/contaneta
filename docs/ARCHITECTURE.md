@@ -76,6 +76,13 @@ Respuesta: HTMLResponse (Jinja) o JSONResponse o FileResponse o RedirectResponse
 | `services/quotations.py` | Cotizaciones, PDF. |
 | `services/form_parse.py` | Parseo formulario factura. |
 | `services/rate_limit.py` | Rate limit por IP. |
+| `services/jobs.py` | Job system (cola genérica robusta): dedupe, locks, reintentos, backoff. |
+| `worker.py` | Worker CLI (claim/execute) para jobs genéricos `jobs`. |
+| `services/error_events.py` | Registro de errores 5xx para observabilidad (admin-only details). |
+| `services/file_access_log.py` | Auditoría de accesos a archivos servidos (XML/PDF/exports). |
+| `services/crypto_at_rest.py` | Cifrado at-rest (AES-GCM) + derivación por issuer. |
+| `services/sat_credentials_secure.py` | Guardado/lectura segura de FIEL (cifrada) + env override para PHP. |
+| `services/tenant.py` | Helpers mínimos para reforzar aislamiento (issuer_id siempre desde sesión). |
 
 ### 3.4 Base de datos
 
@@ -102,6 +109,13 @@ Respuesta: HTMLResponse (Jinja) o JSONResponse o FileResponse o RedirectResponse
 
 La app no invoca sync directamente en cada request; el sync se hace por cron o worker. En portal solo se invoca check_fiel para validar FIEL al subir.
 
+### 4.1 Seguridad de FIEL (e.firma) en la app
+- Los archivos `.cer/.key` se almacenan **cifrados at-rest** como `*.enc` (AES‑GCM) bajo `storage/credentials/{issuer_id}/`.
+- La contraseña de la clave se guarda cifrada en DB (`sat_credentials.fiel_key_password` con prefijo `enc:`).
+- Para ejecutar PHP (SAT), el backend desencripta a temporales y pasa:
+  - `SAT_FIEL_CER_PATH`, `SAT_FIEL_KEY_PATH`, `SAT_FIEL_PASSWORD`
+- Scripts PHP (`sat_sync/*.php`) aceptan override por env para no depender de paths/password en claro.
+
 ---
 
 ## 5. Assets estáticos
@@ -117,7 +131,40 @@ No hay bundler ni build step; carga vía `<link>` y `<script>` en los templates.
 
 ---
 
-## 6. Diagrama de dependencias (simplificado)
+## 6. Job System (cola robusta)
+
+### 6.1 Tabla `jobs`
+Usada para jobs internos del SaaS (no confundir con `sat_jobs` del pipeline SAT legacy).
+
+Campos clave:
+- `status`: queued/running/success/failed
+- `attempts`, `max_attempts`, `run_after` (reintentos + backoff)
+- `locked_by`, `locked_at` (lease)
+- `payload_hash` + índice único parcial para **dedupe** en queued/running
+- `payload_json`, `result_json`, `error_json`
+
+Implementación:
+- `services/jobs.py`: `enqueue_job`, `claim_next_job`, `complete_job`, `fail_job`, `update_progress`
+- `worker.py`: `--once` / `--loop`
+
+---
+
+## 7. Observabilidad (mínima)
+- `error_events` (DB) guarda 5xx con `request_id` y detalles internos **solo para admin**.
+- Panel admin:
+  - `/admin/errors` + detalle `/admin/errors/{id}`
+  - `/admin/jobs` + detalle `/admin/jobs/{id}`
+
+---
+
+## 8. Backups y recuperación
+- DB: `scripts/backup_db.sh` → `backup/invoicing_*.db.gz`
+- Storage esencial: `scripts/backup_storage.sh` → `backup/storage_*.tar.gz`
+- Restore: ver `RECOVERY_PLAYBOOK.md`
+
+---
+
+## 9. Diagrama de dependencias (simplificado)
 
 ```
 app.py

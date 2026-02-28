@@ -82,6 +82,7 @@ Debe salir "OK"; si no, revisar las líneas indicadas.
 
 - **Para IAs / onboarding:** `docs/README_FOR_AI.md`
 - **Arquitectura:** `docs/ARCHITECTURE.md`
+- **Dev local (5 min + golden paths):** `docs/LOCAL_DEV.md`
 - **Frontend (Jinja/CSS/JS):** `docs/FRONTEND_GUIDE.md`
 - **Auditoría y mejoras:** `docs/AUDIT_REPORT.md`, `docs/AUDITORIA_PARA_ANALISIS_IA.md`
 - **Changelog hardening:** `docs/CHANGELOG_HARDENING.md`
