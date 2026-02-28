@@ -555,6 +555,14 @@ async def redirect_token_middleware(request: Request, call_next):
     is_portal_html = request.url.path.startswith("/portal/") and not is_api and not is_public
 
     if token_query and is_portal_html:
+        # Rate limit token login: max 5 attempts per IP per 60s
+        from services.rate_limit import is_rate_limited, get_client_ip
+        if is_rate_limited(request, "token_login", window_seconds=60, max_attempts=5):
+            client_ip = get_client_ip(request)
+            logging.getLogger(__name__).warning(
+                "token_login rate limited: ip=%s path=%s", client_ip, request.url.path
+            )
+            return Response("Too Many Requests", status_code=429)
         try:
             issuer = issuers.get_issuer_by_token(token_query)
             parsed = urlparse(str(request.url))
@@ -573,7 +581,9 @@ async def redirect_token_middleware(request: Request, call_next):
             )
             return response
         except ValueError:
-            pass
+            logging.getLogger(__name__).info(
+                "token_login failed: ip=%s path=%s", get_client_ip(request), request.url.path
+            )
 
     if is_portal_html and not token_query:
         cookie_val = request.cookies.get(SESSION_COOKIE_NAME)
