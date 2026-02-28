@@ -37,6 +37,12 @@ def get_public_router(templates):
         """Página de seguridad tipo fintech: sesiones, aislamiento por cuenta, FIEL solo para sync; enlaces a términos y privacidad."""
         return templates.TemplateResponse("seguridad.html", {"request": request})
 
+    @router.get("/trust", response_class=RedirectResponse)
+    @router.get("/security", response_class=RedirectResponse)
+    def trust_alias():
+        """Aliases para marketing / SEO."""
+        return RedirectResponse(url="/seguridad", status_code=302)
+
     @router.get("/q/{public_token}/pdf")
     def public_quotation_pdf(public_token: str):
         quote = quotations.get_quotation_by_public_token(public_token)

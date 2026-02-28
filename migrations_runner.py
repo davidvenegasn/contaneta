@@ -393,6 +393,94 @@ def _apply_023_bank_movements_dedup(conn: sqlite3.Connection) -> None:
             logger.warning("023: índice único movement_hash: %s", e)
 
 
+def _apply_025_jobs_robust(conn: sqlite3.Connection) -> None:
+    """
+    Sistema robusto de jobs:
+    - attempts/max_attempts + run_after para reintentos
+    - locked_by/locked_at con lease para evitar doble ejecución
+    - payload_hash + índice parcial único para dedupe (queued/running)
+    - error_json para fallo estructurado
+    """
+    if not _table_exists(conn, "jobs"):
+        return
+
+    # Columnas nuevas (idempotente)
+    for col, typ in [
+        ("attempts", "INTEGER NOT NULL DEFAULT 0"),
+        ("max_attempts", "INTEGER NOT NULL DEFAULT 3"),
+        ("run_after", "TEXT"),
+        ("locked_by", "TEXT"),
+        ("locked_at", "TEXT"),
+        ("payload_hash", "TEXT"),
+        ("error_json", "TEXT"),
+    ]:
+        _safe_add_column(conn, "jobs", col, typ)
+
+    # Backfill payload_hash si hay jobs existentes sin hash.
+    try:
+        cur = conn.execute("SELECT id, issuer_id, name, payload_json FROM jobs WHERE payload_hash IS NULL")
+        rows = cur.fetchall()
+        for r in rows:
+            jid = r["id"]
+            issuer_id = r["issuer_id"]
+            name = (r["name"] or "").strip()
+            payload_json = (r["payload_json"] or "").strip()
+            h = hashlib.sha256(f"{issuer_id}|{name}|{payload_json}".encode("utf-8")).hexdigest()
+            conn.execute("UPDATE jobs SET payload_hash = ? WHERE id = ?", (h, jid))
+        if rows:
+            logger.info("025: backfill payload_hash en %d jobs", len(rows))
+    except Exception as e:
+        logger.warning("025: no se pudo backfill payload_hash: %s", e)
+
+    # Dedupe: conservar el job más antiguo por (issuer_id,name,payload_hash) en estados activos.
+    try:
+        cur = conn.execute(
+            """
+            DELETE FROM jobs
+            WHERE status IN ('queued','running')
+              AND payload_hash IS NOT NULL
+              AND id NOT IN (
+                SELECT MIN(id)
+                FROM jobs
+                WHERE status IN ('queued','running') AND payload_hash IS NOT NULL
+                GROUP BY issuer_id, name, payload_hash
+              )
+            """
+        )
+        deleted = cur.rowcount
+        if deleted:
+            logger.info("025: eliminados %d jobs duplicados (queued/running)", deleted)
+    except Exception as e:
+        logger.warning("025: dedupe jobs falló: %s", e)
+
+    # Índices recomendados (IF NOT EXISTS = idempotente)
+    for sql in [
+        "CREATE INDEX IF NOT EXISTS idx_jobs_status_run_after ON jobs(status, run_after)",
+        "CREATE INDEX IF NOT EXISTS idx_jobs_issuer_status ON jobs(issuer_id, status)",
+        "CREATE INDEX IF NOT EXISTS idx_jobs_locked_at ON jobs(locked_at)",
+        "CREATE INDEX IF NOT EXISTS idx_jobs_payload_hash ON jobs(payload_hash)",
+    ]:
+        try:
+            conn.execute(sql)
+        except sqlite3.OperationalError as e:
+            if "already exists" not in str(e).lower():
+                raise
+
+    # Índice único parcial para dedupe (evita duplicados por issuer+name+payload en cola/ejecución).
+    # Nota: puede fallar si aún quedan duplicados; por eso hacemos dedupe antes.
+    try:
+        conn.execute(
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_jobs_dedupe_active
+            ON jobs(issuer_id, name, payload_hash)
+            WHERE payload_hash IS NOT NULL AND status IN ('queued','running')
+            """
+        )
+    except sqlite3.OperationalError as e:
+        # Si hay conflictos, no romper migraciones; se puede limpiar manualmente y recrear.
+        logger.warning("025: no se pudo crear idx_jobs_dedupe_active: %s", e)
+
+
 def apply_migrations(
     db_path: str,
     migrations_dir: str | None = None,
@@ -468,6 +556,8 @@ def apply_migrations(
                         _apply_021_bank_movements_module(conn)
                     elif version == "023":
                         _apply_023_bank_movements_dedup(conn)
+                    elif version == "025":
+                        _apply_025_jobs_robust(conn)
                     else:
                         with open(filepath, "r", encoding="utf-8") as f:
                             sql = f.read()

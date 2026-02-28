@@ -5,6 +5,7 @@ from fastapi import Request, HTTPException
 
 from config import ALLOW_DEMO_PORTAL, DEV_MODE, DEV_TOKEN
 from services import issuers, session, users
+from services import rate_limit as rate_limit_service
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +23,11 @@ def get_portal_issuer(request: Request) -> dict:
     is_api = request.url.path.startswith("/api/") or request.url.path.startswith("/download/")
 
     if token_query:
+        # Mitigar brute force sobre tokens legacy (por IP).
+        if rate_limit_service.is_rate_limited(request, "token", window_seconds=60.0, max_attempts=20):
+            if is_api:
+                raise HTTPException(status_code=429, detail="Demasiados intentos. Espera un minuto.")
+            raise HTTPException(status_code=401, detail="No autorizado - redirigir a /login")
         try:
             issuer = issuers.get_issuer_by_token(token_query)
         except ValueError:

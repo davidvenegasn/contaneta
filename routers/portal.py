@@ -112,6 +112,11 @@ def _run_fiel_validation(issuer_id: int) -> tuple[bool, str]:
     env = os.environ.copy()
     env["APP_DB_PATH"] = str(DB_PATH)
     try:
+        # Cifrado at-rest: pasar credenciales desencriptadas vía env (solo al proceso PHP)
+        from services.sat_credentials_secure import decrypted_fiel_env
+
+        with decrypted_fiel_env(int(issuer_id)) as fiel_env:
+            env.update(fiel_env)
         stdout, stderr = run_php(
             [php_script, str(issuer_id)],
             timeout=30,
@@ -611,6 +616,16 @@ def get_portal_router(templates):
             quick_customers_json = _script_safe(json.dumps([_serialize_row(r) for r in quick_customers]))
             quick_products_json = _script_safe(json.dumps([_serialize_row(r) for r in quick_products]))
 
+            # Notificaciones (motor simple)
+            notifications = []
+            try:
+                from services import notifications as notifications_service
+
+                notifications_service.refresh_for_issuer(int(issuer_id))
+                notifications = notifications_service.list_notifications(int(issuer_id), unread_only=True, limit=10) or []
+            except Exception:
+                notifications = []
+
             return _render_portal(
                 request,
                 issuer=issuer,
@@ -641,6 +656,8 @@ def get_portal_router(templates):
                             (issuer_id,),
                         )
                     ),
+                    "notifications": notifications,
+                    "csrf_token": csrf_service.generate_csrf_token(),
                 },
             )
         except Exception:
@@ -2024,6 +2041,176 @@ def get_portal_router(templates):
             logger.exception("portal: error renderizando /portal/summary ym=%s", ym)
             raise
 
+    # ---------- Month Close (cierre mensual PF) ----------
+    @router.get("/month-close", response_class=HTMLResponse)
+    def portal_month_close(request: Request, issuer: dict = Depends(get_portal_issuer), ym: str | None = Query(None)):
+        issuer_id = int(issuer.get("id") or 0)
+        if issuer_id <= 0:
+            raise HTTPException(status_code=401, detail="Sesión inválida")
+        ym_val = (ym or ym_now()).strip()[:7] or ym_now()
+        from services import month_close as month_close_service
+
+        status = month_close_service.get_status(issuer_id, ym_val)
+        ov = status.get("overrides") if isinstance(status.get("overrides"), dict) else {}
+
+        issued_count = db_rows(
+            """
+            SELECT COUNT(*) AS n FROM sat_cfdi
+            WHERE issuer_id = ? AND direction = 'issued' AND fecha_emision IS NOT NULL
+              AND substr(fecha_emision,1,7) = ? AND (total IS NULL OR total >= 0.01)
+            """,
+            (issuer_id, ym_val),
+        )
+        received_count = db_rows(
+            """
+            SELECT COUNT(*) AS n FROM sat_cfdi
+            WHERE issuer_id = ? AND direction = 'received' AND fecha_emision IS NOT NULL
+              AND substr(fecha_emision,1,7) = ? AND total IS NOT NULL AND total >= 0.01
+              AND (tipo_comprobante IS NULL OR UPPER(TRIM(tipo_comprobante)) != 'N')
+            """,
+            (issuer_id, ym_val),
+        )
+        n_issued = int(issued_count[0]["n"] if issued_count else 0)
+        n_received = int(received_count[0]["n"] if received_count else 0)
+
+        movements_count = 0
+        try:
+            r = db_rows("SELECT COUNT(*) AS n FROM bank_movements WHERE issuer_id = ? AND period_month = ?", (issuer_id, ym_val))
+            movements_count = int(r[0]["n"] if r else 0)
+        except Exception:
+            movements_count = 0
+
+        tot_issued = _get_month_totals(issuer_id, ym_val, "issued")
+        tot_received = _get_month_totals(issuer_id, ym_val, "received")
+        iva_est = {
+            "iva_recibido_neto": float(tot_issued.get("total_iva_neto") or 0),
+            "iva_pagado": float(tot_received.get("total_iva") or 0),
+            "iva_estimado_a_pagar": round(float(tot_issued.get("total_iva_neto") or 0) - float(tot_received.get("total_iva") or 0), 2),
+        }
+
+        has_acuse = month_close_service.pdf_exists(issuer_id=issuer_id, ym=ym_val, kind="acuse")
+        has_opinion = month_close_service.pdf_exists(issuer_id=issuer_id, ym=ym_val, kind="opinion")
+
+        items = [
+            {"key": "sync_issued", "label": "Facturas emitidas sincronizadas", "ok": bool(n_issued > 0), "meta": f"{n_issued} este mes"},
+            {"key": "sync_received", "label": "Facturas recibidas sincronizadas", "ok": bool(n_received > 0), "meta": f"{n_received} este mes"},
+            {"key": "bank_movements", "label": "Movimientos bancarios cargados", "ok": bool(movements_count > 0), "meta": f"{movements_count} este mes"},
+            {"key": "reconciliation", "label": "Conciliación: gastos sin factura / facturas sin movimiento", "ok": False, "meta": "MVP: en progreso"},
+            {"key": "tax_estimate", "label": "Estimación de impuestos (IVA)", "ok": bool(n_issued > 0 or n_received > 0), "meta": f"IVA est.: {iva_est['iva_estimado_a_pagar']:.2f}"},
+            {"key": "acuse", "label": "Subir acuse de declaración (PDF)", "ok": bool(has_acuse), "meta": "PDF"},
+            {"key": "opinion", "label": "Subir opinión de cumplimiento (PDF)", "ok": bool(has_opinion), "meta": "PDF"},
+        ]
+        for it in items:
+            if it["key"] in ov:
+                it["ok"] = bool(ov[it["key"]])
+
+        return _render_portal(
+            request,
+            issuer=issuer,
+            template_name="portal_month_close.html",
+            active_page="month_close",
+            title="Cierre del mes",
+            extra={
+                "ym": ym_val,
+                "ym_label": ym_to_label(ym_val),
+                "items": items,
+                "status": status,
+                "iva_est": iva_est,
+                "csrf_token": csrf_service.generate_csrf_token(),
+                "has_acuse": has_acuse,
+                "has_opinion": has_opinion,
+            },
+        )
+
+    @router.post("/month-close/override", response_class=RedirectResponse)
+    def portal_month_close_override(
+        request: Request,
+        issuer: dict = Depends(get_portal_issuer),
+        ym: str = Form(...),
+        key: str = Form(...),
+        value: str = Form("0"),
+        csrf_token: str | None = Form(None),
+    ):
+        token_val = (csrf_token or request.headers.get("X-CSRF-Token") or "").strip()
+        if not csrf_service.verify_csrf_token(token_val):
+            raise HTTPException(status_code=403, detail="Token CSRF inválido o expirado")
+        issuer_id = int(issuer.get("id") or 0)
+        from services import month_close as month_close_service
+
+        month_close_service.set_override(issuer_id, ym, key, value in ("1", "true", "on", "yes"))
+        return RedirectResponse(url=f"/portal/month-close?ym={ym}", status_code=302)
+
+    @router.post("/month-close/upload", response_class=RedirectResponse)
+    async def portal_month_close_upload(
+        request: Request,
+        issuer: dict = Depends(get_portal_issuer),
+        ym: str = Form(...),
+        kind: str = Form(...),
+        pdf: UploadFile = File(...),
+        csrf_token: str | None = Form(None),
+    ):
+        token_val = (csrf_token or request.headers.get("X-CSRF-Token") or "").strip()
+        if not csrf_service.verify_csrf_token(token_val):
+            raise HTTPException(status_code=403, detail="Token CSRF inválido o expirado")
+        if rate_limit_service.is_rate_limited(request, "month_close_upload"):
+            raise HTTPException(status_code=429, detail="Demasiados intentos. Espera un minuto.")
+        issuer_id = int(issuer.get("id") or 0)
+        kind_norm = (kind or "").strip().lower()
+        if kind_norm not in ("acuse", "opinion"):
+            raise HTTPException(status_code=400, detail="Tipo inválido")
+        body = await pdf.read()
+        if not body or len(body) < 10:
+            raise HTTPException(status_code=400, detail="Archivo vacío")
+        if len(body) > 10 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="PDF demasiado grande (máx 10 MB)")
+        if not body.startswith(b"%PDF"):
+            raise HTTPException(status_code=400, detail="El archivo debe ser PDF")
+        from services import month_close as month_close_service
+
+        rel = month_close_service.write_pdf_to_storage(issuer_id=issuer_id, ym=ym, kind=kind_norm, pdf_bytes=body)
+        audit.log(action="month_close_upload", user_id=getattr(request.state, "user_id", 0) or 0, issuer_id=issuer_id, request=request, entity="month_close", entity_id=f"{ym}:{kind_norm}")
+        log_action(request, "month_close_upload", issuer_id=issuer_id, ym=ym, kind=kind_norm)
+        file_access_log.log_file_access(
+            request=request,
+            action="upload_month_close_pdf",
+            issuer_id=issuer_id,
+            user_id=getattr(request.state, "user_id", None),
+            file_path=rel,
+            entity="month_close",
+            entity_id=f"{ym}:{kind_norm}",
+        )
+        return RedirectResponse(url=f"/portal/month-close?ym={ym}", status_code=302)
+
+    @router.get("/month-close/download/{ym}/{kind}", response_class=Response)
+    def portal_month_close_download(
+        request: Request,
+        issuer: dict = Depends(get_portal_issuer),
+        ym: str = "",
+        kind: str = "",
+        dl: int = 0,
+    ):
+        issuer_id = int(issuer.get("id") or 0)
+        from services import month_close as month_close_service
+
+        try:
+            abs_path, rel = month_close_service.get_pdf_abs_path(issuer_id=issuer_id, ym=ym, kind=kind)
+        except ValueError:
+            raise HTTPException(status_code=404, detail="Archivo no encontrado")
+        if not os.path.exists(abs_path):
+            raise HTTPException(status_code=404, detail="Archivo no encontrado")
+        disposition = "attachment" if int(dl or 0) == 1 else "inline"
+        file_access_log.log_file_access(
+            request=request,
+            action="download_month_close_pdf",
+            issuer_id=issuer_id,
+            user_id=getattr(request.state, "user_id", None),
+            file_path=rel,
+            entity="month_close",
+            entity_id=f"{ym}:{kind}",
+        )
+        filename = f"{kind}_{ym}.pdf"
+        return FileResponse(path=abs_path, media_type="application/pdf", filename=filename, headers={"Content-Disposition": f"{disposition}; filename=\"{filename}\""})
+
     @router.get("/plan", response_class=HTMLResponse)
     def portal_plan(request: Request, issuer: dict = Depends(get_portal_issuer), success: str = Query(""), canceled: str = Query("")):
         user_id = getattr(request.state, "user_id", None) or 0
@@ -2090,6 +2277,16 @@ def get_portal_router(templates):
             conn.commit()
         finally:
             conn.close()
+        # Auditoría: inicio de sync SAT
+        audit.log(
+            action="sat_sync_started",
+            user_id=user_id,
+            issuer_id=issuer_id,
+            request=request,
+            entity="sat_jobs",
+            entity_id=str(issuer_id),
+        )
+        log_action(request, "sat_sync_started", user_id=user_id, issuer_id=issuer_id)
         return JSONResponse({"ok": True, "message": "Sincronización iniciada."})
 
     @router.get("/sat/status", response_class=JSONResponse)
@@ -2849,11 +3046,41 @@ def get_portal_router(templates):
             default_period = (upload_metadata.get("period_month") or (meta or {}).get("period_start") or "")[:7]
             mov_has_period = has_column(conn, "bank_movements", "period_month")
             mov_has_hash = has_column(conn, "bank_movements", "movement_hash")
+            user_accounts = bank_list_accounts(int(issuer_id)) if int(issuer_id) > 0 else []
+            statement_owner_name = (upload_metadata.get("detected_holder_name") or "").strip() or None
+            statement_owner_rfc = (upload_metadata.get("detected_holder_rfc") or "").strip() or None
             for t in (meta or {}).get("transactions") or []:
                 fecha = (t.get("fecha") or "")[:32]
                 descripcion = (t.get("descripcion") or "")[:2000]
                 deposito = t.get("deposito")
                 retiro = t.get("retiro")
+                # Reglas Job3 (MVP): traspasos propios + pagos financieros (sin IA)
+                try:
+                    desc_norm = (descripcion or "").strip().upper()
+                    mov_hint = {
+                        "raw_text_original": descripcion,
+                        "raw_text_normalized": desc_norm,
+                        "referencia": "",
+                        "contraparte_nombre": (t.get("contraparte_hint") or "").strip(),
+                        "rfc_detectado": (t.get("rfc_encontrado") or "").strip(),
+                        "tipo_movimiento": (t.get("tipo") or "").strip().upper(),
+                        "monto_deposito": float(deposito or 0),
+                        "monto_retiro": float(retiro or 0),
+                        "categoria_sugerida": (t.get("categoria") or "").strip(),
+                        "warnings": [],
+                    }
+                    detect_own_account_transfer(mov_hint, user_accounts, statement_owner_name, statement_owner_rfc)
+                    if mov_hint.get("es_transferencia_propia_probable"):
+                        t["categoria"] = "CUENTA_PROPIA"
+                    else:
+                        metodo = (t.get("metodo_hint") or "").upper()
+                        if (
+                            ("PAGO CONCENTRACION" in desc_norm or "PAGO TARJETA" in desc_norm or "TARJETA DE CRED" in desc_norm)
+                            or ("TARJETA" in metodo and "PAGO" in desc_norm)
+                        ):
+                            t["categoria"] = "FINANCIERO_PAGO_TARJETA"
+                except Exception:
+                    pass
                 if mov_has_hash:
                     m_hash = _movement_dedup_hash(issuer_id, fecha, descripcion, deposito, retiro)
                     existing = conn.execute(
@@ -3353,9 +3580,11 @@ def get_portal_router(templates):
         tipo: Optional[str] = Query(None, description="INGRESO, GASTO, INFO"),
         categoria: Optional[str] = Query(None),
         cfdi_match_status: Optional[str] = Query(None, description="pending, suggested, confirmed, rejected"),
+        match_filter: Optional[str] = Query(None, description="none|probable (conciliación)"),
         min_confidence: Optional[int] = Query(None, ge=0, le=100),
         search: Optional[str] = Query(None),
         hide_own_transfers: Optional[int] = Query(None, description="1 para ocultar traspasos propios"),
+        hide_financial: Optional[int] = Query(None, description="1 para ocultar pagos/cargos financieros"),
         limit: int = Query(200, ge=1, le=500),
         offset: int = Query(0, ge=0, le=MAX_LIST_OFFSET),
     ):
@@ -3376,6 +3605,7 @@ def get_portal_router(templates):
             conn.row_factory = lambda cursor, row: dict(zip([c[0] for c in cursor.description], row))
             _ensure_bank_movements_table(conn)
             _ensure_bank_exports_table(conn)
+            has_matches = table_exists(conn, "bank_invoice_matches") and table_exists(conn, "sat_cfdi")
 
             params: list = [issuer_id]
             where_clauses = ["issuer_id = ?"]
@@ -3409,9 +3639,33 @@ def get_portal_router(templates):
                 params.append(categoria.strip())
             if hide_own_transfers:
                 where_clauses.append("COALESCE(categoria,'') != 'CUENTA_PROPIA'")
+            if hide_financial:
+                where_clauses.append("COALESCE(categoria,'') NOT IN ('FINANCIERO_PAGO_TARJETA','MOVIMIENTO_FINANCIERO','COMISIONES BANCARIAS','COMISIONES_BANCARIAS','COMISION_BANCARIA')")
             if cfdi_match_status and has_column(conn, "bank_movements", "cfdi_match_status"):
                 where_clauses.append("cfdi_match_status = ?")
                 params.append(cfdi_match_status.strip().lower())
+            if match_filter and has_matches:
+                mf = (match_filter or "").strip().lower()
+                if mf == "probable":
+                    where_clauses.append(
+                        """EXISTS (
+                             SELECT 1 FROM bank_invoice_matches bim
+                             WHERE bim.issuer_id = bank_movements.issuer_id
+                               AND bim.bank_movement_id = bank_movements.id
+                               AND bim.status IN ('suggested','confirmed')
+                               AND COALESCE(bim.score,0) >= 80
+                           )"""
+                    )
+                elif mf == "none":
+                    where_clauses.append(
+                        """NOT EXISTS (
+                             SELECT 1 FROM bank_invoice_matches bim
+                             WHERE bim.issuer_id = bank_movements.issuer_id
+                               AND bim.bank_movement_id = bank_movements.id
+                               AND bim.status IN ('suggested','confirmed')
+                               AND COALESCE(bim.score,0) >= 50
+                           )"""
+                    )
             if min_confidence is not None:
                 where_clauses.append("confidence_score >= ?")
                 params.append(min_confidence)
@@ -3463,6 +3717,41 @@ def get_portal_router(templates):
                 sel.append("bank_statement_id")
             if has_column(conn, "bank_movements", "cfdi_match_status"):
                 sel.append("cfdi_match_status")
+            if has_matches:
+                sel.append(
+                    """(
+                        SELECT sc.uuid
+                        FROM bank_invoice_matches bim
+                        JOIN sat_cfdi sc ON sc.id = bim.cfdi_id
+                        WHERE bim.issuer_id = bank_movements.issuer_id
+                          AND bim.bank_movement_id = bank_movements.id
+                          AND bim.status IN ('suggested','confirmed')
+                        ORDER BY bim.score DESC, bim.id DESC
+                        LIMIT 1
+                    ) AS probable_cfdi_uuid"""
+                )
+                sel.append(
+                    """(
+                        SELECT bim.score
+                        FROM bank_invoice_matches bim
+                        WHERE bim.issuer_id = bank_movements.issuer_id
+                          AND bim.bank_movement_id = bank_movements.id
+                          AND bim.status IN ('suggested','confirmed')
+                        ORDER BY bim.score DESC, bim.id DESC
+                        LIMIT 1
+                    ) AS probable_cfdi_score"""
+                )
+                sel.append(
+                    """(
+                        SELECT bim.status
+                        FROM bank_invoice_matches bim
+                        WHERE bim.issuer_id = bank_movements.issuer_id
+                          AND bim.bank_movement_id = bank_movements.id
+                          AND bim.status IN ('suggested','confirmed')
+                        ORDER BY bim.score DESC, bim.id DESC
+                        LIMIT 1
+                    ) AS probable_cfdi_status"""
+                )
             select_cols = ", ".join(sel)
             params_ext = params + [limit, offset]
             movements = conn.execute(
@@ -3484,11 +3773,16 @@ def get_portal_router(templates):
                 row.setdefault("confidence_score", None)
                 row.setdefault("cfdi_match_status", None)
                 row.setdefault("bank_statement_id", None)
+                row.setdefault("probable_cfdi_uuid", None)
+                row.setdefault("probable_cfdi_score", None)
+                row.setdefault("probable_cfdi_status", None)
                 # Asegurar que montos sean numéricos para el formato en plantilla
-                for key in ("deposito", "retiro", "saldo", "confidence_score"):
+                for key in ("deposito", "retiro", "saldo", "confidence_score", "probable_cfdi_score"):
                     if row.get(key) is not None and row[key] != "":
                         try:
                             if key == "confidence_score":
+                                row[key] = int(float(row[key]))
+                            elif key == "probable_cfdi_score":
                                 row[key] = int(float(row[key]))
                             else:
                                 row[key] = float(row[key])
@@ -3596,14 +3890,63 @@ def get_portal_router(templates):
                 tipo=tipo or "",
                 categoria=categoria or "",
                 cfdi_match_status=cfdi_match_status or "",
+                match_filter=(match_filter or ""),
                 min_confidence=min_confidence,
                 search=search or "",
                 hide_own_transfers=1 if hide_own_transfers else 0,
+                hide_financial=1 if hide_financial else 0,
                 statements_opt=statements_opt,
+                csrf_token=csrf_service.generate_csrf_token(),
             )
         except Exception as e:
             logger.exception("portal movimientos (render): %s", e)
             raise HTTPException(status_code=500, detail=f"Error al mostrar la página: {e!s}")
+
+    @router.post("/bank/movements/reconcile", response_class=RedirectResponse)
+    def portal_bank_movements_reconcile(
+        request: Request,
+        issuer: dict = Depends(get_portal_issuer),
+        ym: str = Form(...),
+        csrf_token: str | None = Form(None),
+    ):
+        token_val = (csrf_token or request.headers.get("X-CSRF-Token") or "").strip()
+        if not csrf_service.verify_csrf_token(token_val):
+            raise HTTPException(status_code=403, detail="Token CSRF inválido o expirado")
+        if rate_limit_service.is_rate_limited(request, "bank_reconcile"):
+            raise HTTPException(status_code=429, detail="Demasiados intentos. Espera un minuto.")
+        issuer_id = int(issuer.get("id") or 0)
+        from services import bank_cfdi_matching as bank_cfdi_matching_service
+
+        bank_cfdi_matching_service.refresh_suggestions_for_month(issuer_id, ym)
+        audit.log(
+            action="bank_reconcile_run",
+            user_id=getattr(request.state, "user_id", 0) or 0,
+            issuer_id=issuer_id,
+            request=request,
+            entity="bank_movements",
+            entity_id=ym,
+        )
+        log_action(request, "bank_reconcile_run", issuer_id=issuer_id, ym=ym)
+        return RedirectResponse(url=f"/portal/bank/movements?ym={ym}", status_code=302)
+
+    @router.post("/notifications/{notification_id}/read", response_class=RedirectResponse)
+    def portal_notification_mark_read(
+        request: Request,
+        notification_id: int,
+        issuer: dict = Depends(get_portal_issuer),
+        next: str = Form("/portal/home"),
+        csrf_token: str | None = Form(None),
+    ):
+        token_val = (csrf_token or request.headers.get("X-CSRF-Token") or "").strip()
+        if not csrf_service.verify_csrf_token(token_val):
+            raise HTTPException(status_code=403, detail="Token CSRF inválido o expirado")
+        issuer_id = int(issuer.get("id") or 0)
+        if issuer_id <= 0:
+            raise HTTPException(status_code=401, detail="Sesión inválida")
+        from services import notifications as notifications_service
+
+        notifications_service.mark_read(int(issuer_id), int(notification_id))
+        return RedirectResponse(url=next or "/portal/home", status_code=302)
 
     # ---------- SAT credentials (FIEL) upload & validate ----------
     MAX_FIEL_SIZE = 2 * 1024 * 1024  # 2 MB
@@ -3667,19 +4010,25 @@ def get_portal_router(templates):
         if len(cer_body) > MAX_FIEL_SIZE or len(key_body) > MAX_FIEL_SIZE:
             raise HTTPException(status_code=400, detail="Cada archivo debe medir como máximo 2 MB")
         cred_dir = _credentials_dir(issuer_id)
-        cer_path = os.path.join(cred_dir, "fiel.cer")
-        key_path = os.path.join(cred_dir, "fiel.key")
-        rel_cer = f"storage/credentials/{issuer_id}/fiel.cer"
-        rel_key = f"storage/credentials/{issuer_id}/fiel.key"
-        with open(cer_path, "wb") as f:
-            f.write(cer_body)
-        with open(key_path, "wb") as f:
-            f.write(key_body)
-        # Permisos 0600: solo el propietario puede leer/escribir (sin prometer cifrado)
-        os.chmod(cer_path, 0o600)
-        os.chmod(key_path, 0o600)
-        # Guardar contraseña tal cual (sin strip) para evitar que espacios válidos rompan el descifrado
-        password = fiel_password if fiel_password is not None else ""
+        # Cifrado at-rest: guardar solo blobs cifrados (AES-GCM). Nunca persistir .cer/.key en claro.
+        cer_enc_path = os.path.join(cred_dir, "fiel.cer.enc")
+        key_enc_path = os.path.join(cred_dir, "fiel.key.enc")
+        rel_cer = f"storage/credentials/{issuer_id}/fiel.cer.enc"
+        rel_key = f"storage/credentials/{issuer_id}/fiel.key.enc"
+        from services.crypto_at_rest import encrypt_bytes, encrypt_text
+
+        cer_blob = encrypt_bytes(issuer_id=int(issuer_id), plaintext=cer_body, aad=b"fiel.cer")
+        key_blob = encrypt_bytes(issuer_id=int(issuer_id), plaintext=key_body, aad=b"fiel.key")
+        with open(cer_enc_path, "wb") as f:
+            f.write(cer_blob)
+        with open(key_enc_path, "wb") as f:
+            f.write(key_blob)
+        os.chmod(cer_enc_path, 0o600)
+        os.chmod(key_enc_path, 0o600)
+        # Guardar contraseña tal cual (sin strip) para evitar que espacios válidos rompan el descifrado,
+        # pero cifrada en DB.
+        password_plain = fiel_password if fiel_password is not None else ""
+        password = encrypt_text(issuer_id=int(issuer_id), plaintext=password_plain)
         conn = db()
         try:
             _ensure_sat_credentials_validation_columns(conn)

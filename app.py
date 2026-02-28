@@ -179,9 +179,10 @@ async def server_error_handler(request: Request, exc: Exception):
 
         error_events_service.log_error_event(
             request=request,
-            status_code=500,
-            error_code="INTERNAL_ERROR",
-            message=f"Unhandled {type(exc).__name__}",
+            status=500,
+            message_public="Error interno del servidor.",
+            message_internal=f"Unhandled {type(exc).__name__}: {str(exc)}",
+            exc=exc,
         )
     except Exception:
         pass
@@ -210,9 +211,10 @@ async def app_error_handler(request: Request, exc: AppError):
 
             error_events_service.log_error_event(
                 request=request,
-                status_code=exc.status_code,
-                error_code=exc.code,
-                message=exc.public_message,
+                status=exc.status_code,
+                message_public=exc.public_message,
+                message_internal=f"{exc.code}: {exc.internal_message or exc.public_message}",
+                exc=exc,
             )
         except Exception:
             pass
@@ -240,9 +242,10 @@ async def sqlite_error_handler(request: Request, exc: sqlite3.Error):
 
         error_events_service.log_error_event(
             request=request,
-            status_code=500,
-            error_code="DB_ERROR",
-            message="SQLite error",
+            status=500,
+            message_public="Error de base de datos.",
+            message_internal=f"DB_ERROR: {str(exc)}",
+            exc=exc,
         )
     except Exception:
         pass
@@ -269,9 +272,10 @@ async def subprocess_error_handler(request: Request, exc: subprocess.CalledProce
 
         error_events_service.log_error_event(
             request=request,
-            status_code=500,
-            error_code="SUBPROCESS_ERROR",
-            message="Subprocess error",
+            status=500,
+            message_public="Error interno del servidor.",
+            message_internal=f"SUBPROCESS_ERROR: returncode={getattr(exc, 'returncode', None)}",
+            exc=exc,
         )
     except Exception:
         pass

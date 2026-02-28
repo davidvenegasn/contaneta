@@ -1,5 +1,27 @@
 from __future__ import annotations
 
+from typing import Any
+
+
+class TenantViolation(ValueError):
+    pass
+
+
+def require_issuer_id(issuer: dict[str, Any]) -> int:
+    """
+    Fuente única de issuer_id: SIEMPRE desde sesión/token (get_portal_issuer).
+    Nunca del body/query.
+    """
+    try:
+        issuer_id = int(issuer.get("id") or 0)
+    except Exception as e:
+        raise TenantViolation("issuer inválido") from e
+    if issuer_id <= 0:
+        raise TenantViolation("issuer inválido")
+    return issuer_id
+
+from __future__ import annotations
+
 import re
 from typing import Any, Mapping
 

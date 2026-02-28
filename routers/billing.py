@@ -9,19 +9,21 @@ from config import STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_PRICE_ID, SI
 from services import session as session_service
 from services import subscription as subscription_service
 from services import users as users_service
+from services import audit
+from services.action_log import log_action
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["billing"])
 
 
-def _get_session_user_id(request: Request) -> Optional[int]:
-    """Devuelve user_id de la cookie de sesión o None."""
+def _get_session_user_and_issuer_id(request: Request) -> tuple[int | None, int | None]:
+    """Devuelve (user_id, issuer_id) de la cookie de sesión o (None, None)."""
     cookie_val = request.cookies.get(session_service.get_session_cookie_name())
     data = session_service.verify_session(cookie_val)
     if not data or data[0] <= 0:
-        return None
-    return data[0]
+        return None, None
+    return data[0], data[1]
 
 
 @router.post("/billing/checkout")
@@ -30,7 +32,7 @@ def billing_checkout(request: Request):
     Crea una sesión de Stripe Checkout (subscription) y devuelve la URL.
     Requiere sesión con user_id > 0.
     """
-    user_id = _get_session_user_id(request)
+    user_id, issuer_id = _get_session_user_and_issuer_id(request)
     if not user_id:
         raise HTTPException(status_code=401, detail="Inicia sesión para actualizar tu plan")
 
@@ -63,6 +65,11 @@ def billing_checkout(request: Request):
         url = checkout_session.get("url")
         if not url:
             raise HTTPException(status_code=500, detail="No se obtuvo URL de checkout")
+        try:
+            audit.log(action="plan_checkout_started", user_id=user_id, issuer_id=issuer_id or 0, request=request, entity="stripe", entity_id=str(checkout_session.get("id") or ""))
+        except Exception:
+            pass
+        log_action(request, "plan_checkout_started", user_id=user_id, issuer_id=issuer_id or 0)
         return {"url": url}
     except Exception as e:
         logger.exception("Stripe checkout: %s", e)
@@ -107,6 +114,7 @@ async def webhook_stripe(
                 stripe_subscription_id=subscription_id,
             )
             logger.info("Subscription activated for user_id=%s", user_id)
+            log_action(request, "plan_changed", user_id=user_id, status="active", plan="pro", stripe_subscription_id=subscription_id)
 
     elif event["type"] == "customer.subscription.updated":
         sub = event["data"]["object"]
@@ -114,15 +122,18 @@ async def webhook_stripe(
         subscription_id = sub.get("id")
         if status in ("canceled", "unpaid", "past_due"):
             _mark_subscription_by_stripe_id(subscription_id, "canceled" if status == "canceled" else status)
+            log_action(request, "plan_changed", status=status, stripe_subscription_id=subscription_id)
         elif status == "active":
             period_end = sub.get("current_period_end")
             from datetime import datetime
             period_end_str = datetime.utcfromtimestamp(period_end).isoformat() + "Z" if period_end else None
             _update_subscription_period_by_stripe_id(subscription_id, period_end_str)
+            log_action(request, "plan_period_updated", stripe_subscription_id=subscription_id, current_period_end=period_end_str)
 
     elif event["type"] == "customer.subscription.deleted":
         sub = event["data"]["object"]
         _mark_subscription_by_stripe_id(sub.get("id"), "canceled")
+        log_action(request, "plan_changed", status="canceled", stripe_subscription_id=sub.get("id"))
 
     return JSONResponse(content={"received": True})
 

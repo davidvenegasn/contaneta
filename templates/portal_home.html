@@ -180,16 +180,27 @@
     <div class="ui-card__body">
       <div class="activity-list-wrap activity-list-wrap--notifications" aria-live="polite">
         <div class="activity-list">
-          {% for a in activities %}
+          {% set ns = notifications|default([]) %}
+          {% for n in ns %}
           <div class="activity-row">
             <div>
               <div class="activity-title">
-                {% if a.direction == 'issued' %}{{ icon_issued() }}{% else %}{{ icon_received() }}{% endif %}
-                Factura {{ 'emitida' if a.direction == 'issued' else 'recibida' }}
+                <span class="badge badge--{{ 'danger' if n.severity == 'danger' else ('warn' if n.severity == 'warning' else 'neutral') }} badge--xs" style="margin-right:6px;">{{ (n.severity or 'info')|upper }}</span>
+                {{ n.title }}
               </div>
-              <div class="activity-sub">{{ a.nombre or 'Sin nombre' }}</div>
+              <div class="activity-sub">{{ n.body }}</div>
+              {% if n.action_url %}
+                <div class="u-mt-1"><a class="muted u-text-12" href="{{ n.action_url }}">Abrir</a></div>
+              {% endif %}
             </div>
-            <div class="activity-sub">{{ a.time_ago }}</div>
+            <div style="text-align:right;">
+              <div class="activity-sub">{{ (n.created_at or '')[:16] }}</div>
+              <form method="post" action="/portal/notifications/{{ n.id }}/read" class="u-mt-1">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+                <input type="hidden" name="next" value="/portal/home" />
+                <button type="submit" class="btn btn--sm btn--ghost">Marcar leído</button>
+              </form>
+            </div>
           </div>
           {% else %}
           <p class="muted u-m0 u-text-sm">No hay notificaciones por ahora.</p>

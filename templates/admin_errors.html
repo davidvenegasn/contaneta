@@ -1,0 +1,48 @@
+{% extends "base_admin.html" %}
+{% block title %}Errores{% endblock %}
+{% block content %}
+  <h1>Errores (5xx)</h1>
+
+  <div class="card">
+    <h2>Últimos 100</h2>
+    {% if events and events|length > 0 %}
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Fecha</th>
+          <th>Status</th>
+          <th>Ruta</th>
+          <th>Issuer</th>
+          <th>Req ID</th>
+          <th>Mensaje (público)</th>
+          <th>Detalle</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for e in events %}
+        <tr>
+          <td>{{ e.id }}</td>
+          <td class="muted">{{ e.created_at or '-' }}</td>
+          <td>{{ e.status or '-' }}</td>
+          <td><code>{{ e.method or '' }} {{ e.path or '' }}</code></td>
+          <td class="muted">{{ e.issuer_id or '-' }}</td>
+          <td><code>{{ e.request_id or '' }}</code></td>
+          <td class="muted">{{ (e.message_public or '')[:140] }}{% if e.message_public and e.message_public|length > 140 %}…{% endif %}</td>
+          <td>
+            {% if can_view_internal %}
+              <a class="btn btn-secondary btn-sm" href="/admin/errors/{{ e.id }}">Ver</a>
+            {% else %}
+              <span class="muted" style="font-size:13px;">Solo admin</span>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+      <p style="margin:0;color:#64748b;">Sin errores registrados.</p>
+    {% endif %}
+  </div>
+{% endblock %}
+

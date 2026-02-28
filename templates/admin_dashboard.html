@@ -7,9 +7,35 @@
     <h2>Resumen</h2>
     <div class="stats">
       <div class="stat"><span class="n">{{ count_users }}</span><span class="label">Usuarios</span></div>
+      <div class="stat"><span class="n">{{ count_active_users }}</span><span class="label">Usuarios activos (con membership)</span></div>
       <div class="stat"><span class="n">{{ count_issuers }}</span><span class="label">Issuers</span></div>
       <div class="stat"><span class="n">{{ count_memberships }}</span><span class="label">Memberships</span></div>
+      <div class="stat"><span class="n">{{ jobs_in_queue }}</span><span class="label">Jobs en cola (queued/running)</span></div>
+      <div class="stat"><span class="n">{{ jobs_failed_today }}</span><span class="label">Jobs fallidos hoy</span></div>
+      <div class="stat"><span class="n">{{ errors_today }}</span><span class="label">Errores 5xx hoy</span></div>
     </div>
+  </div>
+
+  <div class="card">
+    <h2>Últimos logins</h2>
+    {% if last_logins and last_logins|length > 0 %}
+    <table>
+      <thead><tr><th>Fecha</th><th>User</th><th>Email</th><th>Issuer</th><th>RFC</th></tr></thead>
+      <tbody>
+      {% for l in last_logins %}
+      <tr>
+        <td class="muted">{{ l.created_at or '-' }}</td>
+        <td class="muted">{{ l.user_id if l.user_id is not none else '-' }}</td>
+        <td>{{ l.user_email or '-' }}</td>
+        <td class="muted">{{ l.issuer_id if l.issuer_id is not none else '-' }}</td>
+        <td>{{ l.issuer_rfc or '-' }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p style="margin:0;color:#64748b;">Sin logins aún.</p>
+    {% endif %}
   </div>
 
   <div class="card">

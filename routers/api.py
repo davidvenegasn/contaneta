@@ -72,7 +72,9 @@ def api_account_status(request: Request, issuer: dict = Depends(get_portal_issue
     Retorna: issuer_ok, sat_ok, has_customer, has_product, completed, total,
              sat_status, last_sync_at, sync_status, plan_label (P36).
     """
-    issuer_id = issuer.get("id", 0)
+    from services.tenant import require_issuer_id
+
+    issuer_id = require_issuer_id(issuer)
     user_id = getattr(request.state, "user_id", 0) or 0
     issuer_ok = False
     sat_ok = False
@@ -1727,6 +1729,7 @@ def api_invoices_received(
     min_amount: float = Query(None, description="Minimum amount"),
     max_amount: float = Query(None, description="Maximum amount"),
     metodo_pago: str = Query("", description="PUE or PPD"),
+    match_filter: str = Query("", description="Conciliación: none|probable"),
     page: int = Query(1, ge=1, description="Page number"),
     per_page: int = Query(DEFAULT_LIST_LIMIT, ge=1, le=MAX_LIST_LIMIT, description="Items per page"),
 ):
@@ -1798,6 +1801,38 @@ def api_invoices_received(
     if metodo_pago and metodo_pago.upper() in ("PUE", "PPD"):
         where_parts.append("UPPER(TRIM(COALESCE(metodo_pago,''))) = ?")
         params.append(metodo_pago.upper())
+
+    # Conciliación (mismo modelo que bank/movements)
+    mf = (match_filter or "").strip().lower()
+    if mf in ("none", "probable"):
+        # Solo si existe tabla; si no existe, no filtrar (degrada a 'todos')
+        try:
+            conn0 = db()
+            has_matches = ("bank_invoice_matches" in {r[0] for r in conn0.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()})
+            conn0.close()
+        except Exception:
+            has_matches = False
+        if has_matches:
+            if mf == "probable":
+                where_parts.append(
+                    """EXISTS (
+                         SELECT 1 FROM bank_invoice_matches bim
+                         WHERE bim.issuer_id = sat_cfdi.issuer_id
+                           AND bim.cfdi_id = sat_cfdi.id
+                           AND bim.status IN ('suggested','confirmed')
+                           AND COALESCE(bim.score,0) >= 80
+                       )"""
+                )
+            elif mf == "none":
+                where_parts.append(
+                    """NOT EXISTS (
+                         SELECT 1 FROM bank_invoice_matches bim
+                         WHERE bim.issuer_id = sat_cfdi.issuer_id
+                           AND bim.cfdi_id = sat_cfdi.id
+                           AND bim.status IN ('suggested','confirmed')
+                           AND COALESCE(bim.score,0) >= 50
+                       )"""
+                )
     
     where_clause = " AND ".join(where_parts)
     
@@ -1821,7 +1856,65 @@ def api_invoices_received(
             f"""
             SELECT uuid, fecha_emision, rfc_emisor, nombre_emisor, concepto, total, moneda,
                    COALESCE(impuestos, 0) AS impuestos, COALESCE(retenciones, 0) AS retenciones,
-                   metodo_pago, status, xml_path
+                   metodo_pago, status, xml_path,
+                   (
+                     SELECT bm.id
+                     FROM bank_invoice_matches bim
+                     JOIN bank_movements bm ON bm.id = bim.bank_movement_id AND bm.issuer_id = bim.issuer_id
+                     WHERE bim.issuer_id = sat_cfdi.issuer_id
+                       AND bim.cfdi_id = sat_cfdi.id
+                       AND bim.status IN ('suggested','confirmed')
+                     ORDER BY bim.score DESC, bim.id DESC
+                     LIMIT 1
+                   ) AS probable_movement_id,
+                   (
+                     SELECT bm.fecha
+                     FROM bank_invoice_matches bim
+                     JOIN bank_movements bm ON bm.id = bim.bank_movement_id AND bm.issuer_id = bim.issuer_id
+                     WHERE bim.issuer_id = sat_cfdi.issuer_id
+                       AND bim.cfdi_id = sat_cfdi.id
+                       AND bim.status IN ('suggested','confirmed')
+                     ORDER BY bim.score DESC, bim.id DESC
+                     LIMIT 1
+                   ) AS probable_movement_fecha,
+                   (
+                     SELECT COALESCE(bm.deposito, 0) - COALESCE(bm.retiro, 0)
+                     FROM bank_invoice_matches bim
+                     JOIN bank_movements bm ON bm.id = bim.bank_movement_id AND bm.issuer_id = bim.issuer_id
+                     WHERE bim.issuer_id = sat_cfdi.issuer_id
+                       AND bim.cfdi_id = sat_cfdi.id
+                       AND bim.status IN ('suggested','confirmed')
+                     ORDER BY bim.score DESC, bim.id DESC
+                     LIMIT 1
+                   ) AS probable_movement_amount,
+                   (
+                     SELECT bm.descripcion
+                     FROM bank_invoice_matches bim
+                     JOIN bank_movements bm ON bm.id = bim.bank_movement_id AND bm.issuer_id = bim.issuer_id
+                     WHERE bim.issuer_id = sat_cfdi.issuer_id
+                       AND bim.cfdi_id = sat_cfdi.id
+                       AND bim.status IN ('suggested','confirmed')
+                     ORDER BY bim.score DESC, bim.id DESC
+                     LIMIT 1
+                   ) AS probable_movement_desc,
+                   (
+                     SELECT bim.score
+                     FROM bank_invoice_matches bim
+                     WHERE bim.issuer_id = sat_cfdi.issuer_id
+                       AND bim.cfdi_id = sat_cfdi.id
+                       AND bim.status IN ('suggested','confirmed')
+                     ORDER BY bim.score DESC, bim.id DESC
+                     LIMIT 1
+                   ) AS probable_movement_score,
+                   (
+                     SELECT bim.status
+                     FROM bank_invoice_matches bim
+                     WHERE bim.issuer_id = sat_cfdi.issuer_id
+                       AND bim.cfdi_id = sat_cfdi.id
+                       AND bim.status IN ('suggested','confirmed')
+                     ORDER BY bim.score DESC, bim.id DESC
+                     LIMIT 1
+                   ) AS probable_movement_status
             FROM sat_cfdi
             WHERE {where_clause}
             ORDER BY fecha_emision DESC
@@ -1848,6 +1941,7 @@ def api_invoices_received(
             "min_amount": min_amount,
             "max_amount": max_amount,
             "metodo_pago": metodo_pago,
+            "match_filter": match_filter,
         }
     }
 

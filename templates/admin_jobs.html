@@ -1,0 +1,66 @@
+{% extends "base_admin.html" %}
+{% block title %}Jobs{% endblock %}
+{% block content %}
+  <h1>Jobs</h1>
+
+  <div class="card">
+    <h2>Filtros</h2>
+    <form method="get" action="/admin/jobs" style="display:flex; gap:10px; flex-wrap:wrap; align-items:end;">
+      <div>
+        <div style="font-size:12px; color:#64748b; margin-bottom:6px;">Status</div>
+        <input name="status" value="{{ filter_status or '' }}" placeholder="queued/running/success/failed" style="padding:0.5rem 0.75rem; min-width:220px; border-radius:8px; border:1px solid #cbd5e1;" />
+      </div>
+      <div>
+        <div style="font-size:12px; color:#64748b; margin-bottom:6px;">Issuer ID</div>
+        <input name="issuer_id" value="{{ filter_issuer_id or '' }}" placeholder="123" style="padding:0.5rem 0.75rem; min-width:140px; border-radius:8px; border:1px solid #cbd5e1;" />
+      </div>
+      <div>
+        <div style="font-size:12px; color:#64748b; margin-bottom:6px;">Nombre contiene</div>
+        <input name="q" value="{{ filter_q or '' }}" placeholder="sync, backup..." style="padding:0.5rem 0.75rem; min-width:260px; border-radius:8px; border:1px solid #cbd5e1;" />
+      </div>
+      <div>
+        <button type="submit" class="btn btn-primary">Aplicar</button>
+        <a class="btn btn-secondary" href="/admin/jobs">Limpiar</a>
+      </div>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2>Últimos jobs</h2>
+    {% if jobs and jobs|length > 0 %}
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Issuer</th>
+          <th>Nombre</th>
+          <th>Status</th>
+          <th>Progreso</th>
+          <th>Attempts</th>
+          <th>Run after</th>
+          <th>Actualizado</th>
+          <th>Detalle</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for j in jobs %}
+        <tr>
+          <td>{{ j.id }}</td>
+          <td class="muted">{{ j.issuer_id }}{% if j.issuer_rfc %} <span class="muted">({{ j.issuer_rfc }})</span>{% endif %}</td>
+          <td>{{ j.name }}</td>
+          <td><span class="badge badge--neutral badge--xs">{{ j.status }}</span></td>
+          <td class="muted">{{ j.progress }}%</td>
+          <td class="muted">{{ j.attempts if j.attempts is not none else 0 }}/{{ j.max_attempts if j.max_attempts is not none else 0 }}</td>
+          <td class="muted">{{ j.run_after or '-' }}</td>
+          <td class="muted">{{ j.updated_at or j.created_at or '' }}</td>
+          <td><a class="btn btn-secondary btn-sm" href="/admin/jobs/{{ j.id }}">Ver</a></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+      <p style="margin:0;color:#64748b;">Sin jobs.</p>
+    {% endif %}
+  </div>
+{% endblock %}
+

@@ -37,6 +37,10 @@
     .alert { padding: 12px; border-radius: 8px; margin-bottom: 12px; }
     .alert-success { background: #dcfce7; color: #166534; }
     .alert-error { background: #fee2e2; color: #991b1b; }
+    .badge { display:inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; background: #e2e8f0; color: #334155; }
+    .badge--xs { font-size: 11px; padding: 2px 6px; }
+    .badge--neutral { background: #e2e8f0; color: #334155; }
+    .muted { color: #64748b; }
     .impersonate-form { display: inline; }
     .impersonate-form button { margin-left: 4px; }
   </style>
@@ -44,11 +48,13 @@
 <body>
   <div class="admin-wrap">
     <nav class="admin-nav">
-      <a href="/admin" class="{% if active_page == 'dashboard' %}active{% endif %}">Dashboard</a>
+      <a href="/admin/dashboard" class="{% if active_page == 'dashboard' %}active{% endif %}">Dashboard</a>
       <span class="sep">|</span>
       <a href="/admin/users" class="{% if active_page == 'users' %}active{% endif %}">Usuarios</a>
       <a href="/admin/issuers" class="{% if active_page == 'issuers' %}active{% endif %}">Issuers</a>
       <a href="/admin/memberships" class="{% if active_page == 'memberships' %}active{% endif %}">Memberships</a>
+      <a href="/admin/jobs" class="{% if active_page == 'jobs' %}active{% endif %}">Jobs</a>
+      <a href="/admin/errors" class="{% if active_page == 'errors' %}active{% endif %}">Errores</a>
       <span class="sep">|</span>
       <a href="/admin/ops" class="{% if active_page == 'ops' %}active{% endif %}">Operaciones</a>
       <span class="sep">|</span>

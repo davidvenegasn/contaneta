@@ -1,0 +1,94 @@
+{% extends "base_portal.html" %}
+{% block title %}Cierre del mes{% endblock %}
+
+{% block content %}
+  <div class="page-header" style="display:flex; align-items:flex-end; justify-content:space-between; gap:16px; flex-wrap:wrap;">
+    <div>
+      <h1 style="margin:0;">Cierre del mes</h1>
+      <p class="muted" style="margin:6px 0 0;">Checklist para dejar el mes listo (PF). Mes: <strong>{{ ym_label }}</strong></p>
+    </div>
+    <form method="get" action="/portal/month-close" style="display:flex; gap:10px; align-items:end;">
+      <div>
+        <div class="muted" style="font-size:12px; margin-bottom:6px;">Mes (YYYY-MM)</div>
+        <input name="ym" value="{{ ym }}" style="padding:10px 12px; border:1px solid #cbd5e1; border-radius:10px; width:140px;" />
+      </div>
+      <button class="btn btn-primary" type="submit">Ver</button>
+    </form>
+  </div>
+
+  <div class="card" style="margin-top:14px;">
+    <h2 style="margin-top:0;">Estado</h2>
+    <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+      {% if status.closed %}
+        <span class="badge badge--success">Mes marcado como cerrado</span>
+      {% else %}
+        <span class="badge badge--neutral">Pendiente</span>
+      {% endif %}
+      <span class="muted">IVA estimado a pagar: <strong>{{ "%.2f"|format(iva_est.iva_estimado_a_pagar) }}</strong></span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0;">Checklist</h2>
+    <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap:12px;">
+      {% for it in items %}
+      <div style="border:1px solid #e2e8f0; border-radius:14px; padding:14px; background:#fff;">
+        <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:10px;">
+          <div>
+            <div style="font-weight:700; color:#0f172a;">{{ it.label }}</div>
+            <div class="muted" style="font-size:13px; margin-top:6px;">{{ it.meta }}</div>
+          </div>
+          {% if it.ok %}
+            <span class="badge badge--success">Listo</span>
+          {% else %}
+            <span class="badge badge--neutral">Pendiente</span>
+          {% endif %}
+        </div>
+
+        {% if it.key in ['sync_issued','sync_received','bank_movements','reconciliation','tax_estimate'] %}
+        <form method="post" action="/portal/month-close/override" style="margin-top:12px; display:flex; gap:8px; align-items:center;">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+          <input type="hidden" name="ym" value="{{ ym }}" />
+          <input type="hidden" name="key" value="{{ it.key }}" />
+          <input type="hidden" name="value" value="{{ '0' if it.ok else '1' }}" />
+          <button class="btn btn-secondary btn-sm" type="submit">
+            {% if it.ok %}Marcar pendiente{% else %}Marcar listo{% endif %}
+          </button>
+        </form>
+        {% endif %}
+
+        {% if it.key == 'acuse' %}
+          <div style="margin-top:12px;">
+            {% if has_acuse %}
+              <a class="btn btn-secondary btn-sm" href="/portal/month-close/download/{{ ym }}/acuse?dl=1">Descargar acuse</a>
+            {% endif %}
+            <form method="post" action="/portal/month-close/upload" enctype="multipart/form-data" style="margin-top:10px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+              <input type="hidden" name="ym" value="{{ ym }}" />
+              <input type="hidden" name="kind" value="acuse" />
+              <input type="file" name="pdf" accept="application/pdf" required />
+              <button class="btn btn-primary btn-sm" type="submit">Subir PDF</button>
+            </form>
+          </div>
+        {% endif %}
+
+        {% if it.key == 'opinion' %}
+          <div style="margin-top:12px;">
+            {% if has_opinion %}
+              <a class="btn btn-secondary btn-sm" href="/portal/month-close/download/{{ ym }}/opinion?dl=1">Descargar opinión</a>
+            {% endif %}
+            <form method="post" action="/portal/month-close/upload" enctype="multipart/form-data" style="margin-top:10px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+              <input type="hidden" name="ym" value="{{ ym }}" />
+              <input type="hidden" name="kind" value="opinion" />
+              <input type="file" name="pdf" accept="application/pdf" required />
+              <button class="btn btn-primary btn-sm" type="submit">Subir PDF</button>
+            </form>
+          </div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+{% endblock %}
+

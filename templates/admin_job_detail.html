@@ -1,0 +1,54 @@
+{% extends "base_admin.html" %}
+{% block title %}Job {{ job.id }}{% endblock %}
+{% block content %}
+  <h1>Job #{{ job.id }}</h1>
+
+  <div class="card">
+    <h2>Resumen</h2>
+    <table>
+      <tbody>
+        <tr><th style="width:220px;">Issuer</th><td>{{ job.issuer_id }}{% if job.issuer_rfc %} <span class="muted">({{ job.issuer_rfc }})</span>{% endif %} {{ job.issuer_name or '' }}</td></tr>
+        <tr><th>Nombre</th><td>{{ job.name }}</td></tr>
+        <tr><th>Status</th><td>{{ job.status }}</td></tr>
+        <tr><th>Progreso</th><td>{{ job.progress }}%</td></tr>
+        <tr><th>Attempts</th><td class="muted">{{ job.attempts if job.attempts is not none else 0 }}/{{ job.max_attempts if job.max_attempts is not none else 0 }}</td></tr>
+        <tr><th>Run after</th><td class="muted">{{ job.run_after or '-' }}</td></tr>
+        <tr><th>Locked</th><td class="muted">{{ job.locked_by or '-' }}{% if job.locked_at %} <span class="muted">({{ job.locked_at }})</span>{% endif %}</td></tr>
+        <tr><th>Mensaje</th><td>{{ job.message or '-' }}</td></tr>
+        <tr><th>Creado</th><td class="muted">{{ job.created_at or '-' }}</td></tr>
+        <tr><th>Actualizado</th><td class="muted">{{ job.updated_at or '-' }}</td></tr>
+      </tbody>
+    </table>
+    <div style="margin-top:12px;">
+      <a class="btn btn-secondary" href="/admin/jobs">Volver</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Payload</h2>
+    {% if payload_pretty %}
+      <pre class="ops-result">{{ payload_pretty }}</pre>
+    {% else %}
+      <p style="margin:0;color:#64748b;">(vacío)</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h2>Resultado</h2>
+    {% if result_pretty %}
+      <pre class="ops-result">{{ result_pretty }}</pre>
+    {% else %}
+      <p style="margin:0;color:#64748b;">(vacío)</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h2>Error (error_json)</h2>
+    {% if job.error_json %}
+      <pre class="ops-result">{{ job.error_json }}</pre>
+    {% else %}
+      <p style="margin:0;color:#64748b;">(vacío)</p>
+    {% endif %}
+  </div>
+{% endblock %}
+

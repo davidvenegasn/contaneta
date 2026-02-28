@@ -38,7 +38,7 @@
             <tr>
               <th>Fecha</th>
               <th>Status</th>
-              <th>Código</th>
+              <th>Método</th>
               <th>Ruta</th>
               <th>Issuer</th>
               <th>Req ID</th>
@@ -49,12 +49,12 @@
             {% for e in error_events %}
               <tr>
                 <td class="muted">{{ e.created_at or '' }}</td>
-                <td>{{ e.status_code or '' }}</td>
-                <td><span class="badge badge--neutral badge--xs">{{ e.error_code or '' }}</span></td>
+                <td>{{ e.status or '' }}</td>
+                <td><span class="badge badge--neutral badge--xs">{{ (e.method or '') }}</span></td>
                 <td><code>{{ e.method or '' }} {{ e.path or '' }}</code></td>
                 <td class="muted">{{ e.issuer_id or '' }}</td>
                 <td><code>{{ e.request_id or '' }}</code></td>
-                <td class="muted">{{ (e.message or '')[:160] }}</td>
+                <td class="muted">{{ (e.message_public or '')[:160] }}</td>
               </tr>
             {% endfor %}
           </tbody>

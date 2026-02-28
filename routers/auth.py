@@ -158,6 +158,8 @@ def get_auth_router(templates):
     @router.get("/login", response_class=HTMLResponse)
     def login_page(request: Request, token: str = Query("", alias="token"), error: str | None = Query(None)):
         if token and token.strip():
+            if rate_limit_service.is_rate_limited(request, "token_login", window_seconds=60.0, max_attempts=20):
+                return _render_login(request, error="Demasiados intentos. Espera un minuto.")
             try:
                 issuer = issuers.get_issuer_by_token(token.strip())
             except ValueError:
