@@ -588,21 +588,29 @@ body.no-scroll{
   align-items: stretch;
 }
 
-/* Cards en el top: altura similar (desktop) */
-.home-top-grid > .ui-card{
+/* Home cards: fixed height on desktop */
+:root{ --home-card-height: 520px; }
+.home-top-grid > .ui-card,
+.home-card{
   display: flex;
   flex-direction: column;
-  min-height: 420px;
+  height: var(--home-card-height);
+  max-height: var(--home-card-height);
 }
-.home-top-grid > .ui-card .ui-card__body{
+.home-top-grid > .ui-card .ui-card__body,
+.home-card .ui-card__body{
   flex: 1;
   min-height: 0;
+  overflow: auto;
 }
 
-/* Scroll interno (si crece) */
-.home-top-grid .notifications-card .ui-card__body,
-.home-top-grid .quick-actions-card .ui-card__body{
-  overflow: auto;
+/* Hide grey scrollbar on notifications card */
+.home-card.notifications-card .ui-card__body{
+  scrollbar-width: none;          /* Firefox */
+  -ms-overflow-style: none;       /* IE/Edge */
+}
+.home-card.notifications-card .ui-card__body::-webkit-scrollbar{
+  display: none;                  /* Chrome/Safari */
 }
 
 .qi-section-head{
@@ -645,15 +653,17 @@ body.no-scroll{
 .notifications-card .notifications-placeholder p {
   line-height: 1.5;
 }
-@media (max-width: 768px){
+@media (max-width: 1100px){
   .dashboard-half-row{
     grid-template-columns: 1fr;
   }
   .home-top-grid{
     grid-template-columns: 1fr;
   }
-  .home-top-grid > .ui-card{
-    min-height: auto;
+  .home-top-grid > .ui-card,
+  .home-card{
+    height: auto;
+    max-height: none;
   }
   .home-top-grid .notifications-card .ui-card__body,
   .home-top-grid .quick-actions-card .ui-card__body{

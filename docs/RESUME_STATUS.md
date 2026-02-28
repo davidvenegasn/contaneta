@@ -29,6 +29,7 @@ c5cecf1 feat: robust jobs, crypto at-rest, notifications, month close, and match
 | **Invoice Engine** | services/invoices_engine.py, routers/invoicing.py | Validacion CFDI 4.0 (RFC, CP, regimen), compute taxes, unified builder. Submit via `/submit` |
 | **Plans + Limits** | migrations/031, services/plans.py, services/plan_guard.py | 4 planes (FREE/TRIAL/BASIC/PRO) con limites por mes |
 | **Plan Page** | templates/portal_plan.html, routers/portal.py | `/portal/plan` — usage bars, plan grid, upgrade buttons |
+| **Home Layout (EXTRA A)** | static/css/portal.css, templates/portal_home.html | Fixed-height cards (520px), scroll in notifications, hidden scrollbar, 1100px responsive breakpoint |
 
 ### PRE-EXISTENTE (antes del mega-job)
 
