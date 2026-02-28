@@ -30,6 +30,8 @@ c5cecf1 feat: robust jobs, crypto at-rest, notifications, month close, and match
 | **Plans + Limits** | migrations/031, services/plans.py, services/plan_guard.py | 4 planes (FREE/TRIAL/BASIC/PRO) con limites por mes |
 | **Plan Page** | templates/portal_plan.html, routers/portal.py | `/portal/plan` — usage bars, plan grid, upgrade buttons |
 | **Home Layout (EXTRA A)** | static/css/portal.css, templates/portal_home.html | Fixed-height cards (520px), scroll in notifications, hidden scrollbar, 1100px responsive breakpoint |
+| **Clients Toolbar (EXTRA B)** | templates/portal_clients.html | Bulk select toggle, checkbox column, icon actions (edit/delete), bulk delete |
+| **Providers Toolbar (EXTRA B)** | templates/partials/providers_list.html | Bulk select toggle, checkbox column, icon actions (copy RFC/view invoices), bulk copy RFCs |
 
 ### PRE-EXISTENTE (antes del mega-job)
 

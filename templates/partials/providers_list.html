@@ -17,6 +17,7 @@
             </svg>
             Agregar proveedor
           </button>
+          <button id="provBulkToggleBtn" type="button" class="btn btn--secondary" aria-pressed="false">Escoger varios</button>
         </div>
       </div>
       <div class="card-header__right">
@@ -25,10 +26,18 @@
       </div>
     </div>
 
+    <div id="provBulkBar" class="u-flex u-items-center u-gap-2 u-mb-2" hidden>
+      <button type="button" class="btn btn--secondary" id="provBulkCopyBtn">Copiar RFCs</button>
+      <button type="button" class="btn btn-ghost" id="provBulkCancelBtn">Cancelar</button>
+      <span class="muted u-text-12" id="provBulkCountText"></span>
+    </div>
     <div class="table-wrap table-wrap--overflow" id="provTableWrap">
       <table class="table table--zebra table--min-w-900" id="provTable">
         <thead>
           <tr>
+            <th id="provBulkTh" hidden style="width:40px;">
+              <input type="checkbox" id="provBulkSelectAll" aria-label="Seleccionar todos" />
+            </th>
             <th class="th--w-140">RFC</th>
             <th class="th--w-260">Razón social</th>
             <th class="th--w-100">Facturas</th>
@@ -275,6 +284,71 @@
     }
   });
 
+  // Bulk mode for providers
+  var provBulkMode = false;
+  var provSelected = new Set();
+  const provBulkToggle = document.getElementById('provBulkToggleBtn');
+  const provBulkBar = document.getElementById('provBulkBar');
+  const provBulkTh = document.getElementById('provBulkTh');
+  const provBulkSelectAll = document.getElementById('provBulkSelectAll');
+  const provBulkCopyBtn = document.getElementById('provBulkCopyBtn');
+  const provBulkCancelBtn = document.getElementById('provBulkCancelBtn');
+  const provBulkCountText = document.getElementById('provBulkCountText');
+
+  function setProvBulkMode(on) {
+    provBulkMode = !!on;
+    if (provBulkToggle) {
+      provBulkToggle.setAttribute('aria-pressed', provBulkMode ? 'true' : 'false');
+      provBulkToggle.textContent = provBulkMode ? 'Cancelar seleccion' : 'Escoger varios';
+    }
+    if (provBulkBar) provBulkBar.hidden = !provBulkMode;
+    if (provBulkTh) provBulkTh.hidden = !provBulkMode;
+    document.querySelectorAll('.provBulkTd').forEach(function (td) { td.hidden = !provBulkMode; });
+    if (!provBulkMode) {
+      provSelected.clear();
+      document.querySelectorAll('.js-prov-bulk-item').forEach(function (cb) { cb.checked = false; });
+      if (provBulkSelectAll) provBulkSelectAll.checked = false;
+    }
+    refreshProvBulkCount();
+  }
+  function refreshProvBulkCount() {
+    if (provBulkCountText) provBulkCountText.textContent = provSelected.size ? (provSelected.size + ' seleccionados') : '';
+  }
+  if (provBulkToggle) provBulkToggle.addEventListener('click', function () { setProvBulkMode(!provBulkMode); });
+  if (provBulkCancelBtn) provBulkCancelBtn.addEventListener('click', function () { setProvBulkMode(false); });
+
+  // Delegated events for bulk checkboxes (rows are dynamic)
+  document.addEventListener('change', function (e) {
+    if (!e.target.classList.contains('js-prov-bulk-item')) return;
+    var rfc = e.target.getAttribute('data-rfc');
+    if (!rfc) return;
+    if (e.target.checked) provSelected.add(rfc); else provSelected.delete(rfc);
+    refreshProvBulkCount();
+  });
+  if (provBulkSelectAll) provBulkSelectAll.addEventListener('change', function () {
+    var checked = !!provBulkSelectAll.checked;
+    document.querySelectorAll('.js-prov-bulk-item').forEach(function (cb) {
+      cb.checked = checked;
+      var rfc = cb.getAttribute('data-rfc');
+      if (!rfc) return;
+      if (checked) provSelected.add(rfc); else provSelected.delete(rfc);
+    });
+    refreshProvBulkCount();
+  });
+  if (provBulkCopyBtn) provBulkCopyBtn.addEventListener('click', async function () {
+    if (!provSelected.size) {
+      window.portalToast && window.portalToast({ type: 'info', title: 'Selecciona proveedores', message: 'Elige uno o mas proveedores.' });
+      return;
+    }
+    var rfcs = Array.from(provSelected).join('\n');
+    try {
+      await navigator.clipboard.writeText(rfcs);
+      window.portalToast && window.portalToast({ type: 'success', title: 'Copiado', message: provSelected.size + ' RFC(s) copiados al portapapeles.' });
+    } catch (_) {
+      window.portalToast && window.portalToast({ type: 'danger', title: 'Error', message: 'No se pudo copiar.' });
+    }
+  });
+
   const hl = (text, q) => (window.uiHighlightSearch ? window.uiHighlightSearch(text, q) : esc(text));
 
   function rowHTML(r, searchQ){
@@ -283,16 +357,32 @@
     const name = q ? hl(r.legal_name || '—', q) : esc(r.legal_name || '—');
     const count = Number(r.facturas_count) || 0;
     const total = fmtMoney(r.total_recibido);
+    const bulkHidden = provBulkMode ? '' : ' hidden';
 
     return `
       <tr>
+        <td class="provBulkTd"${bulkHidden}>
+          <input type="checkbox" class="js-prov-bulk-item" data-rfc="${esc(r.rfc || '')}" aria-label="Seleccionar ${esc(r.legal_name || r.rfc || '')}" />
+        </td>
         <td><code>${rfc}</code></td>
         <td><div class="u-fw-650">${name}</div></td>
         <td>${count}</td>
         <td class="muted">$${total} MXN</td>
         <td>
-          <button type="button" class="btn btn-small btn-ghost" data-copy="${esc(r.rfc || '')}">Copiar RFC</button>
-          <button type="button" class="btn btn-small" data-provider-rfc="${esc(r.rfc || '')}" data-provider-name="${esc(r.legal_name || '')}">Ver facturas</button>
+          <div class="u-flex u-gap-2 u-items-center">
+            <button type="button" class="icon-btn" title="Copiar RFC" aria-label="Copiar RFC ${esc(r.rfc || '')}" data-copy="${esc(r.rfc || '')}">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <rect x="9" y="9" width="13" height="13" rx="2" stroke="currentColor" stroke-width="1.75"/>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke="currentColor" stroke-width="1.75"/>
+              </svg>
+            </button>
+            <button type="button" class="icon-btn" title="Ver facturas" aria-label="Ver facturas de ${esc(r.legal_name || '')}" data-provider-rfc="${esc(r.rfc || '')}" data-provider-name="${esc(r.legal_name || '')}">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7z" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M14 2v5h5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+          </div>
         </td>
       </tr>
     `;
