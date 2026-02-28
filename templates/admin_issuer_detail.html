@@ -1,0 +1,66 @@
+{% extends "base_admin.html" %}
+{% block title %}Issuer #{{ issuer.id }} — {{ issuer.rfc or 'Sin RFC' }}{% endblock %}
+{% block content %}
+  <p style="margin:0 0 8px;"><a href="/admin/issuers" style="color:#0369a1;">&larr; Issuers</a></p>
+  <h1>{{ issuer.razon_social or 'Sin razón social' }}</h1>
+
+  <div class="card">
+    <h2>Datos del emisor</h2>
+    <table>
+      <tr><th style="width:160px;">ID</th><td>{{ issuer.id }}</td></tr>
+      <tr><th>RFC</th><td>{{ issuer.rfc or '-' }}</td></tr>
+      <tr><th>Razón social</th><td>{{ issuer.razon_social or '-' }}</td></tr>
+      <tr><th>Régimen fiscal</th><td>{{ issuer.regimen_fiscal or '-' }}</td></tr>
+      <tr><th>Estado</th><td>{{ 'Activo' if issuer.active else 'Inactivo' }}</td></tr>
+      <tr><th>Plan</th><td>
+        {% if issuer.plan %}
+          {{ issuer.plan }}{% if issuer.plan_status %} <span class="muted">({{ issuer.plan_status }})</span>{% endif %}
+        {% else %}
+          {% if issuer.trial_expires_at %}
+            trial <span class="muted">({{ issuer.trial_expires_at }})</span>
+          {% else %}
+            free
+          {% endif %}
+        {% endif %}
+      </td></tr>
+      <tr><th>Facturapi Org</th><td><code>{{ issuer.facturapi_org_id or '-' }}</code></td></tr>
+    </table>
+  </div>
+
+  {% if can_impersonate %}
+  <div class="card">
+    <h2>Acciones</h2>
+    <form method="post" action="/admin/impersonate-form" style="display:inline;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+      <input type="hidden" name="issuer_id" value="{{ issuer.id }}" />
+      <button type="submit" class="btn btn-primary btn-sm">Impersonar este issuer</button>
+    </form>
+  </div>
+  {% endif %}
+
+  <div class="card">
+    <h2>Notas de admin</h2>
+    <form method="post" action="/admin/issuers/{{ issuer.id }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+      <div style="margin-bottom:12px;">
+        <label for="admin_notes" style="display:block; font-weight:500; margin-bottom:4px;">Notas internas</label>
+        <textarea id="admin_notes" name="admin_notes" rows="4"
+          style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:8px; font-family:inherit; font-size:14px; resize:vertical;"
+          placeholder="Notas visibles solo para admins...">{{ meta.admin_notes or '' }}</textarea>
+      </div>
+      <div style="margin-bottom:16px;">
+        <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+          <input type="hidden" name="needs_review" value="0" />
+          <input type="checkbox" name="needs_review" value="1"
+            {% if meta.needs_review %}checked{% endif %}
+            style="width:18px; height:18px;" />
+          <span style="font-weight:500;">Necesita revisión</span>
+        </label>
+      </div>
+      <button type="submit" class="btn btn-primary">Guardar notas</button>
+      {% if meta.updated_at %}
+        <span class="muted" style="margin-left:12px; font-size:13px;">Última actualización: {{ meta.updated_at }}</span>
+      {% endif %}
+    </form>
+  </div>
+{% endblock %}

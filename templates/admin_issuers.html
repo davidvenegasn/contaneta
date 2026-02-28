@@ -9,16 +9,33 @@
   <div class="card">
     {% if issuers %}
     <table>
-      <thead><tr><th>ID</th><th>RFC</th><th>Razón social</th><th>Régimen</th><th>Activo</th><th>facturapi_org_id</th><th>Acción</th></tr></thead>
+      <thead><tr><th>ID</th><th>RFC</th><th>Razón social</th><th>Plan</th><th>Estado</th><th>Último SAT sync</th><th>Último error</th><th>Acción</th></tr></thead>
       <tbody>
       {% for i in issuers %}
       <tr>
         <td>{{ i.id }}</td>
-        <td>{{ i.rfc or '-' }}</td>
+        <td><a href="/admin/issuers/{{ i.id }}" style="color:#0369a1;">{{ i.rfc or '-' }}</a></td>
         <td>{{ i.razon_social or '-' }}</td>
-        <td>{{ i.regimen_fiscal or '-' }}</td>
-        <td>{{ 'Sí' if i.active else 'No' }}</td>
-        <td>{{ i.facturapi_org_id or '-' }}</td>
+        <td>
+          {% if i.plan %}
+            {{ i.plan }}{% if i.plan_status %} <span class="muted">({{ i.plan_status }})</span>{% endif %}
+          {% else %}
+            {% if i.trial_expires_at %}
+              trial <span class="muted">({{ i.trial_expires_at }})</span>
+            {% else %}
+              free
+            {% endif %}
+          {% endif %}
+        </td>
+        <td>{{ 'Activo' if i.active else 'Inactivo' }}</td>
+        <td class="muted">{{ i.last_sat_sync_at or '-' }}</td>
+        <td class="muted">
+          {% if i.last_error_request_id %}
+            <code>{{ i.last_error_request_id }}</code>{% if i.last_error_at %} <span class="muted">{{ i.last_error_at }}</span>{% endif %}
+          {% else %}
+            -
+          {% endif %}
+        </td>
         <td>
           {% if can_impersonate %}
           <form method="post" action="/admin/impersonate-form" style="display:inline;">

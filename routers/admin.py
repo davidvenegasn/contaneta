@@ -1,16 +1,23 @@
 """Rutas solo admin/owner: dashboard, listas, impersonación con auditoría, ops."""
+import json
 import os
+import secrets
 import subprocess
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import APIRouter, Request, Depends, HTTPException, Form
+from fastapi import APIRouter, Request, Depends, HTTPException, Form, Query
 from fastapi.responses import RedirectResponse, HTMLResponse
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 
 from config import DB_PATH
-from database import db, db_rows
+from database import db, db_rows, has_column
 from migrations_runner import apply_migrations
 from services import session, issuers, users, audit, csrf as csrf_service, error_events as error_events_service
+from services.action_log import log_action
+from services import admin_issuer as admin_issuer_service
+
+basic_auth = HTTPBasic(auto_error=False)
 
 
 def _get_session_user_and_issuer(request: Request) -> tuple[int, int, int | None]:
@@ -24,16 +31,30 @@ def _get_session_user_and_issuer(request: Request) -> tuple[int, int, int | None
     return user_id, issuer_id, restore_issuer_id
 
 
-def require_admin(request: Request) -> tuple[int, int, int | None]:
+def _require_basic_if_configured(credentials: HTTPBasicCredentials | None) -> None:
+    pw = (os.getenv("ADMIN_PASSWORD") or "").strip()
+    if not pw:
+        return
+    if credentials is None or not secrets.compare_digest((credentials.password or ""), pw):
+        raise HTTPException(
+            status_code=401,
+            detail="BasicAuth requerido",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+
+
+def require_admin(request: Request, credentials: HTTPBasicCredentials | None = Depends(basic_auth)) -> tuple[int, int, int | None]:
     """Dependency: exige sesión válida y rol admin. Devuelve (user_id, issuer_id, restore_issuer_id)."""
+    _require_basic_if_configured(credentials)
     user_id, issuer_id, restore_issuer_id = _get_session_user_and_issuer(request)
     if not users.user_has_admin_role(user_id):
         raise HTTPException(status_code=403, detail="Solo administradores pueden usar esta acción")
     return user_id, issuer_id, restore_issuer_id
 
 
-def require_admin_or_owner(request: Request) -> tuple[int, int, int | None]:
+def require_admin_or_owner(request: Request, credentials: HTTPBasicCredentials | None = Depends(basic_auth)) -> tuple[int, int, int | None]:
     """Dependency: exige sesión válida y rol admin u owner. Devuelve (user_id, issuer_id, restore_issuer_id)."""
+    _require_basic_if_configured(credentials)
     user_id, issuer_id, restore_issuer_id = _get_session_user_and_issuer(request)
     if not users.user_has_admin_or_owner_role(user_id):
         raise HTTPException(status_code=403, detail="Solo administradores u owners pueden acceder al panel admin")
@@ -78,15 +99,34 @@ def get_admin_router(templates):
         return {"error_events": error_events, "jobs_recent": jobs_recent, "sat_recent": sat_recent}
 
     # ---------- GET: Dashboard ----------
-    @router.get("", response_class=HTMLResponse)
-    def admin_dashboard(
-        request: Request,
-        _admin: tuple[int, int, int | None] = Depends(require_admin_or_owner),
-    ):
+    def _render_dashboard(request: Request, _admin: tuple[int, int, int | None]):
         ym = _ym_now()
         count_users = db_rows("SELECT COUNT(*) AS n FROM users")
         count_issuers = db_rows("SELECT COUNT(*) AS n FROM issuers")
         count_memberships = db_rows("SELECT COUNT(*) AS n FROM memberships")
+        active_users = db_rows("SELECT COUNT(DISTINCT user_id) AS n FROM memberships")
+        jobs_in_queue = db_rows("SELECT COUNT(*) AS n FROM jobs WHERE status IN ('queued','running')")
+        jobs_failed_today = db_rows("SELECT COUNT(*) AS n FROM jobs WHERE status = 'failed' AND date(updated_at) = date('now')")
+        last_logins = db_rows(
+            """
+            SELECT al.created_at, al.user_id, u.email AS user_email, al.issuer_id, i.rfc AS issuer_rfc
+            FROM audit_log al
+            LEFT JOIN users u ON u.id = al.user_id
+            LEFT JOIN issuers i ON i.id = al.issuer_id
+            WHERE al.action = 'login'
+            ORDER BY al.id DESC
+            LIMIT 20
+            """
+        )
+        errors_today = 0
+        try:
+            # asegurar tabla si aún no existe
+            error_events_service.list_error_events(limit=1)
+            r = db_rows("SELECT COUNT(*) AS n FROM error_events WHERE date(created_at) = date('now')")
+            errors_today = r[0]["n"] if r else 0
+        except Exception:
+            errors_today = 0
+
         sat_cfdi_by_direction = db_rows(
             """SELECT direction, COUNT(*) AS n FROM sat_cfdi
                WHERE fecha_emision IS NOT NULL AND substr(fecha_emision, 1, 7) = ?
@@ -108,11 +148,30 @@ def get_admin_router(templates):
                 "count_users": count_users[0]["n"] if count_users else 0,
                 "count_issuers": count_issuers[0]["n"] if count_issuers else 0,
                 "count_memberships": count_memberships[0]["n"] if count_memberships else 0,
+                "count_active_users": active_users[0]["n"] if active_users else 0,
+                "jobs_in_queue": jobs_in_queue[0]["n"] if jobs_in_queue else 0,
+                "jobs_failed_today": jobs_failed_today[0]["n"] if jobs_failed_today else 0,
+                "errors_today": errors_today,
+                "last_logins": last_logins,
                 "sat_cfdi_by_direction": sat_cfdi_by_direction,
                 "sat_requests_by_status": sat_requests_by_status,
                 "audit_events": audit_events,
             },
         )
+
+    @router.get("", response_class=HTMLResponse)
+    def admin_dashboard(
+        request: Request,
+        _admin: tuple[int, int, int | None] = Depends(require_admin_or_owner),
+    ):
+        return _render_dashboard(request, _admin)
+
+    @router.get("/dashboard", response_class=HTMLResponse)
+    def admin_dashboard_alias(
+        request: Request,
+        _admin: tuple[int, int, int | None] = Depends(require_admin_or_owner),
+    ):
+        return _render_dashboard(request, _admin)
 
     # ---------- GET: Users ----------
     @router.get("/users", response_class=HTMLResponse)
@@ -145,10 +204,35 @@ def get_admin_router(templates):
         user_id, _, _ = _admin
         can_impersonate = users.user_has_admin_role(user_id)
         search = (q or "").strip()
+        # asegurar tabla error_events para subqueries (si aún no existe)
+        try:
+            error_events_service.list_error_events(limit=1)
+        except Exception:
+            pass
+
+        conn = db()
+        try:
+            has_trial = has_column(conn, "issuers", "trial_expires_at")
+        finally:
+            conn.close()
+        trial_col = "i.trial_expires_at" if has_trial else "NULL AS trial_expires_at"
+
         if search:
             like = f"%{search}%"
             rows = db_rows(
-                """SELECT i.id, i.rfc, i.razon_social, i.regimen_fiscal, i.active, i.facturapi_org_id
+                f"""SELECT i.id, i.rfc, i.razon_social, i.regimen_fiscal, i.active, i.facturapi_org_id,
+                          {trial_col},
+                          (SELECT s.plan FROM memberships m JOIN subscriptions s ON s.user_id = m.user_id
+                           WHERE m.issuer_id = i.id
+                           ORDER BY CASE m.role WHEN 'owner' THEN 1 WHEN 'admin' THEN 2 ELSE 3 END, s.id DESC
+                           LIMIT 1) AS plan,
+                          (SELECT s.status FROM memberships m JOIN subscriptions s ON s.user_id = m.user_id
+                           WHERE m.issuer_id = i.id
+                           ORDER BY CASE m.role WHEN 'owner' THEN 1 WHEN 'admin' THEN 2 ELSE 3 END, s.id DESC
+                           LIMIT 1) AS plan_status,
+                          (SELECT MAX(last_run_at) FROM sat_sync_state st WHERE st.issuer_id = i.id) AS last_sat_sync_at,
+                          (SELECT request_id FROM error_events ee WHERE ee.issuer_id = i.id ORDER BY ee.id DESC LIMIT 1) AS last_error_request_id,
+                          (SELECT created_at FROM error_events ee WHERE ee.issuer_id = i.id ORDER BY ee.id DESC LIMIT 1) AS last_error_at
                    FROM issuers i
                    WHERE i.rfc LIKE ? OR i.razon_social LIKE ?
                       OR i.id IN (
@@ -161,8 +245,21 @@ def get_admin_router(templates):
             )
         else:
             rows = db_rows(
-                """SELECT id, rfc, razon_social, regimen_fiscal, active, facturapi_org_id
-                   FROM issuers ORDER BY id"""
+                f"""SELECT i.id, i.rfc, i.razon_social, i.regimen_fiscal, i.active, i.facturapi_org_id,
+                          {trial_col},
+                          (SELECT s.plan FROM memberships m JOIN subscriptions s ON s.user_id = m.user_id
+                           WHERE m.issuer_id = i.id
+                           ORDER BY CASE m.role WHEN 'owner' THEN 1 WHEN 'admin' THEN 2 ELSE 3 END, s.id DESC
+                           LIMIT 1) AS plan,
+                          (SELECT s.status FROM memberships m JOIN subscriptions s ON s.user_id = m.user_id
+                           WHERE m.issuer_id = i.id
+                           ORDER BY CASE m.role WHEN 'owner' THEN 1 WHEN 'admin' THEN 2 ELSE 3 END, s.id DESC
+                           LIMIT 1) AS plan_status,
+                          (SELECT MAX(last_run_at) FROM sat_sync_state st WHERE st.issuer_id = i.id) AS last_sat_sync_at,
+                          (SELECT request_id FROM error_events ee WHERE ee.issuer_id = i.id ORDER BY ee.id DESC LIMIT 1) AS last_error_request_id,
+                          (SELECT created_at FROM error_events ee WHERE ee.issuer_id = i.id ORDER BY ee.id DESC LIMIT 1) AS last_error_at
+                   FROM issuers i
+                   ORDER BY i.id"""
             )
         return templates.TemplateResponse(
             "admin_issuers.html",
@@ -174,6 +271,199 @@ def get_admin_router(templates):
                 "can_impersonate": can_impersonate,
                 "csrf_token": csrf_service.generate_csrf_token(),
             },
+        )
+
+    # ---------- GET/POST: Issuer detail (notas, necesita revisión) ----------
+    @router.get("/issuers/{issuer_id:int}", response_class=HTMLResponse)
+    def admin_issuer_detail(
+        request: Request,
+        issuer_id: int,
+        _admin: tuple[int, int, int | None] = Depends(require_admin_or_owner),
+    ):
+        rows = db_rows(
+            """
+            SELECT i.id, i.rfc, i.razon_social, i.regimen_fiscal, i.active, i.facturapi_org_id,
+                   i.trial_expires_at,
+                   (SELECT s.plan FROM memberships m JOIN subscriptions s ON s.user_id = m.user_id
+                    WHERE m.issuer_id = i.id ORDER BY CASE m.role WHEN 'owner' THEN 1 WHEN 'admin' THEN 2 ELSE 3 END, s.id DESC LIMIT 1) AS plan,
+                   (SELECT s.status FROM memberships m JOIN subscriptions s ON s.user_id = m.user_id
+                    WHERE m.issuer_id = i.id ORDER BY CASE m.role WHEN 'owner' THEN 1 WHEN 'admin' THEN 2 ELSE 3 END, s.id DESC LIMIT 1) AS plan_status
+            FROM issuers i WHERE i.id = ?
+            """,
+            (issuer_id,),
+        )
+        if not rows:
+            raise HTTPException(status_code=404, detail="Issuer no encontrado")
+        issuer = rows[0]
+        try:
+            issuer["trial_expires_at"] = issuer.get("trial_expires_at")
+        except Exception:
+            issuer["trial_expires_at"] = None
+        meta = admin_issuer_service.get_meta(issuer_id) or {}
+        user_id, _, _ = _admin
+        can_impersonate = users.user_has_admin_role(user_id)
+        return templates.TemplateResponse(
+            "admin_issuer_detail.html",
+            {
+                "request": request,
+                "active_page": "issuers",
+                "issuer": issuer,
+                "meta": meta,
+                "can_impersonate": can_impersonate,
+                "csrf_token": csrf_service.generate_csrf_token(),
+            },
+        )
+
+    @router.post("/issuers/{issuer_id:int}", response_class=RedirectResponse)
+    def admin_issuer_update(
+        request: Request,
+        issuer_id: int,
+        admin_notes: str | None = Form(None),
+        needs_review: str | None = Form(None),
+        csrf_token: str | None = Form(None),
+        _admin: tuple[int, int, int | None] = Depends(require_admin),
+    ):
+        token_val = (csrf_token or request.headers.get("X-CSRF-Token") or "").strip()
+        if not csrf_service.verify_csrf_token(token_val):
+            raise HTTPException(status_code=403, detail="Token CSRF inválido")
+        rows = db_rows("SELECT id FROM issuers WHERE id = ? LIMIT 1", (issuer_id,))
+        if not rows:
+            raise HTTPException(status_code=404, detail="Issuer no encontrado")
+        need_bool = None
+        if needs_review is not None and str(needs_review).strip().lower() in ("1", "true", "on", "yes"):
+            need_bool = True
+        elif needs_review is not None and str(needs_review).strip().lower() in ("0", "false", "off", "no"):
+            need_bool = False
+        admin_issuer_service.update_meta(issuer_id, admin_notes=admin_notes if admin_notes is not None else None, needs_review=need_bool)
+        log_action(request, "admin_issuer_meta_updated", issuer_id=issuer_id, admin_notes_len=len(admin_notes or ""), needs_review=need_bool)
+        return RedirectResponse(url=f"/admin/issuers/{issuer_id}", status_code=302)
+
+    # ---------- GET: Jobs ----------
+    @router.get("/jobs", response_class=HTMLResponse)
+    def admin_jobs(
+        request: Request,
+        status: str | None = Query(None),
+        issuer_id: int | None = Query(None),
+        q: str | None = Query(None),
+        _admin: tuple[int, int, int | None] = Depends(require_admin_or_owner),
+    ):
+        where = ["1=1"]
+        params: list = []
+        if status and status.strip():
+            where.append("j.status = ?")
+            params.append(status.strip())
+        if issuer_id is not None:
+            where.append("j.issuer_id = ?")
+            params.append(int(issuer_id))
+        if q and q.strip():
+            where.append("j.name LIKE ?")
+            params.append(f"%{q.strip()}%")
+        rows = db_rows(
+            f"""
+            SELECT j.id, j.issuer_id, i.rfc AS issuer_rfc, i.razon_social AS issuer_name,
+                   j.name, j.status, j.progress, j.message,
+                   j.attempts, j.max_attempts, j.run_after,
+                   j.locked_by, j.locked_at,
+                   j.created_at, j.updated_at
+            FROM jobs j
+            LEFT JOIN issuers i ON i.id = j.issuer_id
+            WHERE {' AND '.join(where)}
+            ORDER BY j.id DESC
+            LIMIT 200
+            """,
+            tuple(params),
+        )
+        return templates.TemplateResponse(
+            "admin_jobs.html",
+            {
+                "request": request,
+                "active_page": "jobs",
+                "jobs": rows,
+                "filter_status": (status or "").strip(),
+                "filter_issuer_id": issuer_id,
+                "filter_q": (q or "").strip(),
+            },
+        )
+
+    @router.get("/jobs/{job_id:int}", response_class=HTMLResponse)
+    def admin_job_detail(
+        request: Request,
+        job_id: int,
+        _admin: tuple[int, int, int | None] = Depends(require_admin_or_owner),
+    ):
+        rows = db_rows(
+            """
+            SELECT j.*, i.rfc AS issuer_rfc, i.razon_social AS issuer_name
+            FROM jobs j
+            LEFT JOIN issuers i ON i.id = j.issuer_id
+            WHERE j.id = ?
+            LIMIT 1
+            """,
+            (int(job_id),),
+        )
+        if not rows:
+            raise HTTPException(status_code=404, detail="Job no encontrado")
+        job = rows[0]
+
+        payload_pretty = ""
+        result_pretty = ""
+        try:
+            if job.get("payload_json"):
+                payload_pretty = json.dumps(json.loads(job["payload_json"]), ensure_ascii=False, indent=2)
+        except Exception:
+            payload_pretty = job.get("payload_json") or ""
+        try:
+            if job.get("result_json"):
+                result_pretty = json.dumps(json.loads(job["result_json"]), ensure_ascii=False, indent=2)
+        except Exception:
+            result_pretty = job.get("result_json") or ""
+
+        return templates.TemplateResponse(
+            "admin_job_detail.html",
+            {
+                "request": request,
+                "active_page": "jobs",
+                "job": job,
+                "payload_pretty": payload_pretty,
+                "result_pretty": result_pretty,
+            },
+        )
+
+    # ---------- GET: Errors ----------
+    @router.get("/errors", response_class=HTMLResponse)
+    def admin_errors(
+        request: Request,
+        _admin: tuple[int, int, int | None] = Depends(require_admin_or_owner),
+    ):
+        user_id, _, _ = _admin
+        can_view_internal = users.user_has_admin_role(user_id)
+        events = []
+        try:
+            events = error_events_service.list_error_events(limit=100)
+        except Exception:
+            events = []
+        return templates.TemplateResponse(
+            "admin_errors.html",
+            {
+                "request": request,
+                "active_page": "errors",
+                "events": events,
+                "can_view_internal": can_view_internal,
+            },
+        )
+
+    @router.get("/errors/{event_id:int}", response_class=HTMLResponse)
+    def admin_error_detail(
+        request: Request,
+        event_id: int,
+        _admin: tuple[int, int, int | None] = Depends(require_admin),
+    ):
+        ev = error_events_service.get_error_event(int(event_id))
+        if not ev:
+            raise HTTPException(status_code=404, detail="Evento no encontrado")
+        return templates.TemplateResponse(
+            "admin_error_detail.html",
+            {"request": request, "active_page": "errors", "event": ev},
         )
 
     # ---------- GET: Memberships ----------
@@ -348,7 +638,7 @@ def get_admin_router(templates):
         elif action == "backup":
             base_dir = Path(__file__).resolve().parent.parent
             script_db = base_dir / "scripts" / "backup_db.sh"
-            script_storage = base_dir / "scripts" / "backup_storage_xml.sh"
+            script_storage = base_dir / "scripts" / "backup_storage.sh"
             env = os.environ.copy()
             env.setdefault("APP_DB_PATH", DB_PATH)
             try:
@@ -439,6 +729,11 @@ def get_admin_router(templates):
             details=f"target_issuer_id={target_issuer['id']} rfc={target_issuer.get('rfc') or ''}",
             request=request,
         )
+        # obligatorio: action_log también (sin romper si falla)
+        try:
+            log_action(request, "impersonate_start", user_id=user_id, issuer_id=current_issuer_id, target_issuer_id=target_issuer["id"])
+        except Exception:
+            pass
         cookie_val = session.sign_session(
             user_id,
             target_issuer["id"],
@@ -509,6 +804,10 @@ def get_admin_router(templates):
             details=f"restored_issuer_id={restore_issuer_id}",
             request=request,
         )
+        try:
+            log_action(request, "impersonate_stop", user_id=user_id, issuer_id=_current_issuer_id, target_issuer_id=restore_issuer_id)
+        except Exception:
+            pass
         cookie_val = session.sign_session(user_id, restore_issuer_id, restore_issuer_id=None)
         response = RedirectResponse(url="/portal/home", status_code=302)
         response.set_cookie(
