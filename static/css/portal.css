@@ -4790,6 +4790,42 @@ body.no-scroll {
   }
 }
 
+/* Mobile list pages: hide low-value columns, wrap action buttons */
+@media (max-width: 640px) {
+  /* Clients: hide CP and "Última vez visto" columns (nth-child 4,5 — col 1 is hidden bulk checkbox) */
+  .page-section--clients .table th:nth-child(4),
+  .page-section--clients .table td:nth-child(4),
+  .page-section--clients .table th:nth-child(5),
+  .page-section--clients .table td:nth-child(5) {
+    display: none;
+  }
+  /* Products: hide IVA column (always 16%, no info value) */
+  .page-section--products .table th:nth-child(4),
+  .page-section--products .table td:nth-child(4) {
+    display: none;
+  }
+  /* Quotations: hide "Link para cliente" column */
+  .page-section--quotations .table th:nth-child(5),
+  .page-section--quotations .table td:nth-child(5) {
+    display: none;
+  }
+  /* Quotations: action buttons stack vertically */
+  .page-section--quotations .table td:last-child {
+    white-space: normal;
+  }
+  .page-section--quotations .table td:last-child .btn {
+    display: block;
+    width: 100%;
+    margin-bottom: 4px;
+    text-align: center;
+  }
+  /* Bulk bar: wrap buttons on small screens */
+  #clientsBulkBar,
+  #productsBulkBar {
+    flex-wrap: wrap;
+  }
+}
+
 /* Datos fiscales + header con back */
 .app-header--with-back {
   display: flex;
