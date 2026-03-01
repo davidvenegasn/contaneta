@@ -7,15 +7,24 @@
       </button>
     </div>
     <div class="portal-drawer__links">
-      <a class="drawer-link {{ 'drawer-link--active' if (active_page == 'create' or (nav_is_active is defined and nav_is_active('/portal/create'))) else '' }}" href="/portal/create">Nueva factura</a>
-      <a class="drawer-link {{ 'drawer-link--active' if (active_page == 'home' or (nav_is_active is defined and nav_is_active('/portal/home'))) else '' }}" href="/portal/home">Inicio</a>
-      <a class="drawer-link {{ 'drawer-link--active' if (active_page == 'bank_movements' or (nav_is_active is defined and nav_is_active('/portal/movimientos'))) else '' }}" href="/portal/movimientos">Movimientos</a>
-      <a class="drawer-link {{ 'drawer-link--active' if (active_page in ['facturas_hub','issued','received'] or (nav_is_active is defined and (nav_is_active('/portal/facturas') or nav_is_active('/portal/invoices')))) else '' }}" href="/portal/facturas">Facturas</a>
-      <a class="drawer-link {{ 'drawer-link--active' if (active_page in ['contactos_hub','clients','providers'] or (nav_is_active is defined and (nav_is_active('/portal/contactos') or nav_is_active('/portal/clients') or nav_is_active('/portal/providers')))) else '' }}" href="/portal/contactos">Clientes</a>
-      <a class="drawer-link {{ 'drawer-link--active' if (active_page in ['products','product_suggestions'] or (nav_is_active is defined and nav_is_active('/portal/products'))) else '' }}" href="/portal/products">Productos</a>
-      <a class="drawer-link {{ 'drawer-link--active' if (active_page == 'quotations' or (nav_is_active is defined and nav_is_active('/portal/cotizaciones'))) else '' }}" href="/portal/cotizaciones">Cotizaciones</a>
-      <a class="drawer-link {{ 'drawer-link--active' if (active_page == 'convertir_edo_cuenta' or (nav_is_active is defined and nav_is_active('/portal/convertir-edo-cuenta'))) else '' }}" href="/portal/convertir-edo-cuenta">Convertir estado de cuenta</a>
-      <a class="drawer-link {{ 'drawer-link--active' if (active_page == 'summary' or (nav_is_active is defined and nav_is_active('/portal/summary'))) else '' }}" href="/portal/summary">Resumen</a>
+      <a class="drawer-link {{ 'drawer-link--active' if (active_page == 'create' or (nav_is_active is defined and nav_is_active('/portal/create'))) else '' }}" href="/portal/create">
+        <span class="drawer-link__icon" aria-hidden="true">{{ icon_create() }}</span>Nueva factura</a>
+      <a class="drawer-link {{ 'drawer-link--active' if (active_page == 'home' or (nav_is_active is defined and nav_is_active('/portal/home'))) else '' }}" href="/portal/home">
+        <span class="drawer-link__icon" aria-hidden="true">{{ icon_home() }}</span>Inicio</a>
+      <a class="drawer-link {{ 'drawer-link--active' if (active_page == 'bank_movements' or (nav_is_active is defined and nav_is_active('/portal/movimientos'))) else '' }}" href="/portal/movimientos">
+        <span class="drawer-link__icon" aria-hidden="true">{{ icon_movements() }}</span>Movimientos</a>
+      <a class="drawer-link {{ 'drawer-link--active' if (active_page in ['facturas_hub','issued','received'] or (nav_is_active is defined and (nav_is_active('/portal/facturas') or nav_is_active('/portal/invoices')))) else '' }}" href="/portal/facturas">
+        <span class="drawer-link__icon" aria-hidden="true">{{ icon_issued() }}</span>Facturas</a>
+      <a class="drawer-link {{ 'drawer-link--active' if (active_page in ['contactos_hub','clients','providers'] or (nav_is_active is defined and (nav_is_active('/portal/contactos') or nav_is_active('/portal/clients') or nav_is_active('/portal/providers')))) else '' }}" href="/portal/contactos">
+        <span class="drawer-link__icon" aria-hidden="true">{{ icon_clients() }}</span>Clientes</a>
+      <a class="drawer-link {{ 'drawer-link--active' if (active_page in ['products','product_suggestions'] or (nav_is_active is defined and nav_is_active('/portal/products'))) else '' }}" href="/portal/products">
+        <span class="drawer-link__icon" aria-hidden="true">{{ icon_products() }}</span>Productos</a>
+      <a class="drawer-link {{ 'drawer-link--active' if (active_page == 'quotations' or (nav_is_active is defined and nav_is_active('/portal/cotizaciones'))) else '' }}" href="/portal/cotizaciones">
+        <span class="drawer-link__icon" aria-hidden="true">{{ icon_quotations() }}</span>Cotizaciones</a>
+      <a class="drawer-link {{ 'drawer-link--active' if (active_page == 'convertir_edo_cuenta' or (nav_is_active is defined and nav_is_active('/portal/convertir-edo-cuenta'))) else '' }}" href="/portal/convertir-edo-cuenta">
+        <span class="drawer-link__icon" aria-hidden="true">{{ icon_bank() }}</span>Convertir estado de cuenta</a>
+      <a class="drawer-link {{ 'drawer-link--active' if (active_page == 'summary' or (nav_is_active is defined and nav_is_active('/portal/summary'))) else '' }}" href="/portal/summary">
+        <span class="drawer-link__icon" aria-hidden="true">{{ icon_summary() }}</span>Resumen</a>
     </div>
   </div>
 </aside>
