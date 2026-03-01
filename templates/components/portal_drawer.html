@@ -2,6 +2,9 @@
   <div class="portal-drawer__inner">
     <div class="portal-drawer__head">
       <span class="portal-drawer__brand">ContaNeta</span>
+      <button type="button" class="mobile-menu-close" id="mobileMenuClose" aria-label="Cerrar menú">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
     </div>
     <div class="portal-drawer__links">
       <a class="drawer-link {{ 'drawer-link--active' if (active_page == 'create' or (nav_is_active is defined and nav_is_active('/portal/create'))) else '' }}" href="/portal/create">Nueva factura</a>
