@@ -336,6 +336,7 @@ button.rail-item {
 .topbar-hamburger__icon {
   display: block;
   transition: transform 250ms ease;
+  pointer-events: none;
 }
 body.mobile-menu-open .topbar-hamburger__icon {
   transform: rotate(180deg);
