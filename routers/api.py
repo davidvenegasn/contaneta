@@ -364,7 +364,7 @@ def api_customers_create(request: Request, payload: ClientCreate = Body(...), is
         )
         conn.commit()
         conn.close()
-        return {"ok": True, "data": {"rfc": rfc}}
+        return ok({"rfc": rfc})
     except HTTPException:
         raise
     except Exception:
@@ -388,7 +388,7 @@ def api_customers_delete(request: Request, payload: dict = Body(...), issuer: di
         conn.close()
         if cur.rowcount == 0:
             raise HTTPException(status_code=404, detail="Cliente no encontrado")
-        return {"ok": True, "data": {"rfc": rfc}}
+        return ok({"rfc": rfc})
     except HTTPException:
         raise
     except Exception:
@@ -441,7 +441,7 @@ def api_products_create(request: Request, payload: ProductCreate = Body(...), is
         conn.commit()
         rid = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
         conn.close()
-        return {"ok": True, "data": {"id": rid}}
+        return ok({"id": rid})
     except HTTPException:
         raise
     except Exception:
@@ -473,7 +473,7 @@ def api_products_delete(request: Request, payload: dict = Body(...), issuer: dic
     conn.close()
     if cur.rowcount == 0:
         raise HTTPException(status_code=404, detail="Producto no encontrado o ya fue eliminado.")
-    return {"ok": True}
+    return ok()
 
 
 # ----- Quick invoice (Home: cliente + producto → timbrar sin salir) -----
@@ -1325,7 +1325,7 @@ def api_quotations_create(request: Request, payload: dict = Body(...), issuer: d
             )
         conn.commit()
         conn.close()
-        return {"ok": True, "data": {"id": qid, "public_token": public_token}}
+        return ok({"id": qid, "public_token": public_token})
     except HTTPException:
         raise
     except Exception:
@@ -1391,7 +1391,7 @@ def api_quotations_update_status(request: Request, payload: dict = Body(...), is
         conn.close()
         if cur.rowcount == 0:
             raise HTTPException(status_code=404, detail="Cotización no encontrada")
-        return {"ok": True, "data": {"id": qid, "status": status}}
+        return ok({"id": qid, "status": status})
     except HTTPException:
         raise
     except Exception:
@@ -1438,7 +1438,7 @@ def api_quotations_respond(request: Request, payload: dict = Body(...)):
         )
     conn.commit()
     conn.close()
-    return {"ok": True, "data": {"status": status}}
+    return ok({"status": status})
 
 
 # ----- Provider invoices -----
@@ -1610,7 +1610,7 @@ def api_providers_create(request: Request, payload: dict = Body(...), issuer: di
         )
         conn.commit()
         conn.close()
-        return {"ok": True, "data": {"rfc": rfc}}
+        return ok({"rfc": rfc})
     except HTTPException:
         raise
     except Exception:
