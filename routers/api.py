@@ -123,32 +123,11 @@ def api_account_status(request: Request, issuer: dict = Depends(get_portal_issue
         prod = db_rows("SELECT COUNT(*) AS n FROM issuer_products WHERE issuer_id = ?", (issuer_id,))
         has_product = (prod[0]["n"] if prod else 0) >= 1
 
-        # P36: sync status (mismo criterio que /portal/sat/status)
-        running = db_rows(
-            "SELECT 1 FROM sat_jobs WHERE issuer_id = ? AND status IN ('queued','running') LIMIT 1",
-            (issuer_id,),
-        )
-        last_ok = db_rows(
-            "SELECT MAX(finished_at) AS t FROM sat_jobs WHERE issuer_id = ? AND status = 'ok'",
-            (issuer_id,),
-        )
-        last_error = db_rows(
-            "SELECT finished_at, last_error FROM sat_jobs WHERE issuer_id = ? AND status = 'error' ORDER BY finished_at DESC LIMIT 1",
-            (issuer_id,),
-        )
-        sync_state = db_rows(
-            "SELECT MAX(last_run_at) AS t FROM sat_sync_state WHERE issuer_id = ?",
-            (issuer_id,),
-        )
-        last_sync_at = (sync_state and sync_state[0].get("t")) or (last_ok and last_ok[0].get("t")) or None
-        if running:
-            sync_status = "running"
-        elif last_error and last_ok and last_error[0].get("t") and last_ok[0].get("t") and last_error[0]["t"] > last_ok[0]["t"]:
-            sync_status = "error"
-        elif last_error and not last_ok:
-            sync_status = "error"
-        else:
-            sync_status = "ok"
+        # P36: sync status (shared logic from services.sat_sync)
+        from services.sat_sync import get_sat_sync_status
+        _sync = get_sat_sync_status(issuer_id)
+        last_sync_at = _sync["last_sync_at"]
+        sync_status = _sync["status"]
 
         # P36: plan_label Trial / Pro
         if subscription_service.is_subscription_active(user_id):
