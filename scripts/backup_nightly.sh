@@ -11,8 +11,9 @@
 set -euo pipefail
 
 APP_DIR="${APP_DIR:-/opt/contaneta}"
-DB_PATH="${APP_DB_PATH:-$APP_DIR/invoicing.db}"
-BACKUP_DIR="${BACKUP_DIR:-$APP_DIR/backups}"
+DB_PATH="${APP_DB_PATH:-/var/lib/contaneta/invoicing.db}"
+BACKUP_DIR="${BACKUP_DIR:-/var/backups/contaneta}"
+STORAGE_BASE="${APP_STORAGE_PATH:-/var/lib/contaneta/storage}"
 RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-7}"
 DATE=$(date +%Y%m%d_%H%M%S)
 HOSTNAME=$(hostname -s)
@@ -32,14 +33,13 @@ else
 fi
 
 # 2) Storage backup (XML files, credentials excluded)
-STORAGE_DIR="$APP_DIR/storage"
-if [ -d "$STORAGE_DIR" ]; then
+if [ -d "$STORAGE_BASE" ]; then
     STORAGE_BACKUP="$BACKUP_DIR/storage_${DATE}.tar.gz"
     tar czf "$STORAGE_BACKUP" \
-        -C "$APP_DIR" \
-        --exclude="storage/credentials" \
-        --exclude="storage/temp" \
-        storage/ 2>/dev/null || true
+        -C "$(dirname "$STORAGE_BASE")" \
+        --exclude="*/credentials" \
+        --exclude="*/temp" \
+        "$(basename "$STORAGE_BASE")" 2>/dev/null || true
     echo "  Storage backup: $STORAGE_BACKUP ($(du -h "$STORAGE_BACKUP" | cut -f1))"
 fi
 

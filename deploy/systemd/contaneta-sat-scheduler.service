@@ -1,5 +1,5 @@
-# ContaNeta SAT Scheduler (enqueue auto-sync jobs)
-# Triggered by contaneta-sat-scheduler.timer
+# ContaNeta SAT Scheduler (enqueue auto-sync jobs for eligible issuers)
+# Triggered by contaneta-sat-scheduler.timer — do NOT enable this .service directly.
 # Copy to /etc/systemd/system/contaneta-sat-scheduler.service
 
 [Unit]
@@ -8,16 +8,18 @@ After=network.target
 
 [Service]
 Type=oneshot
-User=deploy
-Group=deploy
+User=contaneta
+Group=contaneta
 WorkingDirectory=/opt/contaneta
 EnvironmentFile=/opt/contaneta/.env
-ExecStart=/opt/contaneta/.venv/bin/python scripts/sat_scheduler.py --batch-size 50 --cooldown-hours 8 --active-days 30
-StandardOutput=append:/opt/contaneta/logs/sat_scheduler.log
-StandardError=append:/opt/contaneta/logs/sat_scheduler.log
+ExecStart=/opt/contaneta/.venv/bin/python scripts/sat_scheduler.py \
+    --batch-size 50 \
+    --cooldown-hours 8 \
+    --active-days 30
+StandardOutput=append:/var/log/contaneta/sat_scheduler.log
+StandardError=append:/var/log/contaneta/sat_scheduler.log
 
-# Security hardening
 NoNewPrivileges=yes
 ProtectSystem=strict
-ReadWritePaths=/opt/contaneta
+ReadWritePaths=/opt/contaneta /var/lib/contaneta /var/log/contaneta
 PrivateTmp=yes

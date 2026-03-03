@@ -1,0 +1,58 @@
+# ContaNeta — Caddy reverse proxy with automatic HTTPS
+# Copy to /etc/caddy/Caddyfile (or include from main Caddyfile)
+# Replace TU_DOMINIO.com with your actual domain.
+# Caddy handles HTTPS/TLS certificates automatically via Let's Encrypt.
+#
+# Install Caddy: https://caddyserver.com/docs/install
+#   sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https
+#   curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+#   curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
+#   sudo apt update && sudo apt install caddy
+#
+# Start: sudo systemctl enable caddy && sudo systemctl start caddy
+
+TU_DOMINIO.com {
+    # Reverse proxy to gunicorn
+    reverse_proxy 127.0.0.1:8000 {
+        # Pass real client IP
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+
+        # Timeouts
+        transport http {
+            read_timeout 120s
+            write_timeout 120s
+        }
+    }
+
+    # Serve static files directly (bypass gunicorn)
+    handle_path /static/* {
+        root * /opt/contaneta/static
+        file_server {
+            precompressed gzip
+        }
+        header Cache-Control "public, max-age=604800, immutable"
+    }
+
+    # Security headers
+    header {
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "SAMEORIGIN"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        -Server
+    }
+
+    # Max upload size (FIEL .cer/.key + bank PDFs)
+    request_body {
+        max_size 10MB
+    }
+
+    # Access log
+    log {
+        output file /var/log/contaneta/caddy_access.log {
+            roll_size 50MiB
+            roll_keep 5
+        }
+    }
+}

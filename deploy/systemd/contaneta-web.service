@@ -1,6 +1,9 @@
 # ContaNeta Web Application (FastAPI + Gunicorn/Uvicorn)
 # Copy to /etc/systemd/system/contaneta-web.service
 # sudo systemctl daemon-reload && sudo systemctl enable contaneta-web && sudo systemctl start contaneta-web
+#
+# NOTE: 1 gunicorn worker recommended for SQLite (no concurrent writes).
+# If you need more throughput, use --threads 4 instead of -w 2.
 
 [Unit]
 Description=ContaNeta Web (FastAPI)
@@ -9,27 +12,28 @@ Wants=contaneta-sat-worker.service
 
 [Service]
 Type=simple
-User=deploy
-Group=deploy
+User=contaneta
+Group=contaneta
 WorkingDirectory=/opt/contaneta
 EnvironmentFile=/opt/contaneta/.env
 ExecStart=/opt/contaneta/.venv/bin/gunicorn app:app \
     -k uvicorn.workers.UvicornWorker \
     -w 1 \
+    --threads 4 \
     -b 127.0.0.1:8000 \
     --timeout 120 \
     --graceful-timeout 30 \
-    --access-logfile /opt/contaneta/logs/access.log \
-    --error-logfile /opt/contaneta/logs/error.log
+    --access-logfile /var/log/contaneta/access.log \
+    --error-logfile /var/log/contaneta/error.log
 Restart=always
 RestartSec=5
-StandardOutput=append:/opt/contaneta/logs/web.log
-StandardError=append:/opt/contaneta/logs/web.log
+StandardOutput=append:/var/log/contaneta/web.log
+StandardError=append:/var/log/contaneta/web.log
 
 # Security hardening
 NoNewPrivileges=yes
 ProtectSystem=strict
-ReadWritePaths=/opt/contaneta
+ReadWritePaths=/opt/contaneta /var/lib/contaneta /var/log/contaneta /var/backups/contaneta
 PrivateTmp=yes
 
 [Install]
