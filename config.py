@@ -71,6 +71,14 @@ SITE_URL = (os.getenv("SITE_URL") or "").strip() or None
 # Portal shell V2: rail + drawer (Mindtrip-style, delgado a la izquierda solo iconos). 0 = sidebar clásico; 1 = rail + drawer.
 PORTAL_SHELL_V2 = os.getenv("PORTAL_SHELL_V2", "0") == "1"
 
+# AT_REST_MASTER_KEY: strongly recommended in prod for independent encryption key
+AT_REST_MASTER_KEY_SET = bool((os.getenv("AT_REST_MASTER_KEY") or "").strip())
+if IS_PROD and not AT_REST_MASTER_KEY_SET:
+    _log.warning(
+        "AT_REST_MASTER_KEY no definido en producción. Se usará fallback (SHA256 de SESSION_SECRET). "
+        "Se recomienda configurarlo: python3 -c \"import secrets; print(secrets.token_hex(32))\""
+    )
+
 # En prod con Stripe: SITE_URL recomendado para redirects de checkout y webhooks
 if IS_PROD and STRIPE_SECRET_KEY and not SITE_URL:
     _log.critical(

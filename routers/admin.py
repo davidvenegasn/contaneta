@@ -10,7 +10,7 @@ from fastapi import APIRouter, Request, Depends, HTTPException, Form, Query
 from fastapi.responses import RedirectResponse, HTMLResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 
-from config import DB_PATH
+from config import DB_PATH, ENV, IS_PROD, DEV_MODE, SESSION_SECRET_FROM_ENV, AT_REST_MASTER_KEY_SET, COOKIE_SECURE, SITE_URL, STRIPE_SECRET_KEY
 from database import db, db_rows, has_column
 from migrations_runner import apply_migrations
 from services import session, issuers, users, audit, csrf as csrf_service, error_events as error_events_service
@@ -865,6 +865,50 @@ def get_admin_router(templates):
   </div>
 </body>
 </html>"""
+        return HTMLResponse(html)
+
+    # ---------- GET: Admin config check ----------
+    @router.get("/config", response_class=HTMLResponse)
+    def admin_config(
+        request: Request,
+        _admin: tuple[int, int, int | None] = Depends(require_admin_or_owner),
+    ):
+        """Show environment config status (no secrets revealed)."""
+        checks = [
+            ("ENV", ENV, ENV == "prod", "Should be 'prod' in production"),
+            ("SESSION_SECRET", "set from .env" if SESSION_SECRET_FROM_ENV else "auto-generated", SESSION_SECRET_FROM_ENV, "Must be set in .env for prod"),
+            ("AT_REST_MASTER_KEY", "configured" if AT_REST_MASTER_KEY_SET else "using fallback", AT_REST_MASTER_KEY_SET, "Recommended: dedicated encryption key"),
+            ("COOKIE_SECURE", "yes" if COOKIE_SECURE else "no", COOKIE_SECURE or not IS_PROD, "Must be true in prod (HTTPS)"),
+            ("DEV_MODE", "on" if DEV_MODE else "off", not DEV_MODE or not IS_PROD, "Must be off in prod"),
+            ("SITE_URL", SITE_URL or "not set", bool(SITE_URL), "Required for Stripe callbacks and emails"),
+            ("STRIPE_SECRET_KEY", "configured" if STRIPE_SECRET_KEY else "not set", True, "Optional — only if billing enabled"),
+            ("DB_PATH", DB_PATH, True, ""),
+        ]
+        rows_html = ""
+        for label, value, ok, hint in checks:
+            icon = "✅" if ok else "⚠️"
+            rows_html += f'<tr><td><strong>{label}</strong></td><td>{value}</td><td>{icon}</td><td class="muted">{hint}</td></tr>'
+        html = f"""<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"/><title>Config Check</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+body {{ font-family: "Plus Jakarta Sans",system-ui,sans-serif; margin: 16px; background: #f0fdf9; color: #0d1f1c; }}
+.wrap {{ max-width: 800px; margin: 0 auto; }}
+.card {{ background: #fff; border-radius: 8px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }}
+table {{ width: 100%; border-collapse: collapse; }}
+th, td {{ padding: 8px 10px; text-align: left; border-bottom: 1px solid #e2e8f0; }}
+th {{ background: #f8fafc; font-size: 12px; color: #64748b; text-transform: uppercase; }}
+.muted {{ color: #64748b; font-size: 13px; }}
+a {{ color: #0369a1; text-decoration: none; }}
+</style></head><body>
+<div class="wrap">
+  <p><a href="/admin/dashboard">&larr; Dashboard</a></p>
+  <h1>Config Check</h1>
+  <div class="card">
+    <table><thead><tr><th>Variable</th><th>Value</th><th>Status</th><th>Notes</th></tr></thead>
+    <tbody>{rows_html}</tbody></table>
+  </div>
+</div></body></html>"""
         return HTMLResponse(html)
 
     # ---------- GET / POST: Ops ----------
