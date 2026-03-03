@@ -39,7 +39,7 @@
       <tr><th style="width:160px;">Último éxito</th><td class="muted">{{ sync_state.last_success_at or '-' }}</td></tr>
       <tr><th>Último intento</th><td class="muted">{{ sync_state.last_attempt_at or '-' }}</td></tr>
       <tr><th>Último error</th><td>{% if sync_state.last_error %}<span style="color:#dc2626;">{{ sync_state.last_error }}</span>{% else %}-{% endif %}</td></tr>
-      <tr><th>Cooldown hasta</th><td class="muted">{{ sync_state.cooldown_until or '-' }}</td></tr>
+      <tr><th>Cooldown hasta</th><td>{% if sync_state.cooldown_until %}<span class="badge badge--xs badge--warning">{{ sync_state.cooldown_until }}</span>{% else %}<span class="muted">-</span>{% endif %}</td></tr>
     </table>
   </div>
   {% endif %}
