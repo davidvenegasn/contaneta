@@ -40,6 +40,24 @@ from routers.invoicing import get_invoicing_router
 from routers.admin import get_admin_router
 from routers.billing import router as billing_router
 
+# Optional Sentry integration
+_sentry_dsn = os.environ.get("SENTRY_DSN", "").strip()
+if _sentry_dsn:
+    try:
+        import sentry_sdk
+        from sentry_sdk.integrations.fastapi import FastApiIntegration
+        from sentry_sdk.integrations.starlette import StarletteIntegration
+        sentry_sdk.init(
+            dsn=_sentry_dsn,
+            environment=os.environ.get("ENV", "dev"),
+            traces_sample_rate=float(os.environ.get("SENTRY_TRACES_RATE", "0.1")),
+            integrations=[StarletteIntegration(), FastApiIntegration()],
+            send_default_pii=False,
+        )
+        logging.getLogger(__name__).info("Sentry initialized (env=%s)", os.environ.get("ENV", "dev"))
+    except ImportError:
+        logging.getLogger(__name__).warning("SENTRY_DSN set but sentry-sdk not installed. pip install sentry-sdk[fastapi]")
+
 app = FastAPI()
 if os.path.isdir(STATIC_DIR):
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
@@ -733,6 +751,11 @@ def health():
     status = "ok" if checks["db_readable"] else "degraded"
     versions = checks.get("migrations_versions") or []
     migration_version = versions[-1] if versions else None
+    try:
+        import pdfplumber  # noqa: F401
+        pdfplumber_ok = True
+    except ImportError:
+        pdfplumber_ok = False
     return {
         "status": status,
         "db": "ok" if checks["db_readable"] else "error",
@@ -741,6 +764,7 @@ def health():
         "migration_version": migration_version,
         "storage_exists": checks["storage_exists"],
         "storage_writable": checks["storage_writable"],
+        "pdfplumber_available": pdfplumber_ok,
     }
 
 

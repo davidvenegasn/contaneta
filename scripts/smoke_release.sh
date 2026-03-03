@@ -100,6 +100,9 @@ echo "--- Auth Enforcement ---"
 check "GET /portal/home without cookie redirects to login (302)" \
   bash -c "curl -s -o /dev/null -w '%{http_code}' '$BASE_URL/portal/home' | grep -qE '302|401'"
 
+check "GET /portal/login returns 200" \
+  bash -c "curl -sf -o /dev/null -w '%{http_code}' '$BASE_URL/portal/login' | grep -qE '200|302'"
+
 check "GET /api/customers without auth returns 401" \
   bash -c "curl -s -o /dev/null -w '%{http_code}' '$BASE_URL/api/customers' | grep -q '401'"
 
@@ -108,6 +111,9 @@ check "GET /api/products without auth returns 401" \
 
 check "GET /api/account/status without auth returns 401" \
   bash -c "curl -s -o /dev/null -w '%{http_code}' '$BASE_URL/api/account/status' | grep -q '401'"
+
+check "GET /admin without auth returns 401/403" \
+  bash -c "curl -s -o /dev/null -w '%{http_code}' '$BASE_URL/admin' | grep -qE '401|403'"
 
 echo
 
