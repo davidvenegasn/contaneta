@@ -1,0 +1,14 @@
+# ContaNeta Nightly Backup Timer (runs daily at 3 AM)
+# Copy to /etc/systemd/system/contaneta-backup.timer
+# sudo systemctl daemon-reload && sudo systemctl enable contaneta-backup.timer && sudo systemctl start contaneta-backup.timer
+
+[Unit]
+Description=Run ContaNeta backup daily at 3 AM
+
+[Timer]
+OnCalendar=*-*-* 03:00:00
+AccuracySec=15min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,14 @@
+# ContaNeta SAT Scheduler Timer (runs every 10 minutes)
+# Copy to /etc/systemd/system/contaneta-sat-scheduler.timer
+# sudo systemctl daemon-reload && sudo systemctl enable contaneta-sat-scheduler.timer && sudo systemctl start contaneta-sat-scheduler.timer
+
+[Unit]
+Description=Run ContaNeta SAT Scheduler every 10 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=10min
+AccuracySec=1min
+
+[Install]
+WantedBy=timers.target

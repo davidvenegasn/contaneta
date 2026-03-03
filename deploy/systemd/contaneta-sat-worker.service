@@ -1,0 +1,29 @@
+# ContaNeta SAT Worker (processes sat_jobs queue)
+# Copy to /etc/systemd/system/contaneta-sat-worker.service
+# sudo systemctl daemon-reload && sudo systemctl enable contaneta-sat-worker && sudo systemctl start contaneta-sat-worker
+
+[Unit]
+Description=ContaNeta SAT Worker
+After=network.target
+PartOf=contaneta-web.service
+
+[Service]
+Type=simple
+User=deploy
+Group=deploy
+WorkingDirectory=/opt/contaneta
+EnvironmentFile=/opt/contaneta/.env
+ExecStart=/opt/contaneta/.venv/bin/python worker.py --loop --sleep 2 --timeout-seconds 600 --lease-seconds 900
+Restart=always
+RestartSec=10
+StandardOutput=append:/opt/contaneta/logs/worker.log
+StandardError=append:/opt/contaneta/logs/worker.log
+
+# Security hardening
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/opt/contaneta
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target
