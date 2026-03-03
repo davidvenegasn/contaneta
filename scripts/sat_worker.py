@@ -6,9 +6,9 @@ y actualiza status a 'ok' o 'error' con last_error.
 Idempotente: se puede ejecutar cada X minutos por cron.
 Usa busy_timeout y WAL para evitar locks en SQLite.
 """
+import logging
 import os
 import sys
-import subprocess
 import sqlite3
 
 # Raíz del proyecto (donde está invoicing.db y sat_sync/)
@@ -16,6 +16,9 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 BASE_DIR = os.path.dirname(SCRIPT_DIR)
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(levelname)s: %(message)s")
+logger = logging.getLogger("sat_worker")
 
 from services.errors import ExternalServiceError  # noqa: E402
 from services.subprocess_utils import run_php  # noqa: E402
@@ -112,37 +115,36 @@ def process_one_job(conn, job) -> bool:
     direction = job["direction"] or "issued"
     if direction not in ("issued", "received"):
         mark_done(conn, job_id, False, "direction inválida")
-        print("    -> error: direction inválida", file=sys.stderr)
+        logger.error("Job %s: direction inválida", job_id)
         return True
     mark_running(conn, job_id)
     ok, msg = run_sync_php(issuer_id, direction)
     mark_done(conn, job_id, ok, None if ok else msg)
     if ok:
-        print("    -> ok", file=sys.stderr)
+        logger.info("Job %s: ok", job_id)
     else:
-        print("    -> error:", msg or "desconocido", file=sys.stderr)
+        logger.error("Job %s: error: %s", job_id, msg or "desconocido")
     return True
 
 
 def main():
     if not os.path.isfile(DB_PATH):
-        print("DB no encontrada:", DB_PATH, file=sys.stderr)
+        logger.error("DB no encontrada: %s", DB_PATH)
         sys.exit(1)
     conn = db_connection()
     try:
         jobs = fetch_queued_jobs(conn)
         if not jobs:
-            print("sat_worker: 0 jobs en cola. Nada que hacer.", file=sys.stderr)
+            logger.info("0 jobs en cola. Nada que hacer.")
             return
-        print("sat_worker: %d job(s) en cola. Procesando..." % len(jobs), file=sys.stderr)
+        logger.info("%d job(s) en cola. Procesando...", len(jobs))
         for job in jobs:
             job_id = job["id"]
             issuer_id = job["issuer_id"]
             direction = job["direction"] or "issued"
-            print("  Job %s: issuer_id=%s direction=%s" % (job_id, issuer_id, direction), file=sys.stderr)
+            logger.info("Job %s: issuer_id=%s direction=%s", job_id, issuer_id, direction)
             process_one_job(conn, job)
-            # El resultado (ok/error) queda en la BD; si quieres ver last_error, haz SELECT después
-        print("sat_worker: listo.", file=sys.stderr)
+        logger.info("Listo.")
     finally:
         conn.close()
 
