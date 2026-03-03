@@ -1,0 +1,74 @@
+{% extends "base_admin.html" %}
+{% block title %}SAT Jobs{% endblock %}
+{% block content %}
+  <h1>SAT Jobs</h1>
+
+  <div class="card">
+    <h2>Filtros</h2>
+    <form method="get" action="/admin/sat-jobs" style="display:flex; gap:10px; flex-wrap:wrap; align-items:end;">
+      <div>
+        <div style="font-size:12px; color:#64748b; margin-bottom:6px;">Status</div>
+        <select name="status" style="padding:0.5rem 0.75rem; min-width:160px; border-radius:8px; border:1px solid #cbd5e1;">
+          <option value="">Todos</option>
+          <option value="queued" {% if filter_status == 'queued' %}selected{% endif %}>queued</option>
+          <option value="running" {% if filter_status == 'running' %}selected{% endif %}>running</option>
+          <option value="ok" {% if filter_status == 'ok' %}selected{% endif %}>ok</option>
+          <option value="error" {% if filter_status == 'error' %}selected{% endif %}>error</option>
+        </select>
+      </div>
+      <div>
+        <div style="font-size:12px; color:#64748b; margin-bottom:6px;">Dirección</div>
+        <select name="direction" style="padding:0.5rem 0.75rem; min-width:140px; border-radius:8px; border:1px solid #cbd5e1;">
+          <option value="">Todas</option>
+          <option value="issued" {% if filter_direction == 'issued' %}selected{% endif %}>issued</option>
+          <option value="received" {% if filter_direction == 'received' %}selected{% endif %}>received</option>
+        </select>
+      </div>
+      <div>
+        <div style="font-size:12px; color:#64748b; margin-bottom:6px;">Issuer ID</div>
+        <input name="issuer_id" value="{{ filter_issuer_id or '' }}" placeholder="123" style="padding:0.5rem 0.75rem; min-width:100px; border-radius:8px; border:1px solid #cbd5e1;" />
+      </div>
+      <div>
+        <button type="submit" class="btn btn-primary">Aplicar</button>
+        <a class="btn btn-secondary" href="/admin/sat-jobs">Limpiar</a>
+      </div>
+    </form>
+  </div>
+
+  <div class="card">
+    {% if sat_jobs and sat_jobs|length > 0 %}
+    <div style="overflow-x:auto;">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th><th>Issuer</th><th>Tipo</th><th>Dirección</th><th>Status</th>
+          <th>Intentos</th><th>Error</th><th>Inicio</th><th>Fin</th><th>Creado</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for sj in sat_jobs %}
+        <tr>
+          <td><a href="/admin/sat-jobs/{{ sj.id }}" style="color:#0369a1;">{{ sj.id }}</a></td>
+          <td class="muted">
+            <a href="/admin/issuers/{{ sj.issuer_id }}" style="color:#0369a1;">{{ sj.issuer_id }}</a>
+            {% if sj.issuer_rfc %}<br><span class="muted">{{ sj.issuer_rfc }}</span>{% endif %}
+          </td>
+          <td>{{ sj.job_type }}</td>
+          <td>{{ sj.direction or '-' }}</td>
+          <td><span class="badge badge--xs {% if sj.status == 'error' %}badge--error{% elif sj.status == 'ok' %}badge--success{% elif sj.status == 'running' %}badge--warning{% endif %}">{{ sj.status }}</span></td>
+          <td class="muted">{{ sj.attempts }}</td>
+          <td class="muted" style="max-width:200px; overflow:hidden; text-overflow:ellipsis;">{{ (sj.last_error or '')[:80] }}</td>
+          <td class="muted">{{ sj.started_at or '-' }}</td>
+          <td class="muted">{{ sj.finished_at or '-' }}</td>
+          <td class="muted">{{ sj.created_at or '-' }}</td>
+          <td><a class="btn btn-secondary btn-sm" href="/admin/sat-jobs/{{ sj.id }}">Ver</a></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% else %}
+      <p style="margin:0;color:#64748b;">Sin SAT jobs{% if filter_status or filter_direction or filter_issuer_id %} con esos filtros{% endif %}.</p>
+    {% endif %}
+  </div>
+{% endblock %}

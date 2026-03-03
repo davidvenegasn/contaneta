@@ -1,11 +1,16 @@
 {% extends "base_admin.html" %}
 {% block title %}Errores{% endblock %}
 {% block content %}
-  <h1>Errores (5xx)</h1>
+  <h1>Errores (5xx)
+    {% if events and events|length > 0 %}
+    <span class="badge badge--error" style="font-size:0.7em; vertical-align:middle;">{{ events|length }}</span>
+    {% endif %}
+  </h1>
 
   <div class="card">
     <h2>Últimos 100</h2>
     {% if events and events|length > 0 %}
+    <div style="overflow-x:auto;">
     <table>
       <thead>
         <tr>
@@ -15,20 +20,20 @@
           <th>Ruta</th>
           <th>Issuer</th>
           <th>Req ID</th>
-          <th>Mensaje (público)</th>
-          <th>Detalle</th>
+          <th>Mensaje</th>
+          <th></th>
         </tr>
       </thead>
       <tbody>
       {% for e in events %}
         <tr>
           <td>{{ e.id }}</td>
-          <td class="muted">{{ e.created_at or '-' }}</td>
-          <td>{{ e.status or '-' }}</td>
-          <td><code>{{ e.method or '' }} {{ e.path or '' }}</code></td>
-          <td class="muted">{{ e.issuer_id or '-' }}</td>
-          <td><code>{{ e.request_id or '' }}</code></td>
-          <td class="muted">{{ (e.message_public or '')[:140] }}{% if e.message_public and e.message_public|length > 140 %}…{% endif %}</td>
+          <td class="muted" style="white-space:nowrap;">{{ (e.created_at or '-')[:19] }}</td>
+          <td><span class="badge badge--xs badge--error">{{ e.status or '-' }}</span></td>
+          <td><code style="font-size:12px;">{{ e.method or '' }} {{ (e.path or '')[:60] }}</code></td>
+          <td class="muted">{% if e.issuer_id %}<a href="/admin/issuers/{{ e.issuer_id }}" style="color:#0369a1;">{{ e.issuer_id }}</a>{% else %}-{% endif %}</td>
+          <td><code style="font-size:11px;">{{ e.request_id or '' }}</code></td>
+          <td class="muted" style="max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ (e.message_public or e.message_internal or '')[:120] }}</td>
           <td>
             {% if can_view_internal %}
               <a class="btn btn-secondary btn-sm" href="/admin/errors/{{ e.id }}">Ver</a>
@@ -40,6 +45,7 @@
       {% endfor %}
       </tbody>
     </table>
+    </div>
     {% else %}
       <p style="margin:0;color:#64748b;">Sin errores registrados.</p>
     {% endif %}

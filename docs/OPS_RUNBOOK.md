@@ -4,10 +4,10 @@
 
 | Action | Command |
 |--------|---------|
-| Start server | `./run_server.sh` or `systemctl start conta-invoicing` |
-| Stop server | `systemctl stop conta-invoicing` |
-| Restart | `systemctl restart conta-invoicing` |
-| View logs | `journalctl -u conta-invoicing -f` |
+| Start server | `systemctl start contaneta-web` |
+| Stop server | `systemctl stop contaneta-web` |
+| Restart | `systemctl restart contaneta-web contaneta-sat-worker` |
+| View logs | `journalctl -u contaneta-web -f` or `tail -f /var/log/contaneta/web.log` |
 | Health check | `curl -s http://localhost:8000/health \| jq` |
 | Readiness | `curl -s http://localhost:8000/ready` |
 | Run tests | `.venv/bin/pytest -q` |
@@ -15,8 +15,35 @@
 | Backup storage | `bash scripts/backup_storage.sh` |
 | Backup all | `bash scripts/backup_all.sh` |
 | Process SAT jobs | `python scripts/sat_worker.py` |
+| SAT auto-sync scheduler | `python scripts/sat_scheduler.py --batch 50` |
 | Process generic jobs | `python worker.py --once` |
 | Run migrations | Automatic on startup; or `python -c "from migrations_runner import apply_migrations; apply_migrations()"` |
+
+---
+
+## Production Mode (recommended)
+
+**Gunicorn**: 1 worker + 4 threads (SQLite limitation — no concurrent writers).
+
+```bash
+gunicorn app:app -k uvicorn.workers.UvicornWorker -w 1 --threads 4 -b 127.0.0.1:8000
+```
+
+**Directory layout** (data outside the repo):
+
+| Path | Contents |
+|------|----------|
+| `/opt/contaneta/` | Application code (git repo) |
+| `/var/lib/contaneta/invoicing.db` | SQLite database (`APP_DB_PATH`) |
+| `/var/lib/contaneta/storage/` | XML files, encrypted creds (`APP_STORAGE_PATH`) |
+| `/var/log/contaneta/` | Application + access logs |
+| `/var/backups/contaneta/` | Nightly backups (`BACKUP_DIR`) |
+
+**Reverse proxy**: Caddy (automatic HTTPS) or Nginx + certbot.
+
+**Services**: See `deploy/systemd/` for service files and `deploy/README_DEPLOY.md` for full setup.
+
+**Bootstrap**: `sudo bash scripts/prod_bootstrap.sh` sets up user, dirs, venv, logrotate, firewall.
 
 ---
 
@@ -140,11 +167,14 @@ bash scripts/backup_storage.sh
 # Storage backup weekly (Sunday 3 AM)
 0 3 * * 0 cd /path/to/project && bash scripts/backup_storage.sh >> /tmp/backup.log 2>&1
 
-# SAT sync every 15 min
+# SAT sync every 15 min (legacy direct sync)
 */15 * * * * /path/to/project/sat_sync/cron_sat_sync.sh >> /tmp/sat_sync.log 2>&1
 
-# SAT job queue every 5 min
-*/5 * * * * cd /path/to/project && .venv/bin/python scripts/sat_worker.py >> /tmp/sat_worker.log 2>&1
+# SAT auto-sync scheduler every 10 min (enqueues jobs for eligible issuers)
+*/10 * * * * cd /path/to/project && .venv/bin/python scripts/sat_scheduler.py --batch 50 --cooldown-hours 8 >> /tmp/sat_scheduler.log 2>&1
+
+# SAT job queue every 2 min (processes enqueued jobs)
+*/2 * * * * cd /path/to/project && .venv/bin/python scripts/sat_worker.py >> /tmp/sat_worker.log 2>&1
 ```
 
 ### Restore Procedure
@@ -194,7 +224,7 @@ ADMIN_PASSWORD=your-strong-password  # Required for admin access
 | Dashboard | `/admin/` | User/issuer counts, recent logins, job status, CFDI stats |
 | Users | `/admin/users` | All users with roles |
 | Issuers | `/admin/issuers` | All companies with subscription status |
-| Issuer Detail | `/admin/issuers/{id}` | Notes, needs_review flag |
+| Issuer Detail | `/admin/issuers/{id}` | Notes, needs_review flag, force-sync button |
 | Jobs | `/admin/jobs` | Job queue with status filters |
 | Errors | `/admin/errors` | Error events with traceback |
 | Memberships | `/admin/memberships` | User-issuer-role matrix |

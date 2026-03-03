@@ -7,14 +7,69 @@
     <h2>Resumen</h2>
     <div class="stats">
       <div class="stat"><span class="n">{{ count_users }}</span><span class="label">Usuarios</span></div>
-      <div class="stat"><span class="n">{{ count_active_users }}</span><span class="label">Usuarios activos (con membership)</span></div>
+      <div class="stat"><span class="n">{{ count_active_users }}</span><span class="label">Usuarios activos</span></div>
       <div class="stat"><span class="n">{{ count_issuers }}</span><span class="label">Issuers</span></div>
-      <div class="stat"><span class="n">{{ count_memberships }}</span><span class="label">Memberships</span></div>
-      <div class="stat"><span class="n">{{ jobs_in_queue }}</span><span class="label">Jobs en cola (queued/running)</span></div>
+      <div class="stat"><span class="n">{{ jobs_in_queue }}</span><span class="label">Jobs en cola</span></div>
       <div class="stat"><span class="n">{{ jobs_failed_today }}</span><span class="label">Jobs fallidos hoy</span></div>
       <div class="stat"><span class="n">{{ errors_today }}</span><span class="label">Errores 5xx hoy</span></div>
     </div>
   </div>
+
+  <div class="card">
+    <h2>SAT Jobs (24h)</h2>
+    <div class="stats">
+      <div class="stat"><span class="n">{{ sat_jobs_24h.queued }}</span><span class="label">Queued</span></div>
+      <div class="stat"><span class="n">{{ sat_jobs_24h.running }}</span><span class="label">Running</span></div>
+      <div class="stat" {% if sat_jobs_24h.error > 0 %}style="background:#fef2f2;"{% endif %}><span class="n">{{ sat_jobs_24h.error }}</span><span class="label">Error</span></div>
+      <div class="stat" {% if needs_review_count > 0 %}style="background:#fef9c3;"{% endif %}><span class="n">{{ needs_review_count }}</span><span class="label">Necesita revisión</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Últimos 20 jobs</h2>
+    {% if recent_jobs and recent_jobs|length > 0 %}
+    <table>
+      <thead><tr><th>ID</th><th>Issuer</th><th>Nombre</th><th>Status</th><th>Mensaje</th><th>Fecha</th><th></th></tr></thead>
+      <tbody>
+      {% for j in recent_jobs %}
+      <tr>
+        <td>{{ j.id }}</td>
+        <td class="muted">{{ j.issuer_id }}{% if j.issuer_rfc %} ({{ j.issuer_rfc }}){% endif %}</td>
+        <td>{{ j.name }}</td>
+        <td><span class="badge badge--xs {% if j.status == 'failed' %}badge--error{% elif j.status == 'success' %}badge--success{% endif %}">{{ j.status }}</span></td>
+        <td class="muted">{{ (j.message or '')[:60] }}</td>
+        <td class="muted">{{ j.updated_at or j.created_at or '' }}</td>
+        <td><a class="btn btn-secondary btn-sm" href="/admin/jobs/{{ j.id }}">Ver</a></td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p style="margin:0;color:#64748b;">Sin jobs recientes.</p>
+    {% endif %}
+  </div>
+
+  {% if recent_errors and recent_errors|length > 0 %}
+  <div class="card">
+    <h2>Últimos 20 errores</h2>
+    <table>
+      <thead><tr><th>ID</th><th>Fecha</th><th>Path</th><th>Status</th><th>Request ID</th><th>Issuer</th><th></th></tr></thead>
+      <tbody>
+      {% for e in recent_errors %}
+      <tr>
+        <td>{{ e.id }}</td>
+        <td class="muted">{{ e.created_at or '-' }}</td>
+        <td>{{ e.path or '-' }}</td>
+        <td>{{ e.status_code or '-' }}</td>
+        <td><code>{{ (e.request_id or '-')[:12] }}</code></td>
+        <td class="muted">{{ e.issuer_id or '-' }}</td>
+        <td><a class="btn btn-secondary btn-sm" href="/admin/errors/{{ e.id }}">Ver</a></td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
 
   <div class="card">
     <h2>Últimos logins</h2>
@@ -49,22 +104,11 @@
     </div>
   </div>
 
-  {% if sat_requests_by_status %}
-  <div class="card">
-    <h2>Sat requests por estado</h2>
-    <div class="stats">
-      {% for row in sat_requests_by_status %}
-      <div class="stat"><span class="n">{{ row.n }}</span><span class="label">{{ row.status }}</span></div>
-      {% endfor %}
-    </div>
-  </div>
-  {% endif %}
-
   <div class="card">
     <h2>Últimos 20 eventos (audit_log)</h2>
     {% if audit_events %}
     <table>
-      <thead><tr><th>Fecha</th><th>Acción</th><th>user_id</th><th>issuer_id</th><th>target_issuer_id</th><th>Detalles</th></tr></thead>
+      <thead><tr><th>Fecha</th><th>Acción</th><th>user_id</th><th>issuer_id</th><th>Detalles</th></tr></thead>
       <tbody>
       {% for e in audit_events %}
       <tr>
@@ -72,7 +116,6 @@
         <td>{{ e.action or '-' }}</td>
         <td>{{ e.user_id if e.user_id is not none else '-' }}</td>
         <td>{{ e.issuer_id if e.issuer_id is not none else '-' }}</td>
-        <td>{{ e.target_issuer_id if e.target_issuer_id is not none else '-' }}</td>
         <td>{{ (e.details or '')[:80] }}{% if e.details and e.details|length > 80 %}…{% endif %}</td>
       </tr>
       {% endfor %}

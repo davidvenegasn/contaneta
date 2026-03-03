@@ -23,6 +23,7 @@ logger = logging.getLogger("sat_worker")
 from services.errors import ExternalServiceError  # noqa: E402
 from services.subprocess_utils import run_php  # noqa: E402
 from services.sat_credentials_secure import decrypted_fiel_env  # noqa: E402
+from services.sat_autosync import update_sync_state_after_job  # noqa: E402
 
 DB_PATH = os.environ.get("APP_DB_PATH") or os.path.join(BASE_DIR, "invoicing.db")
 SAT_SYNC_DIR = os.path.join(BASE_DIR, "sat_sync")
@@ -120,6 +121,11 @@ def process_one_job(conn, job) -> bool:
     mark_running(conn, job_id)
     ok, msg = run_sync_php(issuer_id, direction)
     mark_done(conn, job_id, ok, None if ok else msg)
+    # Update sat_sync_state for cooldown/status tracking
+    try:
+        update_sync_state_after_job(issuer_id, direction, ok=ok, error_msg=msg if not ok else None)
+    except Exception:
+        logger.exception("Failed to update sat_sync_state for issuer %s dir %s", issuer_id, direction)
     if ok:
         logger.info("Job %s: ok", job_id)
     else:

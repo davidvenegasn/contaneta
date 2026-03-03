@@ -67,6 +67,15 @@ Use `bash scripts/safe_export.sh` to generate a verified-clean deploy package.
 - **Used for**: FIEL .cer/.key files, bank account CLABE numbers
 - **Format**: `enc:v1:<nonce_b64>.<ciphertext_b64>` (text) or `CNENC1<nonce><ct>` (binary)
 
+## File Upload Limits
+
+| Route | Max Size | Validation |
+|-------|----------|------------|
+| `/portal/config/sat` (FIEL .cer/.key) | 2 MB each | Extension whitelist (.cer, .key) |
+| `/portal/month-close/upload` (PDF) | 10 MB | `%PDF` magic byte check |
+| `/portal/bank/*` (bank PDFs) | 15 MB per file, 50 MB total | Extension + size check |
+| Caddy reverse proxy | 10 MB default | `request_body max_size` directive |
+
 ## Rate Limiting
 
 - **Module**: `services/rate_limit.py`

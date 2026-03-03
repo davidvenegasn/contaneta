@@ -49,7 +49,7 @@ echo "==> Verifying zip does not contain secrets..."
 
 # Safety checks: fail if dangerous files are inside
 VIOLATIONS=""
-for pattern in ".env" "storage/credentials" "invoicing.db" "keys/" ".venv/"; do
+for pattern in ".env" "storage/credentials" "invoicing.db" ".db" "keys/" ".venv/" "backup/" "backups/"; do
     if zipinfo -1 "$OUT_PATH" 2>/dev/null | grep -q "$pattern"; then
         VIOLATIONS="$VIOLATIONS  FOUND: $pattern\n"
     fi

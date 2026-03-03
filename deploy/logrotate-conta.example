@@ -1,8 +1,8 @@
-# Ejemplo logrotate por si la app escribe a un archivo de log.
-# Copiar a /etc/logrotate.d/conta-invoicing y ajustar rutas.
-# Si solo usas journald (systemd), no necesitas este archivo.
+# Logrotate config for ContaNeta application logs.
+# Copy to /etc/logrotate.d/contaneta and adjust paths if needed.
+# If only using journald (systemd), this file is optional.
 
-/var/www/conta-invoicing/logs/*.log {
+/var/log/contaneta/*.log {
     daily
     rotate 14
     compress
@@ -10,4 +10,5 @@
     missingok
     notifempty
     copytruncate
+    su contaneta contaneta
 }

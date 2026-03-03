@@ -1,0 +1,22 @@
+# ContaNeta Nightly Backup (DB + storage)
+# Triggered by contaneta-backup.timer — do NOT enable this .service directly.
+# Copy to /etc/systemd/system/contaneta-backup.service
+
+[Unit]
+Description=ContaNeta Nightly Backup (DB + storage)
+After=network.target
+
+[Service]
+Type=oneshot
+User=contaneta
+Group=contaneta
+WorkingDirectory=/opt/contaneta
+EnvironmentFile=/opt/contaneta/.env
+ExecStart=/opt/contaneta/scripts/backup_nightly.sh
+StandardOutput=append:/var/log/contaneta/backup.log
+StandardError=append:/var/log/contaneta/backup.log
+
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/opt/contaneta /var/lib/contaneta /var/log/contaneta /var/backups/contaneta
+PrivateTmp=yes

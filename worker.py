@@ -2,15 +2,19 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import os
 import signal
 import sys
 import time
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any, Callable
 
 from migrations_runner import apply_migrations
 from services import jobs as jobs_service
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -29,13 +33,16 @@ def _handler_not_implemented(job: dict, _ctx: JobContext) -> dict:
 
 
 def _load_handlers() -> dict[str, JobHandler]:
-    """
-    Registry simple. En MVP:
-    - Si quieres conectar módulos reales (sat_sync, bank_ingest, etc), agrega handlers aquí.
-    """
+    """Handler registry.  Maps job name → handler function."""
+    from services.sat_job_handlers import (
+        handle_sat_sync_month,
+        handle_sat_refresh_light,
+        handle_sat_verify_credentials,
+    )
     return {
-        # Ejemplo:
-        # "sat_sync": handle_sat_sync,
+        "sat_sync_month": handle_sat_sync_month,
+        "sat_refresh_light": handle_sat_refresh_light,
+        "sat_verify_credentials": handle_sat_verify_credentials,
     }
 
 
@@ -96,7 +103,57 @@ def _run_once(*, worker_id: str, lease_seconds: int, job_timeout_seconds: int) -
     return True
 
 
+_SCHEDULER_INTERVAL_SECONDS = int(os.getenv("SAT_SCHEDULER_INTERVAL", "300"))  # 5 min
+_last_schedule_run = 0.0
+
+
+def _run_scheduler() -> None:
+    """Enqueue sat_refresh_light jobs for eligible issuers whose cooldown expired."""
+    global _last_schedule_run
+    now = time.time()
+    if now - _last_schedule_run < _SCHEDULER_INTERVAL_SECONDS:
+        return
+    _last_schedule_run = now
+
+    from database import db as get_db
+
+    conn = get_db()
+    try:
+        # Eligible issuers: valid FIEL, cooldown expired or no sync state yet
+        rows = conn.execute(
+            """
+            SELECT DISTINCT sc.issuer_id
+            FROM sat_credentials sc
+            JOIN issuers i ON i.id = sc.issuer_id AND i.active = 1
+            LEFT JOIN sat_sync_state ss
+              ON ss.issuer_id = sc.issuer_id AND ss.direction = 'issued'
+            WHERE sc.validation_ok = 1
+              AND (ss.cooldown_until IS NULL OR ss.cooldown_until < datetime('now'))
+            LIMIT 10
+            """
+        ).fetchall()
+    finally:
+        conn.close()
+
+    for row in rows:
+        issuer_id = row["issuer_id"] if isinstance(row, dict) else row[0]
+        try:
+            jobs_service.enqueue_job(
+                "sat_refresh_light",
+                issuer_id,
+                payload={"issuer_id": issuer_id, "directions": ["issued", "received"]},
+                max_attempts=2,
+            )
+            logger.info("Scheduled sat_refresh_light for issuer %s", issuer_id)
+        except Exception:
+            logger.exception("Failed to enqueue sat_refresh_light for issuer %s", issuer_id)
+
+
 def main(argv: list[str] | None = None) -> int:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
+    )
     argv = argv or sys.argv[1:]
     p = argparse.ArgumentParser(description="Worker simple para jobs (SQLite).")
     mode = p.add_mutually_exclusive_group(required=True)
@@ -107,6 +164,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--lease-seconds", type=int, default=int(os.getenv("JOB_LEASE_SECONDS") or "900"))
     p.add_argument("--timeout-seconds", type=int, default=int(os.getenv("JOB_TIMEOUT_SECONDS") or "60"))
     p.add_argument("--db", default=os.getenv("APP_DB_PATH") or os.getenv("DB_PATH") or "", help="Opcional: path DB (solo para migraciones).")
+    p.add_argument("--no-scheduler", action="store_true", help="Disable auto-sync scheduler in loop mode.")
     args = p.parse_args(argv)
 
     # Asegurar migraciones antes de trabajar (incluye 025 jobs_robust).
@@ -120,6 +178,11 @@ def main(argv: list[str] | None = None) -> int:
     # loop
     while True:
         ran = _run_once(worker_id=args.worker_id, lease_seconds=args.lease_seconds, job_timeout_seconds=args.timeout_seconds)
+        if not args.no_scheduler:
+            try:
+                _run_scheduler()
+            except Exception:
+                logger.exception("Scheduler error")
         if not ran:
             time.sleep(max(0.2, float(args.sleep)))
 

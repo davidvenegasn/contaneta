@@ -108,6 +108,15 @@
       <button type="button" class="btn btn--sm btn--ghost fiel-status__btn" id="satReplaceBtn">Reemplazar archivos</button>
       {% endif %}
     </div>
+
+    {% if validation_ok %}
+    <div class="card fiel-sync-card" id="satSyncCard">
+      <h3 class="fiel-status__title">Sincronización SAT</h3>
+      <div id="satSyncContent">
+        <p class="muted" style="margin:0;">Cargando estado…</p>
+      </div>
+    </div>
+    {% endif %}
   </aside>
 </div>
 
@@ -290,11 +299,11 @@
   if (window.location.search.indexOf('saved=1') >= 0 && resultEl) {
     resultEl.hidden = false;
     if ({{ 'true' if validation_ok else 'false' }}) {
-      resultContent.innerHTML = '<p style="margin:0;"><span class="fiel-result__ok">✓</span> Credenciales guardadas. FIEL válida.</p>';
+      resultContent.innerHTML = '<p style="margin:0;"><span class="fiel-result__ok">✓</span> Credenciales guardadas. FIEL válida. Sincronizando tus facturas… puede tardar unos minutos.</p>';
       resultEl.style.background = 'var(--success-bg, rgba(22,163,74,.08))';
       resultEl.style.borderLeft = '4px solid var(--success, #16a34a)';
       if (window.uiSuccessOverlay) {
-        window.uiSuccessOverlay({ title: 'SAT Configurado', message: 'Tus credenciales se guardaron y la FIEL se validó correctamente.', actions: [{ label: 'Entendido', onClick: function () { if (window.uiSuccessOverlayClose) window.uiSuccessOverlayClose(); } }] });
+        window.uiSuccessOverlay({ title: 'SAT Configurado', message: 'Tus credenciales se guardaron y la FIEL se validó correctamente. La sincronización de facturas ya se inició — puede tardar unos minutos.', actions: [{ label: 'Entendido', onClick: function () { if (window.uiSuccessOverlayClose) window.uiSuccessOverlayClose(); } }] });
       }
     } else {
       var msgEl = document.getElementById('fielSavedValidationMessage');
@@ -324,6 +333,101 @@
       });
     }
   }
+})();
+
+/* ── SAT Sync Status Polling ── */
+(function(){
+  var card = document.getElementById('satSyncCard');
+  var content = document.getElementById('satSyncContent');
+  if (!card || !content) return;
+  var pollInterval = 8000;
+  var timer = null;
+
+  function fmt(dt) {
+    if (!dt) return '—';
+    return dt.replace('T', ' ').substring(0, 19);
+  }
+  function dirLabel(d) { return d === 'issued' ? 'Emitidas' : d === 'received' ? 'Recibidas' : d; }
+
+  function renderStatus(data) {
+    var html = '';
+    var d = data.data || data;
+    var pending = d.has_pending_jobs;
+
+    if (pending) {
+      html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">';
+      html += '<span class="spinner spinner--sm" aria-hidden="true"></span>';
+      html += '<span style="font-weight:500;">Sincronizando…</span>';
+      html += '</div>';
+    }
+
+    // Per-direction sync state
+    var ss = d.sync_state || {};
+    var dirs = ['issued', 'received'];
+    for (var i = 0; i < dirs.length; i++) {
+      var dir = dirs[i];
+      var st = ss[dir];
+      html += '<div style="margin-bottom:8px;">';
+      html += '<div style="font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;">' + dirLabel(dir) + '</div>';
+      if (st) {
+        if (st.last_success_at) {
+          html += '<div class="muted" style="font-size:13px;">Último éxito: ' + fmt(st.last_success_at) + '</div>';
+        }
+        if (st.last_error) {
+          html += '<div style="font-size:13px;color:#dc2626;">' + st.last_error.substring(0, 120) + '</div>';
+        }
+        if (!st.last_success_at && !st.last_error) {
+          html += '<div class="muted" style="font-size:13px;">Sin datos aún</div>';
+        }
+      } else {
+        html += '<div class="muted" style="font-size:13px;">Sin datos aún</div>';
+      }
+      html += '</div>';
+    }
+
+    // Recent jobs summary
+    var jobs = d.recent_jobs || [];
+    if (jobs.length > 0) {
+      var running = 0, ok = 0, err = 0;
+      for (var j = 0; j < jobs.length; j++) {
+        var s = jobs[j].status;
+        if (s === 'running' || s === 'queued') running++;
+        else if (s === 'ok') ok++;
+        else if (s === 'error') err++;
+      }
+      html += '<div style="font-size:12px;color:#64748b;margin-top:4px;">';
+      html += 'Últimos 10 jobs: ';
+      if (running) html += '<span style="color:#854d0e;">' + running + ' en proceso</span> ';
+      if (ok) html += '<span style="color:#166534;">' + ok + ' OK</span> ';
+      if (err) html += '<span style="color:#991b1b;">' + err + ' error</span>';
+      html += '</div>';
+    }
+
+    if (!pending && !jobs.length && !ss.issued && !ss.received) {
+      html = '<p class="muted" style="margin:0;">Aún no se ha sincronizado. La primera sincronización se inicia automáticamente al guardar las credenciales.</p>';
+    }
+
+    content.innerHTML = html;
+    return pending;
+  }
+
+  function poll() {
+    var fetchFn = window.portalFetchJSON || function(url) {
+      return fetch(url, { credentials: 'same-origin' }).then(function(r) { return r.json().then(function(d) { return { data: d }; }); });
+    };
+    fetchFn('/api/sat/status').then(function(r) {
+      var stillPending = renderStatus(r.data || r);
+      if (stillPending) {
+        timer = setTimeout(poll, pollInterval);
+      } else if (timer) {
+        timer = setTimeout(poll, 30000);
+      }
+    }).catch(function() {
+      content.innerHTML = '<p class="muted" style="margin:0;">No se pudo cargar el estado.</p>';
+    });
+  }
+
+  poll();
 })();
 </script>
 {% endblock %}
