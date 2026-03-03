@@ -78,9 +78,10 @@ def get_invoicing_router(templates):
         except HTTPException:
             raise
         except FacturapiError as fe:
+            logger.warning("FacturapiError: issuer_id=%s %s", issuer.get("id"), fe)
             return HTMLResponse(
                 "<h3>Error al timbrar</h3><p>No pudimos completar la facturación. Revisa los datos e intenta de nuevo.</p>",
-                status_code=400,
+                status_code=502,
             )
         except Exception:
             logger.exception("invoicing submit: issuer_id=%s", issuer.get("id"))
@@ -408,7 +409,7 @@ def _submit_impl(templates, request: Request, issuer: dict, form):
                 )
                 conn.commit()
             except Exception as e:
-                print(f"[submit] save_customer failed: {e}")
+                logger.warning("save_customer failed: %s", e)
 
     payload = invoices_engine.build_facturapi_payload(
         invoice_type=tipo_comprobante,
@@ -469,7 +470,7 @@ def _submit_impl(templates, request: Request, issuer: dict, form):
                         )
             conn.commit()
         except Exception as e:
-            print(f"[submit] storing payment_relations failed: {e}")
+            logger.warning("storing payment_relations failed: %s", e)
     conn.commit()
     conn.close()
 

@@ -5,7 +5,7 @@ import time
 from collections import defaultdict
 from urllib.parse import quote
 
-from fastapi import APIRouter, Request, Form, Query
+from fastapi import APIRouter, Request, Form, Query, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 import httpx
 
@@ -719,6 +719,8 @@ def get_auth_router(templates):
 
     @router.get("/debug-oauth")
     def debug_oauth():
+        if not DEV_MODE:
+            raise HTTPException(status_code=404, detail="Not found")
         cid = os.getenv("GOOGLE_CLIENT_ID", "").strip()
         return {
             "GOOGLE_CLIENT_ID_set": bool(cid),
