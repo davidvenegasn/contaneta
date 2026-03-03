@@ -11,7 +11,7 @@ from fastapi import APIRouter, Request, Body, Depends, Query, HTTPException
 
 logger = logging.getLogger(__name__)
 
-from database import db, db_rows, table_exists, has_column, list_catalog, search_catalog, safe_update
+from database import db, db_rows, table_exists, has_column, list_catalog, search_catalog
 from validators import validate_customer, validate_product
 from routers.deps import get_portal_issuer
 from config import BASE_DIR, DEV_FIXTURES
@@ -37,7 +37,7 @@ from services.http import ok, ok_list
 from services.schemas import ClientCreate, ProductCreate
 from services import clients_service, products_service
 from services import jobs as jobs_service
-from services import invoices_service
+from services import invoices_engine
 
 router = APIRouter(prefix="/api")
 
@@ -731,10 +731,6 @@ def api_invoices_quick(
     payment_method = (payload.get("payment_method") or "PUE").strip().upper() or "PUE"
     currency = (payload.get("currency") or "MXN").strip().upper() or "MXN"
 
-    # Validaciones ligeras (mismo validador que create_customer/product)
-    cust_errors = validate_customer(customer_rfc, customer_legal_name, customer_zip, customer_tax_system, customer_email)
-    if cust_errors:
-        raise HTTPException(status_code=400, detail="; ".join(cust_errors))
     items_fact = []
     items_meta = []  # para DB invoice_items + sat_cfdi (multi-item)
     if has_items:
@@ -847,81 +843,36 @@ def api_invoices_quick(
                 "price_to_send": round(price_to_send, 2),
             }
         )
-    payload_fact = invoices_service.build_invoice_payload(
+    payload_fact = invoices_engine.build_facturapi_payload(
         invoice_type="I",
         export_code="01",
-        customer=invoices_service.build_customer(
-            rfc=customer_rfc,
-            legal_name=customer_legal_name,
-            zip_code=customer_zip,
-            tax_system=customer_tax_system,
-            email=customer_email,
-        ),
+        customer={
+            "rfc": customer_rfc,
+            "legal_name": customer_legal_name,
+            "zip": customer_zip,
+            "tax_system": customer_tax_system,
+            "email": customer_email,
+        },
         items=items_fact,
-        payments=None,
         cfdi_use=cfdi_use,
         payment_form=payment_form,
         payment_method=payment_method,
         currency=currency,
+        validate_receiver=True,
     )
     if issuer.get("facturapi_org_id") in (None, "", 0) or issuer.get("id") == -1:
         raise HTTPException(status_code=400, detail="Configuración de facturación no disponible.")
     conn = db()
     try:
-        cur = conn.execute(
-            """
-            INSERT INTO invoices (
-                issuer_id, currency, exchange_rate,
-                payment_form, payment_method, cfdi_use,
-                customer_rfc, customer_legal_name,
-                customer_zip, customer_tax_system, customer_email
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                issuer_id,
-                currency,
-                None,
-                payment_form,
-                payment_method,
-                cfdi_use,
-                customer_rfc,
-                customer_legal_name,
-                customer_zip,
-                customer_tax_system,
-                customer_email,
-            ),
+        invoice_local_id = invoices_engine.save_invoice_record(
+            conn, issuer_id,
+            currency=currency, exchange_rate=None,
+            payment_form=payment_form, payment_method=payment_method, cfdi_use=cfdi_use,
+            customer_rfc=customer_rfc, customer_legal_name=customer_legal_name,
+            customer_zip=customer_zip, customer_tax_system=customer_tax_system,
+            customer_email=customer_email, export_code="01", tipo_comprobante="I",
         )
-        invoice_local_id = cur.lastrowid
-        safe_update(
-            conn,
-            "invoices",
-            invoice_local_id,
-            {"export_code": "01", "tipo_comprobante": "I"},
-        )
-        cols = {r[1] for r in conn.execute("PRAGMA table_info(invoice_items)").fetchall()}
-        base_cols = ["invoice_id", "quantity", "description", "product_key", "unit_price", "iva_rate"]
-        has_unit_key = "unit_key" in cols
-        has_discount = "discount" in cols
-        insert_cols = base_cols + (["unit_key"] if has_unit_key else []) + (["discount"] if has_discount else [])
-        placeholders = ", ".join(["?"] * len(insert_cols))
-        for it in items_meta:
-            base_vals = [
-                invoice_local_id,
-                float(it["quantity"]),
-                it["description"],
-                it["product_key"],
-                float(it["price_to_send"]),
-                float(it["iva_rate"]),
-            ]
-            extra_vals = []
-            if has_unit_key:
-                extra_vals.append(it.get("unit_key") or "E48")
-            if has_discount:
-                extra_vals.append(0.0)
-            conn.execute(
-                f"INSERT INTO invoice_items ({', '.join(insert_cols)}) VALUES ({placeholders})",
-                tuple(base_vals + extra_vals),
-            )
+        invoices_engine.save_invoice_items(conn, invoice_local_id, items_fact)
         conn.commit()
     except Exception as e:
         conn.close()
@@ -939,11 +890,10 @@ def api_invoices_quick(
     fact_id = invoice.get("id")
     uuid = invoice.get("uuid")
     total = invoice.get("total")
-    conn.execute(
-        "UPDATE invoices SET facturapi_invoice_id = ?, uuid = ?, total = ? WHERE id = ? AND issuer_id = ?",
-        (fact_id, uuid, total, invoice_local_id, issuer_id),
+    invoices_engine.update_invoice_stamp(
+        conn, invoice_local_id, issuer_id,
+        facturapi_id=fact_id, uuid=uuid, total=total,
     )
-    conn.commit()
     conn.close()
 
     # ----- Guardar XML en storage + registrar en sat_cfdi para descargas /portal/sat/xml|pdf/{uuid} -----
@@ -2285,3 +2235,61 @@ def api_notification_mark_read(
         raise HTTPException(status_code=401, detail="Sesión inválida")
     success = notif_service.mark_read(issuer_id, notification_id)
     return ok({"marked": success})
+
+
+# ── SAT Sync Status ──────────────────────────────────────────────
+@router.get("/sat/status")
+def api_sat_status(issuer: dict = Depends(get_portal_issuer)):
+    """Return SAT sync status for current issuer: credentials, sync state, recent jobs."""
+    issuer_id = int(issuer.get("id") or 0)
+    if issuer_id <= 0:
+        raise HTTPException(status_code=401, detail="Sesión inválida")
+
+    # Credentials status
+    creds = None
+    try:
+        rows = db_rows(
+            "SELECT validation_ok, validation_at, validation_message FROM sat_credentials WHERE issuer_id = ?",
+            (issuer_id,),
+        )
+        if rows:
+            creds = {"validation_ok": bool(rows[0].get("validation_ok")), "validation_at": rows[0].get("validation_at"), "message": rows[0].get("validation_message")}
+    except Exception:
+        pass
+
+    # Sync state per direction
+    sync_states = {}
+    try:
+        for row in db_rows(
+            "SELECT direction, last_success_at, last_attempt_at, last_error, cooldown_until FROM sat_sync_state WHERE issuer_id = ?",
+            (issuer_id,),
+        ):
+            sync_states[row["direction"]] = {
+                "last_success_at": row.get("last_success_at"),
+                "last_attempt_at": row.get("last_attempt_at"),
+                "last_error": row.get("last_error"),
+                "cooldown_until": row.get("cooldown_until"),
+            }
+    except Exception:
+        pass
+
+    # Recent jobs (last 10)
+    recent_jobs = []
+    try:
+        recent_jobs = db_rows(
+            """SELECT id, job_type, direction, status, last_error, started_at, finished_at, created_at
+               FROM sat_jobs WHERE issuer_id = ? ORDER BY id DESC LIMIT 10""",
+            (issuer_id,),
+        )
+    except Exception:
+        pass
+
+    # Summary flags
+    has_queued = any(j.get("status") in ("queued", "running") for j in recent_jobs)
+
+    return ok({
+        "credentials": creds,
+        "sync_state": sync_states,
+        "recent_jobs": recent_jobs,
+        "has_pending_jobs": has_queued,
+    })
