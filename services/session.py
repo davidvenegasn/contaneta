@@ -37,8 +37,8 @@ def sign_session(user_id: int, issuer_id: int, restore_issuer_id: Optional[int] 
     return base64.urlsafe_b64encode(f"{payload}.{sig}".encode()).decode().rstrip("=")
 
 
-def verify_session(cookie_val: Optional[str]) -> Optional[tuple]:
-    """Devuelve (user_id, issuer_id, restore_issuer_id|None). user_id=0 = legacy por token."""
+def verify_session(cookie_val: Optional[str], *, include_expiry: bool = False) -> Optional[tuple]:
+    """Devuelve (user_id, issuer_id, restore_issuer_id|None[, expiry]). user_id=0 = legacy por token."""
     if not cookie_val or not cookie_val.strip():
         _log_session_invalid("missing cookie")
         return None
@@ -62,13 +62,15 @@ def verify_session(cookie_val: Optional[str]) -> Optional[tuple]:
         if time.time() > expiry:
             _log_session_invalid("expired (legacy 2-part)")
             return None
-        return (0, issuer_id, None)
+        base = (0, issuer_id, None)
+        return (*base, expiry) if include_expiry else base
     if len(parts) == 3:
         user_id, issuer_id, expiry = int(parts[0]), int(parts[1]), int(parts[2])
         if time.time() > expiry:
             _log_session_invalid("expired (3-part)")
             return None
-        return (user_id, issuer_id, None)
+        base = (user_id, issuer_id, None)
+        return (*base, expiry) if include_expiry else base
     if len(parts) == 4:
         user_id, issuer_id, expiry, restore_issuer_id = (
             int(parts[0]), int(parts[1]), int(parts[2]), int(parts[3])
@@ -76,7 +78,8 @@ def verify_session(cookie_val: Optional[str]) -> Optional[tuple]:
         if time.time() > expiry:
             _log_session_invalid("expired (4-part)")
             return None
-        return (user_id, issuer_id, restore_issuer_id)
+        base = (user_id, issuer_id, restore_issuer_id)
+        return (*base, expiry) if include_expiry else base
     _log_session_invalid("bad payload parts")
     return None
 

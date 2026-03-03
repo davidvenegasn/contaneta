@@ -139,7 +139,14 @@ def update_user_password(user_id: int, password_hash: str) -> None:
         return
     conn = db()
     try:
-        conn.execute("UPDATE users SET password_hash = ? WHERE id = ?", (password_hash, user_id))
+        from database import has_column
+        if has_column(conn, "users", "password_changed_at"):
+            conn.execute(
+                "UPDATE users SET password_hash = ?, password_changed_at = datetime('now') WHERE id = ?",
+                (password_hash, user_id),
+            )
+        else:
+            conn.execute("UPDATE users SET password_hash = ? WHERE id = ?", (password_hash, user_id))
         conn.commit()
     finally:
         conn.close()

@@ -1,13 +1,38 @@
 """Dependencias FastAPI (get_portal_issuer)."""
 import logging
+import time
 
 from fastapi import Request, HTTPException
 
-from config import ALLOW_DEMO_PORTAL, DEV_MODE, DEV_TOKEN
+from config import ALLOW_DEMO_PORTAL, DEV_MODE, DEV_TOKEN, SESSION_TTL_DAYS
+from database import db_rows, has_column, db
 from services import issuers, session, users
 from services import rate_limit as rate_limit_service
 
 logger = logging.getLogger(__name__)
+
+
+def _session_invalidated_by_password_change(user_id: int, session_expiry: int) -> bool:
+    """Check if the session was created before the user's last password change."""
+    try:
+        conn = db()
+        if not has_column(conn, "users", "password_changed_at"):
+            conn.close()
+            return False
+        conn.close()
+        rows = db_rows(
+            "SELECT password_changed_at FROM users WHERE id = ? LIMIT 1",
+            (user_id,),
+        )
+        if not rows or not rows[0].get("password_changed_at"):
+            return False
+        from datetime import datetime
+        pw_changed = datetime.strptime(rows[0]["password_changed_at"], "%Y-%m-%d %H:%M:%S")
+        session_created = session_expiry - SESSION_TTL_DAYS * 86400
+        session_created_dt = datetime.utcfromtimestamp(session_created)
+        return session_created_dt < pw_changed
+    except Exception:
+        return False
 
 
 def get_portal_issuer(request: Request) -> dict:
@@ -40,11 +65,12 @@ def get_portal_issuer(request: Request) -> dict:
             request.state.impersonation_restore_issuer_id = None
             return issuer
 
-    session_data = session.verify_session(cookie_val)
+    session_data = session.verify_session(cookie_val, include_expiry=True)
     if session_data is not None:
         user_id = session_data[0]
         issuer_id = session_data[1]
         restore_issuer_id = session_data[2] if len(session_data) >= 3 else None
+        session_expiry = session_data[3] if len(session_data) >= 4 else 0
         if issuer_id == 0:
             if is_api:
                 raise HTTPException(status_code=403, detail="Completa tu perfil fiscal en onboarding.")
@@ -52,6 +78,12 @@ def get_portal_issuer(request: Request) -> dict:
         issuer = issuers.get_issuer_by_id(issuer_id)
         if issuer:
             if user_id > 0:
+                # Invalidate session if password was changed after session creation
+                if session_expiry and _session_invalidated_by_password_change(user_id, session_expiry):
+                    logger.info("Session invalidated: password changed after session creation for user_id=%s", user_id)
+                    if is_api:
+                        raise HTTPException(status_code=401, detail="Sesión expirada. Inicia sesión de nuevo.")
+                    raise HTTPException(status_code=401, detail="No autorizado - redirigir a /login")
                 mem = users.get_membership(user_id, issuer_id)
                 if not mem:
                     pass
