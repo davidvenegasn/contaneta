@@ -19,8 +19,14 @@
         <tr><th>Actualizado</th><td class="muted">{{ job.updated_at or '-' }}</td></tr>
       </tbody>
     </table>
-    <div style="margin-top:12px;">
+    <div style="margin-top:12px; display:flex; gap:8px;">
       <a class="btn btn-secondary" href="/admin/jobs">Volver</a>
+      {% if job.status in ('failed', 'running') %}
+      <form method="post" action="/admin/jobs/{{ job.id }}/requeue" style="display:inline;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+        <button type="submit" class="btn btn-primary btn-sm">Re-encolar</button>
+      </form>
+      {% endif %}
     </div>
   </div>
 

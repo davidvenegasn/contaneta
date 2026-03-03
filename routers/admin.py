@@ -120,12 +120,30 @@ def get_admin_router(templates):
         )
         errors_today = 0
         try:
-            # asegurar tabla si aún no existe
             error_events_service.list_error_events(limit=1)
             r = db_rows("SELECT COUNT(*) AS n FROM error_events WHERE date(created_at) = date('now')")
             errors_today = r[0]["n"] if r else 0
         except Exception:
             errors_today = 0
+
+        # SAT jobs stats (24h)
+        sat_jobs_24h = {"queued": 0, "running": 0, "error": 0}
+        try:
+            for row in db_rows(
+                "SELECT status, COUNT(*) AS n FROM sat_jobs WHERE created_at > datetime('now', '-24 hours') GROUP BY status"
+            ):
+                if row["status"] in sat_jobs_24h:
+                    sat_jobs_24h[row["status"]] = row["n"]
+        except Exception:
+            pass
+
+        # Issuers needing review
+        needs_review_count = 0
+        try:
+            r = db_rows("SELECT COUNT(*) AS n FROM admin_issuer_meta WHERE needs_review = 1")
+            needs_review_count = r[0]["n"] if r else 0
+        except Exception:
+            pass
 
         sat_cfdi_by_direction = db_rows(
             """SELECT direction, COUNT(*) AS n FROM sat_cfdi
@@ -136,6 +154,25 @@ def get_admin_router(templates):
         sat_requests_by_status = db_rows(
             "SELECT status, COUNT(*) AS n FROM sat_requests GROUP BY status"
         )
+
+        # Recent jobs (last 20) for table
+        recent_jobs = db_rows(
+            """SELECT j.id, j.issuer_id, i.rfc AS issuer_rfc, j.name, j.status, j.message,
+                      j.created_at, j.updated_at
+               FROM jobs j LEFT JOIN issuers i ON i.id = j.issuer_id
+               ORDER BY j.id DESC LIMIT 20"""
+        )
+
+        # Recent errors (last 20)
+        recent_errors = []
+        try:
+            recent_errors = db_rows(
+                """SELECT id, created_at, path, status_code, request_id, issuer_id
+                   FROM error_events ORDER BY id DESC LIMIT 20"""
+            )
+        except Exception:
+            pass
+
         audit_events = db_rows(
             """SELECT id, created_at, action, user_id, issuer_id, target_issuer_id, details,
                       entity, entity_id, meta_json, ip, user_agent FROM audit_log ORDER BY id DESC LIMIT 20"""
@@ -152,9 +189,13 @@ def get_admin_router(templates):
                 "jobs_in_queue": jobs_in_queue[0]["n"] if jobs_in_queue else 0,
                 "jobs_failed_today": jobs_failed_today[0]["n"] if jobs_failed_today else 0,
                 "errors_today": errors_today,
+                "sat_jobs_24h": sat_jobs_24h,
+                "needs_review_count": needs_review_count,
                 "last_logins": last_logins,
                 "sat_cfdi_by_direction": sat_cfdi_by_direction,
                 "sat_requests_by_status": sat_requests_by_status,
+                "recent_jobs": recent_jobs,
+                "recent_errors": recent_errors,
                 "audit_events": audit_events,
             },
         )
@@ -217,10 +258,7 @@ def get_admin_router(templates):
             conn.close()
         trial_col = "i.trial_expires_at" if has_trial else "NULL AS trial_expires_at"
 
-        if search:
-            like = f"%{search}%"
-            rows = db_rows(
-                f"""SELECT i.id, i.rfc, i.razon_social, i.regimen_fiscal, i.active, i.facturapi_org_id,
+        issuer_select = f"""SELECT i.id, i.rfc, i.razon_social, i.regimen_fiscal, i.active, i.facturapi_org_id,
                           {trial_col},
                           (SELECT s.plan FROM memberships m JOIN subscriptions s ON s.user_id = m.user_id
                            WHERE m.issuer_id = i.id
@@ -230,10 +268,25 @@ def get_admin_router(templates):
                            WHERE m.issuer_id = i.id
                            ORDER BY CASE m.role WHEN 'owner' THEN 1 WHEN 'admin' THEN 2 ELSE 3 END, s.id DESC
                            LIMIT 1) AS plan_status,
-                          (SELECT MAX(last_run_at) FROM sat_sync_state st WHERE st.issuer_id = i.id) AS last_sat_sync_at,
-                          (SELECT request_id FROM error_events ee WHERE ee.issuer_id = i.id ORDER BY ee.id DESC LIMIT 1) AS last_error_request_id,
-                          (SELECT created_at FROM error_events ee WHERE ee.issuer_id = i.id ORDER BY ee.id DESC LIMIT 1) AS last_error_at
-                   FROM issuers i
+                          (SELECT last_success_at FROM sat_sync_state st WHERE st.issuer_id = i.id AND st.direction = 'issued') AS last_sync_issued,
+                          (SELECT last_success_at FROM sat_sync_state st WHERE st.issuer_id = i.id AND st.direction = 'received') AS last_sync_received,
+                          (SELECT COUNT(*) FROM sat_jobs sj WHERE sj.issuer_id = i.id AND sj.status = 'error' AND sj.updated_at > datetime('now', '-24 hours')) AS jobs_failed_24h,
+                          CASE
+                            WHEN (SELECT validation_ok FROM sat_credentials sc WHERE sc.issuer_id = i.id) = 1
+                              THEN CASE
+                                WHEN (SELECT last_error FROM sat_sync_state st WHERE st.issuer_id = i.id ORDER BY st.updated_at DESC LIMIT 1) IS NOT NULL
+                                  THEN 'SAT ERROR'
+                                ELSE 'SAT OK'
+                              END
+                            WHEN (SELECT id FROM sat_credentials sc WHERE sc.issuer_id = i.id) IS NOT NULL
+                              THEN 'SAT ERROR'
+                            ELSE 'NO CONFIG'
+                          END AS sat_badge
+                   FROM issuers i"""
+        if search:
+            like = f"%{search}%"
+            rows = db_rows(
+                f"""{issuer_select}
                    WHERE i.rfc LIKE ? OR i.razon_social LIKE ?
                       OR i.id IN (
                         SELECT m.issuer_id FROM memberships m
@@ -245,20 +298,7 @@ def get_admin_router(templates):
             )
         else:
             rows = db_rows(
-                f"""SELECT i.id, i.rfc, i.razon_social, i.regimen_fiscal, i.active, i.facturapi_org_id,
-                          {trial_col},
-                          (SELECT s.plan FROM memberships m JOIN subscriptions s ON s.user_id = m.user_id
-                           WHERE m.issuer_id = i.id
-                           ORDER BY CASE m.role WHEN 'owner' THEN 1 WHEN 'admin' THEN 2 ELSE 3 END, s.id DESC
-                           LIMIT 1) AS plan,
-                          (SELECT s.status FROM memberships m JOIN subscriptions s ON s.user_id = m.user_id
-                           WHERE m.issuer_id = i.id
-                           ORDER BY CASE m.role WHEN 'owner' THEN 1 WHEN 'admin' THEN 2 ELSE 3 END, s.id DESC
-                           LIMIT 1) AS plan_status,
-                          (SELECT MAX(last_run_at) FROM sat_sync_state st WHERE st.issuer_id = i.id) AS last_sat_sync_at,
-                          (SELECT request_id FROM error_events ee WHERE ee.issuer_id = i.id ORDER BY ee.id DESC LIMIT 1) AS last_error_request_id,
-                          (SELECT created_at FROM error_events ee WHERE ee.issuer_id = i.id ORDER BY ee.id DESC LIMIT 1) AS last_error_at
-                   FROM issuers i
+                f"""{issuer_select}
                    ORDER BY i.id"""
             )
         return templates.TemplateResponse(
@@ -302,6 +342,55 @@ def get_admin_router(templates):
         meta = admin_issuer_service.get_meta(issuer_id) or {}
         user_id, _, _ = _admin
         can_impersonate = users.user_has_admin_role(user_id)
+
+        # SAT credentials status (without secrets)
+        sat_creds = None
+        try:
+            creds_rows = db_rows(
+                "SELECT validation_ok, validation_at, validation_message, updated_at FROM sat_credentials WHERE issuer_id = ?",
+                (issuer_id,),
+            )
+            sat_creds = creds_rows[0] if creds_rows else None
+        except Exception:
+            pass
+
+        # Sync state per direction
+        sync_states = []
+        try:
+            sync_states = db_rows(
+                "SELECT direction, last_success_at, last_attempt_at, last_error, cooldown_until, updated_at FROM sat_sync_state WHERE issuer_id = ? ORDER BY direction",
+                (issuer_id,),
+            )
+        except Exception:
+            pass
+
+        # Recent jobs for this issuer
+        issuer_jobs = db_rows(
+            """SELECT id, name, status, progress, message, attempts, max_attempts, created_at, updated_at
+               FROM jobs WHERE issuer_id = ? ORDER BY id DESC LIMIT 20""",
+            (issuer_id,),
+        )
+        # Recent sat_jobs for this issuer
+        issuer_sat_jobs = []
+        try:
+            issuer_sat_jobs = db_rows(
+                """SELECT id, job_type, direction, status, attempts, last_error, started_at, finished_at, created_at
+                   FROM sat_jobs WHERE issuer_id = ? ORDER BY id DESC LIMIT 20""",
+                (issuer_id,),
+            )
+        except Exception:
+            pass
+
+        # Recent errors for this issuer
+        issuer_errors = []
+        try:
+            issuer_errors = db_rows(
+                "SELECT id, created_at, path, status_code, request_id FROM error_events WHERE issuer_id = ? ORDER BY id DESC LIMIT 10",
+                (issuer_id,),
+            )
+        except Exception:
+            pass
+
         return templates.TemplateResponse(
             "admin_issuer_detail.html",
             {
@@ -311,6 +400,11 @@ def get_admin_router(templates):
                 "meta": meta,
                 "can_impersonate": can_impersonate,
                 "csrf_token": csrf_service.generate_csrf_token(),
+                "sat_creds": sat_creds,
+                "sync_states": sync_states,
+                "issuer_jobs": issuer_jobs,
+                "issuer_sat_jobs": issuer_sat_jobs,
+                "issuer_errors": issuer_errors,
             },
         )
 
@@ -345,6 +439,7 @@ def get_admin_router(templates):
         status: str | None = Query(None),
         issuer_id: int | None = Query(None),
         q: str | None = Query(None),
+        direction: str | None = Query(None),
         _admin: tuple[int, int, int | None] = Depends(require_admin_or_owner),
     ):
         where = ["1=1"]
@@ -373,15 +468,50 @@ def get_admin_router(templates):
             """,
             tuple(params),
         )
+
+        # SAT jobs
+        sat_where = ["1=1"]
+        sat_params: list = []
+        if status and status.strip():
+            sat_where.append("sj.status = ?")
+            sat_params.append(status.strip())
+        if issuer_id is not None:
+            sat_where.append("sj.issuer_id = ?")
+            sat_params.append(int(issuer_id))
+        if direction and direction.strip():
+            sat_where.append("sj.direction = ?")
+            sat_params.append(direction.strip())
+        sat_rows = []
+        try:
+            sat_rows = db_rows(
+                f"""
+                SELECT sj.id, sj.issuer_id, i.rfc AS issuer_rfc,
+                       sj.job_type, sj.direction, sj.status,
+                       sj.attempts, sj.last_error,
+                       sj.started_at, sj.finished_at, sj.created_at
+                FROM sat_jobs sj
+                LEFT JOIN issuers i ON i.id = sj.issuer_id
+                WHERE {' AND '.join(sat_where)}
+                ORDER BY sj.id DESC
+                LIMIT 200
+                """,
+                tuple(sat_params),
+            )
+        except Exception:
+            pass
+
         return templates.TemplateResponse(
             "admin_jobs.html",
             {
                 "request": request,
                 "active_page": "jobs",
                 "jobs": rows,
+                "sat_jobs": sat_rows,
                 "filter_status": (status or "").strip(),
                 "filter_issuer_id": issuer_id,
                 "filter_q": (q or "").strip(),
+                "filter_direction": (direction or "").strip(),
+                "csrf_token": csrf_service.generate_csrf_token(),
             },
         )
 
@@ -426,8 +556,79 @@ def get_admin_router(templates):
                 "job": job,
                 "payload_pretty": payload_pretty,
                 "result_pretty": result_pretty,
+                "csrf_token": csrf_service.generate_csrf_token(),
             },
         )
+
+    # ---------- POST: Requeue a failed job ----------
+    @router.post("/jobs/{job_id:int}/requeue", response_class=RedirectResponse)
+    def admin_job_requeue(
+        request: Request,
+        job_id: int,
+        _admin: tuple[int, int, int | None] = Depends(require_admin),
+    ):
+        csrf_service.validate_csrf_token(request)
+        conn = db()
+        try:
+            row = conn.execute("SELECT id, status FROM jobs WHERE id = ?", (job_id,)).fetchone()
+            if not row:
+                raise HTTPException(status_code=404, detail="Job no encontrado")
+            conn.execute(
+                "UPDATE jobs SET status = 'queued', locked_by = NULL, locked_at = NULL, updated_at = datetime('now') WHERE id = ?",
+                (job_id,),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+        user_id, _, _ = _admin
+        audit.log(action="admin_job_requeue", user_id=user_id, request=request, entity="job", entity_id=str(job_id))
+        log_action(request, "admin_job_requeue", job_id=job_id)
+        return RedirectResponse(url=f"/admin/jobs/{job_id}", status_code=302)
+
+    # ---------- POST: Force SAT sync for an issuer ----------
+    @router.post("/issuers/{issuer_id:int}/force-sync", response_class=RedirectResponse)
+    def admin_force_sync(
+        request: Request,
+        issuer_id: int,
+        _admin: tuple[int, int, int | None] = Depends(require_admin),
+    ):
+        csrf_service.validate_csrf_token(request)
+        from services.sat_autosync import enqueue_sat_sync
+        enqueued = []
+        for direction in ("issued", "received"):
+            jid = enqueue_sat_sync(issuer_id, direction)
+            if jid:
+                enqueued.append(jid)
+        user_id, _, _ = _admin
+        audit.log(
+            action="admin_force_sync", user_id=user_id, request=request,
+            entity="issuer", entity_id=str(issuer_id),
+            details=f"enqueued={enqueued}",
+        )
+        log_action(request, "admin_force_sync", issuer_id=issuer_id)
+        return RedirectResponse(url=f"/admin/issuers/{issuer_id}", status_code=302)
+
+    # ---------- POST: Requeue failed sat_jobs for an issuer ----------
+    @router.post("/issuers/{issuer_id:int}/requeue-failed", response_class=RedirectResponse)
+    def admin_requeue_failed_jobs(
+        request: Request,
+        issuer_id: int,
+        _admin: tuple[int, int, int | None] = Depends(require_admin),
+    ):
+        csrf_service.validate_csrf_token(request)
+        conn = db()
+        try:
+            conn.execute(
+                "UPDATE sat_jobs SET status = 'queued', locked_at = NULL, updated_at = datetime('now') WHERE issuer_id = ? AND status = 'error'",
+                (issuer_id,),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+        user_id, _, _ = _admin
+        audit.log(action="admin_requeue_failed", user_id=user_id, request=request, entity="issuer", entity_id=str(issuer_id))
+        log_action(request, "admin_requeue_failed", issuer_id=issuer_id)
+        return RedirectResponse(url=f"/admin/issuers/{issuer_id}", status_code=302)
 
     # ---------- GET: Errors ----------
     @router.get("/errors", response_class=HTMLResponse)

@@ -27,14 +27,130 @@
     </table>
   </div>
 
+  <div class="card">
+    <h2>Credenciales SAT</h2>
+    {% if sat_creds %}
+    <table>
+      <tr><th style="width:160px;">Validación</th><td>
+        {% if sat_creds.validation_ok %}
+          <span class="badge" style="background:#dcfce7;color:#166534;">Válida</span>
+        {% else %}
+          <span class="badge" style="background:#fee2e2;color:#991b1b;">Inválida</span>
+        {% endif %}
+      </td></tr>
+      <tr><th>Fecha validación</th><td class="muted">{{ sat_creds.validation_at or '-' }}</td></tr>
+      <tr><th>Mensaje</th><td class="muted">{{ sat_creds.validation_message or '-' }}</td></tr>
+      <tr><th>Actualizado</th><td class="muted">{{ sat_creds.updated_at or '-' }}</td></tr>
+    </table>
+    {% else %}
+    <p style="margin:0;color:#64748b;">Sin credenciales SAT configuradas.</p>
+    {% endif %}
+  </div>
+
+  {% if sync_states %}
+  <div class="card">
+    <h2>Estado de sincronización SAT</h2>
+    <table>
+      <thead><tr><th>Dirección</th><th>Último éxito</th><th>Último intento</th><th>Último error</th><th>Cooldown hasta</th></tr></thead>
+      <tbody>
+      {% for ss in sync_states %}
+      <tr>
+        <td>{{ ss.direction }}</td>
+        <td class="muted">{{ ss.last_success_at or '-' }}</td>
+        <td class="muted">{{ ss.last_attempt_at or '-' }}</td>
+        <td>{% if ss.last_error %}<span style="color:#dc2626;">{{ ss.last_error[:80] }}</span>{% else %}-{% endif %}</td>
+        <td class="muted">{{ ss.cooldown_until or '-' }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
   {% if can_impersonate %}
   <div class="card">
     <h2>Acciones</h2>
-    <form method="post" action="/admin/impersonate-form" style="display:inline;">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
-      <input type="hidden" name="issuer_id" value="{{ issuer.id }}" />
-      <button type="submit" class="btn btn-primary btn-sm">Impersonar este issuer</button>
-    </form>
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+      <form method="post" action="/admin/impersonate-form" style="display:inline;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+        <input type="hidden" name="issuer_id" value="{{ issuer.id }}" />
+        <button type="submit" class="btn btn-primary btn-sm">Impersonar</button>
+      </form>
+      <form method="post" action="/admin/issuers/{{ issuer.id }}/force-sync" style="display:inline;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+        <button type="submit" class="btn btn-secondary btn-sm">Forzar sync SAT</button>
+      </form>
+      <form method="post" action="/admin/issuers/{{ issuer.id }}/requeue-failed" style="display:inline;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+        <button type="submit" class="btn btn-secondary btn-sm">Re-encolar jobs fallidos</button>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if issuer_sat_jobs %}
+  <div class="card">
+    <h2>SAT Jobs recientes</h2>
+    <table>
+      <thead><tr><th>ID</th><th>Tipo</th><th>Dirección</th><th>Status</th><th>Intentos</th><th>Error</th><th>Inicio</th><th>Fin</th></tr></thead>
+      <tbody>
+      {% for sj in issuer_sat_jobs %}
+      <tr>
+        <td>{{ sj.id }}</td>
+        <td>{{ sj.job_type }}</td>
+        <td>{{ sj.direction or '-' }}</td>
+        <td><span class="badge badge--xs {% if sj.status == 'error' %}badge--error{% elif sj.status == 'ok' %}badge--success{% endif %}">{{ sj.status }}</span></td>
+        <td class="muted">{{ sj.attempts }}</td>
+        <td class="muted">{{ (sj.last_error or '')[:60] }}</td>
+        <td class="muted">{{ sj.started_at or '-' }}</td>
+        <td class="muted">{{ sj.finished_at or '-' }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  {% if issuer_jobs %}
+  <div class="card">
+    <h2>Jobs genéricos recientes</h2>
+    <table>
+      <thead><tr><th>ID</th><th>Nombre</th><th>Status</th><th>Progreso</th><th>Mensaje</th><th>Fecha</th><th></th></tr></thead>
+      <tbody>
+      {% for j in issuer_jobs %}
+      <tr>
+        <td>{{ j.id }}</td>
+        <td>{{ j.name }}</td>
+        <td><span class="badge badge--xs {% if j.status == 'failed' %}badge--error{% elif j.status == 'success' %}badge--success{% endif %}">{{ j.status }}</span></td>
+        <td class="muted">{{ j.progress }}%</td>
+        <td class="muted">{{ (j.message or '')[:60] }}</td>
+        <td class="muted">{{ j.updated_at or j.created_at }}</td>
+        <td><a class="btn btn-secondary btn-sm" href="/admin/jobs/{{ j.id }}">Ver</a></td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  {% if issuer_errors %}
+  <div class="card">
+    <h2>Errores recientes</h2>
+    <table>
+      <thead><tr><th>ID</th><th>Fecha</th><th>Path</th><th>Status</th><th>Request ID</th><th></th></tr></thead>
+      <tbody>
+      {% for e in issuer_errors %}
+      <tr>
+        <td>{{ e.id }}</td>
+        <td class="muted">{{ e.created_at or '-' }}</td>
+        <td>{{ e.path or '-' }}</td>
+        <td>{{ e.status_code or '-' }}</td>
+        <td><code>{{ (e.request_id or '-')[:12] }}</code></td>
+        <td><a class="btn btn-secondary btn-sm" href="/admin/errors/{{ e.id }}">Ver</a></td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
   </div>
   {% endif %}
 
