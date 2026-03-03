@@ -62,8 +62,9 @@ e20bcf3 perf: add query indices and in-memory catalog cache
 - [x] Backup ZIP created
 - [x] Branch `release-prep-20260303` created
 - [x] This status document created
-- [ ] JOB 1: SAT AutoSync PRO — scheduler + policy + onboarding + dedupe
-- [ ] JOB 3: Admin Ops PRO — dashboard + issuers + jobs + errors + actions
-- [ ] JOB 4: Deploy VPS PRO — nginx + gunicorn + systemd + SSL + backups
+- [x] JOB 1: SAT AutoSync PRO — scheduler + policy + onboarding + dedupe
+- [x] JOB 3: Admin Ops PRO — dashboard + issuers + jobs + errors + actions
+- [x] JOB 4: Deploy VPS PRO — nginx + gunicorn + systemd + SSL + backups
+- [x] JOB 5: Release Guardrails — smoke tests + Sentry + launch checklist
 - [ ] Final integration testing
 - [ ] Merge to main
