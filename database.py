@@ -1,6 +1,7 @@
 """Conexiones y helpers para invoicing.db y catalogs.db."""
 import os
 import sqlite3
+import time
 
 from config import CATALOGS_DB, DB_PATH
 from contextlib import contextmanager
@@ -147,9 +148,19 @@ def _pick_column(cols: set[str], candidates: list[str]) -> str:
     raise KeyError(f"No se encontró ninguna columna de {candidates} en la tabla")
 
 
+# In-memory cache for read-only catalog data (TTL 300s)
+_catalog_cache: dict[str, list[dict]] = {}
+_catalog_cache_ts: dict[str, float] = {}
+_CATALOG_CACHE_TTL = 300.0
+
+
 def list_catalog(table: str, order_by: str | None = None) -> list[dict]:
     """Devuelve [{"key": "...", "label": "..."}] de una tabla de catálogo SAT. table debe estar en ALLOWED_CATALOG_TABLES."""
     _check_catalog_table(table)
+    cache_key = f"{table}:{order_by or ''}"
+    now = time.monotonic()
+    if cache_key in _catalog_cache and (now - _catalog_cache_ts.get(cache_key, 0)) < _CATALOG_CACHE_TTL:
+        return _catalog_cache[cache_key]
     con = db_catalogs()
     try:
         cols = _table_columns(con, table)
@@ -159,9 +170,12 @@ def list_catalog(table: str, order_by: str | None = None) -> list[dict]:
         rows = con.execute(
             f"SELECT {key_col} AS k, {label_col} AS v FROM {table} ORDER BY {ob}"
         ).fetchall()
-        return [{"key": str(r["k"]), "label": str(r["v"])} for r in rows]
+        result = [{"key": str(r["k"]), "label": str(r["v"])} for r in rows]
     finally:
         con.close()
+    _catalog_cache[cache_key] = result
+    _catalog_cache_ts[cache_key] = now
+    return result
 
 
 def search_catalog(table: str, q: str, limit: int = 20) -> list[dict]:
