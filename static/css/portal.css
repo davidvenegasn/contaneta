@@ -54,6 +54,8 @@ body.sidebar-open .sidebar{ transform: translateX(0); visibility: visible; }
 
 /* ===== Barra superior: solo arriba, no acompaña al scroll; compacta ===== */
 .portal-topbar{
+  position: relative;
+  z-index: 1000;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -2033,7 +2035,7 @@ button:hover, button:focus, button:active, button:focus-visible,
   background: rgba(255,255,255,.94);
   backdrop-filter: blur(10px);
   box-shadow: 0 18px 60px rgba(0,0,0,.16);
-  z-index: 90;
+  z-index: 1100;
   transform-origin: top right;
   animation: menuIn var(--motion-modal, 200ms) ease both;
 }
