@@ -387,6 +387,10 @@
     // Si no aplica, sugerimos 0 (solo si no están manual)
     const shouldSuggest = issuerResico && receiverPM && anyService;
 
+    // Show/hide retention hint
+    const retHint = document.getElementById("retencionHint");
+    if (retHint) retHint.style.display = shouldSuggest ? "block" : "none";
+
     if (gIsr.dataset.manual !== "1") {
       gIsr.value = shouldSuggest ? "0.0125" : "0";
     }
@@ -866,5 +870,17 @@
     onTaxContextChanged();
 
     calcTotals();
+
+    // Tooltips: mobile tap support
+    document.addEventListener("click", (e) => {
+      const tip = e.target.closest(".tip");
+      document.querySelectorAll(".tip.is-active").forEach((t) => {
+        if (t !== tip) t.classList.remove("is-active");
+      });
+      if (tip) {
+        e.preventDefault();
+        tip.classList.toggle("is-active");
+      }
+    });
   })();
 </script>

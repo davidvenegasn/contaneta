@@ -1,27 +1,27 @@
 <div class="card">
-  <div class="card-title-row mb-14"><h3 class="section-title">02 — Comprobante</h3></div>
+  <div class="card-title-row mb-14"><h3 class="section-title">02 — Pago y condiciones</h3></div>
   <div class="row">
     <div>
-      <label>Moneda</label>
+      <label>Moneda <span class="tip" data-tip="Moneda en la que cobras. Si no es MXN, se requiere tipo de cambio.">?</span></label>
       <select name="currency" id="currency" required>
         <option value="">Cargando…</option>
       </select>
     </div>
     <div>
-      <label>Tipo de cambio (solo si USD)</label>
+      <label>Tipo de cambio <span class="tip" data-tip="Tipo de cambio del día del pago. Si no es MXN, SAT lo requiere.">?</span></label>
       <input name="exchange_rate" id="exchange_rate" placeholder="Ej. 17.20" disabled />
     </div>
   </div>
 
   <div class="row">
     <div>
-      <label>Método de pago</label>
+      <label>Método de pago <span class="tip" data-tip="PUE: si te pagan en una sola exhibición. PPD: si te pagan en parcialidades (luego se emite complemento de pago).">?</span></label>
       <select name="payment_method" id="payment_method" required>
         <option value="">Cargando…</option>
       </select>
     </div>
     <div>
-      <label>Forma de pago</label>
+      <label>Forma de pago <span class="tip" data-tip="Cómo te pagaron: transferencia, efectivo, tarjeta, etc.">?</span></label>
       <select name="payment_form" id="payment_form" required>
         <option value="">Cargando…</option>
       </select>

@@ -1,7 +1,7 @@
 <div class="card tax-global-card" id="ivaCard">
   <div class="tax-global-card__head">
-    <h3 class="section-title">04 — IVA (global)</h3>
-    <span class="section-title tax-global-card__title2">05 — Retenciones (global)</span>
+    <h3 class="section-title">04 — IVA <span class="tip" data-tip="Generalmente 16%. Zona fronteriza 8%. Si tu producto o servicio no lleva IVA, puede ser 0% o Exento, según el caso.">?</span></h3>
+    <span class="section-title tax-global-card__title2">05 — Retenciones (si aplica) <span class="tip" data-tip="Las retenciones aplican en algunos casos. Ej: si eres Persona Física y le facturas a una Persona Moral, puede aplicar retención. Si no estás seguro, déjalo en 0 y consulta a tu contador.">?</span></span>
   </div>
   <p class="muted tax-global-card__intro">Tasa de IVA para todos los conceptos. Retenciones: ISR sobre base; IVA ret. sobre IVA trasladado.</p>
   <div class="tax-global-row">
@@ -30,4 +30,5 @@
       </select>
     </div>
   </div>
+  <p class="muted" id="retencionHint" style="margin:10px 0 0; display:none;">Posible caso de retenciones. Revisa ISR/IVA retenido.</p>
 </div>

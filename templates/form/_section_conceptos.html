@@ -1,6 +1,6 @@
 <div class="card conceptos-card">
   <div class="card-title-row mb-14">
-    <h3 class="section-title">03 — Conceptos</h3>
+    <h3 class="section-title">03 — Lo que estás cobrando</h3>
     <span class="pill" id="itemsCounter">1 concepto</span>
   </div>
 
@@ -12,30 +12,30 @@
       <div class="item-row-top concept-block__inner">
         <div class="row">
           <div>
-            <label>Cantidad</label>
+            <label>Cantidad <span class="tip" data-tip="Cantidad de unidades.">?</span></label>
             <input name="qty_{{i}}" placeholder="1" inputmode="decimal" />
           </div>
           <div>
-            <label>Descripción</label>
-            <input name="desc_{{i}}" placeholder="Descripción del concepto" value="{{ concept_prefill.description | e if concept_prefill and i == 1 else '' }}" />
+            <label>Descripción <span class="tip" data-tip="Describe claro lo que cobras. Ej: Diseño de software.">?</span></label>
+            <input name="desc_{{i}}" placeholder="Describe lo que cobras" value="{{ concept_prefill.description | e if concept_prefill and i == 1 else '' }}" />
           </div>
         </div>
         <div class="row">
           <div>
-            <label>Precio unitario</label>
+            <label>Precio unitario sin IVA <span class="tip" data-tip="El precio, sin impuestos.">?</span></label>
             <div class="price-wrap">
               <span class="price-prefix">$</span>
               <input name="price_{{i}}" placeholder="0.00" inputmode="decimal" value="{{ concept_prefill.unit_price | e if concept_prefill and i == 1 else '' }}" />
             </div>
           </div>
           <div>
-            <label>Desc. %</label>
-            <input name="disc_{{i}}" class="disc" data-i="{{i}}" placeholder="0" inputmode="decimal" />
+            <label>Descuento <span class="tip" data-tip="Si aplica descuento. Si no, déjalo en 0.">?</span></label>
+            <input name="disc_{{i}}" class="disc" data-i="{{i}}" placeholder="0%" inputmode="decimal" />
           </div>
         </div>
         <div class="row">
           <div>
-            <label>Clave ProdServ</label>
+            <label>Clave ProdServ <span class="tip" data-tip="Categoría SAT de tu producto/servicio. Usa 'Buscar' si no la sabes.">?</span></label>
             <div class="prodserv-wrap prodserv-wrap--inline">
               <div class="prodserv-input">
                 <input name="key_{{i}}" class="prodserv" data-i="{{i}}"
@@ -54,7 +54,7 @@
             </div>
           </div>
           <div>
-            <label>Unidad</label>
+            <label>Unidad <span class="tip" data-tip="Si es un servicio: Unidad de servicio. Si es un producto: elige la unidad que más le vaya.">?</span></label>
             <div class="unit-wrap" data-unit-wrap="{{i}}" data-prefill-unit="{{ concept_prefill.unit_key | e if concept_prefill and i == 1 else '' }}">
               <select class="unitCommon" id="unit_select_{{i}}" data-i="{{i}}">
                 <option value="E48" selected>E48 — Unidad de servicio</option>
