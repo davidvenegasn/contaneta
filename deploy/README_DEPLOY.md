@@ -3,34 +3,34 @@
 ## Quick Start (Ubuntu 22.04/24.04)
 
 ```bash
-# 1. Run bootstrap (as root)
-sudo bash scripts/prod_bootstrap.sh
+# 1. Get the code on the server
+git clone YOUR_REPO_URL /opt/contaneta
 
-# 2. Clone repo (if not done by bootstrap)
-sudo -u contaneta git clone YOUR_REPO_URL /opt/contaneta
+# 2. Run bootstrap (installs deps, Caddy, creates user/dirs/venv/systemd)
+sudo bash /opt/contaneta/deploy/bootstrap_ubuntu.sh
 
-# 3. Edit .env
-sudo -u contaneta nano /opt/contaneta/.env
+# 3. Edit .env with real values
+sudo nano /var/lib/contaneta/.env
 
-# 4. Start everything
+# 4. Set up Caddy (HTTPS)
+sudo cp /opt/contaneta/deploy/caddy/Caddyfile /etc/caddy/Caddyfile
+sudo sed -i 's/TU_DOMINIO.com/YOUR_DOMAIN.com/g' /etc/caddy/Caddyfile
+sudo systemctl enable --now caddy
+
+# 5. Start services
 sudo systemctl enable --now contaneta-web contaneta-sat-worker
 sudo systemctl enable --now contaneta-sat-scheduler.timer contaneta-backup.timer
 
-# 5. Set up Caddy (HTTPS)
-sudo apt install caddy
-sudo cp /opt/contaneta/deploy/caddy/Caddyfile /etc/caddy/Caddyfile
-# Edit domain: sudo nano /etc/caddy/Caddyfile
-sudo systemctl enable --now caddy
-
 # 6. Verify
-curl https://YOUR_DOMAIN/health
+curl https://YOUR_DOMAIN.com/health
+BASE_URL=https://YOUR_DOMAIN.com bash /opt/contaneta/scripts/smoke_prod.sh
 ```
 
 ## Directory Layout (production)
 
 ```
 /opt/contaneta/            # Application code (git repo)
-├── .env                   # Environment config (chmod 600)
+├── .env -> /var/lib/contaneta/.env  # Symlink to data dir
 ├── .venv/                 # Python virtualenv
 ├── deploy/                # Deployment configs
 │   ├── systemd/           # systemd service + timer files

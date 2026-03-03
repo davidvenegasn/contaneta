@@ -1,239 +1,257 @@
 # Deploy ContaNeta on Ubuntu VPS
 
-Complete guide to deploy ContaNeta on a fresh Ubuntu 22.04/24.04 VPS.
+Complete guide to deploy ContaNeta on a fresh Ubuntu 22.04/24.04 VPS with Caddy (auto-HTTPS).
 
-## 1. Server Setup
+## Prerequisites
+
+- A fresh Ubuntu 22.04+ VPS (e.g. DigitalOcean, Hetzner, Vultr)
+- A domain pointing to the VPS IP (A record)
+- SSH access as root
+
+## Quick Start (1-Click)
 
 ```bash
-# Update system
-sudo apt update && sudo apt upgrade -y
+# 1. SSH into your VPS
+ssh root@YOUR_IP
 
-# Install dependencies
-sudo apt install -y \
-    nginx \
-    python3 python3-pip python3-venv \
-    php-cli php-curl php-xml php-mbstring php-sqlite3 \
-    sqlite3 \
-    certbot python3-certbot-nginx \
-    git \
-    ufw
+# 2. Get the code
+git clone YOUR_REPO_URL /opt/contaneta
 
-# Create deploy user
-sudo useradd -m -s /bin/bash deploy
-sudo mkdir -p /opt/contaneta
-sudo chown deploy:deploy /opt/contaneta
+# 3. Run the bootstrap (installs everything)
+sudo bash /opt/contaneta/deploy/bootstrap_ubuntu.sh
+
+# 4. Edit .env with real values
+sudo nano /var/lib/contaneta/.env
+
+# 5. Set up Caddy for HTTPS
+sudo cp /opt/contaneta/deploy/caddy/Caddyfile /etc/caddy/Caddyfile
+sudo sed -i 's/TU_DOMINIO.com/YOUR_DOMAIN.com/g' /etc/caddy/Caddyfile
+sudo systemctl restart caddy
+
+# 6. Start services
+sudo systemctl enable --now contaneta-web
+sudo systemctl enable --now contaneta-sat-worker
+sudo systemctl enable --now contaneta-sat-scheduler.timer
+sudo systemctl enable --now contaneta-backup.timer
+
+# 7. Verify
+curl https://YOUR_DOMAIN.com/health
 ```
 
-## 2. Application Setup
+## Step by Step
+
+### 1. Create VPS + Point DNS
+
+1. Create an Ubuntu 22.04 VPS (2GB RAM minimum recommended)
+2. Note the IP address
+3. In your DNS provider, create an A record: `YOUR_DOMAIN.com → VPS_IP`
+4. Wait for DNS propagation (check with `dig YOUR_DOMAIN.com`)
+
+### 2. Get the Code on the Server
 
 ```bash
-# Switch to deploy user
-sudo -u deploy -i
-
-# Clone repository
-cd /opt/contaneta
-git clone YOUR_REPO_URL .
-
-# Python virtualenv
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-
-# Create directories
-mkdir -p logs storage/xml_files storage/credentials backups
-
-# Environment configuration
-cp .env.example .env
-nano .env   # Edit with your values (see section below)
+ssh root@YOUR_IP
+git clone YOUR_REPO_URL /opt/contaneta
 ```
 
-## 3. Environment Variables (.env)
+Or use the deploy zip:
+```bash
+scp contaneta_deploy.zip root@YOUR_IP:/tmp/
+ssh root@YOUR_IP
+unzip /tmp/contaneta_deploy.zip -d /opt/contaneta
+```
+
+### 3. Run Bootstrap
 
 ```bash
-# Required in production
+sudo bash /opt/contaneta/deploy/bootstrap_ubuntu.sh
+```
+
+This idempotent script:
+- Installs system packages (python3, php, sqlite3, Caddy, git, ufw)
+- Creates `contaneta` system user
+- Creates directories: `/opt/contaneta`, `/var/lib/contaneta`, `/var/log/contaneta`, `/var/backups/contaneta`
+- Sets up Python virtualenv + installs dependencies
+- Creates `.env` template at `/var/lib/contaneta/.env`
+- Installs systemd services and timers
+- Configures logrotate
+- Opens firewall ports (22, 80, 443)
+
+### 4. Configure Environment
+
+```bash
+sudo -u contaneta nano /var/lib/contaneta/.env
+```
+
+**Required values** — replace placeholders:
+
+```bash
 ENV=prod
-SESSION_SECRET=<generate with: python3 -c "import secrets; print(secrets.token_hex(32))">
-AT_REST_MASTER_KEY=<generate with: python3 -c "import secrets; print(secrets.token_hex(32))">
-APP_DB_PATH=/opt/contaneta/invoicing.db
-SITE_URL=https://TU_DOMINIO.com
-
-# Admin
-ADMIN_PASSWORD=<strong password for /admin basic auth>
-
-# Stripe (billing)
-STRIPE_SECRET_KEY=sk_live_...
-STRIPE_WEBHOOK_SECRET=whsec_...
-STRIPE_PRICE_ID=price_...
-
-# SAT sync
-PHP_BIN=php
-SAT_SYNC_BACKFILL_DAYS=7
-SAT_SYNC_WINDOW_HOURS=6
-
-# Optional: Sentry
-# SENTRY_DSN=https://xxx@sentry.io/yyy
-
-# Optional: Backups to S3
-# BACKUP_RCLONE_REMOTE=contaneta-backup:bucket/path
+SESSION_SECRET=<python3 -c "import secrets; print(secrets.token_hex(32))">
+AT_REST_MASTER_KEY=<python3 -c "import secrets; print(secrets.token_hex(32))">
+SITE_URL=https://YOUR_DOMAIN.com
+APP_DB_PATH=/var/lib/contaneta/invoicing.db
+APP_STORAGE_PATH=/var/lib/contaneta/storage
 ```
 
-## 4. Run Migrations
+See `deploy/.env.example.prod` for the full template.
+
+### 5. Set Up Caddy (HTTPS)
 
 ```bash
-cd /opt/contaneta
-source .venv/bin/activate
-python -c "from migrations_runner import apply_migrations; apply_migrations('/opt/contaneta/invoicing.db')"
+# Copy Caddyfile
+sudo cp /opt/contaneta/deploy/caddy/Caddyfile /etc/caddy/Caddyfile
+
+# Replace domain placeholder
+sudo sed -i 's/TU_DOMINIO.com/YOUR_DOMAIN.com/g' /etc/caddy/Caddyfile
+
+# Optional: set Let's Encrypt email
+# sudo nano /etc/caddy/Caddyfile   # add: tls YOUR_EMAIL@example.com
+
+# Start Caddy
+sudo systemctl enable --now caddy
 ```
 
-## 5. PHP Dependencies (SAT sync)
+Caddy automatically obtains and renews HTTPS certificates from Let's Encrypt.
 
+**Alternative: Nginx + Certbot** — see `deploy/nginx/contaneta.conf`:
 ```bash
-cd /opt/contaneta/sat_sync
-# Install Composer if not present
-php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
-php composer-setup.php
-php -r "unlink('composer-setup.php');"
-php composer.phar install --no-dev
+sudo cp /opt/contaneta/deploy/nginx/contaneta.conf /etc/nginx/sites-available/contaneta
+sudo ln -sf /etc/nginx/sites-available/contaneta /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+sudo certbot --nginx -d YOUR_DOMAIN.com
 ```
 
-## 6. Systemd Services
+### 6. Start Services
 
 ```bash
-# Copy service files
-sudo cp deploy/systemd/contaneta-web.service /etc/systemd/system/
-sudo cp deploy/systemd/contaneta-sat-worker.service /etc/systemd/system/
-sudo cp deploy/systemd/contaneta-sat-scheduler.service /etc/systemd/system/
-sudo cp deploy/systemd/contaneta-sat-scheduler.timer /etc/systemd/system/
-sudo cp deploy/systemd/contaneta-backup.service /etc/systemd/system/
-sudo cp deploy/systemd/contaneta-backup.timer /etc/systemd/system/
-
-# Reload and enable
-sudo systemctl daemon-reload
-sudo systemctl enable contaneta-web contaneta-sat-worker
-sudo systemctl enable contaneta-sat-scheduler.timer contaneta-backup.timer
-
-# Start services
-sudo systemctl start contaneta-web
-sudo systemctl start contaneta-sat-worker
-sudo systemctl start contaneta-sat-scheduler.timer
-sudo systemctl start contaneta-backup.timer
-
-# Verify
-sudo systemctl status contaneta-web
-sudo systemctl status contaneta-sat-worker
-sudo systemctl list-timers --all | grep contaneta
+sudo systemctl enable --now contaneta-web
+sudo systemctl enable --now contaneta-sat-worker
+sudo systemctl enable --now contaneta-sat-scheduler.timer
+sudo systemctl enable --now contaneta-backup.timer
 ```
 
-## 7. Nginx + SSL
+### 7. Verify
 
 ```bash
-# Copy nginx config
-sudo cp deploy/nginx/contaneta.conf /etc/nginx/sites-available/contaneta.conf
+# Health check (direct)
+curl -s http://localhost:8000/health | python3 -m json.tool
 
-# Edit: replace TU_DOMINIO.com with your actual domain
-sudo nano /etc/nginx/sites-available/contaneta.conf
-
-# Enable site
-sudo ln -sf /etc/nginx/sites-available/contaneta.conf /etc/nginx/sites-enabled/
-sudo rm -f /etc/nginx/sites-enabled/default  # Remove default site
-
-# Test and reload
-sudo nginx -t
-sudo systemctl reload nginx
-
-# SSL with Let's Encrypt
-sudo certbot --nginx -d TU_DOMINIO.com
-# Follow prompts, choose redirect HTTP→HTTPS
-```
-
-## 8. Firewall
-
-```bash
-sudo ufw allow 22/tcp    # SSH
-sudo ufw allow 80/tcp    # HTTP (for certbot renewal)
-sudo ufw allow 443/tcp   # HTTPS
-sudo ufw enable
-sudo ufw status
-```
-
-## 9. Log Rotation
-
-```bash
-# Copy logrotate config
-sudo cp deploy/logrotate-conta.example /etc/logrotate.d/contaneta
-
-# Or create manually:
-sudo tee /etc/logrotate.d/contaneta << 'LOGROTATE'
-/opt/contaneta/logs/*.log {
-    daily
-    missingok
-    rotate 14
-    compress
-    delaycompress
-    notifempty
-    create 0640 deploy deploy
-    sharedscripts
-    postrotate
-        systemctl reload contaneta-web 2>/dev/null || true
-    endscript
-}
-LOGROTATE
-```
-
-## 10. Verify Deployment
-
-```bash
-# Health check
-curl -s http://localhost:8000/health
-
-# From outside
-curl -s https://TU_DOMINIO.com/health
+# Health check (via Caddy HTTPS)
+curl -s https://YOUR_DOMAIN.com/health | python3 -m json.tool
 
 # Check services
 sudo systemctl status contaneta-web contaneta-sat-worker
 
 # Check timers
-sudo systemctl list-timers contaneta-*
+sudo systemctl list-timers --all | grep contaneta
 
-# Check logs
-tail -f /opt/contaneta/logs/web.log
-tail -f /opt/contaneta/logs/worker.log
-
-# Run smoke test
-cd /opt/contaneta && bash scripts/smoke_release.sh
+# Full smoke test
+BASE_URL=https://YOUR_DOMAIN.com bash /opt/contaneta/scripts/smoke_prod.sh
 ```
 
-## Updates
+Visit `/admin` in a browser to access the admin panel.
+
+## Directory Layout
+
+```
+/opt/contaneta/                 # Application code (read-only in prod)
+├── app.py                      # FastAPI application
+├── deploy/                     # Deploy configs (systemd, Caddy, bootstrap)
+├── scripts/                    # Ops scripts (backup, restore, triage)
+├── .venv/                      # Python virtualenv
+└── sat_sync/                   # PHP SAT sync scripts
+
+/var/lib/contaneta/             # Application data
+├── .env                        # Environment variables (chmod 600)
+├── invoicing.db                # SQLite database
+└── storage/                    # Uploaded files
+    ├── xml_files/              # SAT CFDI XMLs
+    ├── credentials/            # Encrypted FIEL .cer/.key (chmod 700)
+    ├── uploads/                # Bank PDFs, month-close docs
+    └── temp/                   # Temporary processing files
+
+/var/log/contaneta/             # Application logs
+├── web.log                     # App output
+├── access.log                  # Gunicorn HTTP access
+├── error.log                   # Gunicorn errors
+├── worker.log                  # Job queue worker
+├── sat_scheduler.log           # SAT scheduler
+├── backup.log                  # Nightly backup
+└── caddy_access.log            # Caddy access (if configured)
+
+/var/backups/contaneta/         # Daily backups (7-day rotation)
+├── invoicing_YYYYMMDD_HHMMSS.db.gz
+└── storage_YYYYMMDD_HHMMSS.tar.gz
+```
+
+## Viewing Logs
 
 ```bash
-# Pull latest code
-sudo -u deploy -i
+# Web app (real-time)
+sudo journalctl -u contaneta-web -f
+
+# Or log file
+tail -f /var/log/contaneta/web.log
+
+# Worker
+sudo journalctl -u contaneta-sat-worker -f
+
+# Caddy access
+tail -f /var/log/contaneta/caddy_access.log
+
+# All ContaNeta services
+sudo journalctl -u 'contaneta-*' --since "1 hour ago"
+```
+
+## Running Restore
+
+```bash
+# List available backups
+ls -lt /var/backups/contaneta/invoicing_*.db.gz
+
+# Restore latest
+sudo bash /opt/contaneta/scripts/restore_latest.sh
+
+# Restore specific backup
+sudo bash /opt/contaneta/scripts/restore_latest.sh invoicing_20260303_020000.db.gz
+```
+
+## Running Diagnostics
+
+```bash
+sudo -u contaneta bash /opt/contaneta/scripts/ops_triage.sh
+```
+
+Shows: services status, DB health, recent errors, stuck jobs, disk usage, health check.
+
+## Updating
+
+```bash
 cd /opt/contaneta
-git pull
-
-# Update dependencies
-source .venv/bin/activate
-pip install -r requirements.txt
-
-# Restart services (migrations run automatically on startup)
+sudo -u contaneta git pull
+sudo -u contaneta .venv/bin/pip install -q -r requirements.txt
 sudo systemctl restart contaneta-web contaneta-sat-worker
+# Migrations run automatically on app startup
 ```
 
 ## Troubleshooting
 
 | Problem | Check |
 |---------|-------|
-| 502 Bad Gateway | `sudo systemctl status contaneta-web` / `journalctl -u contaneta-web` |
-| SAT sync not running | `sudo systemctl status contaneta-sat-worker` / check `sat_jobs` table |
-| Scheduler not enqueuing | `sudo systemctl list-timers contaneta-sat-scheduler.timer` |
-| SSL cert expired | `sudo certbot renew --dry-run` |
-| DB locked | Check if multiple writers; SQLite uses WAL mode — only 1 gunicorn worker recommended |
-| PHP errors | `php -v` and check `sat_sync/vendor/` exists |
+| 502 Bad Gateway | `systemctl status contaneta-web` / `journalctl -u contaneta-web -n 50` |
+| App won't start | Check `.env`: SESSION_SECRET set? DB path writable? |
+| SAT sync not running | `systemctl status contaneta-sat-worker` / check `sat_jobs` table |
+| Scheduler not enqueuing | `systemctl list-timers contaneta-sat-scheduler.timer` |
+| SSL cert issue | Caddy auto-renews. Check: `caddy validate` / `systemctl status caddy` |
+| DB locked | Only 1 gunicorn worker recommended (SQLite WAL). Check no stale processes |
+| PHP errors | `php -v` and verify `sat_sync/vendor/` exists |
 
 ## Architecture Notes
 
-- **1 gunicorn worker** is recommended because SQLite doesn't support concurrent writes well. WAL mode helps but 1 writer is safest.
-- The **worker** runs in loop mode, polling every 2 seconds for new jobs.
-- The **scheduler** runs every 10 minutes via systemd timer, enqueuing eligible issuers.
-- **Backups** run nightly at 3 AM with 7-day rotation.
+- **1 gunicorn worker + 4 threads**: SQLite doesn't support concurrent writes. WAL mode + 1 writer is safest.
+- **Worker** runs continuously (`--loop --sleep 2`), processing both `jobs` and `sat_jobs` queues.
+- **Scheduler** runs every 10 minutes via systemd timer, enqueuing SAT sync for eligible issuers.
+- **Backups** run daily at 3 AM — SQLite online backup + storage tar, 7-day rotation, optional S3 via rclone.
+- **Caddy** handles HTTPS automatically via Let's Encrypt. No manual cert renewal needed.
 - All services auto-restart on failure (systemd `Restart=always`).

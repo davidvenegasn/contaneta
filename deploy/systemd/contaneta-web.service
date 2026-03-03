@@ -15,7 +15,7 @@ Type=simple
 User=contaneta
 Group=contaneta
 WorkingDirectory=/opt/contaneta
-EnvironmentFile=/opt/contaneta/.env
+EnvironmentFile=/var/lib/contaneta/.env
 ExecStart=/opt/contaneta/.venv/bin/gunicorn app:app \
     -k uvicorn.workers.UvicornWorker \
     -w 1 \
