@@ -17,6 +17,8 @@ invoicing.db-*
 invoicing.db.*
 *.db-wal
 *.db-shm
+*.sqlite
+*.sqlite3
 sqlite_aux_backup/
 
 # --- Storage local (NO versionar) ---
@@ -32,6 +34,7 @@ keys/**
 
 # --- Backups locales (NO versionar) ---
 backup/
+backups/
 
 # --- Secrets ---
 .env
