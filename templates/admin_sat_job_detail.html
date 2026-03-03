@@ -1,0 +1,60 @@
+{% extends "base_admin.html" %}
+{% block title %}SAT Job #{{ job.id }}{% endblock %}
+{% block content %}
+  <p style="margin:0 0 8px;"><a href="/admin/sat-jobs" style="color:#0369a1;">&larr; SAT Jobs</a></p>
+  <h1>SAT Job #{{ job.id }}
+    <span class="badge {% if job.status == 'error' %}badge--error{% elif job.status == 'ok' %}badge--success{% elif job.status == 'running' %}badge--warning{% endif %}" style="font-size:0.7em; vertical-align:middle;">{{ job.status }}</span>
+  </h1>
+
+  <div class="card">
+    <h2>Datos del job</h2>
+    <table>
+      <tr><th style="width:160px;">ID</th><td>{{ job.id }}</td></tr>
+      <tr><th>Issuer</th><td><a href="/admin/issuers/{{ job.issuer_id }}" style="color:#0369a1;">{{ job.issuer_id }}</a> {% if job.issuer_rfc %}({{ job.issuer_rfc }} — {{ job.issuer_name or '' }}){% endif %}</td></tr>
+      <tr><th>Tipo</th><td>{{ job.job_type or '-' }}</td></tr>
+      <tr><th>Dirección</th><td>{{ job.direction or '-' }}</td></tr>
+      <tr><th>Status</th><td><span class="badge badge--xs {% if job.status == 'error' %}badge--error{% elif job.status == 'ok' %}badge--success{% elif job.status == 'running' %}badge--warning{% endif %}">{{ job.status }}</span></td></tr>
+      <tr><th>Intentos</th><td>{{ job.attempts or 0 }}</td></tr>
+      <tr><th>Window from</th><td class="muted">{{ job.window_from or '-' }}</td></tr>
+      <tr><th>Window to</th><td class="muted">{{ job.window_to or '-' }}</td></tr>
+      <tr><th>Creado</th><td class="muted">{{ job.created_at or '-' }}</td></tr>
+      <tr><th>Locked at</th><td class="muted">{{ job.locked_at or '-' }}</td></tr>
+      <tr><th>Started at</th><td class="muted">{{ job.started_at or '-' }}</td></tr>
+      <tr><th>Finished at</th><td class="muted">{{ job.finished_at or '-' }}</td></tr>
+      <tr><th>Updated at</th><td class="muted">{{ job.updated_at or '-' }}</td></tr>
+    </table>
+  </div>
+
+  {% if job.last_error %}
+  <div class="card">
+    <h2>Error</h2>
+    <div class="ops-result">{{ job.last_error }}</div>
+  </div>
+  {% endif %}
+
+  {% if sync_state %}
+  <div class="card">
+    <h2>Sync State ({{ job.direction }})</h2>
+    <table>
+      <tr><th style="width:160px;">Último éxito</th><td class="muted">{{ sync_state.last_success_at or '-' }}</td></tr>
+      <tr><th>Último intento</th><td class="muted">{{ sync_state.last_attempt_at or '-' }}</td></tr>
+      <tr><th>Último error</th><td>{% if sync_state.last_error %}<span style="color:#dc2626;">{{ sync_state.last_error }}</span>{% else %}-{% endif %}</td></tr>
+      <tr><th>Cooldown hasta</th><td class="muted">{{ sync_state.cooldown_until or '-' }}</td></tr>
+    </table>
+  </div>
+  {% endif %}
+
+  <div class="card">
+    <h2>Acciones</h2>
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+      {% if job.status in ('error',) %}
+      <form method="post" action="/admin/sat-jobs/{{ job.id }}/requeue" style="display:inline;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+        <button type="submit" class="btn btn-primary btn-sm">Re-encolar</button>
+      </form>
+      {% endif %}
+      <a class="btn btn-secondary btn-sm" href="/admin/issuers/{{ job.issuer_id }}">Ver issuer</a>
+      <a class="btn btn-secondary btn-sm" href="/admin/sat-jobs?issuer_id={{ job.issuer_id }}">Jobs de este issuer</a>
+    </div>
+  </div>
+{% endblock %}

@@ -630,6 +630,122 @@ def get_admin_router(templates):
         log_action(request, "admin_requeue_failed", issuer_id=issuer_id)
         return RedirectResponse(url=f"/admin/issuers/{issuer_id}", status_code=302)
 
+    # ---------- GET: SAT Jobs (dedicated) ----------
+    @router.get("/sat-jobs", response_class=HTMLResponse)
+    def admin_sat_jobs(
+        request: Request,
+        status: str | None = Query(None),
+        issuer_id: int | None = Query(None),
+        direction: str | None = Query(None),
+        _admin: tuple[int, int, int | None] = Depends(require_admin_or_owner),
+    ):
+        where = ["1=1"]
+        params: list = []
+        if status and status.strip():
+            where.append("sj.status = ?")
+            params.append(status.strip())
+        if issuer_id is not None:
+            where.append("sj.issuer_id = ?")
+            params.append(int(issuer_id))
+        if direction and direction.strip():
+            where.append("sj.direction = ?")
+            params.append(direction.strip())
+        rows = []
+        try:
+            rows = db_rows(
+                f"""
+                SELECT sj.id, sj.issuer_id, i.rfc AS issuer_rfc, i.razon_social AS issuer_name,
+                       sj.job_type, sj.direction, sj.status,
+                       sj.attempts, sj.last_error,
+                       sj.started_at, sj.finished_at, sj.created_at, sj.updated_at
+                FROM sat_jobs sj
+                LEFT JOIN issuers i ON i.id = sj.issuer_id
+                WHERE {' AND '.join(where)}
+                ORDER BY sj.id DESC
+                LIMIT 200
+                """,
+                tuple(params),
+            )
+        except Exception:
+            pass
+        return templates.TemplateResponse(
+            "admin_sat_jobs.html",
+            {
+                "request": request,
+                "active_page": "sat-jobs",
+                "sat_jobs": rows,
+                "filter_status": (status or "").strip(),
+                "filter_issuer_id": issuer_id,
+                "filter_direction": (direction or "").strip(),
+                "csrf_token": csrf_service.generate_csrf_token(),
+            },
+        )
+
+    @router.get("/sat-jobs/{job_id:int}", response_class=HTMLResponse)
+    def admin_sat_job_detail(
+        request: Request,
+        job_id: int,
+        _admin: tuple[int, int, int | None] = Depends(require_admin_or_owner),
+    ):
+        rows = db_rows(
+            """
+            SELECT sj.*, i.rfc AS issuer_rfc, i.razon_social AS issuer_name
+            FROM sat_jobs sj
+            LEFT JOIN issuers i ON i.id = sj.issuer_id
+            WHERE sj.id = ?
+            LIMIT 1
+            """,
+            (int(job_id),),
+        )
+        if not rows:
+            raise HTTPException(status_code=404, detail="SAT Job no encontrado")
+        job = rows[0]
+        # Sync state for this issuer+direction
+        sync_state = None
+        if job.get("direction"):
+            try:
+                ss = db_rows(
+                    "SELECT * FROM sat_sync_state WHERE issuer_id = ? AND direction = ?",
+                    (job["issuer_id"], job["direction"]),
+                )
+                sync_state = ss[0] if ss else None
+            except Exception:
+                pass
+        return templates.TemplateResponse(
+            "admin_sat_job_detail.html",
+            {
+                "request": request,
+                "active_page": "sat-jobs",
+                "job": job,
+                "sync_state": sync_state,
+                "csrf_token": csrf_service.generate_csrf_token(),
+            },
+        )
+
+    @router.post("/sat-jobs/{job_id:int}/requeue", response_class=RedirectResponse)
+    def admin_sat_job_requeue(
+        request: Request,
+        job_id: int,
+        _admin: tuple[int, int, int | None] = Depends(require_admin),
+    ):
+        csrf_service.validate_csrf_token(request)
+        conn = db()
+        try:
+            row = conn.execute("SELECT id FROM sat_jobs WHERE id = ?", (job_id,)).fetchone()
+            if not row:
+                raise HTTPException(status_code=404, detail="SAT Job no encontrado")
+            conn.execute(
+                "UPDATE sat_jobs SET status = 'queued', locked_at = NULL, updated_at = datetime('now') WHERE id = ?",
+                (job_id,),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+        user_id, _, _ = _admin
+        audit.log(action="admin_sat_job_requeue", user_id=user_id, request=request, entity="sat_job", entity_id=str(job_id))
+        log_action(request, "admin_sat_job_requeue", job_id=job_id)
+        return RedirectResponse(url=f"/admin/sat-jobs/{job_id}", status_code=302)
+
     # ---------- GET: Errors ----------
     @router.get("/errors", response_class=HTMLResponse)
     def admin_errors(
