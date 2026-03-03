@@ -85,8 +85,8 @@ def has_column(conn: sqlite3.Connection, table: str, column: str) -> bool:
     return False
 
 
-def safe_update(conn: sqlite3.Connection, table: str, row_id: int, data: dict) -> None:
-    """Actualiza solo columnas que existan en el schema actual."""
+def safe_update(conn: sqlite3.Connection, table: str, row_id: int, data: dict, *, issuer_id: int | None = None) -> None:
+    """Actualiza solo columnas que existan en el schema actual. Si issuer_id se pasa, añade filtro de tenant."""
     if not data:
         return
     rows = conn.execute(f"PRAGMA table_info({table})").fetchall()
@@ -103,7 +103,11 @@ def safe_update(conn: sqlite3.Connection, table: str, row_id: int, data: dict) -
         return
     set_sql = ", ".join([f"{k} = ?" for k in payload.keys()])
     vals = list(payload.values()) + [row_id]
-    conn.execute(f"UPDATE {table} SET {set_sql} WHERE id = ?", vals)
+    where = "WHERE id = ?"
+    if issuer_id is not None:
+        where += " AND issuer_id = ?"
+        vals.append(int(issuer_id))
+    conn.execute(f"UPDATE {table} SET {set_sql} {where}", vals)
 
 
 # ----------------------------
