@@ -12,6 +12,7 @@ An issuer qualifies for auto-sync when ALL conditions are met:
 2. **Valid FIEL** — `sat_credentials.validation_ok = 1`
 3. **Cooldown expired** — `sat_sync_state.cooldown_until < now()` or no sync state exists
 4. **No recent jobs** — No `sat_jobs` with `status IN ('queued','running')` created in the last 2 hours for that issuer+direction
+5. **Recently active** — User logged in within `--active-days` (default 30) OR has an active/trialing subscription
 
 ## Cooldown
 
@@ -48,6 +49,12 @@ If found, the enqueue is skipped. This prevents duplicate jobs from multiple sch
 2. `sat_sync_state.last_error` is updated
 3. Cooldown is NOT extended — the scheduler will re-attempt on its next eligible run
 4. Manual retry available via admin panel (`/admin/jobs/{id}` → "Re-encolar")
+
+### Error Backoff (suggested)
+- 1st failure: retry on next scheduler run (~10 min)
+- 2nd failure: retry on next scheduler run
+- 3rd consecutive failure: consider setting `cooldown_until = now + 24h` (manual via admin)
+- The generic worker (`worker.py`) already has exponential backoff: `min(600s, 2^attempts + jitter)`
 
 ## Onboarding Auto-Sync
 
