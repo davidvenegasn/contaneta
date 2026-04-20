@@ -1,24 +1,75 @@
 {# Rail: un solo botón que al abrir se mueve al otro extremo y gira (expandir/cerrar). #}
 <nav class="portal-rail" aria-label="Navegación">
-  <span class="rail-align-spacer" aria-hidden="true"></span>
-  <button type="button" class="rail-item rail-toggle-btn" data-drawer-toggle aria-label="Expandir menú" title="Expandir">
-    <span class="rail-toggle-btn__icon" aria-hidden="true">
-      <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-    </span>
-    <span class="rail-tooltip">Expandir</span>
+  <button type="button" class="rail-brand-toggle" data-drawer-toggle aria-label="Expandir menú" title="Expandir menú">
+    <svg class="rail-brand-toggle__logo" width="24" height="24" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <rect width="32" height="32" rx="8" fill="var(--accent, #6366f1)"/>
+      <text x="16" y="22" text-anchor="middle" font-family="system-ui, sans-serif" font-weight="700" font-size="18" fill="#fff">C</text>
+    </svg>
+    <svg class="rail-brand-toggle__arrow" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
   </button>
-  <a class="rail-item {{ 'is-active' if (active_page == 'create' or (nav_is_active is defined and nav_is_active('/portal/create'))) else '' }}" href="/portal/create" aria-label="Nueva factura">
+  <button type="button" class="rail-item rail-item--cta {{ 'is-active' if (active_page == 'create' or (nav_is_active is defined and nav_is_active('/portal/create'))) else '' }}" id="railNewInvoiceBtn" aria-label="Nueva factura" aria-haspopup="true" aria-expanded="false">
     <span class="icon" aria-hidden="true">
-      <svg class="icon-solid" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
-        <rect x="3" y="3" width="18" height="18" rx="5" fill="currentColor"/>
-        <path d="M12 7.25v9.5" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/>
-        <path d="M7.25 12h9.5" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/>
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.75"/>
+        <path d="M12 8v8M8 12h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
       </svg>
     </span>
     <span class="rail-tooltip">Nueva factura</span>
-  </a>
+  </button>
+  <div class="rail-invoice-flyout" id="railInvoiceFlyout" hidden>
+    <div class="rail-invoice-flyout__panels">
+      {# ── Panel 1: Menú principal ── #}
+      <div class="rail-invoice-flyout__panel" id="flyoutPanelMain">
+        <button type="button" class="rail-invoice-flyout__option" id="flyoutGoQuick">
+          <span class="rail-invoice-flyout__icon">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+          </span>
+          <div class="rail-invoice-flyout__text">
+            <strong>Factura rápida</strong>
+            <small>Selecciona cliente y producto</small>
+          </div>
+          <svg class="rail-invoice-flyout__chevron" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <a class="rail-invoice-flyout__option" href="/portal/create">
+          <span class="rail-invoice-flyout__icon">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7z"/><path d="M14 2v5h5"/><path d="M8 12h8M8 16h8M8 8h3"/></svg>
+          </span>
+          <div class="rail-invoice-flyout__text">
+            <strong>Factura tradicional</strong>
+            <small>Formulario completo CFDI</small>
+          </div>
+        </a>
+      </div>
+      {# ── Panel 2: Factura rápida (selección de cliente + producto) ── #}
+      <div class="rail-invoice-flyout__panel rail-invoice-flyout__panel--sub" id="flyoutPanelQuick">
+        <div class="rail-invoice-flyout__subheader">
+          <button type="button" class="rail-invoice-flyout__back" id="flyoutQuickBack" aria-label="Volver">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <strong>Factura rápida</strong>
+        </div>
+        <div class="rail-invoice-flyout__sep"></div>
+        <div class="rail-invoice-flyout__field">
+          <label class="rail-invoice-flyout__label" for="flyoutClientSearch">Cliente</label>
+          <input class="rail-invoice-flyout__input" id="flyoutClientSearch" placeholder="Buscar por nombre o RFC…" autocomplete="off" />
+          <div class="rail-invoice-flyout__results" id="flyoutClientResults"></div>
+          <div class="rail-invoice-flyout__selected" id="flyoutClientSelected" hidden></div>
+        </div>
+        <div class="rail-invoice-flyout__field">
+          <label class="rail-invoice-flyout__label" for="flyoutProductSearch">Producto</label>
+          <input class="rail-invoice-flyout__input" id="flyoutProductSearch" placeholder="Buscar producto…" autocomplete="off" />
+          <div class="rail-invoice-flyout__results" id="flyoutProductResults"></div>
+          <div class="rail-invoice-flyout__selected" id="flyoutProductSelected" hidden></div>
+        </div>
+        <button type="button" class="rail-invoice-flyout__submit" id="flyoutQuickSubmit" disabled>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+          Generar factura
+        </button>
+      </div>
+    </div>
+  </div>
   <a class="rail-item {{ 'is-active' if (active_page == 'home' or (nav_is_active is defined and nav_is_active('/portal/home'))) else '' }}" href="/portal/home" aria-label="Inicio">
     <span class="icon" aria-hidden="true">{{ icon_home() }}</span>
     <span class="rail-tooltip">Inicio</span>
@@ -27,28 +78,39 @@
     <span class="icon" aria-hidden="true">{{ icon_movements() }}</span>
     <span class="rail-tooltip">Movimientos</span>
   </a>
-  <a class="rail-item {{ 'is-active' if (active_page == 'facturas_hub' or active_page == 'issued' or active_page == 'received' or (nav_is_active is defined and (nav_is_active('/portal/facturas') or nav_is_active('/portal/invoices'))) ) else '' }}" href="/portal/facturas" aria-label="Facturas">
+  <a class="rail-item {{ 'is-active' if (active_page == 'facturas_hub' or active_page == 'issued' or active_page == 'received' or (nav_is_active is defined and nav_is_active('/portal/facturas')) ) else '' }}" href="/portal/facturas" aria-label="Facturas">
     <span class="icon" aria-hidden="true">{{ icon_issued() }}</span>
     <span class="rail-tooltip">Facturas</span>
   </a>
-  <a class="rail-item {{ 'is-active' if (active_page == 'contactos_hub' or active_page == 'clients' or active_page == 'providers' or (nav_is_active is defined and (nav_is_active('/portal/contactos') or nav_is_active('/portal/clients') or nav_is_active('/portal/providers'))) ) else '' }}" href="/portal/contactos" aria-label="Clientes">
-    <span class="icon" aria-hidden="true">{{ icon_clients() }}</span>
-    <span class="rail-tooltip">Clientes</span>
-  </a>
-  <a class="rail-item {{ 'is-active' if (active_page == 'products' or active_page == 'product_suggestions' or (nav_is_active is defined and nav_is_active('/portal/products'))) else '' }}" href="/portal/products" aria-label="Productos">
-    <span class="icon" aria-hidden="true">{{ icon_products() }}</span>
-    <span class="rail-tooltip">Productos</span>
+  <a class="rail-item {{ 'is-active' if (active_page == 'invoices_ext' or (nav_is_active is defined and nav_is_active('/portal/invoices-ext'))) else '' }}" href="/portal/invoices-ext" aria-label="Invoices">
+    <span class="icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10A15.3 15.3 0 0 1 12 2"/></svg>
+    </span>
+    <span class="rail-tooltip">Invoices</span>
   </a>
   <a class="rail-item {{ 'is-active' if (active_page == 'quotations' or (nav_is_active is defined and nav_is_active('/portal/cotizaciones'))) else '' }}" href="/portal/cotizaciones" aria-label="Cotizaciones">
     <span class="icon" aria-hidden="true">{{ icon_quotations() }}</span>
     <span class="rail-tooltip">Cotizaciones</span>
   </a>
-  <a class="rail-item {{ 'is-active' if (active_page == 'convertir_edo_cuenta' or (nav_is_active is defined and nav_is_active('/portal/convertir-edo-cuenta')) ) else '' }}" href="/portal/convertir-edo-cuenta" aria-label="Convertir estado de cuenta">
-    <span class="icon" aria-hidden="true">{{ icon_bank() }}</span>
-    <span class="rail-tooltip">Convertir estado de cuenta</span>
+  <div class="rail-divider" aria-hidden="true"></div>
+  {# Hueco equivalente a la fila "CATÁLOGOS" del drawer (solo desktop menú abierto) para alinear iconos con títulos. #}
+  <span class="rail-nav-section-gap" aria-hidden="true"></span>
+  <a class="rail-item {{ 'is-active' if (active_page in ['catalogos_hub','contactos_hub','clients','providers','products','product_suggestions'] or (nav_is_active is defined and (nav_is_active('/portal/catalogos') or nav_is_active('/portal/contactos') or nav_is_active('/portal/clients') or nav_is_active('/portal/products') or nav_is_active('/portal/providers')))) else '' }}" href="/portal/catalogos" aria-label="Catálogos">
+    <span class="icon" aria-hidden="true">{{ icon_clients() }}</span>
+    <span class="rail-tooltip">Catálogos</span>
   </a>
-  <a class="rail-item {{ 'is-active' if (active_page == 'summary' or (nav_is_active is defined and nav_is_active('/portal/summary'))) else '' }}" href="/portal/summary" aria-label="Resumen">
-    <span class="icon" aria-hidden="true">{{ icon_summary() }}</span>
-    <span class="rail-tooltip">Resumen</span>
+  <span class="rail-spacer" aria-hidden="true"></span>
+  <a class="rail-item {{ 'is-active' if (active_page == 'guides' or (nav_is_active is defined and nav_is_active('/portal/guides'))) else '' }}" href="/portal/guides" aria-label="Guías">
+    <span class="icon" aria-hidden="true">{{ icon_guides() }}</span>
+    <span class="rail-tooltip">Guías</span>
   </a>
+  <button type="button" class="rail-item rail-item--create-btn" id="railCreateBtn" aria-label="Crear nuevo" title="Crear nuevo">
+    <span class="icon" aria-hidden="true">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.75"/>
+        <path d="M12 8v8M8 12h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+    </span>
+    <span class="rail-tooltip">Crear nuevo</span>
+  </button>
 </nav>

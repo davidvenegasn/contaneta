@@ -33,3 +33,23 @@ def download_invoice(org_id: str, invoice_id: str, fmt: str) -> bytes:
     if r.status_code >= 400:
         raise FacturapiError(f"Facturapi download error {r.status_code}: {r.text}")
     return r.content
+
+def cancel_invoice(org_id: str, invoice_id: str, motive: str) -> dict:
+    """Cancel a stamped invoice via DELETE /v2/invoices/{id}?motive={code}.
+    Returns the updated invoice object from FacturAPI."""
+    r = requests.delete(
+        f"{BASE_URL}/invoices/{invoice_id}",
+        params={"motive": motive},
+        headers=_headers(org_id),
+        timeout=60,
+    )
+    if r.status_code >= 400:
+        raise FacturapiError(f"Facturapi cancel error {r.status_code}: {r.text}")
+    return r.json()
+
+def get_invoice(org_id: str, invoice_id: str) -> dict:
+    """Get invoice details via GET /v2/invoices/{id}."""
+    r = requests.get(f"{BASE_URL}/invoices/{invoice_id}", headers=_headers(org_id), timeout=60)
+    if r.status_code >= 400:
+        raise FacturapiError(f"Facturapi get error {r.status_code}: {r.text}")
+    return r.json()

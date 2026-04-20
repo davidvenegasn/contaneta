@@ -2,62 +2,58 @@
 {% set title = title|default('Clientes') %}
 
 {% block content %}
-<section class="page-section page-section--clients">
-  <div class="card ui-card">
-    <div class="card-header card-header--with-tools ui-card__header">
-      <div class="card-header__left">
-        <div class="table-tools table-tools--inline">
-          <form class="table-tools__search" method="get" action="/portal/clients">
-            <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path d="M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="M16.2 16.2 21 21" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
-            </svg>
-            <input class="input ui-input" type="search" name="q" value="{{ q|default('')|e }}" placeholder="Buscar por RFC o nombre" autocomplete="off" />
-          </form>
-          <button id="backfillBtn" type="button" class="btn btn-primary">
-            <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true" style="width:16px; height:16px;">
-              <path d="M12 5v14" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
-              <path d="M5 12h14" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
-            </svg>
-            Añadir cliente
-          </button>
-          <button id="bulkToggleBtn" type="button" class="btn btn--secondary" aria-pressed="false">Seleccionar varios</button>
+<section class=”page-section page-section--clients”>
+  <div class=”card ui-card”>
+    <div class=”card-header card-header--with-tools ui-card__header” style=”flex-direction:column; align-items:stretch; gap:0;”>
+      <div style=”display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;”>
+        <div>
+          <h3 class=”section-title u-m0”>Clientes</h3>
+          <p class=”muted u-m0 u-text-sm” id=”clientsCount”>
+            {% if total is defined %}
+              {% if total > 0 %}
+                {% set from = (page - 1) * per_page + 1 %}
+                {% set to = min(page * per_page, total) %}
+                {% if page == 1 and to == min(per_page, total) %}{{ to }} de {{ total }}{% else %}{{ from }}–{{ to }} de {{ total }}{% endif %}
+              {% else %}Sin datos{% endif %}
+            {% else %}
+              {% if rows and rows|length %}{{ rows|length }} clientes{% else %}Sin datos{% endif %}
+            {% endif %}
+          </p>
         </div>
+        <form class=”table-tools__search” method=”get” action=”/portal/clients” style=”max-width:280px;”>
+          <svg class=”icon” viewBox=”0 0 24 24” fill=”none” aria-hidden=”true”>
+            <path d=”M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z” stroke=”currentColor” stroke-width=”1.75” stroke-linecap=”round” stroke-linejoin=”round”/>
+            <path d=”M16.2 16.2 21 21” stroke=”currentColor” stroke-width=”1.75” stroke-linecap=”round”/>
+          </svg>
+          <input class=”input ui-input” type=”search” name=”q” value=”{{ q|default('')|e }}” placeholder=”Buscar por RFC o nombre” autocomplete=”off” />
+        </form>
       </div>
-      <div class="card-header__right">
-        <h3 class="section-title">Clientes</h3>
-        <p class="muted u-m0" id="clientsCount">
-          {% if total is defined %}
-            {% if total > 0 %}
-              {% set from = (page - 1) * per_page + 1 %}
-              {% set to = min(page * per_page, total) %}
-              {% if page == 1 and to == min(per_page, total) %}Mostrando los primeros {{ to }} de {{ total }}{% else %}Mostrando {{ from }}-{{ to }} de {{ total }}{% endif %}
-            {% else %}Sin datos{% endif %}
-          {% else %}
-            {% if rows and rows|length %}Mostrando los primeros {{ rows|length }}{% else %}Sin datos{% endif %}
-          {% endif %}
-        </p>
+      <div style=”display:flex; align-items:center; gap:8px; margin-top:10px; flex-wrap:wrap;”>
+        <button id=”bulkToggleBtn” type=”button” class=”btn btn--secondary btn--sm” aria-pressed=”false”>Seleccionar varios</button>
+        <button id=”backfillBtn” type=”button” class=”btn btn-primary btn--sm”>
+          <svg class=”icon” viewBox=”0 0 24 24” fill=”none” aria-hidden=”true” style=”width:14px; height:14px;”>
+            <path d=”M12 5v14” stroke=”currentColor” stroke-width=”1.75” stroke-linecap=”round”/>
+            <path d=”M5 12h14” stroke=”currentColor” stroke-width=”1.75” stroke-linecap=”round”/>
+          </svg>
+          Añadir cliente
+        </button>
+        <div id=”clientsBulkBar” class=”u-flex u-items-center u-gap-2” hidden>
+          <button type=”button” class=”btn btn-primary btn--sm” id=”bulkInvoiceBtn”>Emitir a seleccionados</button>
+          <button type=”button” class=”btn btn--secondary btn--sm” id=”bulkDeleteBtn”>Borrar seleccionados</button>
+          <button type=”button” class=”btn btn-ghost btn--sm” id=”bulkCancelBtn”>Cancelar</button>
+          <span class=”muted u-text-12” id=”bulkCountText”></span>
+        </div>
       </div>
     </div>
 
-    <p class="card-legend muted">
-      Lista sugerida (auto-captura) desde tus CFDI emitidos. Puedes editar campos para dejarlos “limpios”.
-    </p>
-
-    <div class="card-list-sep">
+    <div class=”card-list-sep”>
       {% if not rows or rows|length == 0 %}
         {% from 'portal/_ui_components.html' import portal_empty_state %}
-        {% call portal_empty_state('Aún no hay clientes detectados', 'Haz clic en “Actualizar desde mis facturas emitidas” para crear tu lista automáticamente.') %}
-          <button type="button" class="btn btn-primary" id="backfillBtnEmpty">Actualizar ahora</button>
+        {% call portal_empty_state('Aún no hay clientes detectados', 'Haz clic en “Añadir cliente” para crear tu lista automáticamente desde tus facturas emitidas.') %}
+          <button type=”button” class=”btn btn-primary” id=”backfillBtnEmpty”>Actualizar ahora</button>
         {% endcall %}
       {% else %}
-      <div id="clientsBulkBar" class="u-flex u-items-center u-gap-2 u-mb-2" hidden>
-        <button type="button" class="btn btn-primary" id="bulkInvoiceBtn">Emitir a seleccionados</button>
-        <button type="button" class="btn btn--secondary" id="bulkDeleteBtn">Borrar seleccionados</button>
-        <button type="button" class="btn btn-ghost" id="bulkCancelBtn">Cancelar</button>
-        <span class="muted u-text-12" id="bulkCountText"></span>
-      </div>
-      <div class="table-wrap">
+      <div class=”table-wrap”>
         <table class="table ui-table ui-table--zebra">
           <thead>
             <tr>
@@ -268,7 +264,7 @@
     }
     var ok = true;
     if (typeof window.portalConfirm === 'function') {
-      ok = await window.portalConfirm({ title: 'Borrar clientes', message: 'Borrar ' + selected.size + ' cliente(s)? No se puede deshacer.', confirmLabel: 'Si, borrar', cancelLabel: 'Cancelar' });
+      ok = await window.portalConfirm({ title: 'Borrar clientes', message: 'Borrar ' + selected.size + ' cliente(s)? No se puede deshacer.', confirmLabel: 'Sí, borrar', cancelLabel: 'Cancelar' });
     } else { ok = confirm('Borrar ' + selected.size + ' cliente(s)?'); }
     if (!ok) return;
     try {
@@ -301,7 +297,7 @@
       if (!id) return;
       var ok = true;
       if (typeof window.portalConfirm === 'function') {
-        ok = await window.portalConfirm({ title: 'Borrar cliente', message: 'Borrar "' + name + '"? No se puede deshacer.', confirmLabel: 'Si, borrar', cancelLabel: 'Cancelar' });
+        ok = await window.portalConfirm({ title: 'Borrar cliente', message: 'Borrar "' + name + '"? No se puede deshacer.', confirmLabel: 'Sí, borrar', cancelLabel: 'Cancelar' });
       } else { ok = confirm('Borrar "' + name + '"?'); }
       if (!ok) return;
       try {

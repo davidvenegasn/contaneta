@@ -10,7 +10,29 @@
       <p class="muted m-0">Se calcula con tu captura. El timbrado final depende del PAC/Facturapi.</p>
     </div>
     <div class="sac-actions">
-      <button type="button" class="btn-primary" onclick="document.getElementById('submitInvoiceHidden')?.click()">Emitir factura</button>
+      <button type="button" class="btn-primary" id="emitirFacturaBtn">Emitir factura</button>
     </div>
   </div>
 </div>
+
+<script>
+(function(){
+  var btn = document.getElementById('emitirFacturaBtn');
+  var hidden = document.getElementById('submitInvoiceHidden');
+  if (!btn || !hidden) return;
+
+  btn.addEventListener('click', function(){
+    if (btn.classList.contains('btn-loading')) return;
+    var total = document.getElementById('action_total_text');
+    var amount = total ? total.textContent.trim() : '';
+    if (!amount || amount === '—' || amount === '$0.00') {
+      alert('Agrega al menos un concepto antes de emitir.');
+      return;
+    }
+    if (!confirm('¿Emitir factura por ' + amount + '? Esta acción no se puede deshacer.')) return;
+    btn.classList.add('btn-loading');
+    btn.textContent = 'Emitiendo…';
+    hidden.click();
+  });
+})();
+</script>

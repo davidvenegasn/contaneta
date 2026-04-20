@@ -13,15 +13,14 @@ def _stable_hash(s: str) -> str:
 
 
 def compute_dedupe_fingerprint(mov: dict[str, Any]) -> str:
-    """Fingerprint para detectar duplicados: fecha + monto + concepto + cve + archivo."""
+    """Fingerprint para detectar duplicados: fecha + monto + concepto + cve.
+    No incluye source_file_name ni saldo (depende de posición) para que funcione cross-file."""
     f = mov.get("fecha") or ""
     dep = mov.get("monto_deposito") or 0
     ret = mov.get("monto_retiro") or 0
-    saldo = mov.get("saldo")
     concept = (mov.get("concepto_resumen") or "")[:200]
     cve = (mov.get("cve_rastreo") or "")[:64]
-    src = mov.get("source_file_name") or ""
-    payload = f"{f}|{dep}|{ret}|{saldo}|{concept}|{cve}|{src}"
+    payload = f"{f}|{dep}|{ret}|{concept}|{cve}"
     return _stable_hash(payload)
 
 

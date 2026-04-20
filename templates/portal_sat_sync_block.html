@@ -11,7 +11,7 @@
         {% endif %}
       </span>
       <span class="sat-sync-block__status" id="satSyncStatus" data-status="{{ sat_sync_status.status|default('ok') }}" aria-live="polite">
-        {% if sat_sync_status.status == 'running' %}<span class="spinner spinner--sm" aria-hidden="true"></span> Sincronizando…{% elif sat_sync_status.status == 'error' %}Error{% if sat_sync_status.message %}: <span id="satSyncError" class="sat-sync-block__error-inline">{{ (sat_sync_status.message or '')[:120] }}{% if (sat_sync_status.message or '')|length > 120 %}…{% endif %}</span>{% endif %}{% else %}OK{% endif %}
+        {% if sat_sync_status.status == 'running' %}<span class="spinner spinner--sm" aria-hidden="true"></span> Sincronizando…{% elif sat_sync_status.status == 'stale' %}<span style="color:var(--warn, #d97706);">La sincronización tardó más de lo esperado</span>{% elif sat_sync_status.status == 'error' %}Error{% if sat_sync_status.message %}: <span id="satSyncError" class="sat-sync-block__error-inline">{{ (sat_sync_status.message or '')[:120] }}{% if (sat_sync_status.message or '')|length > 120 %}…{% endif %}</span>{% endif %}{% else %}OK{% endif %}
       </span>
     </div>
     <button type="button" class="btn btn--sm btn--secondary" id="satSyncBtn" data-loading-text="Encolando…">

@@ -4,8 +4,9 @@ import os
 import uuid
 import sqlite3
 import subprocess
+from contextlib import asynccontextmanager
 from contextvars import ContextVar
-from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
+from urllib.parse import parse_qs, quote, urlencode, urlparse, urlunparse
 
 request_id_ctx: ContextVar[str] = ContextVar("request_id", default="-")
 
@@ -26,6 +27,7 @@ from config import (
     DEV_MODE,
     DEV_TOKEN,
     IS_PROD,
+    ALLOW_LEGACY_TOKEN_LOGIN,
     BASE_DIR,
     SESSION_SECRET_FROM_ENV,
 )
@@ -58,7 +60,37 @@ if _sentry_dsn:
     except ImportError:
         logging.getLogger(__name__).warning("SENTRY_DSN set but sentry-sdk not installed. pip install sentry-sdk[fastapi]")
 
-app = FastAPI()
+def _startup_impl() -> None:
+    _configure_logging()
+    try:
+        apply_migrations(DB_PATH)
+    except Exception as e:
+        logging.exception("Migrations failed: %s", e)
+        raise
+    _startup_config_check()
+    # Limpiar entradas viejas de rate limiting al arrancar
+    try:
+        from services import rate_limit as _rl
+        _rl.cleanup_old_entries(max_age_seconds=86400)
+    except Exception:
+        logging.warning("rate_limit cleanup on startup failed", exc_info=True)
+    # Limpiar error events viejos (>90 días)
+    try:
+        from services import error_events as _ee
+        deleted = _ee.cleanup_old_events(max_age_days=90)
+        if deleted:
+            logging.info("Cleaned up %d old error events", deleted)
+    except Exception:
+        logging.warning("error_events cleanup on startup failed", exc_info=True)
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    _startup_impl()
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
 if os.path.isdir(STATIC_DIR):
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
@@ -75,6 +107,65 @@ def _jinja_tojson(value):
 
 
 templates.env.filters["tojson"] = _jinja_tojson
+
+
+def _fecha_corta(value):
+    """'2026-02-28' → '28 feb'."""
+    if not value:
+        return "—"
+    try:
+        from datetime import datetime as _dt
+        _MESES = {1: "ene", 2: "feb", 3: "mar", 4: "abr", 5: "may", 6: "jun",
+                  7: "jul", 8: "ago", 9: "sep", 10: "oct", 11: "nov", 12: "dic"}
+        d = _dt.strptime(str(value)[:10], "%Y-%m-%d")
+        return f"{d.day} {_MESES[d.month]}"
+    except Exception:
+        return str(value)
+
+
+templates.env.filters["fecha_corta"] = _fecha_corta
+
+
+def _primer_nombre(value):
+    """'Diego Alejandro García' → 'Diego'."""
+    if not value:
+        return ""
+    return str(value).strip().split()[0]
+
+
+templates.env.filters["primer_nombre"] = _primer_nombre
+
+
+_CAT_LABELS = {
+    "TARJETAS_CREDITO": "Tarjetas de crédito",
+    "CUENTA_PROPIA": "Cuenta propia",
+    "FINANCIERO_PAGO_TARJETA": "Pago de tarjeta",
+    "COMISION_BANCARIA": "Comisión bancaria",
+    "GASTO": "Gasto",
+    "INGRESO": "Ingreso",
+    "TRANSFERENCIA": "Transferencia",
+    "ALIMENTOS": "Alimentos",
+    "IMPUESTOS": "Impuestos",
+    "EFECTIVO": "Efectivo",
+    "NOMINA": "Nómina",
+    "SERVICIOS": "Servicios",
+    "SUSCRIPCION": "Suscripción",
+    "SALUD": "Salud",
+    "EDUCACION": "Educación",
+    "TRANSPORTE": "Transporte",
+    "OTROS": "Otros",
+    "FINANCIERO": "Financiero",
+}
+
+
+def _humanize_category(value):
+    """'COMISION_BANCARIA' → 'Comisión bancaria'."""
+    if not value or not isinstance(value, str):
+        return value or "—"
+    return _CAT_LABELS.get(value.strip(), value.replace("_", " ").capitalize())
+
+
+templates.env.filters["humanize_category"] = _humanize_category
 
 
 def _html_404() -> str:
@@ -202,12 +293,12 @@ async def server_error_handler(request: Request, exc: Exception):
             message_internal=f"Unhandled {type(exc).__name__}: {str(exc)}",
             exc=exc,
         )
-    except Exception:
-        pass
+    except Exception as log_exc:
+        logging.warning("Failed to log error event: %s", log_exc)
     accept = (request.headers.get("accept") or "").lower()
     if "text/html" in accept:
         rid = getattr(request.state, "request_id", request_id_ctx.get())
-        return HTMLResponse(_html_error(500, f"Ha ocurrido un error en el servidor. Intenta de nuevo. (ID: {rid})"), status_code=500)
+        return HTMLResponse(_html_error(500, f"Ha ocurrido un error en el servidor. Intenta de nuevo. (ID: {rid}) Si el problema persiste, contacta a soporte."), status_code=500)
     from fastapi.responses import JSONResponse
     path = (request.url.path or "")
     if path.startswith("/api/"):
@@ -234,8 +325,8 @@ async def app_error_handler(request: Request, exc: AppError):
                 message_internal=f"{exc.code}: {exc.internal_message or exc.public_message}",
                 exc=exc,
             )
-        except Exception:
-            pass
+        except Exception as log_exc:
+            logging.warning("Failed to log error event: %s", log_exc)
     else:
         logging.info("AppError %s (%s): %s", exc.code, exc.status_code, exc.internal_message or exc.public_message)
 
@@ -265,8 +356,8 @@ async def sqlite_error_handler(request: Request, exc: sqlite3.Error):
             message_internal=f"DB_ERROR: {str(exc)}",
             exc=exc,
         )
-    except Exception:
-        pass
+    except Exception as log_exc:
+        logging.warning("Failed to log error event: %s", log_exc)
     accept = (request.headers.get("accept") or "").lower()
     path = (request.url.path or "")
     is_api = path.startswith("/api/") or path.startswith("/download/")
@@ -366,7 +457,9 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
     is_api = path.startswith("/api/") or path.startswith("/download/")
     accept = (request.headers.get("accept") or "").lower()
     if exc.status_code in (401, 403) and "text/html" in accept and not is_api:
-        return RedirectResponse(url="/login", status_code=302)
+        redirect_path = quote(path, safe="") if path and path.startswith("/portal/") else ""
+        login_url = "/login" + ("?redirect_to=" + redirect_path if redirect_path else "")
+        return RedirectResponse(url=login_url, status_code=302)
     from fastapi.responses import JSONResponse
     if is_api:
         return JSONResponse(_api_error_body(exc.status_code, exc.detail), status_code=exc.status_code)
@@ -387,7 +480,7 @@ async def request_validation_handler(request: Request, exc: RequestValidationErr
     try:
         errs = exc.errors() or []
         parts = []
-        for e in errs[:6]:
+        for e in errs[:12]:
             loc = ".".join([str(x) for x in (e.get("loc") or []) if x not in ("body", "query", "path")])
             t = (e.get("msg") or "").strip()
             if loc and t:
@@ -426,8 +519,9 @@ def _configure_logging() -> None:
     logging.setLogRecordFactory(record_factory)
     log_file = os.getenv("LOG_FILE", "").strip()
     if log_file:
+        from logging.handlers import RotatingFileHandler
         root = logging.getLogger()
-        fh = logging.FileHandler(log_file, encoding="utf-8")
+        fh = RotatingFileHandler(log_file, maxBytes=50 * 1024 * 1024, backupCount=5, encoding="utf-8")
         fh.setLevel(logging.INFO)
         fh.setFormatter(logging.Formatter(log_format))
         root.addHandler(fh)
@@ -504,15 +598,16 @@ def _startup_config_check() -> None:
         raise RuntimeError(msg)
 
 
-@app.on_event("startup")
-def _startup() -> None:
-    _configure_logging()
-    try:
-        apply_migrations(DB_PATH)
-    except Exception as e:
-        logging.exception("Migrations failed: %s", e)
-        raise
-    _startup_config_check()
+_MAX_BODY_BYTES = int(os.environ.get("MAX_BODY_BYTES", str(100 * 1024 * 1024)))  # 100 MB
+
+
+@app.middleware("http")
+async def body_size_limit_middleware(request: Request, call_next):
+    """Reject requests with Content-Length exceeding MAX_BODY_BYTES."""
+    cl = request.headers.get("content-length")
+    if cl and cl.isdigit() and int(cl) > _MAX_BODY_BYTES:
+        return Response("Request body too large", status_code=413)
+    return await call_next(request)
 
 
 @app.middleware("http")
@@ -556,11 +651,25 @@ async def security_headers_middleware(request: Request, call_next):
         response.headers["X-Frame-Options"] = "DENY"
     if "Referrer-Policy" not in response.headers:
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    if IS_PROD and "Strict-Transport-Security" not in response.headers:
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
     if "Permissions-Policy" not in response.headers:
         response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=(), payment=(), usb=(), serial=()"
     if "Content-Security-Policy" not in response.headers:
         # CSP básico; frame-ancestors 'none' evita que la app se embeba en iframes
-        csp = "default-src 'self'; frame-ancestors 'none'; script-src 'self' 'unsafe-inline' https://js.stripe.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; frame-src 'self' https://js.stripe.com https://hooks.stripe.com; img-src 'self' data:; connect-src 'self' https://api.stripe.com;"
+        csp = (
+            "default-src 'self'; "
+            "base-uri 'self'; "
+            "object-src 'none'; "
+            "frame-ancestors 'none'; "
+            "form-action 'self'; "
+            "script-src 'self' 'unsafe-inline' https://js.stripe.com; "
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+            "font-src 'self' https://fonts.gstatic.com; "
+            "frame-src 'self' https://js.stripe.com https://hooks.stripe.com; "
+            "img-src 'self' data:; "
+            "connect-src 'self' https://api.stripe.com;"
+        )
         response.headers["Content-Security-Policy"] = csp
     return response
 
@@ -572,7 +681,7 @@ async def redirect_token_middleware(request: Request, call_next):
     is_public = request.url.path.startswith("/q/") or request.url.path.startswith("/public/")
     is_portal_html = request.url.path.startswith("/portal/") and not is_api and not is_public
 
-    if token_query and is_portal_html:
+    if token_query and is_portal_html and ALLOW_LEGACY_TOKEN_LOGIN:
         # Rate limit token login: max 5 attempts per IP per 60s
         from services.rate_limit import is_rate_limited, get_client_ip
         if is_rate_limited(request, "token_login", window_seconds=60, max_attempts=5):
@@ -607,7 +716,9 @@ async def redirect_token_middleware(request: Request, call_next):
         cookie_val = request.cookies.get(SESSION_COOKIE_NAME)
         session_data = session.verify_session(cookie_val)
         if session_data is None and not DEV_MODE:
-            return RedirectResponse(url="/login", status_code=302)
+            redirect_path = quote(request.url.path, safe="") if request.url.path else ""
+            login_url = "/login" + ("?redirect_to=" + redirect_path if redirect_path else "")
+            return RedirectResponse(url=login_url, status_code=302)
         if session_data is not None and session_data[1] == 0 and not DEV_MODE:
             return RedirectResponse(url="/confirmar-perfil", status_code=302)
 
@@ -675,15 +786,18 @@ def _health_checks():
     try:
         if os.path.isfile(DB_PATH):
             conn = db()
-            conn.execute("SELECT 1")
-            conn.close()
-            out["db_readable"] = True
             try:
-                rows = db_rows("SELECT version FROM schema_migrations ORDER BY version")
-                out["migrations_applied"] = True
-                out["migrations_versions"] = [r["version"] for r in rows]
-            except Exception:
-                pass
+                conn.execute("SELECT 1")
+                out["db_readable"] = True
+            finally:
+                conn.close()
+            if out["db_readable"]:
+                try:
+                    rows = db_rows("SELECT version FROM schema_migrations ORDER BY version")
+                    out["migrations_applied"] = True
+                    out["migrations_versions"] = [r["version"] for r in rows]
+                except Exception:
+                    pass
     except Exception:
         pass
     storage_dir = os.path.join(BASE_DIR, "storage")
@@ -698,7 +812,23 @@ def _health_checks():
         out["storage_writable"] = True
     except Exception:
         pass
-    out["ok"] = out["db_readable"] and out["migrations_applied"]
+    # Disk space check
+    try:
+        import shutil
+        usage = shutil.disk_usage(BASE_DIR)
+        free_mb = usage.free // (1024 * 1024)
+        out["disk_free_mb"] = free_mb
+        out["disk_ok"] = free_mb > 500  # warn if < 500 MB free
+    except Exception:
+        out["disk_free_mb"] = None
+        out["disk_ok"] = True  # assume ok if we can't check
+
+    # SAT sync prerequisites (informational, not in ok verdict)
+    import shutil
+    out["sat_sync_dir_exists"] = os.path.isdir(os.path.join(BASE_DIR, "sat_sync"))
+    out["php_available"] = shutil.which("php") is not None
+
+    out["ok"] = out["db_readable"] and out["migrations_applied"] and out.get("disk_ok", True)
 
     # Support Snapshot: diagnóstico rápido sin exponer secretos ni rutas completas en prod
     out["support"] = _support_snapshot(out, ENV, DEV_MODE)
@@ -765,6 +895,8 @@ def health():
         "storage_exists": checks["storage_exists"],
         "storage_writable": checks["storage_writable"],
         "pdfplumber_available": pdfplumber_ok,
+        "sat_sync_dir_exists": checks.get("sat_sync_dir_exists", False),
+        "php_available": checks.get("php_available", False),
     }
 
 

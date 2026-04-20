@@ -1,7 +1,7 @@
-/* Rail delgado fijo (estilo Mindtrip): blanco, activo con barra vertical. */
+/* Rail + columna de etiquetas: ancho pegado al texto (referencia tipo Instagram). */
 :root {
-  --rail-w: 64px;
-  --rail-expand-w: 200px;
+  --rail-w: 56px;
+  --rail-expand-w: 168px;
   --rail-border: rgba(0, 0, 0, 0.08);
   --rail-muted: #ffffff;
   --rail-t: 280ms;
@@ -18,7 +18,7 @@
   width: var(--rail-w);
   display: flex;
   flex-direction: row;
-  background: #fff;
+  background: var(--surface, #fff);
   border-right: 1px solid var(--rail-border);
   z-index: 50;
   box-sizing: border-box;
@@ -41,15 +41,86 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 14px 10px;
-  gap: 10px;
+  padding: 28px 7px 12px;
+  gap: 6px;
   box-sizing: border-box;
 }
 
+/* Brand + toggle merged: C logo crossfades to chevron on hover */
+.rail-brand-toggle {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  padding: 0;
+  -webkit-appearance: none;
+  appearance: none;
+  font: inherit;
+  margin-bottom: 2px;
+  transition: background var(--rail-t) var(--rail-ease);
+}
+
+.rail-brand-toggle__logo,
+.rail-brand-toggle__arrow {
+  grid-area: 1 / 1;
+  transition: opacity var(--rail-t) var(--rail-ease), transform var(--rail-t) var(--rail-ease);
+}
+
+.rail-brand-toggle__logo {
+  opacity: 1;
+  width: 26px;
+  height: 26px;
+}
+
+.rail-brand-toggle__arrow {
+  width: 20px;
+  height: 20px;
+  opacity: 0;
+  color: var(--text, #1e293b);
+}
+
+.rail-brand-toggle:hover {
+  background: var(--accent-soft, #eef2ff);
+}
+
+.rail-brand-toggle:hover .rail-brand-toggle__logo {
+  opacity: 0;
+}
+
+.rail-brand-toggle:hover .rail-brand-toggle__arrow {
+  opacity: 1;
+}
+
+.rail-brand-toggle:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* When drawer is open: arrow points left (close) */
+.portal-shell-wrap.drawer-open .rail-brand-toggle__arrow {
+  transform: rotate(180deg);
+}
+
+/* Hide tooltips when drawer is open (drawer text is visible) */
+.portal-shell-wrap.drawer-open .rail-tooltip {
+  display: none;
+}
+
+/* Hide duplicate C logo in drawer head when rail brand is visible (desktop) */
+.portal-shell-wrap.drawer-open .portal-drawer__brand > svg {
+  display: none;
+}
+
 .rail-item {
-  width: 44px;
-  height: 44px;
-  border-radius: 16px;
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
   display: grid;
   place-items: center;
   position: relative;
@@ -61,8 +132,8 @@
 
 /* Icono Movimientos: más grande, delgado sin selección, más bold al estar activo */
 .rail-item--movements .icon {
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
 }
 .rail-item--movements .icon path {
   stroke-width: 2;
@@ -89,75 +160,42 @@ button.rail-item {
 
 .portal-shell-wrap.drawer-open .rail-align-spacer {
   display: block;
-  min-height: 44px;
+  min-height: 9px;
   transition: min-height var(--rail-drawer-t) var(--rail-ease);
 }
 
-/* Un solo botón: cerrado = en rail (›), abierto = al otro extremo (‹) con animación */
-.rail-toggle-btn {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: #fff;
-  border: 1px solid var(--rail-border);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
-  transition: transform var(--rail-drawer-t) var(--rail-ease);
-}
-
-.rail-toggle-btn:hover {
-  background: rgba(0, 0, 0, 0.04);
-  border-color: rgba(0, 0, 0, 0.12);
-}
-
-.rail-toggle-btn__icon {
-  display: block;
-  transition: transform var(--rail-drawer-t) var(--rail-ease);
-}
-
-/* Cuando el menú está abierto: botón se desplaza al extremo derecho y la flecha gira */
-.portal-shell-wrap.drawer-open .rail-toggle-btn {
-  position: absolute;
-  left: 12px;
-  top: 14px;
-  transform: translateX(var(--rail-expand-w));
-  z-index: 60;
-}
-
-.portal-shell-wrap.drawer-open .rail-toggle-btn__icon {
-  transform: rotate(180deg);
-}
-
 .rail-item:hover {
-  background: var(--surface-2, rgba(0, 0, 0, 0.06));
-  transform: translateY(-1px);
+  background: var(--accent-soft, #eef2ff);
+  transform: scale(1.06);
 }
 
 .rail-item:focus-visible {
-  outline: 2px solid rgba(0, 0, 0, 0.2);
+  outline: 2px solid var(--primary);
   outline-offset: 2px;
 }
 
-/* Activo: barra vertical a la derecha del icono (estilo Mindtrip) */
+/* Activo: barra vertical a la izquierda del icono (fintech indicator) */
 .rail-item.is-active {
-  background: transparent;
-  color: #1e293b;
+  background: var(--accent-soft, #eef2ff);
+  border-radius: 12px;
+  color: var(--primary);
 }
 
 .rail-item.is-active::after {
   content: "";
   position: absolute;
-  right: 6px;
+  left: 2px;
   top: 50%;
   transform: translateY(-50%);
-  width: 4px;
-  height: 22px;
-  background: var(--accent, #1e293b);
-  border-radius: 2px;
+  width: 3px;
+  height: 18px;
+  background: var(--primary);
+  border-radius: 3px;
   pointer-events: none;
 }
 
 .rail-item.is-active .icon {
-  color: var(--accent, #1e293b);
+  color: var(--primary);
 }
 
 .rail-item.is-active .icon path,
@@ -166,8 +204,37 @@ button.rail-item {
 }
 
 .rail-item .icon {
+  width: 20px;
+  height: 20px;
+}
+
+/* Divider between nav sections */
+.rail-divider {
   width: 22px;
-  height: 22px;
+  height: 1px;
+  background: var(--border, rgba(0,0,0,0.08));
+  margin: 4px 0;
+  flex-shrink: 0;
+}
+
+/* Oculto salvo escritorio + drawer abierto: compensa la fila .drawer-section-label del drawer */
+.rail-nav-section-gap {
+  display: none;
+  flex-shrink: 0;
+  width: 22px;
+  pointer-events: none;
+}
+
+/* Drawer section label — compact to reduce gap */
+.drawer-section-label {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #52525b;
+  padding: 6px 0 2px calc(var(--rail-w) + 4px);
+  margin: 6px 0 0;
 }
 
 .rail-tooltip {
@@ -212,8 +279,7 @@ button.rail-item {
 .portal-shell-wrap.drawer-instant.drawer-open .portal-sidebar-unified,
 .portal-shell-wrap.drawer-instant.drawer-open .portal-main,
 .portal-shell-wrap.drawer-instant.drawer-open .portal-drawer,
-.portal-shell-wrap.drawer-instant.drawer-open .rail-toggle-btn,
-.portal-shell-wrap.drawer-instant.drawer-open .rail-toggle-btn__icon,
+.portal-shell-wrap.drawer-instant.drawer-open .rail-brand-toggle__arrow,
 .portal-shell-wrap.drawer-instant.drawer-open .rail-align-spacer {
   transition: none !important;
 }
@@ -240,77 +306,308 @@ button.rail-item {
 .portal-drawer__inner {
   width: var(--rail-expand-w);
   min-height: 100%;
-  padding: 14px 12px 14px 0;
+  padding: 28px 4px 12px 0;
   background: transparent;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
   overflow: visible;
 }
 
 /* Primera fila: solo ContaNeta (el botón cerrar es el mismo que expandir, al otro extremo) */
 .portal-drawer__head {
-  min-height: 44px;
+  min-height: 40px;
+  margin-bottom: 2px;
   display: flex;
   align-items: center;
   flex-shrink: 0;
 }
 
 .portal-drawer__brand {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text, #1e293b);
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--text, #0f172a);
   font-family: var(--font-family);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
+/* Sidebar labels: fade-in when drawer opens */
+.portal-sidebar-unified .nav-label,
+.portal-sidebar-unified .sidebar-label {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--motion-fast, 100ms) ease;
+}
+.portal-shell-wrap.drawer-open .portal-sidebar-unified .nav-label,
+.portal-shell-wrap.drawer-open .portal-sidebar-unified .sidebar-label {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 /* Filas de enlaces: solo texto; los iconos son los del rail. La sombra gris abarca icono + texto (estilo Mindtrip). */
 .portal-drawer__links {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 4px;
+  flex: 1;
+}
+
+/* Bottom spacer: matches rail "Crear nuevo" button so Guías aligns */
+.drawer-bottom-spacer {
+  min-height: 40px;
+  flex-shrink: 0;
 }
 
 .drawer-link {
   display: flex;
   align-items: center;
-  min-height: 44px;
+  gap: 8px;
+  min-height: 40px;
   margin-left: calc(-1 * var(--rail-w));
-  padding-left: calc(var(--rail-w) + 8px);
-  padding-right: 10px;
-  border-radius: 12px;
+  padding: 0 4px 0 calc(var(--rail-w) + 4px);
+  border-radius: 8px;
   text-decoration: none;
-  color: rgba(0, 0, 0, 0.88);
-  font-size: 14px;
+  color: #0f172a;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  white-space: nowrap;
   font-family: var(--font-family);
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  -webkit-appearance: none;
+  appearance: none;
   transition: background var(--rail-t) var(--rail-ease), color var(--rail-t) var(--rail-ease);
 }
 
 /* Hover y activo: la sombra gris abarca desde el icono (rail) hasta el texto */
 .drawer-link:hover {
-  background: rgba(0, 0, 0, 0.06);
-  color: #1e293b;
+  background: #f4f4f5;
+  color: #020617;
 }
 
 .drawer-link--active {
-  background: rgba(0, 0, 0, 0.06);
-  font-weight: 600;
-  color: #1e293b;
+  background: var(--accent-soft, #eef2ff);
+  border-radius: 8px;
+  font-weight: 700;
+  color: var(--primary);
 }
+.drawer-link--active .drawer-link__icon { color: var(--primary); }
 
-/* Drawer link icons: hidden on desktop (rail provides them), visible on mobile */
+/* Drawer link icons: shown alongside text */
 .drawer-link__icon {
-  display: none;
-  width: 20px;
-  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
   flex-shrink: 0;
+  color: #64748b;
 }
 .drawer-link__icon .icon,
 .drawer-link__icon svg {
-  width: 20px;
-  height: 20px;
+  width: 17px;
+  height: 17px;
+}
+
+/* ============ Invoice flyout (Nueva factura popover) ============ */
+/* ── Invoice Flyout (MindTrip-style multi-panel popover) ── */
+.rail-invoice-flyout {
+  position: absolute;
+  left: calc(var(--rail-w) + 6px);
+  z-index: 200;
+  width: 280px;
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, rgba(0,0,0,0.08));
+  border-radius: 14px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.06);
+  animation: railFlyoutIn 150ms ease;
+}
+.rail-invoice-flyout[hidden] { display: none; }
+
+@keyframes railFlyoutIn {
+  from { opacity: 0; transform: translateX(-6px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* Panels container — overflow hidden for slide effect */
+.rail-invoice-flyout__panels {
+  position: relative;
+  overflow: hidden;
+}
+
+/* Each panel */
+.rail-invoice-flyout__panel {
+  padding: 6px;
+  transition: opacity 200ms ease;
+}
+/* Sub-panel hidden by default (absolute, out of flow) */
+.rail-invoice-flyout__panel--sub {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+/* When sub-panel is active: swap static/absolute */
+.rail-invoice-flyout__panels.flyout-sub-active .rail-invoice-flyout__panel:not(.rail-invoice-flyout__panel--sub) {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+.rail-invoice-flyout__panels.flyout-sub-active .rail-invoice-flyout__panel--sub {
+  position: static;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* ── Options (menu items) ── */
+.rail-invoice-flyout__option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-decoration: none;
+  color: var(--text, #1e293b);
+  font-family: inherit;
+  text-align: left;
+  width: 100%;
+  transition: background 150ms ease;
+}
+.rail-invoice-flyout__option:hover { background: var(--accent-soft, #eef2ff); }
+
+.rail-invoice-flyout__icon {
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  background: var(--surface-2, #f5f5f7);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.rail-invoice-flyout__icon .icon { width: 16px; height: 16px; }
+
+.rail-invoice-flyout__text {
+  display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1;
+}
+.rail-invoice-flyout__text strong { font-size: 13px; font-weight: 600; }
+.rail-invoice-flyout__text small { font-size: 11px; color: var(--text-muted, #6b7280); }
+
+.rail-invoice-flyout__chevron {
+  width: 16px; height: 16px; flex-shrink: 0;
+  color: var(--text-muted, #94a3b8);
+}
+
+/* ── Sub-panel header ── */
+.rail-invoice-flyout__subheader {
+  display: flex; align-items: center; gap: 6px;
+  padding: 8px 8px 4px;
+  font-size: 13px;
+}
+.rail-invoice-flyout__back {
+  display: flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px;
+  border: none; background: transparent; cursor: pointer;
+  border-radius: 6px; color: var(--text, #1e293b);
+  transition: background 120ms ease;
+}
+.rail-invoice-flyout__back:hover { background: var(--surface-2, #f1f5f9); }
+.rail-invoice-flyout__back svg { width: 16px; height: 16px; }
+
+.rail-invoice-flyout__sep {
+  height: 1px; margin: 4px 12px;
+  background: var(--border, rgba(0,0,0,0.06));
+}
+
+/* ── Search fields ── */
+.rail-invoice-flyout__field {
+  padding: 2px 8px;
+  position: relative;
+}
+.rail-invoice-flyout__label {
+  display: block; font-size: 11px; font-weight: 600;
+  color: var(--text-muted, #6b7280);
+  margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.04em;
+}
+.rail-invoice-flyout__input {
+  width: 100%; padding: 7px 10px;
+  border: 1px solid var(--border, rgba(0,0,0,0.12));
+  border-radius: 8px; font-size: 13px;
+  font-family: inherit; background: var(--surface, #fff);
+  color: var(--text, #1e293b);
+  transition: border-color 120ms ease;
+  outline: none;
+}
+.rail-invoice-flyout__input:focus {
+  border-color: var(--accent, #6366f1);
+  box-shadow: 0 0 0 2px rgba(99,102,241,0.12);
+}
+.rail-invoice-flyout__input::placeholder { color: var(--text-muted, #94a3b8); }
+
+/* ── Search results dropdown ── */
+.rail-invoice-flyout__results {
+  max-height: 160px; overflow-y: auto;
+  margin-top: 4px; border-radius: 8px;
+}
+.rail-invoice-flyout__results:empty { display: none; }
+
+.rail-invoice-flyout__result-item {
+  display: flex; flex-direction: column; gap: 1px;
+  padding: 7px 10px; cursor: pointer;
+  border-radius: 6px; font-size: 13px;
+  transition: background 100ms ease;
+}
+.rail-invoice-flyout__result-item:hover { background: var(--accent-soft, #eef2ff); }
+.rail-invoice-flyout__result-item small {
+  font-size: 11px; color: var(--text-muted, #6b7280);
+}
+
+/* ── Selected chip ── */
+.rail-invoice-flyout__selected {
+  display: flex; align-items: center; gap: 6px;
+  margin-top: 4px; padding: 5px 8px;
+  background: var(--accent-soft, #eef2ff);
+  border-radius: 8px; font-size: 12px; font-weight: 500;
+  color: var(--accent, #6366f1);
+}
+.rail-invoice-flyout__selected[hidden] { display: none; }
+.rail-invoice-flyout__selected-remove {
+  margin-left: auto; border: none; background: transparent;
+  cursor: pointer; color: var(--text-muted, #94a3b8);
+  padding: 0; line-height: 1; font-size: 16px;
+}
+.rail-invoice-flyout__selected-remove:hover { color: var(--text, #1e293b); }
+
+/* ── Submit button ── */
+.rail-invoice-flyout__submit {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  width: calc(100% - 16px); margin: 8px;
+  padding: 9px 12px;
+  border: none; border-radius: 10px;
+  background: var(--accent, #6366f1); color: #fff;
+  font-size: 13px; font-weight: 600; font-family: inherit;
+  cursor: pointer; transition: opacity 150ms ease;
+}
+.rail-invoice-flyout__submit:disabled { opacity: 0.45; cursor: default; }
+.rail-invoice-flyout__submit:not(:disabled):hover { opacity: 0.9; }
+.rail-invoice-flyout__submit svg { width: 15px; height: 15px; }
+
+/* When drawer is open, shift flyout right */
+.portal-shell-wrap.drawer-open .rail-invoice-flyout {
+  left: calc(var(--rail-w) + var(--rail-expand-w) + 6px);
+}
+
+@media (max-width: 1099px) {
+  .rail-invoice-flyout { display: none !important; }
 }
 
 /* Hamburger button base (must precede media queries for correct cascade) */
@@ -392,8 +689,8 @@ body.mobile-menu-open .topbar-hamburger__icon {
     bottom: 0;
     width: 280px;
     max-width: 85vw;
-    z-index: 1000;
-    background: #fff;
+    z-index: var(--z-modal, 400);
+    background: var(--surface, #fff);
     border-right: 1px solid var(--rail-border);
     box-shadow: 4px 0 24px rgba(0, 0, 0, 0.12);
     animation: mobileMenuSlideIn 250ms ease forwards;
@@ -419,6 +716,10 @@ body.mobile-menu-open .topbar-hamburger__icon {
     padding-left: 14px;
     gap: 10px;
   }
+  body.mobile-menu-open .drawer-section-label {
+    padding-left: 14px;
+    margin-top: 8px;
+  }
   /* Show icons in mobile drawer */
   body.mobile-menu-open .drawer-link__icon {
     display: flex;
@@ -431,7 +732,7 @@ body.mobile-menu-open .topbar-hamburger__icon {
     position: fixed;
     inset: 0;
     background: rgba(0, 0, 0, 0.4);
-    z-index: 999;
+    z-index: calc(var(--z-modal, 400) - 1);
   }
   /* Prevent body scroll */
   body.mobile-menu-open {
@@ -462,3 +763,285 @@ body.mobile-menu-open .topbar-hamburger__icon {
 @media (max-width: 900px) and (min-width: 1100px) {
   /* This range is now empty; the 1099px breakpoint above covers it */
 }
+
+/* ── Night mode ── */
+html.nightmode .portal-rail {
+  background: var(--surface, #161b22);
+  border-right-color: var(--border, rgba(255,255,255,.08));
+}
+html.nightmode .rail-item { color: var(--text-muted, #8b949e); }
+html.nightmode .rail-item:hover,
+html.nightmode .rail-item.is-active { color: var(--text, #e6edf3); }
+html.nightmode .rail-item:hover { background: rgba(255,255,255,.06); }
+html.nightmode .rail-tooltip {
+  background: var(--surface-2, #21262d);
+  color: var(--text, #e6edf3);
+  border-color: var(--border-strong, rgba(255,255,255,.14));
+}
+html.nightmode .portal-drawer {
+  background: var(--surface, #161b22);
+}
+html.nightmode .drawer-link {
+  color: var(--text, #e6edf3);
+}
+html.nightmode .drawer-link:hover {
+  background: rgba(255,255,255,.06);
+  color: var(--text, #f8fafc);
+}
+html.nightmode .drawer-link--active { background: rgba(129,140,248,.12); color: var(--accent, #818cf8); }
+html.nightmode .rail-brand-toggle:hover { background: rgba(255,255,255,.06); }
+html.nightmode .rail-divider { background: var(--border, rgba(255,255,255,.08)); }
+html.nightmode .drawer-section-label { color: var(--text-muted, #8b949e); }
+
+/* Flyout nightmode */
+html.nightmode .rail-invoice-flyout {
+  background: var(--surface, #161b22);
+  border-color: var(--border-strong, rgba(255,255,255,.14));
+  box-shadow: 0 8px 24px rgba(0,0,0,.5);
+}
+html.nightmode .rail-invoice-flyout__option:hover { background: rgba(255,255,255,.06); }
+html.nightmode .rail-invoice-flyout__icon { background: var(--surface-2, #21262d); }
+html.nightmode .rail-invoice-flyout__input {
+  background: var(--surface-2, #21262d);
+  border-color: var(--border-strong, rgba(255,255,255,.14));
+  color: var(--text, #e6edf3);
+}
+html.nightmode .rail-invoice-flyout__input:focus {
+  border-color: var(--accent, #818cf8);
+  box-shadow: 0 0 0 2px rgba(129,140,248,.2);
+}
+html.nightmode .rail-invoice-flyout__result-item:hover { background: rgba(255,255,255,.06); }
+html.nightmode .rail-invoice-flyout__selected {
+  background: rgba(129,140,248,.12);
+  color: var(--accent, #818cf8);
+}
+html.nightmode .rail-invoice-flyout__sep { background: var(--border, rgba(255,255,255,.08)); }
+
+/* ── Drawer inline submenu (mobile "Nueva factura" options) ── */
+.drawer-submenu {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 2px 0 2px 28px;
+}
+.drawer-submenu[hidden] { display: none; }
+.drawer-submenu__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-decoration: none;
+  color: var(--text, #1e293b);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 400;
+  text-align: left;
+  width: 100%;
+  transition: background 150ms ease;
+}
+.drawer-submenu__item:hover { background: var(--accent-soft, #eef2ff); }
+.drawer-submenu__icon { width: 18px; height: 18px; flex-shrink: 0; color: var(--text-muted, #6b7280); }
+
+/* ── Drawer quick invoice panel ── */
+.drawer-quick__header {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 0 8px; font-size: 13px;
+}
+.drawer-quick__back {
+  display: flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border: none; background: transparent;
+  cursor: pointer; border-radius: 6px; color: var(--text, #1e293b);
+  padding: 0; transition: background 120ms ease;
+}
+.drawer-quick__back:hover { background: var(--surface-2, #f1f5f9); }
+.drawer-quick__back svg { width: 16px; height: 16px; }
+.drawer-quick__field { padding: 4px 0; position: relative; }
+.drawer-quick__label {
+  display: block; font-size: 11px; font-weight: 600;
+  color: var(--text-muted, #6b7280);
+  margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.04em;
+}
+.drawer-quick__input {
+  width: 100%; padding: 8px 10px;
+  border: 1px solid var(--border, rgba(0,0,0,0.12));
+  border-radius: 8px; font-size: 14px;
+  font-family: inherit; background: var(--surface, #fff);
+  color: var(--text, #1e293b); outline: none;
+  box-sizing: border-box;
+  transition: border-color 120ms ease;
+}
+.drawer-quick__input:focus {
+  border-color: var(--accent, #6366f1);
+  box-shadow: 0 0 0 2px rgba(99,102,241,0.12);
+}
+.drawer-quick__input::placeholder { color: var(--text-muted, #94a3b8); }
+.drawer-quick__results {
+  max-height: 180px; overflow-y: auto; margin-top: 4px; border-radius: 8px;
+}
+.drawer-quick__results:empty { display: none; }
+.drawer-quick__result-item {
+  display: flex; flex-direction: column; gap: 1px;
+  padding: 8px 10px; cursor: pointer;
+  border-radius: 6px; font-size: 13px; transition: background 100ms ease;
+}
+.drawer-quick__result-item:hover { background: var(--accent-soft, #eef2ff); }
+.drawer-quick__result-item small { font-size: 11px; color: var(--text-muted, #6b7280); }
+.drawer-quick__selected {
+  display: flex; align-items: center; gap: 6px;
+  margin-top: 4px; padding: 6px 8px;
+  background: var(--accent-soft, #eef2ff);
+  border-radius: 8px; font-size: 12px; font-weight: 500;
+  color: var(--accent, #6366f1);
+}
+.drawer-quick__selected[hidden] { display: none; }
+.drawer-quick__selected-remove {
+  margin-left: auto; border: none; background: transparent;
+  cursor: pointer; color: var(--text-muted, #94a3b8);
+  padding: 0; line-height: 1; font-size: 16px;
+}
+.drawer-quick__selected-remove:hover { color: var(--text, #1e293b); }
+.drawer-quick__submit {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  width: 100%; margin-top: 10px; padding: 10px 12px;
+  border: none; border-radius: 10px;
+  background: var(--accent, #6366f1); color: #fff;
+  font-size: 14px; font-weight: 600; font-family: inherit;
+  cursor: pointer; transition: opacity 150ms ease;
+}
+.drawer-quick__submit:disabled { opacity: 0.45; cursor: default; }
+.drawer-quick__submit:not(:disabled):hover { opacity: 0.9; }
+.drawer-quick__submit svg { width: 15px; height: 15px; }
+
+/* Hide drawer submenu on desktop (flyout is used instead) */
+@media (min-width: 1100px) {
+  .drawer-submenu { display: none !important; }
+}
+html.nightmode .drawer-submenu__item { color: var(--text, #e6edf3); }
+html.nightmode .drawer-submenu__item:hover { background: rgba(255,255,255,.06); }
+html.nightmode .drawer-submenu__icon { color: var(--text-muted, #8b949e); }
+html.nightmode .drawer-quick__back { color: var(--text, #e6edf3); }
+html.nightmode .drawer-quick__back:hover { background: rgba(255,255,255,.06); }
+html.nightmode .drawer-quick__input {
+  background: var(--surface-2, #21262d);
+  border-color: var(--border-strong, rgba(255,255,255,.14));
+  color: var(--text, #e6edf3);
+}
+html.nightmode .drawer-quick__input:focus {
+  border-color: var(--accent, #818cf8);
+  box-shadow: 0 0 0 2px rgba(129,140,248,.2);
+}
+html.nightmode .drawer-quick__result-item:hover { background: rgba(255,255,255,.06); }
+html.nightmode .drawer-quick__selected {
+  background: rgba(129,140,248,.12); color: var(--accent, #818cf8);
+}
+
+/* Escritorio: iconos solo en el rail; columna de texto compacta (referencia tipo Instagram). */
+@media (min-width: 1100px) {
+  .drawer-link__icon {
+    display: none;
+  }
+  .portal-shell-wrap.drawer-open .drawer-link {
+    margin-left: 0;
+    padding: 0 4px;
+    gap: 0;
+    min-height: 40px;
+    line-height: 40px;
+    box-sizing: border-box;
+  }
+  .portal-shell-wrap.drawer-open .drawer-section-label {
+    padding-left: 4px;
+    margin-top: 0;
+    padding-top: 4px;
+    padding-bottom: 2px;
+    line-height: 1.15;
+  }
+  /* Sincroniza altura rail ↔ fila "CATÁLOGOS" del drawer (divider 9px + este hueco ≈ bloque del label + gaps) */
+  .portal-shell-wrap.drawer-open .rail-nav-section-gap {
+    display: block;
+    align-self: center;
+    /* Ajusta si el entorno de fuente cambia (≈ fila CATÁLOGOS + gap vs divider 9px) */
+    min-height: var(--rail-nav-catalog-sync, 24px);
+  }
+  .portal-shell-wrap.drawer-open .drawer-submenu {
+    padding-left: 8px;
+    padding-right: 0;
+  }
+  .drawer-section-label {
+    height: auto;
+    margin: 6px 0 0;
+    padding: 6px 0 2px 8px;
+    display: block;
+    overflow: visible;
+  }
+
+  /* Pastilla activa continua: mitad izquierda (rail) + mitad derecha (texto), estilo Instagram */
+  .portal-shell-wrap.drawer-open .portal-rail {
+    align-items: stretch;
+  }
+  .portal-shell-wrap.drawer-open .rail-brand-toggle,
+  .portal-shell-wrap.drawer-open .rail-divider {
+    align-self: center;
+  }
+  .portal-shell-wrap.drawer-open .rail-spacer {
+    align-self: stretch;
+    width: auto;
+  }
+  .portal-shell-wrap.drawer-open .rail-item:not(.is-active) {
+    align-self: center;
+    width: 40px;
+  }
+  .portal-shell-wrap.drawer-open .rail-item.is-active {
+    align-self: stretch;
+    width: 100%;
+    max-width: none;
+    box-sizing: border-box;
+    border-radius: 12px 0 0 12px;
+    margin-right: -1px;
+    position: relative;
+    z-index: 2;
+    transform: none;
+    background: var(--accent-soft, #eef2ff);
+  }
+  .portal-shell-wrap.drawer-open .rail-item.is-active::after {
+    display: none;
+  }
+  .portal-shell-wrap.drawer-open .rail-item:hover {
+    transform: none;
+  }
+  .portal-shell-wrap.drawer-open .rail-item:hover:not(.is-active) {
+    background: #f4f4f5;
+  }
+  .portal-shell-wrap.drawer-open .rail-item.is-active:hover {
+    background: var(--accent-soft, #eef2ff);
+  }
+  .portal-shell-wrap.drawer-open .drawer-link--active {
+    border-radius: 0 12px 12px 0;
+    position: relative;
+    z-index: 1;
+    background: var(--accent-soft, #eef2ff);
+  }
+  .portal-shell-wrap.drawer-open .drawer-link--active:hover {
+    background: var(--accent-soft, #eef2ff);
+    color: var(--primary);
+  }
+  .portal-shell-wrap.drawer-open .portal-drawer__links {
+    gap: 6px;
+  }
+  .portal-shell-wrap.drawer-open .portal-drawer__head {
+    min-height: 42px;
+  }
+
+  html.nightmode .portal-shell-wrap.drawer-open .rail-item.is-active,
+  html.nightmode .portal-shell-wrap.drawer-open .drawer-link--active {
+    background: rgba(129, 140, 248, 0.14);
+  }
+  html.nightmode .portal-shell-wrap.drawer-open .rail-item.is-active:hover,
+  html.nightmode .portal-shell-wrap.drawer-open .drawer-link--active:hover {
+    background: rgba(129, 140, 248, 0.18);
+  }
+}
+

@@ -18,6 +18,16 @@
     <p class="danger">Error: {{ error }}</p>
   {% endif %}
 
+  <ul class="form-step-indicator" id="formStepIndicator" role="list" aria-label="Pasos de la factura">
+    <li class="form-step form-step--active" data-step="receptor"><span class="form-step__number">1</span><span class="form-step__label">Cliente</span></li>
+    <span class="form-step__connector" aria-hidden="true"></span>
+    <li class="form-step" data-step="conceptos"><span class="form-step__number">2</span><span class="form-step__label">Conceptos</span></li>
+    <span class="form-step__connector" aria-hidden="true"></span>
+    <li class="form-step" data-step="pago"><span class="form-step__number">3</span><span class="form-step__label">Pago</span></li>
+    <span class="form-step__connector" aria-hidden="true"></span>
+    <li class="form-step" data-step="extras"><span class="form-step__number">4</span><span class="form-step__label">Extras</span></li>
+  </ul>
+
   <form method="POST" action="/submit">
     <input type="hidden" name="csrf_token" value="{{ csrf_token or '' }}" />
     {% include "form/_section_receptor.html" %}
@@ -32,4 +42,90 @@
 
   {% include "form/_script_mode.html" %}
   {% include "form/_script_form.html" %}
+
+  <script>
+  (function() {
+    var sections = [
+      document.querySelector('[name="customer_rfc"]'),
+      document.getElementById('conceptRows'),
+      document.querySelector('[name="metodo_pago"]'),
+      document.getElementById('extrasCard')
+    ].filter(Boolean);
+    var steps = document.querySelectorAll('#formStepIndicator .form-step');
+    var connectors = document.querySelectorAll('#formStepIndicator .form-step__connector');
+    if (!steps.length || !sections.length) return;
+    function updateSteps() {
+      var scrollY = window.scrollY + window.innerHeight * 0.35;
+      var activeIdx = 0;
+      for (var i = sections.length - 1; i >= 0; i--) {
+        if (sections[i].getBoundingClientRect().top + window.scrollY <= scrollY) { activeIdx = i; break; }
+      }
+      steps.forEach(function(s, idx) {
+        s.classList.toggle('form-step--active', idx === activeIdx);
+        s.classList.toggle('form-step--done', idx < activeIdx);
+      });
+      connectors.forEach(function(c, idx) {
+        c.classList.toggle('form-step__connector--done', idx < activeIdx);
+      });
+    }
+    window.addEventListener('scroll', updateSteps, { passive: true });
+    updateSteps();
+
+    // Sticky shadow: detect when stepper is stuck at top
+    var indicator = document.getElementById('formStepIndicator');
+    if (indicator && 'IntersectionObserver' in window) {
+      var sentinel = document.createElement('div');
+      sentinel.style.height = '1px';
+      sentinel.style.marginBottom = '-1px';
+      indicator.parentNode.insertBefore(sentinel, indicator);
+      var obs = new IntersectionObserver(function(entries) {
+        indicator.classList.toggle('is-stuck', !entries[0].isIntersecting);
+      }, { threshold: 0 });
+      obs.observe(sentinel);
+    }
+
+    // Make steps clickable — smooth scroll to section
+    steps.forEach(function(step, idx) {
+      step.style.cursor = 'pointer';
+      step.addEventListener('click', function() {
+        if (sections[idx]) {
+          sections[idx].scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      });
+    });
+
+    // ===== Inline validation =====
+    // RFC: 12 chars (persona física) or 13 chars (persona moral)
+    var rfcInput = document.querySelector('[name="customer_rfc"]');
+    if (rfcInput) {
+      rfcInput.addEventListener('blur', function() {
+        var v = rfcInput.value.trim().toUpperCase();
+        var parent = rfcInput.parentElement;
+        parent.classList.remove('field--error', 'field--success');
+        var err = parent.querySelector('.field__error');
+        if (!err) { err = document.createElement('span'); err.className = 'field__error'; parent.appendChild(err); }
+        if (!v) return;
+        var rfcRe = /^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/;
+        if (v.length < 12 || v.length > 13 || !rfcRe.test(v)) {
+          parent.classList.add('field--error');
+          err.textContent = v.length < 12 ? 'RFC muy corto' : (v.length > 13 ? 'RFC muy largo' : 'Formato inválido');
+        } else {
+          parent.classList.add('field--success');
+          err.textContent = '';
+        }
+      });
+    }
+
+    // Price/quantity: no negatives
+    document.addEventListener('change', function(e) {
+      var input = e.target;
+      if (!input || input.tagName !== 'INPUT') return;
+      var name = input.name || '';
+      if (name.match(/precio|cantidad|importe|valor_unitario/i) && input.type !== 'hidden') {
+        var num = parseFloat(input.value);
+        if (!isNaN(num) && num < 0) { input.value = Math.abs(num); }
+      }
+    });
+  })();
+  </script>
 {% endblock %}

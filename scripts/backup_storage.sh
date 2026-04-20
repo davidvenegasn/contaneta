@@ -41,6 +41,20 @@ if [ ${#INCLUDES[@]} -eq 0 ]; then
   INCLUDES+=(".")
 fi
 
+# --- Database backup (SQLite safe copy via .backup command, WAL-safe) ---
+DB_PATH="${APP_DB_PATH:-$PROJECT_ROOT/invoicing.db}"
+DB_BACKUP="$BACKUP_DIR/invoicing_${STAMP}.db"
+if [ -f "$DB_PATH" ]; then
+  if command -v sqlite3 &>/dev/null; then
+    sqlite3 "$DB_PATH" ".backup '${DB_BACKUP}'" 2>/dev/null || cp "$DB_PATH" "$DB_BACKUP"
+  else
+    cp "$DB_PATH" "$DB_BACKUP"
+  fi
+  echo "DB backup: $DB_BACKUP"
+else
+  echo "WARN: Database not found at $DB_PATH — skipping DB backup"
+fi
+
 (
   cd "$STORAGE_DIR"
   tar -czf "$OUT_TAR" \
@@ -51,9 +65,9 @@ fi
     "${INCLUDES[@]}"
 )
 
-echo "Backup: $OUT_TAR"
+echo "Storage backup: $OUT_TAR"
 
 # Rotación: borrar copias más antiguas que RETAIN_DAYS (si RETAIN_DAYS > 0)
 if [ -n "$RETAIN_DAYS" ] && [ "$RETAIN_DAYS" -gt 0 ] 2>/dev/null; then
-  find "$BACKUP_DIR" -maxdepth 1 -name "storage_*.tar.gz" -type f -mtime +"$RETAIN_DAYS" -delete 2>/dev/null || true
+  find "$BACKUP_DIR" -maxdepth 1 \( -name "storage_*.tar.gz" -o -name "invoicing_*.db" \) -type f -mtime +"$RETAIN_DAYS" -delete 2>/dev/null || true
 fi

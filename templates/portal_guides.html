@@ -1,0 +1,500 @@
+{% extends "base_portal.html" %}
+{% set title = 'Guías y tutoriales' %}
+
+{% block content %}
+<div class="page-wrap">
+
+  <!-- Header -->
+  <div class="guides-header">
+    <h1 class="guides-header__title">Guías y tutoriales</h1>
+    <p class="guides-header__subtitle">Aprende lo mínimo para facturar y declarar sin miedo (y usa el portal como apoyo).</p>
+    <div class="guides-search">
+      <input type="search" id="guidesSearch" class="guides-search__input" placeholder="Buscar guías..." autocomplete="off">
+    </div>
+    <div class="guides-chips" id="guidesChips">
+      <button class="guides-chip is-active" data-tag="todos">Todos</button>
+      <button class="guides-chip" data-tag="mensual">Mensual</button>
+      <button class="guides-chip" data-tag="facturación">Facturación</button>
+      <button class="guides-chip" data-tag="impuestos">Impuestos</button>
+      <button class="guides-chip" data-tag="sat">SAT</button>
+      <button class="guides-chip" data-tag="deducciones">Deducciones</button>
+      <button class="guides-chip" data-tag="errores">Errores</button>
+    </div>
+  </div>
+
+  <!-- No results message -->
+  <p class="guides-no-results" id="guidesNoResults" hidden>No se encontraron guías con ese criterio.</p>
+
+  <!-- Section A: Ruta mensual -->
+  <section class="guides-section" id="secRutaMensual">
+    <h2 class="guides-section__title">Ruta mensual (según tu régimen)</h2>
+    <div class="guides-grid">
+
+      <!-- RESICO PF -->
+      <div class="guide-item card" data-tags="mensual sat impuestos">
+        <h3 class="guide-item__title">RESICO PF &mdash; declaración mensual</h3>
+        <p class="guide-item__desc">Paso a paso para declarar bajo RESICO (Persona Física).</p>
+        <div class="guide-accordion">
+          <button class="guide-accordion__toggle" aria-expanded="false">
+            <span>Checklist antes de declarar</span>
+            <svg class="guide-accordion__chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <div class="guide-accordion__body" hidden>
+            <ul>
+              <li>Verifica que todas tus facturas emitidas del mes estén timbradas.</li>
+              <li>Revisa que tus facturas recibidas (gastos) estén descargadas.</li>
+              <li>Confirma que tu FIEL/CSD esté vigente.</li>
+              <li>Ten a la mano tu acceso al portal del SAT.</li>
+            </ul>
+          </div>
+
+          <button class="guide-accordion__toggle" aria-expanded="false">
+            <span>Qué números usar del portal</span>
+            <svg class="guide-accordion__chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <div class="guide-accordion__body" hidden>
+            <ul>
+              <li><strong>Ingresos:</strong> suma de facturas emitidas del mes (sin IVA).</li>
+              <li><strong>IVA cobrado:</strong> total de IVA en facturas emitidas.</li>
+              <li>Consulta la sección "Resumen" del portal para ver los totales.</li>
+            </ul>
+          </div>
+
+          <button class="guide-accordion__toggle" aria-expanded="false">
+            <span>Paso a paso en el SAT</span>
+            <svg class="guide-accordion__chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <div class="guide-accordion__body" hidden>
+            <ol>
+              <li>Ingresa al portal del SAT con tu e.firma o contraseña.</li>
+              <li>Ve a "Presentar declaración" &rarr; "Declaraciones mensuales".</li>
+              <li>Selecciona el periodo (mes y año).</li>
+              <li>Captura tus ingresos y el IVA cobrado.</li>
+              <li>Revisa el cálculo automático de ISR e IVA a pagar.</li>
+              <li>Envía la declaración y guarda el acuse.</li>
+            </ol>
+          </div>
+
+          <button class="guide-accordion__toggle" aria-expanded="false">
+            <span>Qué acuse guardar</span>
+            <svg class="guide-accordion__chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <div class="guide-accordion__body" hidden>
+            <p>Descarga y conserva el PDF del acuse de recibo. Contiene:</p>
+            <ul>
+              <li>Número de operación (folio).</li>
+              <li>Fecha y hora de presentación.</li>
+              <li>Sello digital.</li>
+            </ul>
+            <p>Guárdalo al menos 5 años (obligación fiscal).</p>
+          </div>
+
+          <button class="guide-accordion__toggle" aria-expanded="false">
+            <span>Errores comunes</span>
+            <svg class="guide-accordion__chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <div class="guide-accordion__body" hidden>
+            <ul>
+              <li>No incluir facturas canceladas en el cálculo.</li>
+              <li>Confundir IVA trasladado con IVA retenido.</li>
+              <li>Declarar fuera de plazo (fecha límite: día 17 del mes siguiente).</li>
+              <li>No descargar las facturas recibidas antes de declarar.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- PF Actividad Empresarial -->
+      <div class="guide-item card" data-tags="mensual sat impuestos">
+        <h3 class="guide-item__title">PF Actividad Empresarial &mdash; declaración mensual</h3>
+        <p class="guide-item__desc">Guía para Personas Físicas con Actividad Empresarial y Profesional.</p>
+        <div class="guide-accordion">
+          <button class="guide-accordion__toggle" aria-expanded="false">
+            <span>Checklist antes de declarar</span>
+            <svg class="guide-accordion__chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <div class="guide-accordion__body" hidden>
+            <ul>
+              <li>Revisa tus facturas emitidas y recibidas del mes.</li>
+              <li>Calcula tus ingresos acumulados del ejercicio.</li>
+              <li>Identifica tus deducciones autorizadas.</li>
+              <li>Ten lista tu tabla de ISR para pagos provisionales.</li>
+            </ul>
+          </div>
+
+          <button class="guide-accordion__toggle" aria-expanded="false">
+            <span>Qué números usar del portal</span>
+            <svg class="guide-accordion__chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <div class="guide-accordion__body" hidden>
+            <ul>
+              <li><strong>Ingresos:</strong> total facturado del mes (sin IVA).</li>
+              <li><strong>Deducciones:</strong> gastos con factura válida del mes.</li>
+              <li><strong>IVA trasladado:</strong> IVA de facturas emitidas.</li>
+              <li><strong>IVA acreditable:</strong> IVA de facturas recibidas (gastos deducibles).</li>
+            </ul>
+          </div>
+
+          <button class="guide-accordion__toggle" aria-expanded="false">
+            <span>Paso a paso en el SAT</span>
+            <svg class="guide-accordion__chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <div class="guide-accordion__body" hidden>
+            <ol>
+              <li>Ingresa al portal del SAT.</li>
+              <li>Ve a "Presentar declaración" &rarr; tipo "Provisional o definitiva".</li>
+              <li>Selecciona ISR e IVA para el periodo.</li>
+              <li>Captura ingresos acumulados y deducciones.</li>
+              <li>ISR: el sistema calcula el pago provisional con base en la tabla.</li>
+              <li>IVA: captura IVA trasladado menos IVA acreditable.</li>
+              <li>Envía y guarda el acuse.</li>
+            </ol>
+          </div>
+
+          <button class="guide-accordion__toggle" aria-expanded="false">
+            <span>Errores comunes</span>
+            <svg class="guide-accordion__chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <div class="guide-accordion__body" hidden>
+            <ul>
+              <li>No acumular ingresos de meses anteriores en ISR.</li>
+              <li>Deducir gastos sin factura CFDI válida.</li>
+              <li>No restar pagos provisionales anteriores.</li>
+              <li>Olvidar el IVA retenido por clientes personas morales.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Section B: Aprende lo básico -->
+  <section class="guides-section" id="secBasico">
+    <h2 class="guides-section__title">Aprende lo básico (5 min c/u)</h2>
+    <div class="guides-accordion-list">
+
+      <div class="guide-item" data-tags="impuestos">
+        <button class="guide-accordion__toggle" aria-expanded="false">
+          <span>¿Qué es IVA?</span>
+          <svg class="guide-accordion__chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="guide-accordion__body" hidden>
+          <p>El <strong>Impuesto al Valor Agregado (IVA)</strong> es un impuesto indirecto que se cobra sobre la venta de bienes y servicios. En México la tasa general es del <strong>16%</strong>.</p>
+          <ul>
+            <li><strong>IVA trasladado:</strong> el que cobras a tus clientes en tus facturas.</li>
+            <li><strong>IVA acreditable:</strong> el que pagas en tus compras/gastos con factura.</li>
+            <li><strong>IVA a pagar:</strong> trasladado menos acreditable. Si es negativo, tienes saldo a favor.</li>
+          </ul>
+          <p>Se declara mensualmente ante el SAT.</p>
+        </div>
+      </div>
+
+      <div class="guide-item" data-tags="impuestos">
+        <button class="guide-accordion__toggle" aria-expanded="false">
+          <span>¿Qué es ISR?</span>
+          <svg class="guide-accordion__chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="guide-accordion__body" hidden>
+          <p>El <strong>Impuesto Sobre la Renta (ISR)</strong> grava las ganancias (ingresos menos deducciones). Se calcula con tablas progresivas del SAT.</p>
+          <ul>
+            <li><strong>RESICO:</strong> tasa fija reducida (1% a 2.5%) sobre ingresos, sin deducciones.</li>
+            <li><strong>Actividad Empresarial:</strong> pagos provisionales mensuales con base en utilidad acumulada.</li>
+          </ul>
+          <p>Se declara mensualmente (pagos provisionales) y anualmente (declaración anual en abril).</p>
+        </div>
+      </div>
+
+      <div class="guide-item" data-tags="facturación">
+        <button class="guide-accordion__toggle" aria-expanded="false">
+          <span>PUE vs PPD (cuándo usar)</span>
+          <svg class="guide-accordion__chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="guide-accordion__body" hidden>
+          <p>Son las dos formas de pago en CFDI:</p>
+          <ul>
+            <li><strong>PUE (Pago en Una sola Exhibición):</strong> el cliente paga todo al momento o en el mismo mes. La factura se emite con método de pago "PUE" y forma de pago real (transferencia, efectivo, etc.).</li>
+            <li><strong>PPD (Pago en Parcialidades o Diferido):</strong> el pago será después o en partes. Se emite la factura con forma de pago "99 - Por definir" y luego se genera un <strong>Complemento de Pago</strong> cuando se reciba el dinero.</li>
+          </ul>
+          <p><strong>Regla práctica:</strong> si te pagan en el momento, usa PUE. Si no, usa PPD.</p>
+        </div>
+      </div>
+
+      <div class="guide-item" data-tags="facturación">
+        <button class="guide-accordion__toggle" aria-expanded="false">
+          <span>Uso CFDI (qué escoger normalmente)</span>
+          <svg class="guide-accordion__chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="guide-accordion__body" hidden>
+          <p>El "Uso CFDI" indica para qué usará la factura tu cliente. Los más comunes:</p>
+          <ul>
+            <li><strong>G03 - Gastos en general:</strong> la opción más usada para gastos de operación.</li>
+            <li><strong>G01 - Adquisición de mercancías:</strong> si vendes productos que tu cliente revende.</li>
+            <li><strong>S01 - Sin efectos fiscales:</strong> cuando el cliente no la va a deducir (público en general).</li>
+            <li><strong>I01 - Construcciones:</strong> para gastos de construcción o inmuebles.</li>
+          </ul>
+          <p><strong>Tip:</strong> si no sabes, pregunta a tu cliente. Si es público en general, usa S01.</p>
+        </div>
+      </div>
+
+      <div class="guide-item" data-tags="facturación impuestos">
+        <button class="guide-accordion__toggle" aria-expanded="false">
+          <span>Régimen fiscal del cliente (por qué importa)</span>
+          <svg class="guide-accordion__chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="guide-accordion__body" hidden>
+          <p>Desde 2022, el SAT obliga a que la factura incluya el <strong>régimen fiscal del receptor</strong> (tu cliente). Si no coincide, la factura será rechazada.</p>
+          <ul>
+            <li>Pide a tu cliente su <strong>Constancia de Situación Fiscal</strong> (la obtiene en el SAT).</li>
+            <li>Verifica: RFC, razón social exacta, régimen fiscal y código postal.</li>
+            <li>Los más comunes: 601 (General de Ley PM), 612 (PF Actividad Empresarial), 626 (RESICO).</li>
+          </ul>
+          <p>ContaNeta guarda estos datos en tu catálogo de clientes para no pedirlos cada vez.</p>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Section C: Facturación sin errores -->
+  <section class="guides-section" id="secFacturacion">
+    <h2 class="guides-section__title">Facturación sin errores</h2>
+    <div class="guides-accordion-list">
+
+      <div class="guide-item" data-tags="facturación">
+        <button class="guide-accordion__toggle" aria-expanded="false">
+          <span>Cómo emitir tu primera factura</span>
+          <svg class="guide-accordion__chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="guide-accordion__body" hidden>
+          <ol>
+            <li>Asegúrate de tener tus credenciales SAT (FIEL o CSD) cargadas en el portal.</li>
+            <li>Da clic en "Nueva factura" en el menú lateral.</li>
+            <li>Llena los datos del cliente (RFC, razón social, régimen, CP).</li>
+            <li>Agrega los conceptos (producto/servicio, cantidad, precio unitario).</li>
+            <li>Selecciona método de pago (PUE o PPD) y forma de pago.</li>
+            <li>Revisa el total, impuestos y datos fiscales.</li>
+            <li>Da clic en "Timbrar" para enviarla al SAT.</li>
+          </ol>
+          <p>El portal generará el XML y PDF automáticamente.</p>
+        </div>
+      </div>
+
+      <div class="guide-item" data-tags="facturación errores">
+        <button class="guide-accordion__toggle" aria-expanded="false">
+          <span>Errores típicos: CP / régimen / razón social</span>
+          <svg class="guide-accordion__chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="guide-accordion__body" hidden>
+          <p>Los rechazos más frecuentes del SAT al timbrar:</p>
+          <ul>
+            <li><strong>Código postal incorrecto:</strong> debe coincidir con la Constancia de Situación Fiscal del receptor.</li>
+            <li><strong>Régimen fiscal incorrecto:</strong> verificar el régimen exacto del cliente.</li>
+            <li><strong>Razón social con errores:</strong> debe ser idéntica a la constancia (incluyendo acentos, mayúsculas, "S.A. de C.V.", etc.).</li>
+            <li><strong>RFC inválido:</strong> verificar dígito verificador y longitud (12 para PM, 13 para PF).</li>
+          </ul>
+          <p><strong>Solución:</strong> pide siempre la Constancia de Situación Fiscal actualizada al cliente.</p>
+        </div>
+      </div>
+
+      <div class="guide-item" data-tags="facturación sat">
+        <button class="guide-accordion__toggle" aria-expanded="false">
+          <span>Cancelación: cuándo y cómo</span>
+          <svg class="guide-accordion__chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="guide-accordion__body" hidden>
+          <p>Puedes cancelar una factura cuando:</p>
+          <ul>
+            <li>Se emitió con errores (datos incorrectos).</li>
+            <li>La operación no se realizó.</li>
+            <li>Se facturó por un monto incorrecto.</li>
+          </ul>
+          <p><strong>Proceso:</strong></p>
+          <ol>
+            <li>Si la factura es menor a $1,000 MXN, se cancela sin aprobación del receptor.</li>
+            <li>Si es mayor, el receptor debe aprobar la cancelación (tiene 3 días).</li>
+            <li>Debes indicar el motivo de cancelación (01, 02, 03, 04).</li>
+            <li>Si emites una nueva factura que sustituye, relaciona el UUID.</li>
+          </ol>
+          <p><strong>Plazo:</strong> puedes cancelar en el mismo ejercicio fiscal, antes de la declaración anual.</p>
+        </div>
+      </div>
+
+      <div class="guide-item" data-tags="facturación">
+        <button class="guide-accordion__toggle" aria-expanded="false">
+          <span>Facturas PPD + complemento de pago</span>
+          <svg class="guide-accordion__chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="guide-accordion__body" hidden>
+          <p>Cuando usas PPD (Pago en Parcialidades o Diferido), necesitas generar un <strong>Complemento de Pago (REP)</strong> cada vez que recibas dinero:</p>
+          <ul>
+            <li>El complemento se emite dentro del mes siguiente al pago.</li>
+            <li>Debe indicar: fecha de pago, forma de pago real, monto pagado.</li>
+            <li>Relaciona el UUID de la factura original.</li>
+            <li>Si hay parcialidades, se emite un complemento por cada pago.</li>
+          </ul>
+          <p><strong>Importante:</strong> sin el complemento de pago, el ingreso no se considera "efectivamente cobrado" para ISR.</p>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Section D: Deducciones y gastos -->
+  <section class="guides-section" id="secDeducciones">
+    <h2 class="guides-section__title">Deducciones y gastos</h2>
+    <div class="guides-accordion-list">
+
+      <div class="guide-item" data-tags="deducciones">
+        <button class="guide-accordion__toggle" aria-expanded="false">
+          <span>Qué debe tener una factura para deducirse</span>
+          <svg class="guide-accordion__chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="guide-accordion__body" hidden>
+          <p>Para que un gasto sea deducible necesitas:</p>
+          <ul>
+            <li><strong>CFDI válido (vigente)</strong> &mdash; factura timbrada, no cancelada.</li>
+            <li><strong>Datos correctos:</strong> tu RFC, razón social, régimen y CP.</li>
+            <li><strong>Estrictamente indispensable:</strong> el gasto debe ser necesario para tu actividad.</li>
+            <li><strong>Pago comprobable:</strong> transferencia, cheque nominativo o tarjeta (no efectivo si supera $2,000 MXN).</li>
+            <li><strong>Registrado en contabilidad:</strong> en el periodo correcto.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="guide-item" data-tags="deducciones">
+        <button class="guide-accordion__toggle" aria-expanded="false">
+          <span>Factura vigente vs cancelada</span>
+          <svg class="guide-accordion__chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="guide-accordion__body" hidden>
+          <p>Solo puedes deducir facturas con estatus <strong>"Vigente"</strong> en el SAT.</p>
+          <ul>
+            <li>Verifica el estatus en el portal del SAT o en ContaNeta (sincronización).</li>
+            <li>Si tu proveedor canceló la factura sin avisarte, no es deducible.</li>
+            <li>Revisa periódicamente tus facturas recibidas para detectar cancelaciones.</li>
+          </ul>
+          <p><strong>Tip:</strong> ContaNeta marca las facturas canceladas automáticamente al sincronizar con el SAT.</p>
+        </div>
+      </div>
+
+      <div class="guide-item" data-tags="deducciones">
+        <button class="guide-accordion__toggle" aria-expanded="false">
+          <span>Métodos de pago y qué guardar</span>
+          <svg class="guide-accordion__chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="guide-accordion__body" hidden>
+          <p>Para deducir, conserva:</p>
+          <ul>
+            <li><strong>Factura CFDI</strong> (XML y PDF).</li>
+            <li><strong>Comprobante de pago:</strong> estado de cuenta bancario, voucher de transferencia.</li>
+            <li>Si pagas en efectivo, montos mayores a $2,000 MXN no son deducibles.</li>
+            <li>Cheques deben ser nominativos y para abono en cuenta.</li>
+          </ul>
+          <p>Guarda todo al menos <strong>5 años</strong> (plazo de conservación fiscal).</p>
+        </div>
+      </div>
+
+      <div class="guide-item" data-tags="deducciones">
+        <button class="guide-accordion__toggle" aria-expanded="false">
+          <span>Ideas de deducciones típicas para PF</span>
+          <svg class="guide-accordion__chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="guide-accordion__body" hidden>
+          <p>Gastos comunes que puedes deducir (con factura):</p>
+          <ul>
+            <li>Renta de oficina o local.</li>
+            <li>Internet y teléfono (proporción de uso profesional).</li>
+            <li>Equipo de cómputo y software.</li>
+            <li>Papelería y suministros de oficina.</li>
+            <li>Gasolina y mantenimiento de vehículo (con límites).</li>
+            <li>Honorarios de contador.</li>
+            <li>Capacitación y cursos profesionales.</li>
+            <li>Seguros (gastos médicos, vida) en la declaración anual.</li>
+          </ul>
+          <p><strong>Nota:</strong> en RESICO no se aplican deducciones para ISR, pero sí puedes acreditar IVA.</p>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Section E: Problemas comunes -->
+  <section class="guides-section" id="secProblemas">
+    <h2 class="guides-section__title">Problemas comunes</h2>
+    <div class="guides-accordion-list">
+
+      <div class="guide-item" data-tags="errores sat">
+        <button class="guide-accordion__toggle" aria-expanded="false">
+          <span>SAT está lento / no carga</span>
+          <svg class="guide-accordion__chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="guide-accordion__body" hidden>
+          <p>El portal del SAT suele saturarse en días de vencimiento (17 de cada mes). Recomendaciones:</p>
+          <ul>
+            <li>Intenta en horarios de baja demanda (antes de las 8am o después de las 9pm).</li>
+            <li>Usa navegadores actualizados (Chrome o Firefox).</li>
+            <li>Limpia caché y cookies del navegador.</li>
+            <li>Si usas e.firma, verifica que tu plugin JAVA/ActiveX esté actualizado.</li>
+            <li>No esperes al último día para declarar.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="guide-item" data-tags="errores facturación">
+        <button class="guide-accordion__toggle" aria-expanded="false">
+          <span>Mi factura fue rechazada</span>
+          <svg class="guide-accordion__chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="guide-accordion__body" hidden>
+          <p>Si el PAC rechaza tu factura, revisa:</p>
+          <ul>
+            <li><strong>Datos del receptor:</strong> RFC, razón social, régimen fiscal y CP deben coincidir con la Constancia.</li>
+            <li><strong>CSD vigente:</strong> tu Certificado de Sello Digital no debe estar revocado o vencido.</li>
+            <li><strong>Catálogos del SAT:</strong> clave de producto/servicio, unidad de medida, uso CFDI válidos.</li>
+            <li><strong>Cálculos:</strong> los importes y decimales deben cuadrar según las reglas del SAT.</li>
+          </ul>
+          <p>El mensaje de error del PAC suele indicar el campo exacto del problema.</p>
+        </div>
+      </div>
+
+      <div class="guide-item" data-tags="errores facturación">
+        <button class="guide-accordion__toggle" aria-expanded="false">
+          <span>Mi cliente dice que está mal el uso CFDI</span>
+          <svg class="guide-accordion__chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="guide-accordion__body" hidden>
+          <p>El "Uso CFDI" lo define el receptor (tu cliente). Si pide cambiarlo:</p>
+          <ol>
+            <li>Cancela la factura actual (con motivo 01 - Comprobante emitido con errores con relación).</li>
+            <li>Emite una nueva con el uso CFDI correcto.</li>
+            <li>Relaciona la nueva factura con la cancelada.</li>
+          </ol>
+          <p><strong>Usos comunes:</strong> G03 (Gastos en general), G01 (Adquisición de mercancías), S01 (Sin efectos fiscales).</p>
+        </div>
+      </div>
+
+      <div class="guide-item" data-tags="errores sat">
+        <button class="guide-accordion__toggle" aria-expanded="false">
+          <span>No encuentro mi acuse</span>
+          <svg class="guide-accordion__chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="guide-accordion__body" hidden>
+          <p>Si no descargaste el acuse al momento de declarar:</p>
+          <ol>
+            <li>Ingresa al portal del SAT.</li>
+            <li>Ve a "Consultar declaraciones presentadas".</li>
+            <li>Filtra por tipo de declaración y periodo.</li>
+            <li>Da clic en el folio para ver/descargar el acuse.</li>
+          </ol>
+          <p><strong>Tip:</strong> siempre descarga el acuse inmediatamente después de presentar. Guárdalo en una carpeta organizada por mes.</p>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+</div>
+
+<script src="/static/js/guides.js"></script>
+{% endblock %}

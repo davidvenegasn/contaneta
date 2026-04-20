@@ -108,6 +108,12 @@
     presetLines: null,
     // para flows como "si falta cliente, abrir picker y luego abrir modal"
     _pendingOpenAfterPick: null,
+    // Replacement mode: when set, the new invoice replaces the original
+    replaces_uuid: null,
+    prefillCfdiUse: null,
+    prefillPaymentForm: null,
+    prefillPaymentMethod: null,
+    prefillCurrency: null,
   };
 
   function openPortal(modalEl, opts) {
@@ -567,8 +573,12 @@
         });
       })
       .catch(function () {
-        unidadDatalist.innerHTML = '';
         _lastUnidadResults = [];
+        unidadDatalist.innerHTML = '';
+        var opt = document.createElement('option');
+        opt.value = '';
+        opt.label = 'Error al buscar — intenta de nuevo';
+        unidadDatalist.appendChild(opt);
       });
   }, 250);
 
@@ -653,22 +663,28 @@
 
   function openQuickModalOrThrow() {
     if (!modal) throw new Error('Modal no disponible');
-    var cust = findCustomerById(state.currentCustomerId);
-    if (!cust) throw new Error('Cliente no encontrado. Refresca la página.');
+    var cust = state.currentCustomerId ? findCustomerById(state.currentCustomerId) : null;
     var prod = state.currentProductId ? findProductById(state.currentProductId) : null;
-    if (!prod && !(state.presetLines && state.presetLines.length)) throw new Error('Producto no encontrado. Refresca la página.');
+    var hasPresetLines = !!(state.presetLines && state.presetLines.length);
+    if (!cust && !prod && !hasPresetLines) throw new Error('Selecciona al menos un cliente o producto.');
 
     window.__quickCurrentIva = prod ? (parseNum(prod.iva_rate) || 0.16) : 0.16;
     var elRfc = document.getElementById('quickModalCustomerRfc');
-    if (elRfc) elRfc.textContent = cust.rfc ? ('RFC ' + cust.rfc) : '';
+    if (elRfc) elRfc.textContent = (cust && cust.rfc) ? ('RFC ' + cust.rfc) : '';
 
-    if (modalCustomerName) modalCustomerName.value = (cust.legal_name || '').trim();
-    if (modalCustomerZip) modalCustomerZip.value = (cust.zip || '').trim();
-    if (modalCustomerTaxSystem) modalCustomerTaxSystem.value = (cust.tax_system || '').trim();
-    if (modalCustomerEmail) modalCustomerEmail.value = (cust.email || '').trim();
+    // Update "Cambiar" button labels based on state
+    var changeCustBtn = document.getElementById('quickModalChangeCustomer');
+    var changeProdBtn = document.getElementById('quickModalChangeProduct');
+    if (changeCustBtn) changeCustBtn.textContent = cust ? 'Cambiar' : 'Buscar cliente';
+    if (changeProdBtn) changeProdBtn.textContent = prod ? 'Cambiar' : 'Buscar producto';
+
+    if (modalCustomerName) modalCustomerName.value = cust ? (cust.legal_name || '').trim() : '';
+    if (modalCustomerZip) modalCustomerZip.value = cust ? (cust.zip || '').trim() : '';
+    if (modalCustomerTaxSystem) modalCustomerTaxSystem.value = cust ? (cust.tax_system || '').trim() : '';
+    if (modalCustomerEmail) modalCustomerEmail.value = cust ? (cust.email || '').trim() : '';
     if (modalAutoEmail) modalAutoEmail.checked = false;
 
-    if (state.presetLines && state.presetLines.length) {
+    if (hasPresetLines) {
       if (modalItemsSummary) {
         var lines = state.presetLines.slice(0, 50);
         var html = '<div class="muted u-text-12 u-mb-2">Se facturarán ' + state.presetLines.length + ' conceptos:</div>';
@@ -690,13 +706,13 @@
     } else {
       if (modalItemsSummary) { modalItemsSummary.hidden = true; modalItemsSummary.innerHTML = ''; }
       if (modalSingleConcept) modalSingleConcept.hidden = false;
-      if (modalProductDesc) modalProductDesc.value = (prod.description || '').trim();
-      if (modalProductKey) modalProductKey.value = (prod.product_key || '').trim();
-      if (modalUnitKey) modalUnitKey.value = (prod.unit_key || 'E48').trim();
+      if (modalProductDesc) modalProductDesc.value = prod ? (prod.description || '').trim() : '';
+      if (modalProductKey) modalProductKey.value = prod ? (prod.product_key || '').trim() : '';
+      if (modalUnitKey) modalUnitKey.value = prod ? (prod.unit_key || 'E48').trim() : '';
       if (modalQty) modalQty.value = '1';
       if (modalUnitPrice) {
-        modalUnitPrice.value = String(prod.unit_price != null ? prod.unit_price : '');
-        formatMoneyInput(modalUnitPrice);
+        modalUnitPrice.value = prod ? String(prod.unit_price != null ? prod.unit_price : '') : '';
+        if (prod) formatMoneyInput(modalUnitPrice);
       }
     }
 
@@ -749,6 +765,13 @@
 
   function open(options) {
     var opts = options || {};
+    // Replacement mode
+    state.replaces_uuid = opts.replaces_uuid || null;
+    state.prefillCfdiUse = opts.prefillCfdiUse || null;
+    state.prefillPaymentForm = opts.prefillPaymentForm || null;
+    state.prefillPaymentMethod = opts.prefillPaymentMethod || null;
+    state.prefillCurrency = opts.prefillCurrency || null;
+
     return Promise.all([ensureBootstrap(false), ensureCatalogs()])
       .then(function () {
         // Preset lines (multi-product invoice)
@@ -775,24 +798,38 @@
         }
         if (opts.preselectedProductId != null) setSelectedProduct(opts.preselectedProductId);
 
-        // Si aún falta alguno, pedirlo con picker.
-        if (!state.currentCustomerId) {
-          state._pendingOpenAfterPick = function () { open(opts); };
-          openPicker('customer', function () {
-            var fn = state._pendingOpenAfterPick;
-            state._pendingOpenAfterPick = null;
-            if (typeof fn === 'function') fn();
-          });
-          return;
+        // Pre-fill form fields for replacement mode
+        if (state.prefillCfdiUse && modalCfdiUse) modalCfdiUse.value = state.prefillCfdiUse;
+        if (state.prefillPaymentForm && modalPaymentForm) modalPaymentForm.value = state.prefillPaymentForm;
+        if (state.prefillPaymentMethod && modalPaymentMethod) modalPaymentMethod.value = state.prefillPaymentMethod;
+        if (state.prefillCurrency && modalCurrency) modalCurrency.value = state.prefillCurrency;
+
+        // Update submit button text for replacement mode
+        if (modalSubmit) {
+          modalSubmit.textContent = state.replaces_uuid ? 'Timbrar y cancelar original' : 'Timbrar factura';
         }
-        if (!state.currentProductId) {
-          state._pendingOpenAfterPick = function () { open(opts); };
-          openPicker('product', function () {
-            var fn = state._pendingOpenAfterPick;
-            state._pendingOpenAfterPick = null;
-            if (typeof fn === 'function') fn();
-          });
-          return;
+
+        // Si allowPartial, abrir modal directamente con lo que haya.
+        // Si no, pedir lo que falte con picker.
+        if (!opts.allowPartial) {
+          if (!state.currentCustomerId) {
+            state._pendingOpenAfterPick = function () { open(opts); };
+            openPicker('customer', function () {
+              var fn = state._pendingOpenAfterPick;
+              state._pendingOpenAfterPick = null;
+              if (typeof fn === 'function') fn();
+            });
+            return;
+          }
+          if (!state.currentProductId) {
+            state._pendingOpenAfterPick = function () { open(opts); };
+            openPicker('product', function () {
+              var fn = state._pendingOpenAfterPick;
+              state._pendingOpenAfterPick = null;
+              if (typeof fn === 'function') fn();
+            });
+            return;
+          }
         }
 
         openQuickModalOrThrow();
@@ -1081,6 +1118,53 @@
     }
     if (prodservModalInput) prodservModalInput.addEventListener('input', debounce(function () { searchQuickProdserv(prodservModalInput.value); }, 250));
 
+    // "Cambiar" / "Buscar" buttons inside the quick invoice modal
+    var changeCustBtn = document.getElementById('quickModalChangeCustomer');
+    var changeProdBtn = document.getElementById('quickModalChangeProduct');
+    if (changeCustBtn) changeCustBtn.addEventListener('click', function (e) {
+      e.preventDefault();
+      ensureBootstrap(false).then(function () {
+        openPicker('customer', function () {
+          // Refresh modal fields with newly selected customer
+          var c = state.currentCustomerId ? findCustomerById(state.currentCustomerId) : null;
+          if (!c) return;
+          var elRfc = document.getElementById('quickModalCustomerRfc');
+          if (elRfc) elRfc.textContent = c.rfc ? ('RFC ' + c.rfc) : '';
+          if (modalCustomerName) modalCustomerName.value = (c.legal_name || '').trim();
+          if (modalCustomerZip) modalCustomerZip.value = (c.zip || '').trim();
+          if (modalCustomerTaxSystem) modalCustomerTaxSystem.value = (c.tax_system || '').trim();
+          if (modalCustomerEmail) modalCustomerEmail.value = (c.email || '').trim();
+          changeCustBtn.textContent = 'Cambiar';
+          if (modalError) modalError.hidden = true;
+        });
+      });
+    });
+    if (changeProdBtn) changeProdBtn.addEventListener('click', function (e) {
+      e.preventDefault();
+      ensureBootstrap(false).then(function () {
+        openPicker('product', function () {
+          // Refresh modal fields with newly selected product
+          var p = state.currentProductId ? findProductById(state.currentProductId) : null;
+          if (!p) return;
+          window.__quickCurrentIva = parseNum(p.iva_rate) || 0.16;
+          if (modalProductDesc) modalProductDesc.value = (p.description || '').trim();
+          if (modalProductKey) modalProductKey.value = (p.product_key || '').trim();
+          if (modalUnitKey) modalUnitKey.value = (p.unit_key || 'E48').trim();
+          if (modalUnitPrice) { modalUnitPrice.value = String(p.unit_price != null ? p.unit_price : ''); formatMoneyInput(modalUnitPrice); }
+          var iva = parseNum(window.__quickCurrentIva);
+          if (modalIvaRate) {
+            if (Math.abs(iva - 0.16) < 0.0001) modalIvaRate.value = '0.16';
+            else if (Math.abs(iva - 0.08) < 0.0001) modalIvaRate.value = '0.08';
+            else if (Math.abs(iva - 0.0) < 0.0001) modalIvaRate.value = '0.00';
+            else modalIvaRate.value = '0.16';
+          }
+          updateModalTotals();
+          changeProdBtn.textContent = 'Cambiar';
+          if (modalError) modalError.hidden = true;
+        });
+      });
+    });
+
     // Add customer/product open
     if (addCustomerBtn) addCustomerBtn.addEventListener('click', function (e) { e.preventDefault(); openAddCustomerModal(); });
     if (addProductBtn) addProductBtn.addEventListener('click', function (e) { e.preventDefault(); openAddProductModal(); });
@@ -1088,12 +1172,14 @@
 
     // Save customer
     if (addCustomerSave) addCustomerSave.addEventListener('click', function () {
+      if (state._savingCustomer) return;
       var rfc = (addCustomerRfc && addCustomerRfc.value || '').trim().toUpperCase();
       var legalName = (addCustomerName && addCustomerName.value || '').trim();
       if (!rfc || !legalName) {
         if (addCustomerError) { addCustomerError.textContent = 'RFC y Razón social son obligatorios.'; addCustomerError.hidden = false; }
         return;
       }
+      state._savingCustomer = true;
       var zip = (addCustomerZip && addCustomerZip.value || '').trim();
       var taxSystem = (addCustomerTaxSystem && addCustomerTaxSystem.value || '').trim();
       var usoCfdi = (addCustomerUsoCfdi && addCustomerUsoCfdi.value || '').trim();
@@ -1106,6 +1192,7 @@
       if (csrf) headers['X-CSRF-Token'] = csrf;
       httpJson('/api/customers/create', { method: 'POST', credentials: 'same-origin', headers: headers, body: JSON.stringify({ rfc: rfc, legal_name: legalName, zip: zip, tax_system: taxSystem, uso_cfdi_default: usoCfdi, email: email, alias: alias }) }, { timeoutMs: 30000, retry: 0 })
         .then(function (res) {
+          state._savingCustomer = false;
           addCustomerSave.disabled = false;
           if (res && res.ok && res.data && res.data.ok) {
             closeAddCustomerModal();
@@ -1118,6 +1205,7 @@
           if (addCustomerError) { addCustomerError.textContent = detail || (res && res.detail) || 'No se pudo guardar el cliente.'; addCustomerError.hidden = false; }
         })
         .catch(function (err) {
+          state._savingCustomer = false;
           addCustomerSave.disabled = false;
           if (addCustomerError) { addCustomerError.textContent = (err && err.message) || 'Error de conexión. Intenta de nuevo.'; addCustomerError.hidden = false; }
         });
@@ -1125,6 +1213,7 @@
 
     // Save product
     if (addProductSave) addProductSave.addEventListener('click', function () {
+      if (state._savingProduct) return;
       var desc = (addProductDesc && addProductDesc.value || '').trim();
       var prodKey = (addProductKey && addProductKey.value || '').trim();
       var unitKey = (addProductUnitKey && addProductUnitKey.value || '').trim() || 'E48';
@@ -1135,12 +1224,14 @@
         return;
       }
       if (addProductError) { addProductError.hidden = true; addProductError.textContent = ''; }
+      state._savingProduct = true;
       addProductSave.disabled = true;
       var csrf = document.querySelector('meta[name="csrf-token"]') && document.querySelector('meta[name="csrf-token"]').getAttribute('content');
       var headers = { 'Content-Type': 'application/json' };
       if (csrf) headers['X-CSRF-Token'] = csrf;
       httpJson('/api/products/create', { method: 'POST', credentials: 'same-origin', headers: headers, body: JSON.stringify({ description: desc, product_key: prodKey, unit_key: unitKey, unit_price: unitPrice, iva_rate: iva }) }, { timeoutMs: 30000, retry: 0 })
         .then(function (res) {
+          state._savingProduct = false;
           addProductSave.disabled = false;
           if (res && res.ok && res.data && res.data.ok && res.data.id != null) {
             closeAddProductModal();
@@ -1153,6 +1244,7 @@
           if (addProductError) { addProductError.textContent = detail || (res && res.detail) || 'No se pudo guardar el producto.'; addProductError.hidden = false; }
         })
         .catch(function (err) {
+          state._savingProduct = false;
           addProductSave.disabled = false;
           if (addProductError) { addProductError.textContent = (err && err.message) || 'Error de conexión. Intenta de nuevo.'; addProductError.hidden = false; }
         });
@@ -1160,14 +1252,21 @@
 
     // Submit invoice
     if (modalSubmit) modalSubmit.addEventListener('click', function () {
+      if (state._submitting) return;
       var customerId = state.currentCustomerId;
       var productId = state.currentProductId;
-      if (!customerId) return;
+      if (!customerId) {
+        if (modalError) { modalError.textContent = 'Selecciona un cliente con el botón "Buscar cliente".'; modalError.hidden = false; }
+        return;
+      }
       var isMulti = !!(state.presetLines && state.presetLines.length);
       var qty = null;
       var unitPrice = null;
       if (!isMulti) {
-        if (!productId) return;
+        if (!productId) {
+          if (modalError) { modalError.textContent = 'Selecciona un producto con el botón "Buscar producto".'; modalError.hidden = false; }
+          return;
+        }
         qty = parseNum(modalQty && modalQty.value);
         unitPrice = parseNum(modalUnitPrice && modalUnitPrice.value);
         if (!qty || qty <= 0) {
@@ -1181,9 +1280,17 @@
       }
       if (modalError) { modalError.hidden = true; modalError.textContent = ''; }
 
+      state._submitting = true;
       var submitLabel = modalSubmit.textContent;
       modalSubmit.disabled = true;
       modalSubmit.textContent = 'Timbrando…';
+
+      var _submitTimeout = setTimeout(function () {
+        state._submitting = false;
+        modalSubmit.disabled = false;
+        modalSubmit.textContent = submitLabel;
+        toast({ type: 'warning', title: 'La operación tardó demasiado. Intenta de nuevo.' });
+      }, 65000);
 
       var custName = (modalCustomerName && modalCustomerName.value || '').trim();
       var custZip = (modalCustomerZip && modalCustomerZip.value || '').trim();
@@ -1222,6 +1329,10 @@
         payment_form: paymentForm,
         payment_method: paymentMethod
       };
+      // Replacement mode: include replaces_uuid so backend adds related_documents + auto-cancels
+      if (state.replaces_uuid) {
+        payload.replaces_uuid = state.replaces_uuid;
+      }
       if (isMulti) {
         payload.items = state.presetLines.map(function (ln) {
           return { product_id: ln.product_id, quantity: ln.quantity || 1 };
@@ -1236,24 +1347,45 @@
         payload.unit_key = unitKey;
       }
 
+      var isReplacement = !!state.replaces_uuid;
       httpJson('/api/invoices/quick', { method: 'POST', credentials: 'same-origin', headers: headers, body: JSON.stringify(payload) }, { timeoutMs: 60000, retry: 0 })
         .then(function (res) {
+          clearTimeout(_submitTimeout);
+          state._submitting = false;
           modalSubmit.disabled = false;
           modalSubmit.textContent = submitLabel;
           if (res && res.ok && res.data && res.data.ok) {
             closeQuickModal();
-            toast({
-              type: 'success',
-              title: 'Factura timbrada',
-              message: 'Total ' + fmtMoney(res.data.total || 0) + '. Puedes descargar XML/PDF o verla en emitidas.',
-              actions: [{ label: 'Ver facturas emitidas', href: '/portal/invoices/issued' }]
-            });
+            // Reset replacement state
+            state.replaces_uuid = null;
+            var successTitle = isReplacement ? 'Factura emitida — original cancelada' : 'Factura timbrada';
+            var successMsg = 'Total ' + fmtMoney(res.data.total || 0) + '.';
+            if (isReplacement) {
+              var cr = res.data.cancel_result;
+              if (cr === 'pending') successMsg += ' La cancelación de la original está pendiente de aceptación.';
+              else if (cr === 'error') successMsg += ' No se pudo cancelar la original automáticamente.';
+              else successMsg += ' La factura original fue cancelada.';
+            } else {
+              successMsg += ' Puedes descargar XML/PDF o verla en emitidas.';
+            }
+            if (window.uiSuccessOverlay) {
+              window.uiSuccessOverlay({
+                title: successTitle,
+                message: successMsg,
+                actions: [{ label: 'Ver facturas emitidas', href: '/portal/facturas?tab=issued' }],
+                autoDismiss: 6000
+              });
+            } else {
+              toast({ type: 'success', title: successTitle, message: successMsg });
+            }
             return;
           }
           var detail = (res && res.data && res.data.detail) ? (typeof res.data.detail === 'string' ? res.data.detail : JSON.stringify(res.data.detail)) : '';
           if (modalError) { modalError.textContent = detail || (res && res.detail) || 'No se pudo timbrar. Intenta de nuevo.'; modalError.hidden = false; }
         })
         .catch(function (err) {
+          clearTimeout(_submitTimeout);
+          state._submitting = false;
           modalSubmit.disabled = false;
           modalSubmit.textContent = submitLabel;
           if (modalError) { modalError.textContent = (err && err.message) || 'Error de conexión. Intenta de nuevo.'; modalError.hidden = false; }

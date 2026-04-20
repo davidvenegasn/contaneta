@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import tempfile
 from contextlib import contextmanager
@@ -76,8 +77,8 @@ def ensure_fiel_encrypted(issuer_id: int) -> None:
         os.chmod(cer_abs_enc, 0o600)
         try:
             os.remove(cer_abs)
-        except Exception:
-            pass
+        except Exception as e:
+            logging.getLogger(__name__).warning("Failed to remove plaintext FIEL .cer at %s: %s", cer_abs, e)
         row["fiel_cer_path"] = cer_rel_enc
         needs_update = True
 
@@ -93,8 +94,8 @@ def ensure_fiel_encrypted(issuer_id: int) -> None:
         os.chmod(key_abs_enc, 0o600)
         try:
             os.remove(key_abs)
-        except Exception:
-            pass
+        except Exception as e:
+            logging.getLogger(__name__).warning("Failed to remove plaintext FIEL .key at %s: %s", key_abs, e)
         row["fiel_key_path"] = key_rel_enc
         needs_update = True
 

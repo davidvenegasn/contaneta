@@ -574,6 +574,9 @@ def parse_bank_pdf_to_movements_preview(pdf_path: str, preset: str = "conservati
         "count_total": len(movements),
         "needs_review_count": sum(1 for m in movements if m.needs_review),
         "bank_name": detected_bank_name,
+        "raw_rows_count": len(raw_rows),
+        "sections_detected": len(sections),
+        "txs_grouped_count": len(txs_grouped),
     }
     raw_debug = None
     try:

@@ -28,6 +28,8 @@ DEV_MODE = os.getenv("DEV_MODE", _DEV_MODE_DEFAULT) == "1"
 # Solo con ALLOW_DEMO_PORTAL=1 (y DEV_MODE=1) se permite fallback a demo en rutas HTML del portal.
 # Sin esto, sin cookie válida siempre se redirige a /login (HTML) o 401 (API).
 ALLOW_DEMO_PORTAL = os.getenv("ALLOW_DEMO_PORTAL", "0") == "1"
+# Token legacy por query string (solo compatibilidad temporal). Recomendado: 0 en prod.
+ALLOW_LEGACY_TOKEN_LOGIN = os.getenv("ALLOW_LEGACY_TOKEN_LOGIN", "1" if ENV == "dev" else "0") == "1"
 DEV_TOKEN = os.getenv("DEV_TOKEN", "demo")
 # DEV_FIXTURES=1: en listados (GET clients/products/issued/received) devolver JSON de tests/manual_fixtures
 # en lugar de consultar DB. Útil para desarrollar UI sin SAT/DB.
@@ -62,6 +64,29 @@ COOKIE_SECURE = os.getenv("COOKIE_SECURE", "1" if IS_PROD else "0") == "1"
 # Etiquetas de régimen fiscal (RESICO, AE) -> código SAT para CFDI
 REGIMEN_LABEL_TO_CODE = {"RESICO": "626", "AE": "612"}
 
+# Código SAT -> descripción legible del régimen fiscal
+REGIMEN_CODE_DESCRIPTIONS = {
+    "601": "General de Ley Personas Morales",
+    "603": "Personas Morales con Fines no Lucrativos",
+    "605": "Sueldos y Salarios e Ingresos Asimilados a Salarios",
+    "606": "Arrendamiento",
+    "607": "Régimen de Enajenación o Adquisición de Bienes",
+    "608": "Demás ingresos",
+    "610": "Residentes en el Extranjero sin Establecimiento Permanente en México",
+    "611": "Ingresos por Dividendos (socios y accionistas)",
+    "612": "Personas Físicas con Actividades Empresariales y Profesionales",
+    "614": "Ingresos por intereses",
+    "615": "Régimen de los ingresos por obtención de premios",
+    "616": "Sin obligaciones fiscales",
+    "620": "Sociedades Cooperativas de Producción que optan por diferir sus ingresos",
+    "621": "Incorporación Fiscal",
+    "622": "Actividades Agrícolas, Ganaderas, Silvícolas y Pesqueras",
+    "623": "Opcional para Grupos de Sociedades",
+    "624": "Coordinados",
+    "625": "Régimen de las Actividades Empresariales con ingresos a través de Plataformas Tecnológicas",
+    "626": "Régimen Simplificado de Confianza",
+}
+
 # Billing (Stripe)
 STRIPE_SECRET_KEY = (os.getenv("STRIPE_SECRET_KEY") or "").strip() or None
 STRIPE_WEBHOOK_SECRET = (os.getenv("STRIPE_WEBHOOK_SECRET") or "").strip() or None
@@ -71,12 +96,13 @@ SITE_URL = (os.getenv("SITE_URL") or "").strip() or None
 # Portal shell V2: rail + drawer (Mindtrip-style, delgado a la izquierda solo iconos). 0 = sidebar clásico; 1 = rail + drawer.
 PORTAL_SHELL_V2 = os.getenv("PORTAL_SHELL_V2", "0") == "1"
 
-# AT_REST_MASTER_KEY: strongly recommended in prod for independent encryption key
+# AT_REST_MASTER_KEY: required in prod for independent encryption key
 AT_REST_MASTER_KEY_SET = bool((os.getenv("AT_REST_MASTER_KEY") or "").strip())
 if IS_PROD and not AT_REST_MASTER_KEY_SET:
-    _log.warning(
-        "AT_REST_MASTER_KEY no definido en producción. Se usará fallback (SHA256 de SESSION_SECRET). "
-        "Se recomienda configurarlo: python3 -c \"import secrets; print(secrets.token_hex(32))\""
+    raise RuntimeError(
+        "AT_REST_MASTER_KEY is required in production (ENV=prod). "
+        "Without it, encryption keys are derived from SESSION_SECRET (insecure coupling). "
+        "Generate one: python3 -c \"import secrets; print(secrets.token_hex(32))\""
     )
 
 # En prod con Stripe: SITE_URL recomendado para redirects de checkout y webhooks

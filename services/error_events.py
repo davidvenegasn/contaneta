@@ -176,6 +176,21 @@ def list_error_events(limit: int = 50, issuer_id: int | None = None) -> list[dic
         conn.close()
 
 
+def cleanup_old_events(max_age_days: int = 90) -> int:
+    """Delete error events older than max_age_days. Returns count deleted."""
+    conn = db()
+    try:
+        _ensure_table(conn)
+        cur = conn.execute(
+            "DELETE FROM error_events WHERE datetime(created_at) < datetime('now', ?)",
+            (f"-{int(max_age_days)} days",),
+        )
+        conn.commit()
+        return cur.rowcount
+    finally:
+        conn.close()
+
+
 def get_error_event(event_id: int) -> dict | None:
     conn = db()
     try:

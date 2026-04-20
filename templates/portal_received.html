@@ -6,7 +6,7 @@
 {% block content %}
   <div class="card ym-card">
     <div class="ym-selector">
-      {{ month_picker('/portal/invoices/received', token, ym, ym_label) }}
+      {{ month_picker('/portal/facturas?tab=received', token, ym, ym_label) }}
     </div>
     {% set mt = month_totals|default({}) %}
     <div class="dashboard-metrics">
@@ -95,7 +95,7 @@
               <th>Acciones</th>
             </tr>
           </thead>
-          <tbody id="tableBody">
+          <tbody id="tableBody" class="row-stagger">
             <tr><td colspan="10"><div class="skeleton skeleton--row-46"></div></td></tr>
             <tr><td colspan="10"><div class="skeleton skeleton--row-46"></div></td></tr>
             <tr><td colspan="10"><div class="skeleton skeleton--row-46"></div></td></tr>
@@ -125,7 +125,7 @@
       {% from 'portal/_ui_components.html' import portal_empty_state, portal_load_error %}
       {{ portal_load_error('loadErrorState') }}
       {% call portal_empty_state('No hay facturas recibidas este mes', 'Aún no hay facturas recibidas este mes.', id='emptyState') %}
-        <a href="/portal/invoices/issued" class="btn btn--primary">Ver facturas emitidas</a>
+        <a href="/portal/facturas?tab=issued" class="btn btn--primary">Ver facturas emitidas</a>
       {% endcall %}
     </div>
   </div>

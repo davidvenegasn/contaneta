@@ -144,7 +144,7 @@
         <td>{{ e.id }}</td>
         <td class="muted">{{ e.created_at or '-' }}</td>
         <td>{{ e.path or '-' }}</td>
-        <td>{{ e.status_code or '-' }}</td>
+        <td>{{ e.status or '-' }}</td>
         <td><code>{{ (e.request_id or '-')[:12] }}</code></td>
         <td><a class="btn btn-secondary btn-sm" href="/admin/errors/{{ e.id }}">Ver</a></td>
       </tr>
@@ -160,8 +160,7 @@
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
       <div style="margin-bottom:12px;">
         <label for="admin_notes" style="display:block; font-weight:500; margin-bottom:4px;">Notas internas</label>
-        <textarea id="admin_notes" name="admin_notes" rows="4"
-          style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:8px; font-family:inherit; font-size:14px; resize:vertical;"
+        <textarea id="admin_notes" name="admin_notes" rows="4" class="admin-textarea"
           placeholder="Notas visibles solo para admins...">{{ meta.admin_notes or '' }}</textarea>
       </div>
       <div style="margin-bottom:16px;">

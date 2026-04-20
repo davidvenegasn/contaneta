@@ -7,7 +7,7 @@
   <div class="card ym-card ym-card--collapsible" data-resumen-key="portal_resumen_collapsed">
     <div class="ym-card__head">
       <div class="ym-selector">
-        {{ month_picker('/portal/invoices/issued', token, ym, ym_label) }}
+        {{ month_picker('/portal/facturas?tab=issued', token, ym, ym_label) }}
       </div>
       <button type="button" class="ym-card__toggle btn btn--sm btn--ghost" aria-label="Ocultar totales" title="Ocultar totales (proteger tu información)">
         <span class="ym-card__toggle-icon" aria-hidden="true">−</span>
@@ -88,7 +88,7 @@
               <th>Acciones</th>
             </tr>
           </thead>
-          <tbody id="tableBody">
+          <tbody id="tableBody" class="row-stagger">
             <tr><td colspan="9"><div class="skeleton skeleton--row-46"></div></td></tr>
             <tr><td colspan="9"><div class="skeleton skeleton--row-46"></div></td></tr>
             <tr><td colspan="9"><div class="skeleton skeleton--row-46"></div></td></tr>

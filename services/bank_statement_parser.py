@@ -599,76 +599,79 @@ def upsert_bank_movements(
                 continue
             h = _movement_hash(issuer_id, tx)
             fecha = tx.get("fecha") or ""
-            desc_raw = (tx.get("descripcion_full") or tx.get("descripcion_raw") or "")[:4000]
-            desc_norm = (tx.get("descripcion_norm") or "")[:4000]
+            descripcion = (tx.get("descripcion") or tx.get("descripcion_full") or tx.get("descripcion_raw") or "")[:2000]
+            raw_description = (tx.get("descripcion_full") or tx.get("descripcion_raw") or descripcion)[:4000]
+            normalized_description = (tx.get("descripcion_norm") or "")[:4000]
             deposito = float(tx.get("deposito") or 0)
             retiro = float(tx.get("retiro") or 0)
             saldo = tx.get("saldo")
             if saldo is not None:
                 saldo = float(saldo)
-            categoria = (tx.get("categoria") or "")[:64]
-            metodo_hint = (tx.get("metodo_hint") or "")[:32]
-            contraparte_hint = (tx.get("contraparte_hint") or "")[:128]
-            referencia = (tx.get("referencia") or "")[:128]
-            cve_rastreo = (tx.get("cve_rastreo") or "")[:128]
-            rfc_detectado = (tx.get("rfc_encontrado") or "")[:16]
+            categoria = (tx.get("categoria") or "")[:200]
+            metodo_hint = (tx.get("metodo_hint") or "")[:64]
+            contraparte_hint = (tx.get("contraparte_hint") or "")[:200]
+            reference_text = (tx.get("referencia") or tx.get("reference_text") or "")[:128]
+            rfc_encontrado = (tx.get("rfc_encontrado") or "")[:20]
             confidence_score = int(tx.get("confidence_score") or 0)
             source_page_first = tx.get("source_page_first")
-            source_page_last = tx.get("source_page_last")
             if source_page_first is not None:
                 source_page_first = int(source_page_first)
-            if source_page_last is not None:
-                source_page_last = int(source_page_last)
 
-            conn.execute(
-                """
-                INSERT INTO bank_movements (
-                  issuer_id, statement_id, movement_hash, fecha, descripcion_raw, descripcion_norm,
-                  deposito, retiro, saldo, tipo, categoria, metodo_hint, contraparte_hint,
-                  referencia, cve_rastreo, rfc_detectado, confidence_score,
-                  source_page_first, source_page_last, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
-                ON CONFLICT(issuer_id, movement_hash) DO UPDATE SET
-                  statement_id = excluded.statement_id,
-                  fecha = excluded.fecha,
-                  descripcion_raw = excluded.descripcion_raw,
-                  descripcion_norm = excluded.descripcion_norm,
-                  deposito = excluded.deposito,
-                  retiro = excluded.retiro,
-                  saldo = excluded.saldo,
-                  tipo = excluded.tipo,
-                  categoria = excluded.categoria,
-                  metodo_hint = excluded.metodo_hint,
-                  contraparte_hint = excluded.contraparte_hint,
-                  referencia = excluded.referencia,
-                  cve_rastreo = excluded.cve_rastreo,
-                  rfc_detectado = excluded.rfc_detectado,
-                  confidence_score = excluded.confidence_score,
-                  source_page_first = excluded.source_page_first,
-                  source_page_last = excluded.source_page_last
-                """,
-                (
-                    issuer_id,
-                    statement_id,
-                    h,
-                    fecha,
-                    desc_raw,
-                    desc_norm,
-                    deposito,
-                    retiro,
-                    saldo,
-                    tipo,
-                    categoria,
-                    metodo_hint,
-                    contraparte_hint,
-                    referencia,
-                    cve_rastreo,
-                    rfc_detectado,
-                    confidence_score,
-                    source_page_first,
-                    source_page_last,
-                ),
-            )
+            # Derive period_month from fecha (YYYY-MM-DD → YYYY-MM)
+            period_month = None
+            if fecha and len(fecha) >= 7 and fecha[4:5] == "-" and fecha[:4].isdigit() and fecha[5:7].isdigit():
+                period_month = fecha[:7]
+
+            # Check if movement already exists by hash (partial unique index)
+            existing = conn.execute(
+                "SELECT id FROM bank_movements WHERE issuer_id = ? AND movement_hash = ? LIMIT 1",
+                (issuer_id, h),
+            ).fetchone()
+
+            if existing:
+                conn.execute(
+                    """
+                    UPDATE bank_movements SET
+                      statement_file_id = ?, fecha = ?, descripcion = ?,
+                      raw_description = ?, normalized_description = ?,
+                      deposito = ?, retiro = ?, saldo = ?, tipo = ?,
+                      categoria = ?, metodo_hint = ?, contraparte_hint = ?,
+                      reference_text = ?, rfc_encontrado = ?, confidence_score = ?,
+                      source_page_first = ?,
+                      period_month = COALESCE(?, period_month)
+                    WHERE id = ?
+                    """,
+                    (
+                        statement_id, fecha, descripcion,
+                        raw_description, normalized_description,
+                        deposito, retiro, saldo, tipo,
+                        categoria, metodo_hint, contraparte_hint,
+                        reference_text, rfc_encontrado, confidence_score,
+                        source_page_first,
+                        period_month,
+                        existing["id"],
+                    ),
+                )
+            else:
+                conn.execute(
+                    """
+                    INSERT INTO bank_movements (
+                      issuer_id, statement_file_id, movement_hash, fecha, descripcion,
+                      raw_description, normalized_description,
+                      deposito, retiro, saldo, tipo, categoria, metodo_hint, contraparte_hint,
+                      reference_text, rfc_encontrado, confidence_score,
+                      source_page_first, period_month, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+                    """,
+                    (
+                        issuer_id, statement_id, h, fecha, descripcion,
+                        raw_description, normalized_description,
+                        deposito, retiro, saldo, tipo,
+                        categoria, metodo_hint, contraparte_hint,
+                        reference_text, rfc_encontrado, confidence_score,
+                        source_page_first, period_month,
+                    ),
+                )
             count += 1
         conn.commit()
     finally:

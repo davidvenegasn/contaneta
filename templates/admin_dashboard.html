@@ -1,33 +1,133 @@
 {% extends "base_admin.html" %}
-{% block title %}Dashboard{% endblock %}
+{% block title %}Operaciones{% endblock %}
 {% block content %}
-  <h1>Panel Admin</h1>
+  <h1>Centro de Operaciones</h1>
 
+  {% if msg %}
+  <div class="alert alert-success">{{ msg }}</div>
+  {% endif %}
+
+  {# ── KPI row ── #}
   <div class="card">
-    <h2>Resumen</h2>
+    <h2>Resumen general</h2>
     <div class="stats">
       <div class="stat"><span class="n">{{ count_users }}</span><span class="label">Usuarios</span></div>
-      <div class="stat"><span class="n">{{ count_active_users }}</span><span class="label">Usuarios activos</span></div>
+      <div class="stat"><span class="n">{{ count_active_users }}</span><span class="label">Activos</span></div>
       <div class="stat"><span class="n">{{ count_issuers }}</span><span class="label">Issuers</span></div>
       <div class="stat"><span class="n">{{ jobs_in_queue }}</span><span class="label">Jobs en cola</span></div>
-      <div class="stat"><span class="n">{{ jobs_failed_today }}</span><span class="label">Jobs fallidos hoy</span></div>
-      <div class="stat"><span class="n">{{ errors_today }}</span><span class="label">Errores 5xx hoy</span></div>
+      <div class="stat" {% if jobs_failed_today > 0 %}style="background:#fee2e2;"{% endif %}><span class="n">{{ jobs_failed_today }}</span><span class="label">Jobs fallidos hoy</span></div>
+      <div class="stat" {% if errors_today > 0 %}style="background:#fee2e2;"{% endif %}><span class="n">{{ errors_today }}</span><span class="label">Errores 5xx hoy</span></div>
     </div>
   </div>
 
+  {# ── SAT Jobs 24h ── #}
   <div class="card">
     <h2>SAT Jobs (24h)</h2>
     <div class="stats">
-      <div class="stat"><span class="n">{{ sat_jobs_24h.queued }}</span><span class="label">Queued</span></div>
-      <div class="stat"><span class="n">{{ sat_jobs_24h.running }}</span><span class="label">Running</span></div>
-      <div class="stat" {% if sat_jobs_24h.error > 0 %}style="background:#fef2f2;"{% endif %}><span class="n">{{ sat_jobs_24h.error }}</span><span class="label">Error</span></div>
-      <div class="stat" {% if needs_review_count > 0 %}style="background:#fef9c3;"{% endif %}><span class="n">{{ needs_review_count }}</span><span class="label">Necesita revisión</span></div>
+      <div class="stat"><span class="n">{{ sat_jobs_24h.queued }}</span><span class="label">En cola</span></div>
+      <div class="stat"><span class="n">{{ sat_jobs_24h.running }}</span><span class="label">Ejecutando</span></div>
+      <div class="stat" {% if sat_jobs_24h.done > 0 %}style="background:#dcfce7;"{% endif %}><span class="n">{{ sat_jobs_24h.done }}</span><span class="label">Completados</span></div>
+      <div class="stat" {% if sat_jobs_24h.error > 0 %}style="background:#fee2e2;"{% endif %}><span class="n">{{ sat_jobs_24h.error }}</span><span class="label">Error</span></div>
+      <div class="stat" {% if needs_review_count > 0 %}style="background:#fef9c3;"{% endif %}><span class="n">{{ needs_review_count }}</span><span class="label">Revisión</span></div>
+    </div>
+    <div class="stats" style="margin-top:8px;">
+      <div class="stat" {% if cfdi_missing_xml > 0 %}style="background:#fef9c3;"{% endif %}><span class="n">{{ cfdi_missing_xml }}</span><span class="label">CFDIs sin XML</span></div>
+      <div class="stat"><span class="n">{{ backfill_jobs_24h.success }}</span><span class="label">Backfill OK (24h)</span></div>
+      <div class="stat" {% if backfill_jobs_24h.failed > 0 %}style="background:#fee2e2;"{% endif %}><span class="n">{{ backfill_jobs_24h.failed }}</span><span class="label">Backfill Error</span></div>
+    </div>
+    <p class="muted" style="font-size:12px;margin-top:6px;">Worker: conta-worker.service · Cooldown 2h · XML backfill cada 6h</p>
+  </div>
+
+  {# ── Problem issuers (cooldown / recent errors) ── #}
+  {% if problem_issuers and problem_issuers|length > 0 %}
+  <div class="card">
+    <h2>Issuers con problemas SAT</h2>
+    <div style="overflow-x:auto;">
+    <table>
+      <thead><tr><th>ID</th><th>RFC</th><th>Razón Social</th><th>Dir</th><th>Errores 24h</th><th>Cooldown hasta</th><th>Último error</th><th></th></tr></thead>
+      <tbody>
+      {% for p in problem_issuers %}
+      <tr>
+        <td>{{ p.id }}</td>
+        <td><a href="/admin/issuers/{{ p.id }}">{{ p.rfc }}</a></td>
+        <td>{{ (p.razon_social or '')[:30] }}{% if p.razon_social and p.razon_social|length > 30 %}…{% endif %}</td>
+        <td><span class="badge badge--xs">{{ p.direction }}</span></td>
+        <td>{% if p.errors_24h > 0 %}<span class="badge badge--xs badge--error">{{ p.errors_24h }}</span>{% else %}0{% endif %}</td>
+        <td>{% if p.cooldown_until %}<span class="badge badge--xs badge--warning">{{ p.cooldown_until[:16] }}</span>{% else %}-{% endif %}</td>
+        <td class="muted">{{ (p.last_error or '-')[:50] }}{% if p.last_error and p.last_error|length > 50 %}…{% endif %}</td>
+        <td><a class="btn btn-secondary btn-sm" href="/admin/issuers/{{ p.id }}">Ver</a></td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </div>
+  {% endif %}
+
+  {# ── Quick actions ── #}
+  <div class="card">
+    <h2>Acciones rápidas</h2>
+    <div class="ops-actions">
+      {% if sat_errors_recent > 0 %}
+      <form method="POST" action="/admin/sat-jobs/requeue-recent-errors" style="display:inline;" onsubmit="return confirm('Re-encolar {{ sat_errors_recent }} SAT job(s) con error de las últimas 24h?');">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+        <button type="submit" class="btn btn-primary btn-sm">Re-encolar {{ sat_errors_recent }} error(es) SAT recientes</button>
+      </form>
+      {% else %}
+      <span class="badge badge--success">Sin errores SAT recientes</span>
+      {% endif %}
+      <a class="btn btn-secondary btn-sm" href="/admin/ops">Operaciones avanzadas</a>
+      <a class="btn btn-secondary btn-sm" href="/admin/config">Config check</a>
+      <a class="btn btn-secondary btn-sm" href="/admin/sat-jobs">Todos los SAT jobs</a>
+      <a class="btn btn-secondary btn-sm" href="/admin/errors">Todos los errores</a>
     </div>
   </div>
 
+  {# ── Last backup ── #}
+  <div class="card">
+    <h2>Último backup</h2>
+    {% if last_backup %}
+    <div class="stats">
+      <div class="stat"><span class="n">{{ last_backup.time }}</span><span class="label">Fecha</span></div>
+      <div class="stat"><span class="n">{{ last_backup.size_mb }} MB</span><span class="label">Tamaño</span></div>
+      <div class="stat"><span class="n">{{ last_backup.count }}</span><span class="label">Backups disponibles</span></div>
+    </div>
+    <p class="muted" style="margin:8px 0 0; font-size:13px;">Archivo: {{ last_backup.file }}</p>
+    {% else %}
+    <p class="muted" style="margin:0;">No se encontraron backups. Verifica BACKUP_DIR o el directorio backup/.</p>
+    {% endif %}
+  </div>
+
+  {# ── Recent errors ── #}
+  {% if recent_errors and recent_errors|length > 0 %}
+  <div class="card">
+    <h2>Últimos 20 errores 5xx</h2>
+    <div style="overflow-x:auto;">
+    <table>
+      <thead><tr><th>ID</th><th>Fecha</th><th>Path</th><th>Status</th><th>Request ID</th><th>Issuer</th><th></th></tr></thead>
+      <tbody>
+      {% for e in recent_errors %}
+      <tr>
+        <td>{{ e.id }}</td>
+        <td class="muted">{{ (e.created_at or '-')[:16] }}</td>
+        <td>{{ e.path or '-' }}</td>
+        <td><span class="badge badge--xs {% if e.status_code >= 500 %}badge--error{% endif %}">{{ e.status_code or '-' }}</span></td>
+        <td><code>{{ (e.request_id or '-')[:12] }}</code></td>
+        <td class="muted">{{ e.issuer_id or '-' }}</td>
+        <td><a class="btn btn-secondary btn-sm" href="/admin/errors/{{ e.id }}">Ver</a></td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </div>
+  {% endif %}
+
+  {# ── Recent jobs ── #}
   <div class="card">
     <h2>Últimos 20 jobs</h2>
     {% if recent_jobs and recent_jobs|length > 0 %}
+    <div style="overflow-x:auto;">
     <table>
       <thead><tr><th>ID</th><th>Issuer</th><th>Nombre</th><th>Status</th><th>Mensaje</th><th>Fecha</th><th></th></tr></thead>
       <tbody>
@@ -38,39 +138,31 @@
         <td>{{ j.name }}</td>
         <td><span class="badge badge--xs {% if j.status == 'failed' %}badge--error{% elif j.status == 'success' %}badge--success{% endif %}">{{ j.status }}</span></td>
         <td class="muted">{{ (j.message or '')[:60] }}</td>
-        <td class="muted">{{ j.updated_at or j.created_at or '' }}</td>
+        <td class="muted">{{ (j.updated_at or j.created_at or '')[:16] }}</td>
         <td><a class="btn btn-secondary btn-sm" href="/admin/jobs/{{ j.id }}">Ver</a></td>
       </tr>
       {% endfor %}
       </tbody>
     </table>
+    </div>
     {% else %}
-    <p style="margin:0;color:#64748b;">Sin jobs recientes.</p>
+    <p style="margin:0;" class="muted">Sin jobs recientes.</p>
     {% endif %}
   </div>
 
-  {% if recent_errors and recent_errors|length > 0 %}
+  {# ── CFDI this month ── #}
   <div class="card">
-    <h2>Últimos 20 errores</h2>
-    <table>
-      <thead><tr><th>ID</th><th>Fecha</th><th>Path</th><th>Status</th><th>Request ID</th><th>Issuer</th><th></th></tr></thead>
-      <tbody>
-      {% for e in recent_errors %}
-      <tr>
-        <td>{{ e.id }}</td>
-        <td class="muted">{{ e.created_at or '-' }}</td>
-        <td>{{ e.path or '-' }}</td>
-        <td>{{ e.status_code or '-' }}</td>
-        <td><code>{{ (e.request_id or '-')[:12] }}</code></td>
-        <td class="muted">{{ e.issuer_id or '-' }}</td>
-        <td><a class="btn btn-secondary btn-sm" href="/admin/errors/{{ e.id }}">Ver</a></td>
-      </tr>
+    <h2>CFDI este mes (por dirección)</h2>
+    <div class="stats">
+      {% for row in sat_cfdi_by_direction %}
+      <div class="stat"><span class="n">{{ row.n }}</span><span class="label">{{ row.direction }}</span></div>
+      {% else %}
+      <p style="margin:0;" class="muted">Sin datos para el mes actual.</p>
       {% endfor %}
-      </tbody>
-    </table>
+    </div>
   </div>
-  {% endif %}
 
+  {# ── Last logins ── #}
   <div class="card">
     <h2>Últimos logins</h2>
     {% if last_logins and last_logins|length > 0 %}
@@ -79,7 +171,7 @@
       <tbody>
       {% for l in last_logins %}
       <tr>
-        <td class="muted">{{ l.created_at or '-' }}</td>
+        <td class="muted">{{ (l.created_at or '-')[:16] }}</td>
         <td class="muted">{{ l.user_id if l.user_id is not none else '-' }}</td>
         <td>{{ l.user_email or '-' }}</td>
         <td class="muted">{{ l.issuer_id if l.issuer_id is not none else '-' }}</td>
@@ -89,40 +181,30 @@
       </tbody>
     </table>
     {% else %}
-    <p style="margin:0;color:#64748b;">Sin logins aún.</p>
+    <p style="margin:0;" class="muted">Sin logins aún.</p>
     {% endif %}
   </div>
 
+  {# ── Audit events ── #}
   <div class="card">
-    <h2>CFDI este mes (por dirección)</h2>
-    <div class="stats">
-      {% for row in sat_cfdi_by_direction %}
-      <div class="stat"><span class="n">{{ row.n }}</span><span class="label">{{ row.direction }}</span></div>
-      {% else %}
-      <p style="margin:0;color:#64748b;">Sin datos para el mes actual.</p>
-      {% endfor %}
-    </div>
-  </div>
-
-  <div class="card">
-    <h2>Últimos 20 eventos (audit_log)</h2>
+    <h2>Últimos 10 eventos (audit)</h2>
     {% if audit_events %}
     <table>
       <thead><tr><th>Fecha</th><th>Acción</th><th>user_id</th><th>issuer_id</th><th>Detalles</th></tr></thead>
       <tbody>
       {% for e in audit_events %}
       <tr>
-        <td>{{ e.created_at or '-' }}</td>
+        <td class="muted">{{ (e.created_at or '-')[:16] }}</td>
         <td>{{ e.action or '-' }}</td>
-        <td>{{ e.user_id if e.user_id is not none else '-' }}</td>
-        <td>{{ e.issuer_id if e.issuer_id is not none else '-' }}</td>
-        <td>{{ (e.details or '')[:80] }}{% if e.details and e.details|length > 80 %}…{% endif %}</td>
+        <td class="muted">{{ e.user_id if e.user_id is not none else '-' }}</td>
+        <td class="muted">{{ e.issuer_id if e.issuer_id is not none else '-' }}</td>
+        <td class="muted">{{ (e.details or '')[:60] }}{% if e.details and e.details|length > 60 %}…{% endif %}</td>
       </tr>
       {% endfor %}
       </tbody>
     </table>
     {% else %}
-    <p style="margin:0;color:#64748b;">No hay eventos recientes.</p>
+    <p style="margin:0;" class="muted">No hay eventos recientes.</p>
     {% endif %}
   </div>
 {% endblock %}

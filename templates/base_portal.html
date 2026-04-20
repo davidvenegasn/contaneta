@@ -1,14 +1,47 @@
 <!doctype html>
-<html>
+<html lang="es">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="csrf-token" content="{{ csrf_token|default('') }}" />
+    <meta name="portal-issuer-id" content="{{ portal_issuer_id|default(0) }}" />
     <meta name="theme-color" content="#ffffff" />
+    <script>
+(function () {
+  try {
+    function storageKey() {
+      var m = document.querySelector('meta[name="portal-issuer-id"]');
+      var id = m && m.getAttribute('content');
+      return 'portal_selected_ym_' + (id || '0');
+    }
+    function validYm(s) {
+      return typeof s === 'string' && /^\d{4}-(0[1-9]|1[0-2])$/.test(s);
+    }
+    var KEY = storageKey();
+    var path = location.pathname;
+    var params = new URLSearchParams(location.search);
+    var ymUrl = (params.get('ym') || '').trim();
+    if (validYm(ymUrl)) {
+      try { localStorage.setItem(KEY, ymUrl); } catch (e) {}
+      return;
+    }
+    var monthPaths = ['/portal/home', '/portal/facturas', '/portal/movimientos', '/portal/bank/movements', '/portal/invoices-ext', '/portal/invoices/nomina', '/portal/month-close'];
+    if (monthPaths.indexOf(path) < 0) return;
+    if ((path === '/portal/movimientos' || path === '/portal/bank/movements') && validYm((params.get('period_month') || '').trim())) return;
+    var stored = '';
+    try { stored = (localStorage.getItem(KEY) || '').trim(); } catch (e) {}
+    if (!validYm(stored)) return;
+    params.set('ym', stored);
+    var qs = params.toString();
+    location.replace(path + (qs ? '?' + qs : '') + location.hash);
+  } catch (e) {}
+})();
+    </script>
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <title>{{ title or "ContaNeta" }}</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%236366f1'/%3E%3Ctext x='16' y='22' text-anchor='middle' font-family='system-ui' font-weight='700' font-size='18' fill='white'%3EC%3C/text%3E%3C/svg%3E" />
     <script>if(localStorage.getItem('portal_nightmode')==='1')document.documentElement.classList.add('nightmode');</script>
     <!-- P35: cache GET catalogs/customers/products (TTL 10 min); debe cargar antes del content para prefetch en Home -->
     <script src="/static/js/catalog-cache.js"></script>
@@ -21,15 +54,19 @@
     {% endif %}
     <link rel="stylesheet" href="/static/css/portal_ui_v2.css">
     <link rel="stylesheet" href="/static/css/portal_rail.css">
+    <link rel="stylesheet" href="/static/css/portal_sidebar_unified.css">
     <link rel="stylesheet" href="/static/css/portal.css">
+    <link rel="stylesheet" href="/static/css/command-palette.css">
     <link rel="stylesheet" href="/static/css/form.css">
+    <link rel="stylesheet" href="/static/css/movement-modal.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
     <!-- Guardrail: evitar CSS inline grande (mover a static/css/*.css) -->
   </head>
 
   <body class="portal">
+    <a href="#portalMain" class="skip-nav">Saltar al contenido</a>
 {% if dev_debug_panel|default(false) %}
 <script>
 (function() {
@@ -79,9 +116,8 @@
 
 {% macro icon_create() %}
 <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-  <path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7z" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M14 2v5h5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M8 12h8M8 16h8M8 8h3" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.75"/>
+  <path d="M12 8v8M8 12h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
 </svg>
 {% endmacro %}
 
@@ -187,6 +223,14 @@
 </svg>
 {% endmacro %}
 
+{% macro icon_guides() %}
+<svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+  <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.75"/>
+  <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="12" cy="17" r=".5" fill="currentColor"/>
+</svg>
+{% endmacro %}
+
 {% macro month_picker(base_url, token, ym, ym_label) %}
 <div class="month-picker" data-base-url="{{ base_url }}" data-ym="{{ ym }}" data-ym-label="{{ ym_label }}">
   <div class="month-picker__trigger-wrap">
@@ -209,10 +253,7 @@
     <div id="pageLoadingBar" class="page-loading-bar" aria-hidden="true"></div>
     <div id="topProgress" class="top-progress" aria-hidden="true"></div>
     <div class="portal-shell-wrap" data-portal-shell>
-    <div class="portal-sidebar-unified">
-      {% include 'components/portal_rail.html' %}
-      {% include 'components/portal_drawer.html' %}
-    </div>
+      {% include 'components/portal_sidebar_unified.html' %}
     <div class="portal-main">
     <div class="portal-shell">
       <!-- Barra superior fija en todas las páginas (fuera de main para que el scroll no la mueva) -->
@@ -254,6 +295,7 @@
               {% elif active_page=='bank_pdf_to_excel' or active_page=='bank_statements' or active_page=='bancos_hub' or active_page=='convertir_edo_cuenta' %}{% set _auto_icon = icon_bank() %}
               {% elif active_page=='config_sat' %}{% set _auto_icon = icon_summary() %}
               {% elif active_page=='datos_fiscales' %}{% set _auto_icon = icon_summary() %}
+              {% elif active_page=='guides' %}{% set _auto_icon = icon_guides() %}
               {% endif %}
             {% endif %}
             {% if page_icon or _auto_icon %}
@@ -264,17 +306,29 @@
         </div>
 
         <div class="portal-topbar__right">
+          <!-- Buscar (Cmd+K) -->
+          <button type="button" class="topbar-search-trigger" onclick="window.openCommandPalette && window.openCommandPalette()" aria-label="Buscar (⌘K)" title="Buscar (⌘K)">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+            <span class="topbar-search-trigger__label">Buscar</span>
+            <kbd class="topbar-search-trigger__kbd">⌘K</kbd>
+          </button>
+          <!-- Día/Noche toggle -->
+          <button type="button" class="icon-btn topbar-nightmode-btn" id="nightModeBtn" aria-pressed="false" aria-label="Activar modo oscuro" title="Modo día / noche">
+            <svg class="icon topbar-nightmode-icon--sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+            <svg class="icon topbar-nightmode-icon--moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true" style="display:none;"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+          </button>
+          <!-- Notificaciones (campana) -->
+          <button type="button" class="icon-btn topbar-notif-btn" id="notifBellBtn" aria-label="Notificaciones" title="Notificaciones" aria-expanded="false">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+            <span class="topbar-notif-badge" id="notifBadge" hidden>0</span>
+          </button>
           <!-- Acciones rápidas (contextuales) -->
           <div class="portal-topbar__actions">
             {% block topbar_actions %}{% endblock %}
           </div>
 
-          <!-- P36: chips de estado (SAT OK / Sync / Trial-Pro) fintech, clicables a FIEL / Mi plan -->
-          <div class="topbar-status-chips" id="topbarStatusChips" aria-label="Estado de cuenta" hidden>
-            <a href="/portal/config/sat" class="topbar-status-chip topbar-status-chip--sat" id="topbarChipSat" title="FIEL SAT" data-status="none">SAT</a>
-            <a href="/portal/config/sat" class="topbar-status-chip topbar-status-chip--sync" id="topbarChipSync" title="Sincronización SAT" data-status="ok">—</a>
-            <a href="/portal/plan" class="topbar-status-chip topbar-status-chip--plan u-hidden" id="topbarChipPlan" title="Mi plan" data-plan="">Plan</a>
-          </div>
+          <!-- Plan badge (discrete) -->
+          <a href="/portal/plan" class="plan-badge u-hidden" id="topbarPlanBadge" title="Mi plan"></a>
 
           <!-- Menú usuario (en shell v2 el trigger está en el rail; aquí solo el panel) -->
           <div class="user-menu-wrap {% if portal_shell_v2|default(false) %}user-menu-wrap--rail-only{% endif %}">
@@ -326,10 +380,6 @@
                 {% endif %}
               </div>
               <div class="user-menu__sep" aria-hidden="true"></div>
-              <a class="user-menu__item user-menu__item--with-icon" href="/portal/summary" role="menuitem">
-                <span class="user-menu__item-icon" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M21 12a9 9 0 1 1-9-9" stroke-linecap="round"/><path d="M21 3v6h-6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
-                Resumen
-              </a>
               <a class="user-menu__item user-menu__item--with-icon" href="/portal/home" role="menuitem">
                 <span class="user-menu__item-icon" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M3 10.5 12 3l9 7.5"/><path d="M5.5 10.5V21h13V10.5"/><path d="M10 21v-6h4v6"/></svg></span>
                 Inicio
@@ -338,19 +388,6 @@
                 <span class="user-menu__item-icon" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M21 12a9 9 0 1 1-9-9" stroke-linecap="round"/><path d="M21 3v6h-6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
                 Mi plan
               </a>
-              <div class="user-menu__sep" aria-hidden="true"></div>
-              <div class="nightmode-wrap">
-                <button type="button" class="nightmode-toggle" id="nightModeBtn" role="switch" aria-checked="false" aria-label="Modo noche" title="Modo día / Modo noche">
-                  <span class="nightmode-toggle__track">
-                    <span class="nightmode-toggle__label nightmode-toggle__label--day">Día</span>
-                    <span class="nightmode-toggle__label nightmode-toggle__label--night">Noche</span>
-                    <span class="nightmode-toggle__thumb" aria-hidden="true">
-                      <svg class="nightmode-toggle__icon nightmode-toggle__icon--sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
-                      <svg class="nightmode-toggle__icon nightmode-toggle__icon--moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-                    </span>
-                  </span>
-                </button>
-              </div>
               <div class="user-menu__sep" aria-hidden="true"></div>
               <form method="get" action="/logout" class="user-menu__logout-form user-menu__logout-form--prominent form-reset">
                 <button type="submit" class="user-menu__item user-menu__item--logout" role="menuitem">Cerrar sesión</button>
@@ -382,16 +419,20 @@
           <!-- P25: contenedor único para toasts (success/error/info); máx 3 visibles; no usar en carga de listas -->
           <div id="toastStack" class="toast-stack" aria-live="polite" aria-relevant="additions"></div>
 
-          <!-- Demo UI hooks: ?demo=1 para mostrar botones de simulación -->
+          {% if dev_debug_panel|default(false) %}
+          <!-- Demo UI hooks: ?demo=1 para mostrar botones de simulación (dev only) -->
           <div id="demoUiHooks" class="demo-ui-hooks" hidden aria-hidden="true">
             <button type="button" class="btn btn--sm btn--secondary" data-demo-toast="success">Simular éxito</button>
             <button type="button" class="btn btn--sm btn--secondary" data-demo-toast="error">Simular error</button>
             <button type="button" class="btn btn--sm btn--secondary" data-demo-toast="info">Simular info</button>
-            <button type="button" class="btn btn--sm btn--secondary" data-demo-overlay">Simular overlay</button>
+            <button type="button" class="btn btn--sm btn--secondary" data-demo-overlay>Simular overlay</button>
           </div>
+          {% endif %}
 
           <!-- Cargar ui.js antes del content para que las listas (productos, clientes, emitidas, etc.) tengan uiFetchJSON en la primera carga -->
           <script src="/static/js/ui.js"></script>
+          <script src="/static/js/command-palette.js" defer></script>
+          <script src="/static/js/keyboard-shortcuts.js" defer></script>
           <script src="/static/js/portal_drawer.js" defer></script>
           <script src="/static/js/portal_resumen_collapse.js" defer></script>
           {% if portal_shell_v2|default(false) %}
@@ -400,8 +441,11 @@
           <div class="portal-container">
           {% block content %}{% endblock %}
           <footer class="portal-footer" role="contentinfo">
-            Tu sesión está protegida. No compartas tu acceso.
-            <a href="/seguridad">Seguridad</a>
+            <span class="portal-footer__secure">🔒 Tu sesión está protegida</span>
+            <span class="portal-footer__sep" aria-hidden="true">·</span>
+            <a href="/seguridad" class="portal-footer__link">Seguridad</a>
+            <span class="portal-footer__sep" aria-hidden="true">·</span>
+            <a href="/portal/guides" class="portal-footer__link">Guías</a>
           </footer>
           </div>
         </div>
@@ -411,6 +455,36 @@
     </div>
     </div>
 
+      <!-- Mobile bottom tab bar (visible < 768px) -->
+      <nav class="mobile-tab-bar" aria-label="Navegación móvil">
+        <a href="/portal/home" class="mobile-tab-bar__item {{ 'is-active' if active_page|default('') == 'home' else '' }}" aria-label="Inicio">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5.5 10.5V21h13V10.5"/></svg>
+          <span>Inicio</span>
+        </a>
+        <a href="/portal/facturas" class="mobile-tab-bar__item {{ 'is-active' if active_page|default('') in ['facturas_hub','issued','received'] else '' }}" aria-label="Facturas">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7z"/><path d="M14 2v5h5"/></svg>
+          <span>Facturas</span>
+        </a>
+        <a href="/portal/invoices-ext" class="mobile-tab-bar__item {{ 'is-active' if active_page|default('') == 'invoices_ext' else '' }}" aria-label="Invoices Extranjeros">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10A15.3 15.3 0 0 1 12 2"/></svg>
+          <span>Invoices</span>
+        </a>
+        <a href="/portal/create" class="mobile-tab-bar__item mobile-tab-bar__item--cta" aria-label="Nueva factura">
+          <span class="mobile-tab-cta-circle">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          </span>
+          <span>Nueva</span>
+        </a>
+        <a href="/portal/movimientos" class="mobile-tab-bar__item {{ 'is-active' if active_page|default('') == 'bank_movements' else '' }}" aria-label="Movimientos">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M2 17 12 3l10 14"/><path d="M6 17h12"/></svg>
+          <span>Movimientos</span>
+        </a>
+        <button type="button" class="mobile-tab-bar__item" aria-label="Menú" onclick="document.getElementById('portalDrawer') && (document.querySelector('.portal-shell-wrap') ? document.querySelector('.portal-shell-wrap').classList.toggle('drawer-open') : null)">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+          <span>Menú</span>
+        </button>
+      </nav>
+
       <!-- Modal de confirmación para acciones irreversibles (movido a body por script de modales) -->
       <div id="portalConfirmModal" class="modal confirm-modal" role="dialog" aria-modal="true" aria-labelledby="portalConfirmTitle" aria-label="Confirmar acción" hidden>
         <div class="confirm-modal__card">
@@ -418,7 +492,7 @@
           <p id="portalConfirmText" class="confirm-modal__text"></p>
           <div class="confirm-modal__actions">
             <button type="button" id="portalConfirmCancel" class="btn confirm-modal__btn--cancel">Cancelar</button>
-            <button type="button" id="portalConfirmOk" class="btn confirm-modal__btn--danger"></button>
+            <button type="button" id="portalConfirmOk" class="btn confirm-modal__btn--danger" aria-label="Confirmar">Confirmar</button>
           </div>
         </div>
       </div>
@@ -449,7 +523,7 @@
       </div>
       {% endif %}
 
-      <div id="pdfModal" class="pdf-modal" aria-hidden="true" role="dialog" aria-labelledby="pdfModalTitle" aria-label="Vista previa CFDI">
+      <div id="pdfModal" class="pdf-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="pdfModalTitle" aria-label="Vista previa CFDI">
         <div class="pdf-modal__backdrop" id="pdfModalBackdrop"></div>
         <div class="pdf-modal__container">
           <div class="pdf-modal__header">
@@ -551,6 +625,9 @@
   // Page enter animation (all pages)
   requestAnimationFrame(() => {
     document.body.classList.add('page-enter');
+    // After animation ends, switch to page-ready so transform is cleared
+    // (transform creates a containing block that breaks position:fixed/absolute)
+    setTimeout(function() { document.body.classList.add('page-ready'); }, 200);
   });
 
   // ============ Errores amigables: Título + detalle + acción recomendada ============
@@ -714,11 +791,13 @@
     const railBtn = document.getElementById('userMenuBtnRail');
     if (railBtn) railBtn.setAttribute('aria-expanded', 'false');
     userMenu.classList.remove('user-menu--from-rail');
+    if (window.uiUnlockScroll) window.uiUnlockScroll();
   };
   const openUserMenu = () => {
     if (!userBtn || !userMenu) return;
     userMenu.hidden = false;
     userBtn.setAttribute('aria-expanded', 'true');
+    if (window.uiLockScroll) window.uiLockScroll();
     if (window.loadAccountChecklist) window.loadAccountChecklist();
   };
 
@@ -738,10 +817,7 @@
 
   window.loadAccountChecklist = function() {
     const el = document.getElementById('accountChecklistContent');
-    const chipsWrap = document.getElementById('topbarStatusChips');
-    const chipSat = document.getElementById('topbarChipSat');
-    const chipSync = document.getElementById('topbarChipSync');
-    const chipPlan = document.getElementById('topbarChipPlan');
+    const planBadge = document.getElementById('topbarPlanBadge');
     (window.portalFetchJSON ? window.portalFetchJSON('/api/account/status', { credentials: 'same-origin' }, { timeoutMs: 30000, retry: 1 }) : Promise.resolve({ ok: false, status: 0, data: null }))
       .then(function(r) { return (r && r.ok) ? r.data : null; })
       .then(function(data) {
@@ -774,37 +850,17 @@
             el.innerHTML = html;
           }
         }
-        // P36: chips de estado (SAT OK / No configurado / Error — Sync hace X min / En proceso — Trial/Pro)
-        if (chipsWrap && chipSat && chipSync) {
-          chipsWrap.hidden = false;
-          var satStatus = data.sat_status || (data.sat_ok ? 'ok' : 'none');
-          chipSat.setAttribute('data-status', satStatus);
-          chipSat.textContent = satStatus === 'ok' ? 'SAT OK' : satStatus === 'error' ? 'Error' : 'No configurado';
-          chipSat.title = satStatus === 'ok' ? 'FIEL configurada' : satStatus === 'error' ? 'Revisar FIEL' : 'Conectar SAT (FIEL)';
-          chipSat.href = '/portal/config/sat';
-          var syncStatus = data.sync_status || 'ok';
-          chipSync.setAttribute('data-status', syncStatus);
-          if (syncStatus === 'running') {
-            chipSync.textContent = 'En proceso';
-            chipSync.title = 'Sincronización en proceso';
-          } else if (syncStatus === 'error') {
-            chipSync.textContent = 'Error';
-            chipSync.title = 'Error de sincronización';
-          } else {
-            var syncLabel = data.last_sync_at ? 'hace ' + relativeTimeShort(data.last_sync_at) : '—';
-            chipSync.textContent = syncLabel;
-            chipSync.title = data.last_sync_at ? 'Último sync: ' + syncLabel : 'Sin sync';
+        // Plan badge (discrete)
+        if (planBadge && data.plan_label) {
+          var pl = (data.plan_label || '').toLowerCase();
+          planBadge.classList.remove('u-hidden');
+          var badgeText = data.plan_label;
+          if (pl === 'trial' && data.trial_days_left != null) {
+            badgeText = 'Trial: ' + data.trial_days_left + 'd';
           }
-          chipSync.href = '/portal/config/sat';
-          if (chipPlan && data.plan_label) {
-            chipPlan.classList.remove('u-hidden');
-            chipPlan.textContent = data.plan_label;
-            chipPlan.setAttribute('data-plan', (data.plan_label || '').toLowerCase());
-            chipPlan.title = 'Mi plan: ' + data.plan_label;
-            chipPlan.href = '/portal/plan';
-          } else if (chipPlan) {
-            chipPlan.classList.add('u-hidden');
-          }
+          planBadge.textContent = badgeText;
+          planBadge.className = 'plan-badge plan-badge--' + (pl === 'trial' ? 'trial' : 'paid');
+          planBadge.title = 'Mi plan: ' + data.plan_label + (data.trial_days_left != null ? ' (' + data.trial_days_left + ' días restantes)' : '');
         }
       })
       .catch(function() {
@@ -813,7 +869,7 @@
   };
 
   // P36: cargar estado (chips + checklist) al montar para que chips se vean sin abrir dropdown
-  if (document.getElementById('accountChecklistContent') || document.getElementById('topbarStatusChips')) {
+  if (document.getElementById('accountChecklistContent') || document.getElementById('topbarPlanBadge')) {
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', function() { window.loadAccountChecklist(); });
     } else {
@@ -877,17 +933,18 @@
       picker._viewYear = cur.year;
       if (yearEl) yearEl.textContent = picker._viewYear;
       renderMonths(picker._viewYear);
-      dropdown.classList.remove('align-right');
       dropdown.hidden = false;
       dropdown.classList.add('is-open');
       backdrop.classList.add('is-open');
+      document.body.classList.add('month-picker-open');
       if (trigger) trigger.setAttribute('aria-expanded', 'true');
       if (triggerIcon) triggerIcon.setAttribute('aria-expanded', 'true');
+      // Check if dropdown exceeds right viewport edge
       requestAnimationFrame(function() {
+        dropdown.classList.remove('align-right');
         var rect = dropdown.getBoundingClientRect();
-        var margin = 12;
-        if (rect.right > window.innerWidth - margin) dropdown.classList.add('align-right');
-        if (rect.left < margin) dropdown.classList.add('align-right');
+        if (rect.right > window.innerWidth - 12) dropdown.classList.add('align-right');
+        if (rect.left < 12) dropdown.classList.add('align-right');
       });
     }
 
@@ -895,6 +952,7 @@
       dropdown.hidden = true;
       dropdown.classList.remove('is-open', 'align-right');
       backdrop.classList.remove('is-open');
+      document.body.classList.remove('month-picker-open');
       if (trigger) trigger.setAttribute('aria-expanded', 'false');
       if (triggerIcon) triggerIcon.setAttribute('aria-expanded', 'false');
     }
@@ -930,6 +988,11 @@
       if (!monthBtn) return;
       var ym = monthBtn.getAttribute('data-ym');
       if (!ym) return;
+      try {
+        var mk = document.querySelector('meta[name="portal-issuer-id"]');
+        var iid = mk && mk.getAttribute('content');
+        localStorage.setItem('portal_selected_ym_' + (iid || '0'), ym);
+      } catch (err) {}
       var url = baseUrl + (baseUrl.indexOf('?') >= 0 ? '&' : '?') + 'ym=' + encodeURIComponent(ym);
       window.location.href = url;
     });
@@ -939,26 +1002,716 @@
     });
   });
 
-  // ============ Night mode toggle (sliding switch) ============
+  // ============ Night mode toggle (icon button in topbar) ============
   const NIGHT_KEY = 'portal_nightmode';
   const nightBtn = document.getElementById('nightModeBtn');
+  function updateNightIcons(on) {
+    if (!nightBtn) return;
+    nightBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    nightBtn.setAttribute('aria-label', on ? 'Activar modo claro' : 'Activar modo oscuro');
+    var sunIcon = nightBtn.querySelector('.topbar-nightmode-icon--sun');
+    var moonIcon = nightBtn.querySelector('.topbar-nightmode-icon--moon');
+    if (sunIcon) sunIcon.style.display = on ? 'none' : '';
+    if (moonIcon) moonIcon.style.display = on ? '' : 'none';
+  }
   const initNightMode = () => {
     const on = localStorage.getItem(NIGHT_KEY) === '1';
     document.documentElement.classList.toggle('nightmode', on);
-    if (nightBtn) {
-      nightBtn.setAttribute('aria-checked', on ? 'true' : 'false');
-      nightBtn.classList.toggle('nightmode-toggle--on', on);
-    }
+    updateNightIcons(on);
   };
   initNightMode();
   if (nightBtn) {
     nightBtn.addEventListener('click', () => {
       const on = document.documentElement.classList.toggle('nightmode');
       localStorage.setItem(NIGHT_KEY, on ? '1' : '0');
-      nightBtn.setAttribute('aria-checked', on ? 'true' : 'false');
-      nightBtn.classList.toggle('nightmode-toggle--on', on);
+      updateNightIcons(on);
     });
   }
+
+  // ============ Notification Drawer ============
+  // Deferred: drawer HTML is rendered after this script block
+  document.addEventListener('DOMContentLoaded', function() {
+  (function() {
+    var bellBtn = document.getElementById('notifBellBtn');
+    var drawer = document.getElementById('notifDrawer');
+    var backdrop = document.getElementById('notifBackdrop');
+    var closeBtn = document.getElementById('notifDrawerClose');
+    var markAllBtn = document.getElementById('notifMarkAllBtn');
+    var badge = document.getElementById('notifBadge');
+    var listEl = document.getElementById('notifDrawerList');
+    var emptyEl = document.getElementById('notifDrawerEmpty');
+    if (!bellBtn || !drawer) return;
+
+    var NOTIF_LS_KEY = 'notif_last_seen';
+
+    function updateBadge() {
+      fetch('/api/activity?limit=20', { credentials: 'same-origin' })
+        .then(function(r) { return r.json(); })
+        .then(function(res) {
+          var items = res.items || (res.data && res.data.items) || [];
+          var lastSeen = parseInt(localStorage.getItem(NOTIF_LS_KEY) || '0', 10);
+          if (!lastSeen) {
+            localStorage.setItem(NOTIF_LS_KEY, String(Date.now()));
+            badge.hidden = true;
+            return;
+          }
+          var count = 0;
+          items.forEach(function(a) {
+            try {
+              var ts = new Date(a.fecha_emision + (a.fecha_emision.indexOf('Z') === -1 ? 'Z' : '')).getTime();
+              if (ts > lastSeen) count++;
+            } catch(e) {}
+          });
+          if (count > 0) {
+            badge.textContent = count > 9 ? '9+' : String(count);
+            badge.hidden = false;
+          } else {
+            badge.hidden = true;
+          }
+        })
+        .catch(function() {});
+    }
+
+    updateBadge();
+
+    var _notifOpen = false;
+    function openNotifDrawer() {
+      _notifOpen = true;
+      drawer.hidden = false;
+      if (backdrop) backdrop.hidden = false;
+      bellBtn.setAttribute('aria-expanded', 'true');
+      // Force layout recalc so transition works after hidden removal
+      void drawer.offsetHeight;
+      drawer.classList.add('notif-drawer--open');
+      if (backdrop) backdrop.classList.add('notif-backdrop--visible');
+      if (window.uiLockScroll) window.uiLockScroll();
+      loadNotifications();
+      localStorage.setItem(NOTIF_LS_KEY, String(Date.now()));
+      badge.hidden = true;
+    }
+    function closeNotifDrawer() {
+      _notifOpen = false;
+      drawer.classList.remove('notif-drawer--open');
+      if (backdrop) backdrop.classList.remove('notif-backdrop--visible');
+      bellBtn.setAttribute('aria-expanded', 'false');
+      if (window.uiUnlockScroll) window.uiUnlockScroll();
+      setTimeout(function() { drawer.hidden = true; if (backdrop) backdrop.hidden = true; }, 300);
+    }
+
+    // Expose close globally for "Ver todo" button
+    window.closeNotifDrawerGlobal = closeNotifDrawer;
+
+    bellBtn.addEventListener('click', function() { _notifOpen ? closeNotifDrawer() : openNotifDrawer(); });
+    if (closeBtn) closeBtn.addEventListener('click', closeNotifDrawer);
+    if (backdrop) backdrop.addEventListener('click', closeNotifDrawer);
+    document.addEventListener('keydown', function(e) { if (e.key === 'Escape' && _notifOpen) closeNotifDrawer(); });
+
+    var sevIcons = {
+      danger: '<svg class="notif-sev-icon" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="#ef4444" stroke-width="1.5"/><path d="M8 5v3.5" stroke="#ef4444" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="11.5" r="0.75" fill="#ef4444"/></svg>',
+      warning: '<svg class="notif-sev-icon" viewBox="0 0 16 16" fill="none"><path d="M8 2 1.5 14h13L8 2z" stroke="#f59e0b" stroke-width="1.3" stroke-linejoin="round"/><path d="M8 7v3" stroke="#f59e0b" stroke-width="1.3" stroke-linecap="round"/><circle cx="8" cy="12" r="0.6" fill="#f59e0b"/></svg>',
+      info: '<svg class="notif-sev-icon" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="#6366f1" stroke-width="1.5"/><path d="M8 7v4" stroke="#6366f1" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="4.75" r="0.75" fill="#6366f1"/></svg>'
+    };
+    function relativeTime(dateStr) {
+      if (!dateStr) return '';
+      try {
+        var d = new Date(dateStr + (dateStr.indexOf('Z') === -1 && dateStr.indexOf('+') === -1 ? 'Z' : ''));
+        var diff = (Date.now() - d.getTime()) / 1000;
+        if (diff < 60) return 'ahora';
+        if (diff < 3600) return 'hace ' + Math.floor(diff / 60) + 'min';
+        if (diff < 86400) return 'hace ' + Math.floor(diff / 3600) + 'h';
+        if (diff < 604800) return 'hace ' + Math.floor(diff / 86400) + 'd';
+        return dateStr.slice(0, 10);
+      } catch(e) { return dateStr ? dateStr.slice(0, 10) : ''; }
+    }
+    function formatMoney(n) {
+      if (n == null) return '';
+      return '$' + Number(n).toLocaleString('es-MX', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    }
+
+    function loadNotifications() {
+      listEl.innerHTML = '<li class="notif-item" style="justify-content:center;color:var(--text-muted);padding:24px;">Cargando...</li>';
+      emptyEl.hidden = true;
+      var prevLastSeen = parseInt(localStorage.getItem(NOTIF_LS_KEY) || '0', 10);
+      fetch('/api/activity?limit=20')
+        .then(function(r) { return r.json(); })
+        .then(function(res) {
+          var items = res.items || (res.data && res.data.items) || [];
+          if (!items.length) { emptyEl.hidden = false; listEl.innerHTML = ''; return; }
+          emptyEl.hidden = true;
+          listEl.innerHTML = items.map(function(a) {
+            var isIssued = a.direction === 'issued';
+            var icon = isIssued
+              ? '<span class="notif-activity-icon notif-activity-icon--issued" aria-hidden="true">↑</span>'
+              : '<span class="notif-activity-icon notif-activity-icon--received" aria-hidden="true">↓</span>';
+            var label = isIssued ? 'Emitida' : 'Recibida';
+            var name = a.nombre || 'Sin nombre';
+            var detailUrl = '/portal/cfdi/' + (isIssued ? 'issued' : 'received') + '/' + (a.uuid || '');
+            // Determine if unread
+            var isUnread = false;
+            if (prevLastSeen) {
+              try {
+                var ts = new Date(a.fecha_emision + (a.fecha_emision.indexOf('Z') === -1 ? 'Z' : '')).getTime();
+                if (ts > prevLastSeen) isUnread = true;
+              } catch(e) {}
+            }
+            var unreadClass = isUnread ? ' notif-item--unread' : '';
+            return '<li class="notif-item notif-item--activity' + unreadClass + '">' +
+              '<div class="notif-item__icon">' + icon + '</div>' +
+              '<div class="notif-item__content">' +
+                '<div class="notif-item__title">' +
+                  '<span class="notif-activity-badge notif-activity-badge--' + a.direction + '">' + label + '</span> ' +
+                  '<span class="notif-activity-name">' + (name.length > 30 ? name.substring(0, 30) + '…' : name) + '</span>' +
+                '</div>' +
+                '<div class="notif-item__meta">' +
+                  '<span class="notif-item__time">' + (a.time_ago || '') + '</span>' +
+                  (a.total ? '<span class="notif-activity-amount">' + formatMoney(a.total) + '</span>' : '') +
+                '</div>' +
+              '</div>' +
+              '<a href="' + detailUrl + '" class="notif-item__action" title="Ver detalle" ' +
+                'onclick="this.closest(\'.notif-item\').classList.remove(\'notif-item--unread\')">→</a>' +
+            '</li>';
+          }).join('');
+        })
+        .catch(function() {});
+    }
+
+    // Hide mark-all button (not applicable for activity feed)
+    if (markAllBtn) markAllBtn.hidden = true;
+  })();
+
+  // ============ Creation Panel ("+" button) ============
+  // Deferred: panel HTML is rendered after this script block
+  (function() {
+    var createBtn = document.getElementById('railCreateBtn');
+    var panel = document.getElementById('createPanel');
+    var backdrop = document.getElementById('createPanelBackdrop');
+    var closeBtn = document.getElementById('createPanelClose');
+    var menu = document.getElementById('createPanelMenu');
+    var quickViewEl = document.getElementById('createPanelQuickView');
+    var manualViewEl = document.getElementById('createPanelManualView');
+    var titleEl = document.getElementById('createPanelTitle');
+    var backBtn = document.getElementById('createPanelBackBtn');
+    var manualBackBtn = document.getElementById('createPanelManualBackBtn');
+    // Also trigger from mobile tab bar
+    var mobileCreateBtn = document.getElementById('mobileCreateBtn');
+    if (!panel) return;
+
+    var _panelOpen = false;
+    function openCreatePanel() {
+      _panelOpen = true;
+      panel.hidden = false;
+      if (backdrop) backdrop.hidden = false;
+      requestAnimationFrame(function() {
+        panel.classList.add('create-panel--open');
+        if (backdrop) backdrop.classList.add('create-panel-backdrop--visible');
+      });
+      if (window.uiLockScroll) window.uiLockScroll();
+      showMenu();
+    }
+    function closeCreatePanel() {
+      _panelOpen = false;
+      panel.classList.remove('create-panel--open');
+      if (backdrop) backdrop.classList.remove('create-panel-backdrop--visible');
+      if (window.uiUnlockScroll) window.uiUnlockScroll();
+      setTimeout(function() { panel.hidden = true; if (backdrop) backdrop.hidden = true; }, 300);
+    }
+    function showMenu() {
+      menu.hidden = false;
+      if (quickViewEl) quickViewEl.hidden = true;
+      if (manualViewEl) manualViewEl.hidden = true;
+      if (titleEl) titleEl.textContent = 'Crear nuevo';
+    }
+    function showQuickInvoice() {
+      menu.hidden = true;
+      if (quickViewEl) quickViewEl.hidden = false;
+      if (manualViewEl) manualViewEl.hidden = true;
+      if (titleEl) titleEl.textContent = 'Factura rápida';
+    }
+    function showManualMov() {
+      menu.hidden = true;
+      if (quickViewEl) quickViewEl.hidden = true;
+      if (manualViewEl) manualViewEl.hidden = false;
+      if (titleEl) titleEl.textContent = 'Movimiento manual';
+    }
+
+    if (createBtn) createBtn.addEventListener('click', function() { _panelOpen ? closeCreatePanel() : openCreatePanel(); });
+    if (mobileCreateBtn) mobileCreateBtn.addEventListener('click', function(e) { e.preventDefault(); _panelOpen ? closeCreatePanel() : openCreatePanel(); });
+    if (closeBtn) closeBtn.addEventListener('click', closeCreatePanel);
+    if (backdrop) backdrop.addEventListener('click', closeCreatePanel);
+    if (backBtn) backBtn.addEventListener('click', showMenu);
+    if (manualBackBtn) manualBackBtn.addEventListener('click', showMenu);
+    document.addEventListener('keydown', function(e) { if (e.key === 'Escape' && _panelOpen) closeCreatePanel(); });
+
+    var quickInvoiceBtn = document.getElementById('createPanelQuickInvoice');
+    if (quickInvoiceBtn) quickInvoiceBtn.addEventListener('click', function() {
+      closeCreatePanel();
+      setTimeout(function() {
+        if (window.QuickInvoice && typeof window.QuickInvoice.open === 'function') {
+          window.QuickInvoice.open({});
+        } else {
+          console.error('[CreatePanel] QuickInvoice not available:', window.QuickInvoice);
+          if (window.portalToast) window.portalToast({ type: 'error', title: 'Error', message: 'Módulo de factura rápida no disponible. Recarga la página.' });
+        }
+      }, 0);
+    });
+    var manualMovBtn = document.getElementById('createPanelManualMov');
+    if (manualMovBtn) manualMovBtn.addEventListener('click', showManualMov);
+
+    // Manual movement form
+    var manualForm = document.getElementById('manualMovForm');
+    var tipoInput = document.getElementById('manualMovTipo');
+    var tipoBtns = document.querySelectorAll('.manual-mov-tipo-btn');
+    tipoBtns.forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        tipoBtns.forEach(function(b) { b.classList.remove('manual-mov-tipo-btn--active'); });
+        btn.classList.add('manual-mov-tipo-btn--active');
+        if (tipoInput) tipoInput.value = btn.dataset.tipo;
+      });
+    });
+    // Default fecha = today
+    var fechaInput = document.getElementById('manualMovFecha');
+    if (fechaInput && !fechaInput.value) fechaInput.value = new Date().toISOString().slice(0, 10);
+
+    if (manualForm) {
+      manualForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        var csrf = document.querySelector('meta[name="csrf-token"]');
+        var token = csrf ? csrf.content : '';
+        var data = {
+          fecha: document.getElementById('manualMovFecha').value,
+          descripcion: document.getElementById('manualMovDesc').value,
+          monto: parseFloat(document.getElementById('manualMovMonto').value),
+          tipo: tipoInput.value,
+          categoria: document.getElementById('manualMovCat').value || null,
+          notas: document.getElementById('manualMovNotas').value || null,
+        };
+        var submitBtn = document.getElementById('manualMovSubmit');
+        if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Guardando...'; }
+        fetch('/api/movements/manual', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': token },
+          body: JSON.stringify(data)
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(res) {
+          if (res.ok) {
+            if (window.portalToast) window.portalToast({ type: 'success', title: 'Movimiento guardado' });
+            manualForm.reset();
+            if (fechaInput) fechaInput.value = new Date().toISOString().slice(0, 10);
+            tipoBtns.forEach(function(b) { b.classList.remove('manual-mov-tipo-btn--active'); });
+            if (tipoBtns[0]) tipoBtns[0].classList.add('manual-mov-tipo-btn--active');
+            if (tipoInput) tipoInput.value = 'INGRESO';
+            closeCreatePanel();
+          } else {
+            if (window.portalToast) window.portalToast({ type: 'error', title: 'Error', message: (res.error && res.error.message) || res.detail || 'Error al guardar' });
+          }
+        })
+        .catch(function() {
+          if (window.portalToast) window.portalToast({ type: 'error', title: 'Error de conexión' });
+        })
+        .finally(function() {
+          if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Guardar movimiento'; }
+        });
+      });
+    }
+
+    // Expose for external use
+    window.openCreatePanel = openCreatePanel;
+    window.closeCreatePanel = closeCreatePanel;
+  })();
+  }); // end DOMContentLoaded for notification drawer + creation panel
+
+  // ============ Invoice Flyout (MindTrip-style multi-panel) ============
+  (function() {
+    var triggerBtn = document.getElementById('railNewInvoiceBtn');
+    var flyout = document.getElementById('railInvoiceFlyout');
+    var panels = flyout && flyout.querySelector('.rail-invoice-flyout__panels');
+    if (!triggerBtn || !flyout || !panels) return;
+
+    var goQuickBtn = document.getElementById('flyoutGoQuick');
+    var backBtn = document.getElementById('flyoutQuickBack');
+    var clientSearch = document.getElementById('flyoutClientSearch');
+    var clientResults = document.getElementById('flyoutClientResults');
+    var clientSelected = document.getElementById('flyoutClientSelected');
+    var productSearch = document.getElementById('flyoutProductSearch');
+    var productResults = document.getElementById('flyoutProductResults');
+    var productSelected = document.getElementById('flyoutProductSelected');
+    var submitBtn = document.getElementById('flyoutQuickSubmit');
+
+    var _selectedClient = null;
+    var _selectedProduct = null;
+    var _customers = [];
+    var _products = [];
+    var _bootstrapLoaded = false;
+
+    // ── Open / close flyout ──
+    function openFlyout() {
+      var rect = triggerBtn.getBoundingClientRect();
+      flyout.style.position = 'fixed';
+      flyout.style.top = rect.top + 'px';
+      flyout.style.left = rect.right + 6 + 'px';
+      flyout.style.zIndex = '300';
+      flyout.hidden = false;
+      triggerBtn.setAttribute('aria-expanded', 'true');
+      showMainPanel();
+      loadBootstrap();
+    }
+    function closeFlyout() {
+      flyout.hidden = true;
+      flyout.style.position = '';
+      flyout.style.top = '';
+      flyout.style.left = '';
+      flyout.style.zIndex = '';
+      triggerBtn.setAttribute('aria-expanded', 'false');
+    }
+    function toggle() { flyout.hidden ? openFlyout() : closeFlyout(); }
+
+    // ── Panel switching (MindTrip pattern: static↔absolute swap) ──
+    function showMainPanel() {
+      panels.classList.remove('flyout-sub-active');
+    }
+    function showQuickPanel() {
+      panels.classList.add('flyout-sub-active');
+      setTimeout(function() { if (clientSearch) clientSearch.focus(); }, 80);
+    }
+
+    // ── Bootstrap data ──
+    function loadBootstrap() {
+      if (_bootstrapLoaded) return;
+      _bootstrapLoaded = true;
+      fetch('/api/quick-invoice/bootstrap')
+        .then(function(r) { return r.json(); })
+        .then(function(res) {
+          if (res.ok && res.data) {
+            _customers = res.data.clients || res.data.customers || [];
+            _products = res.data.products || [];
+          }
+        })
+        .catch(function() { _bootstrapLoaded = false; });
+    }
+
+    // ── Search / filter ──
+    function renderResults(container, items, type) {
+      container.innerHTML = '';
+      items.forEach(function(item) {
+        var div = document.createElement('div');
+        div.className = 'rail-invoice-flyout__result-item';
+        if (type === 'client') {
+          div.innerHTML = '<span>' + esc(item.legal_name || item.alias || item.rfc) + '</span><small>' + esc(item.rfc || '') + '</small>';
+        } else {
+          div.innerHTML = '<span>' + esc(item.description || item.product_key || '') + '</span><small>$' + esc(fmt(item.unit_price)) + '</small>';
+        }
+        div.addEventListener('click', function(e) {
+          e.stopPropagation();
+          if (type === 'client') selectClient(item);
+          else selectProduct(item);
+        });
+        container.appendChild(div);
+      });
+    }
+
+    function filterList(list, q, keys) {
+      if (!q) return list.slice(0, 8);
+      var lq = q.toLowerCase();
+      return list.filter(function(item) {
+        return keys.some(function(k) { return item[k] && item[k].toLowerCase().indexOf(lq) !== -1; });
+      }).slice(0, 8);
+    }
+
+    var _clientTimer, _productTimer;
+    if (clientSearch) clientSearch.addEventListener('input', function() {
+      clearTimeout(_clientTimer);
+      var v = clientSearch.value.trim();
+      _clientTimer = setTimeout(function() {
+        var matches = filterList(_customers, v, ['legal_name', 'rfc', 'alias']);
+        renderResults(clientResults, matches, 'client');
+      }, 120);
+    });
+    if (clientSearch) clientSearch.addEventListener('focus', function() {
+      if (!clientResults.children.length && !_selectedClient) {
+        renderResults(clientResults, _customers.slice(0, 8), 'client');
+      }
+    });
+
+    if (productSearch) productSearch.addEventListener('input', function() {
+      clearTimeout(_productTimer);
+      var v = productSearch.value.trim();
+      _productTimer = setTimeout(function() {
+        var matches = filterList(_products, v, ['description', 'product_key']);
+        renderResults(productResults, matches, 'product');
+      }, 120);
+    });
+    if (productSearch) productSearch.addEventListener('focus', function() {
+      if (!productResults.children.length && !_selectedProduct) {
+        renderResults(productResults, _products.slice(0, 8), 'product');
+      }
+    });
+
+    // ── Select / deselect ──
+    function selectClient(item) {
+      _selectedClient = item;
+      clientResults.innerHTML = '';
+      clientSearch.hidden = true;
+      clientSelected.hidden = false;
+      clientSelected.innerHTML = '<span>' + esc(item.legal_name || item.rfc) + '</span><button type="button" class="rail-invoice-flyout__selected-remove" aria-label="Quitar">&times;</button>';
+      clientSelected.querySelector('button').addEventListener('click', function(e) { e.stopPropagation(); deselectClient(); });
+      updateSubmit();
+      if (productSearch && !_selectedProduct) setTimeout(function() { productSearch.focus(); }, 80);
+    }
+    function deselectClient() {
+      _selectedClient = null;
+      clientSearch.value = '';
+      clientSearch.hidden = false;
+      clientSelected.hidden = true;
+      updateSubmit();
+    }
+    function selectProduct(item) {
+      _selectedProduct = item;
+      productResults.innerHTML = '';
+      productSearch.hidden = true;
+      productSelected.hidden = false;
+      productSelected.innerHTML = '<span>' + esc(item.description || item.product_key) + '</span><button type="button" class="rail-invoice-flyout__selected-remove" aria-label="Quitar">&times;</button>';
+      productSelected.querySelector('button').addEventListener('click', function(e) { e.stopPropagation(); deselectProduct(); });
+      updateSubmit();
+    }
+    function deselectProduct() {
+      _selectedProduct = null;
+      productSearch.value = '';
+      productSearch.hidden = false;
+      productSelected.hidden = true;
+      updateSubmit();
+    }
+    function updateSubmit() {
+      if (submitBtn) submitBtn.disabled = !(_selectedClient || _selectedProduct);
+    }
+
+    // ── Submit → open QuickInvoice modal with preselected data ──
+    if (submitBtn) submitBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!_selectedClient && !_selectedProduct) return;
+      var opts = { allowPartial: true };
+      if (_selectedClient) {
+        opts.preselectedCustomerId = _selectedClient.id;
+        opts.preselectedCustomerRfc = _selectedClient.rfc;
+      }
+      if (_selectedProduct) {
+        opts.preselectedProductId = _selectedProduct.id;
+      }
+      closeFlyout();
+      // Defer to next tick so QuickInvoice is guaranteed loaded
+      setTimeout(function() {
+        if (window.QuickInvoice && typeof window.QuickInvoice.open === 'function') {
+          window.QuickInvoice.open(opts);
+        } else {
+          console.error('[Flyout] QuickInvoice not available:', window.QuickInvoice);
+          if (window.portalToast) window.portalToast({ type: 'error', title: 'Error', message: 'Módulo de factura rápida no disponible. Recarga la página.' });
+        }
+      }, 0);
+    });
+
+    // ── Helpers ──
+    function esc(s) { var d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+    function fmt(n) { return n != null ? Number(n).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'; }
+
+    // ── Event wiring ──
+    triggerBtn.addEventListener('click', function(e) { e.stopPropagation(); toggle(); });
+    // Drawer "Nueva factura" button: on desktop opens flyout, on mobile toggles inline submenu
+    var drawerNewBtn = document.getElementById('drawerNewInvoiceBtn');
+    var drawerSubmenu = document.getElementById('drawerInvoiceSubmenu');
+    var drawerQuickBtn = document.getElementById('drawerQuickInvoiceBtn');
+    var drawerSubMenuPanel = document.getElementById('drawerSubMenuPanel');
+    var drawerQuickPanel = document.getElementById('drawerQuickPanel');
+    var drawerQuickBack = document.getElementById('drawerQuickBack');
+
+    if (drawerNewBtn) drawerNewBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      var isMobile = window.innerWidth < 1100;
+      if (isMobile && drawerSubmenu) {
+        var wasHidden = drawerSubmenu.hidden;
+        drawerSubmenu.hidden = !wasHidden;
+        if (wasHidden) { _showDrawerMenu(); loadBootstrap(); }
+      } else {
+        toggle();
+      }
+    });
+
+    function _showDrawerMenu() {
+      if (drawerSubMenuPanel) drawerSubMenuPanel.hidden = false;
+      if (drawerQuickPanel) drawerQuickPanel.hidden = true;
+    }
+    function _showDrawerQuick() {
+      if (drawerSubMenuPanel) drawerSubMenuPanel.hidden = true;
+      if (drawerQuickPanel) drawerQuickPanel.hidden = false;
+      var cs = document.getElementById('drawerClientSearch');
+      if (cs) setTimeout(function() { cs.focus(); }, 80);
+    }
+
+    // "Factura rápida" → show client/product selection
+    if (drawerQuickBtn) drawerQuickBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      _showDrawerQuick();
+    });
+    // Back button
+    if (drawerQuickBack) drawerQuickBack.addEventListener('click', function(e) {
+      e.stopPropagation();
+      _showDrawerMenu();
+    });
+
+    // ── Drawer quick invoice: search/select/submit (mirrors flyout logic) ──
+    var _dClient = null, _dProduct = null;
+    var dClientSearch = document.getElementById('drawerClientSearch');
+    var dClientResults = document.getElementById('drawerClientResults');
+    var dClientSelected = document.getElementById('drawerClientSelected');
+    var dProductSearch = document.getElementById('drawerProductSearch');
+    var dProductResults = document.getElementById('drawerProductResults');
+    var dProductSelected = document.getElementById('drawerProductSelected');
+    var dSubmitBtn = document.getElementById('drawerQuickSubmit');
+
+    function dRenderResults(container, items, type) {
+      container.innerHTML = '';
+      items.forEach(function(item) {
+        var div = document.createElement('div');
+        div.className = 'drawer-quick__result-item';
+        if (type === 'client') {
+          div.innerHTML = '<span>' + esc(item.legal_name || item.alias || item.rfc) + '</span><small>' + esc(item.rfc || '') + '</small>';
+        } else {
+          div.innerHTML = '<span>' + esc(item.description || item.product_key || '') + '</span><small>$' + esc(fmt(item.unit_price)) + '</small>';
+        }
+        div.addEventListener('click', function(ev) {
+          ev.stopPropagation();
+          if (type === 'client') dSelectClient(item); else dSelectProduct(item);
+        });
+        container.appendChild(div);
+      });
+    }
+
+    var _dClientTimer, _dProductTimer;
+    if (dClientSearch) {
+      dClientSearch.addEventListener('input', function() {
+        clearTimeout(_dClientTimer);
+        var v = dClientSearch.value.trim();
+        _dClientTimer = setTimeout(function() {
+          dRenderResults(dClientResults, filterList(_customers, v, ['legal_name', 'rfc', 'alias']), 'client');
+        }, 120);
+      });
+      dClientSearch.addEventListener('focus', function() {
+        if (!dClientResults.children.length && !_dClient) {
+          dRenderResults(dClientResults, _customers.slice(0, 8), 'client');
+        }
+      });
+    }
+    if (dProductSearch) {
+      dProductSearch.addEventListener('input', function() {
+        clearTimeout(_dProductTimer);
+        var v = dProductSearch.value.trim();
+        _dProductTimer = setTimeout(function() {
+          dRenderResults(dProductResults, filterList(_products, v, ['description', 'product_key']), 'product');
+        }, 120);
+      });
+      dProductSearch.addEventListener('focus', function() {
+        if (!dProductResults.children.length && !_dProduct) {
+          dRenderResults(dProductResults, _products.slice(0, 8), 'product');
+        }
+      });
+    }
+
+    function dSelectClient(item) {
+      _dClient = item;
+      if (dClientResults) dClientResults.innerHTML = '';
+      if (dClientSearch) dClientSearch.hidden = true;
+      if (dClientSelected) {
+        dClientSelected.hidden = false;
+        dClientSelected.innerHTML = '<span>' + esc(item.legal_name || item.rfc) + '</span><button type="button" class="drawer-quick__selected-remove" aria-label="Quitar">&times;</button>';
+        dClientSelected.querySelector('button').addEventListener('click', function(ev) { ev.stopPropagation(); dDeselectClient(); });
+      }
+      dUpdateSubmit();
+      if (dProductSearch && !_dProduct) setTimeout(function() { dProductSearch.focus(); }, 80);
+    }
+    function dDeselectClient() {
+      _dClient = null;
+      if (dClientSearch) { dClientSearch.value = ''; dClientSearch.hidden = false; }
+      if (dClientSelected) dClientSelected.hidden = true;
+      dUpdateSubmit();
+    }
+    function dSelectProduct(item) {
+      _dProduct = item;
+      if (dProductResults) dProductResults.innerHTML = '';
+      if (dProductSearch) dProductSearch.hidden = true;
+      if (dProductSelected) {
+        dProductSelected.hidden = false;
+        dProductSelected.innerHTML = '<span>' + esc(item.description || item.product_key) + '</span><button type="button" class="drawer-quick__selected-remove" aria-label="Quitar">&times;</button>';
+        dProductSelected.querySelector('button').addEventListener('click', function(ev) { ev.stopPropagation(); dDeselectProduct(); });
+      }
+      dUpdateSubmit();
+    }
+    function dDeselectProduct() {
+      _dProduct = null;
+      if (dProductSearch) { dProductSearch.value = ''; dProductSearch.hidden = false; }
+      if (dProductSelected) dProductSelected.hidden = true;
+      dUpdateSubmit();
+    }
+    function dUpdateSubmit() {
+      if (dSubmitBtn) dSubmitBtn.disabled = !(_dClient || _dProduct);
+    }
+    function dResetQuickState() {
+      _dClient = null; _dProduct = null;
+      if (dClientSearch) { dClientSearch.value = ''; dClientSearch.hidden = false; }
+      if (dProductSearch) { dProductSearch.value = ''; dProductSearch.hidden = false; }
+      if (dClientResults) dClientResults.innerHTML = '';
+      if (dProductResults) dProductResults.innerHTML = '';
+      if (dClientSelected) dClientSelected.hidden = true;
+      if (dProductSelected) dProductSelected.hidden = true;
+      dUpdateSubmit();
+      _showDrawerMenu();
+    }
+
+    if (dSubmitBtn) dSubmitBtn.addEventListener('click', function(e) {
+      e.preventDefault(); e.stopPropagation();
+      if (!_dClient && !_dProduct) return;
+      var opts = { allowPartial: true };
+      if (_dClient) { opts.preselectedCustomerId = _dClient.id; opts.preselectedCustomerRfc = _dClient.rfc; }
+      if (_dProduct) { opts.preselectedProductId = _dProduct.id; }
+      // Close mobile menu + reset
+      dResetQuickState();
+      if (drawerSubmenu) drawerSubmenu.hidden = true;
+      document.body.classList.remove('mobile-menu-open');
+      setTimeout(function() {
+        if (window.QuickInvoice && typeof window.QuickInvoice.open === 'function') {
+          window.QuickInvoice.open(opts);
+        } else if (window.portalToast) {
+          window.portalToast({ type: 'error', title: 'Error', message: 'Módulo de factura rápida no disponible. Recarga la página.' });
+        }
+      }, 100);
+    });
+    if (goQuickBtn) goQuickBtn.addEventListener('click', function(e) { e.stopPropagation(); showQuickPanel(); });
+    if (backBtn) backBtn.addEventListener('click', function(e) { e.stopPropagation(); showMainPanel(); });
+
+    document.addEventListener('click', function(e) {
+      if (!flyout.hidden && !flyout.contains(e.target) && !triggerBtn.contains(e.target) && !(drawerNewBtn && drawerNewBtn.contains(e.target))) closeFlyout();
+    });
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape' && !flyout.hidden) closeFlyout();
+    });
+    var drawerToggle = document.querySelector('[data-drawer-toggle]');
+    if (drawerToggle) drawerToggle.addEventListener('click', function() {
+      if (!flyout.hidden) closeFlyout();
+    });
+
+    // Reset state when flyout closes
+    function resetQuickState() {
+      _selectedClient = null; _selectedProduct = null;
+      if (clientSearch) { clientSearch.value = ''; clientSearch.hidden = false; }
+      if (productSearch) { productSearch.value = ''; productSearch.hidden = false; }
+      if (clientResults) clientResults.innerHTML = '';
+      if (productResults) productResults.innerHTML = '';
+      if (clientSelected) clientSelected.hidden = true;
+      if (productSelected) productSelected.hidden = true;
+      updateSubmit();
+    }
+    var _origClose = closeFlyout;
+    closeFlyout = function() { resetQuickState(); _origClose(); };
+  })();
 
   // ============ PDF modal ============
   const pdfModal = document.getElementById('pdfModal');
@@ -1212,13 +1965,13 @@
         if (e.key === 'i') {
           e.preventDefault();
           pendingG = false;
-          window.location.href = '/portal/invoices/issued';
+          window.location.href = '/portal/facturas?tab=issued';
           return;
         }
         if (e.key === 'r') {
           e.preventDefault();
           pendingG = false;
-          window.location.href = '/portal/invoices/received';
+          window.location.href = '/portal/facturas?tab=received';
           return;
         }
         pendingG = false;
@@ -1352,36 +2105,11 @@
     function updateUI(data) {
       var status = data.status || 'ok';
       if (listBar) listBar.setAttribute('data-status', status);
-      if (chipEl) {
-        var chipText = status === 'running' ? 'En proceso' : status === 'error' ? 'Error' : (data.last_sync_at ? ('Último sync: ' + relativeTime(data.last_sync_at)) : 'Aún no se ha sincronizado');
-        if (status === 'error' && data.message) chipEl.setAttribute('title', data.message);
-        else chipEl.removeAttribute('title');
-        var spinner = chipEl.querySelector('.spinner');
-        if (status === 'running') {
-          if (!spinner) { spinner = document.createElement('span'); spinner.className = 'spinner spinner--sm'; spinner.setAttribute('aria-hidden', 'true'); chipEl.insertBefore(spinner, chipEl.firstChild); }
-          spinner.style.display = '';
-          var tail = chipEl.lastChild; if (tail && tail.nodeType === 3) chipEl.removeChild(tail);
-          chipEl.appendChild(document.createTextNode(' ' + chipText));
-        } else {
-          if (spinner) spinner.style.display = 'none';
-          chipEl.textContent = chipText;
-        }
+      // Sync button spin animation while running
+      if (syncBtn) {
+        var icon = syncBtn.querySelector('.list-sync-bar__btn-icon');
+        if (icon) icon.style.animation = status === 'running' ? 'btnSpinner 1s linear infinite' : 'none';
       }
-      if (metaEl) metaEl.textContent = data.last_sync_at ? ('Último sync: ' + relativeTime(data.last_sync_at)) : 'Aún no se ha sincronizado';
-      if (statusEl) {
-        statusEl.setAttribute('data-status', status);
-        var statusSpinner = statusEl.querySelector('.spinner');
-        if (data.status === 'running') {
-          if (!statusSpinner) { statusSpinner = document.createElement('span'); statusSpinner.className = 'spinner spinner--sm'; statusSpinner.setAttribute('aria-hidden', 'true'); statusEl.insertBefore(statusSpinner, statusEl.firstChild); }
-          statusSpinner.style.display = '';
-          var txt = statusEl.lastChild; if (txt && txt.nodeType === 3) statusEl.removeChild(txt);
-          statusEl.appendChild(document.createTextNode(' Sincronizando…'));
-        } else {
-          if (statusSpinner) statusSpinner.style.display = 'none';
-          var t = statusEl.lastChild; if (t && t.nodeType === 3) statusEl.removeChild(t);
-        }
-      }
-      if (errorEl) { if (data.message) { errorEl.textContent = data.message; errorEl.style.display = ''; } else errorEl.style.display = 'none'; }
       if (data.status === 'running') startPolling(); else stopPolling();
     }
 
@@ -1400,50 +2128,162 @@
     syncBtn.addEventListener('click', function () {
       if (syncBtn.disabled) return;
       syncBtn.disabled = true;
-      var label = syncBtn.querySelector('.list-sync-bar__btn-label') || syncBtn.querySelector('.fiel-submit__text') || syncBtn.childNodes[0];
-      var origText = label ? label.textContent : syncBtn.textContent;
-      var loadingSpinner = syncBtn.querySelector('.list-sync-bar__btn-spinner');
-      if (!loadingSpinner) { loadingSpinner = document.createElement('span'); loadingSpinner.className = 'spinner spinner--sm list-sync-bar__btn-spinner'; loadingSpinner.setAttribute('aria-hidden', 'true'); syncBtn.insertBefore(loadingSpinner, syncBtn.firstChild); }
-      loadingSpinner.style.display = 'inline-block';
-      if (label) label.textContent = loadingText;
+      updateUI({ status: 'running' });
       (window.portalFetchJSON ? window.portalFetchJSON('/portal/sat/sync', { method: 'POST', credentials: 'same-origin', headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' } }, { timeoutMs: 30000, retry: 0 }) : Promise.resolve({ ok: false, status: 0, data: null, detail: 'Helper no disponible' }))
         .then(function (r) {
           if (r && r.status === 401) return;
           var data = (r && r.data) ? r.data : { ok: false, message: (r && r.detail) || 'No se pudo iniciar.' };
           if (data && data.ok) {
             fetchStatus();
-            updateUI({ status: 'running', last_sync_at: null });
-            if (window.portalBanner) window.portalBanner({ id: 'sync-warning', type: 'warning', title: 'Sync SAT', message: 'Puede tardar unos minutos. Los CFDI se descargan en segundo plano.', dismissible: true });
-            if (window.uiSuccessOverlay) window.uiSuccessOverlay({ title: 'Sincronización iniciada', message: 'Los CFDI se están descargando en segundo plano. Puedes seguir usando el portal.', actions: [{ label: 'Entendido', onClick: function () { if (window.uiSuccessOverlayClose) window.uiSuccessOverlayClose(); } }] });
-            else if (window.portalToast) window.portalToast({ type: 'info', title: 'Sync iniciado', message: 'Los CFDI se descargan en segundo plano.' });
+            if (window.portalToast) window.portalToast({ type: 'info', title: 'Sincronización en proceso', message: 'Los CFDI se descargan en segundo plano.' });
           } else if (data && !data.ok) {
             var errMsg = data.message || 'No se pudo iniciar.';
-            if (metaEl) metaEl.textContent = errMsg;
-            if (metaEl) metaEl.removeAttribute('aria-hidden');
-            if (chipEl) { chipEl.textContent = 'Error'; chipEl.title = errMsg; }
-            if (listBar) listBar.setAttribute('data-status', 'error');
-            if (window.portalBanner) window.portalBanner({ id: 'sync-error', type: 'error', title: 'Sync SAT', message: errMsg, dismissible: true });
-            if (window.portalToast) window.portalToast({ type: 'error', title: 'Sync', message: errMsg });
-            else if (window.uiSuccessOverlay) window.uiSuccessOverlay({ title: 'No se pudo sincronizar', message: errMsg, actions: [{ label: 'Entendido', onClick: function () { if (window.uiSuccessOverlayClose) window.uiSuccessOverlayClose(); } }] });
+            updateUI({ status: 'error' });
+            if (window.portalToast) window.portalToast({ type: 'error', title: 'Error', message: errMsg });
           }
         })
         .catch(function () {
-          if (metaEl) metaEl.textContent = 'Error de conexión.';
-          if (chipEl) { chipEl.textContent = 'Error'; chipEl.title = 'Error de conexión.'; }
-          if (listBar) listBar.setAttribute('data-status', 'error');
-          if (window.portalBanner) window.portalBanner({ id: 'sync-error', type: 'error', title: 'Sync SAT', message: 'Error de conexión. Revisa tu red e intenta de nuevo.', dismissible: true });
+          updateUI({ status: 'error' });
+          if (window.portalToast) window.portalToast({ type: 'error', title: 'Error de conexión', message: 'Revisa tu red e intenta de nuevo.' });
         })
         .finally(function () {
           syncBtn.disabled = false;
-          if (label) label.textContent = origText;
-          var sp = syncBtn.querySelector('.list-sync-bar__btn-spinner');
-          if (sp) sp.style.display = 'none';
         });
     });
 
     fetchStatus();
   })();
 </script>
+<!-- ── Notification Drawer (right side, 320px) ── -->
+<div class="notif-backdrop" id="notifBackdrop" hidden></div>
+<aside class="notif-drawer" id="notifDrawer" aria-label="Notificaciones" hidden>
+  <div class="notif-drawer__head">
+    <h2 class="notif-drawer__title">Notificaciones</h2>
+    <button type="button" class="btn btn-ghost btn-small" onclick="if(window.closeNotifDrawerGlobal)window.closeNotifDrawerGlobal();if(window.openActivityModal)window.openActivityModal();">Ver todo</button>
+    <button type="button" class="icon-btn notif-drawer__close" id="notifDrawerClose" aria-label="Cerrar">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+    </button>
+  </div>
+  <div class="notif-drawer__body" id="notifDrawerBody">
+    <div class="notif-drawer__empty" id="notifDrawerEmpty" hidden>
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="1.25" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      <p>Sin notificaciones pendientes</p>
+    </div>
+    <ul class="notif-drawer__list" id="notifDrawerList"></ul>
+  </div>
+</aside>
+
+<!-- ── Creation Panel ("+" context panel) ── -->
+<div class="create-panel-backdrop" id="createPanelBackdrop" hidden></div>
+<aside class="create-panel" id="createPanel" aria-label="Crear nuevo" hidden>
+  <div class="create-panel__head">
+    <h2 class="create-panel__title" id="createPanelTitle">Crear nuevo</h2>
+    <button type="button" class="icon-btn create-panel__close" id="createPanelClose" aria-label="Cerrar">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+    </button>
+  </div>
+  <div class="create-panel__body" id="createPanelBody">
+    <!-- Menu view -->
+    <div class="create-panel__menu" id="createPanelMenu">
+      <a class="create-panel__option" href="/portal/create">
+        <span class="create-panel__option-icon"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7z"/><path d="M14 2v5h5"/><path d="M12 11v6M9 14h6"/></svg></span>
+        <div class="create-panel__option-text">
+          <strong>Nueva factura</strong>
+          <small>Formulario completo CFDI</small>
+        </div>
+      </a>
+      <button type="button" class="create-panel__option" id="createPanelQuickInvoice">
+        <span class="create-panel__option-icon"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg></span>
+        <div class="create-panel__option-text">
+          <strong>Factura rápida</strong>
+          <small>1 cliente, 1 concepto</small>
+        </div>
+      </button>
+      <a class="create-panel__option" href="/portal/cotizaciones" id="createPanelNewQuotation">
+        <span class="create-panel__option-icon"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7z"/><path d="M14 2v5h5"/><path d="M8 12h8M8 16h5"/></svg></span>
+        <div class="create-panel__option-text">
+          <strong>Nueva cotización</strong>
+          <small>Envía propuesta al cliente</small>
+        </div>
+      </a>
+      <button type="button" class="create-panel__option" id="createPanelManualMov">
+        <span class="create-panel__option-icon"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M12 2v20M2 12h20"/><rect x="3" y="3" width="18" height="18" rx="3"/></svg></span>
+        <div class="create-panel__option-text">
+          <strong>Movimiento manual</strong>
+          <small>Ingreso o gasto sin banco</small>
+        </div>
+      </button>
+      <a class="create-panel__option" href="/portal/clients#new">
+        <span class="create-panel__option-icon"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+        <div class="create-panel__option-text">
+          <strong>Nuevo cliente</strong>
+          <small>Agregar receptor RFC</small>
+        </div>
+      </a>
+    </div>
+    <!-- Quick invoice subview (injected via JS) -->
+    <div class="create-panel__subview" id="createPanelQuickView" hidden>
+      <button type="button" class="create-panel__back" id="createPanelBackBtn">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        Volver
+      </button>
+      <div id="createPanelQuickContent"></div>
+    </div>
+    <!-- Manual movement subview -->
+    <div class="create-panel__subview" id="createPanelManualView" hidden>
+      <button type="button" class="create-panel__back" id="createPanelManualBackBtn">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        Volver
+      </button>
+      <form class="manual-mov-form" id="manualMovForm">
+        <div class="manual-mov-tipo-toggle">
+          <button type="button" class="manual-mov-tipo-btn manual-mov-tipo-btn--active" data-tipo="INGRESO">Ingreso</button>
+          <button type="button" class="manual-mov-tipo-btn" data-tipo="GASTO">Gasto</button>
+        </div>
+        <input type="hidden" name="tipo" id="manualMovTipo" value="INGRESO">
+        <label class="form-field">
+          <span class="form-label">Fecha</span>
+          <input type="date" name="fecha" id="manualMovFecha" required>
+        </label>
+        <label class="form-field">
+          <span class="form-label">Descripción</span>
+          <input type="text" name="descripcion" id="manualMovDesc" placeholder="Ej: Renta de oficina" required>
+        </label>
+        <label class="form-field">
+          <span class="form-label">Monto (MXN)</span>
+          <input type="number" name="monto" id="manualMovMonto" step="0.01" min="0.01" placeholder="0.00" required>
+        </label>
+        <label class="form-field">
+          <span class="form-label">Categoría</span>
+          <select name="categoria" id="manualMovCat">
+            <option value="">Sin categoría</option>
+            <option value="SERVICIOS">Servicios</option>
+            <option value="ALIMENTOS">Alimentos</option>
+            <option value="NOMINA">Nómina</option>
+            <option value="IMPUESTOS">Impuestos</option>
+            <option value="EFECTIVO">Efectivo</option>
+            <option value="GASTO">Gasto general</option>
+            <option value="INGRESO">Ingreso general</option>
+            <option value="OTROS">Otros</option>
+          </select>
+        </label>
+        <label class="form-field">
+          <span class="form-label">Notas (opcional)</span>
+          <textarea name="notas" id="manualMovNotas" rows="2" placeholder="Notas adicionales..."></textarea>
+        </label>
+        <button type="submit" class="btn btn-primary w-full" id="manualMovSubmit">Guardar movimiento</button>
+      </form>
+    </div>
+  </div>
+</aside>
+
+<!-- ── Quick Invoice modal (global, available from rail flyout on all pages) ── -->
+{% include "components/quick_invoice_modal.html" %}
+<script src="/static/js/quick-invoice.js"></script>
+
+{% include "components/movement_modal.html" %}
+<script src="/static/js/movement-modal.js"></script>
+
 {% if dev_debug_panel|default(false) %}
 <div id="devDebugPanel" class="dev-debug-panel" aria-label="Panel de debug (solo desarrollo)" data-env="dev">
   <button type="button" class="dev-debug-panel__toggle" id="devDebugPanelToggle" aria-expanded="false" aria-controls="devDebugPanelList" title="Ver últimos errores de peticiones (solo desarrollo)">Debug <span id="devDebugPanelCount">0</span></button>

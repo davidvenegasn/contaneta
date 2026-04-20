@@ -4,7 +4,7 @@ import time
 
 from fastapi import Request, HTTPException
 
-from config import ALLOW_DEMO_PORTAL, DEV_MODE, DEV_TOKEN, SESSION_TTL_DAYS
+from config import ALLOW_DEMO_PORTAL, ALLOW_LEGACY_TOKEN_LOGIN, DEV_MODE, DEV_TOKEN, SESSION_TTL_DAYS
 from database import db_rows, has_column, db
 from services import issuers, session, users
 from services import rate_limit as rate_limit_service
@@ -47,7 +47,7 @@ def get_portal_issuer(request: Request) -> dict:
     cookie_val = request.cookies.get(cookie_name)
     is_api = request.url.path.startswith("/api/") or request.url.path.startswith("/download/")
 
-    if token_query:
+    if token_query and ALLOW_LEGACY_TOKEN_LOGIN:
         # Mitigar brute force sobre tokens legacy (por IP).
         if rate_limit_service.is_rate_limited(request, "token", window_seconds=60.0, max_attempts=20):
             if is_api:
@@ -86,7 +86,10 @@ def get_portal_issuer(request: Request) -> dict:
                     raise HTTPException(status_code=401, detail="No autorizado - redirigir a /login")
                 mem = users.get_membership(user_id, issuer_id)
                 if not mem:
-                    pass
+                    logger.warning("Tenant isolation: user_id=%s has no membership for issuer_id=%s", user_id, issuer_id)
+                    if is_api:
+                        raise HTTPException(status_code=403, detail="No tienes acceso a este emisor.")
+                    raise HTTPException(status_code=401, detail="No autorizado - redirigir a /login")
                 else:
                     request.state.issuer_id = issuer["id"]
                     request.state.issuer = issuer

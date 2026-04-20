@@ -16,6 +16,7 @@ from typing import Any
 
 from services import invoices_service
 from services.errors import ValidationError
+from database import safe_update
 
 # ---------- CFDI 4.0 defaults ----------
 
@@ -212,6 +213,7 @@ def build_facturapi_payload(
     customer: dict[str, Any],
     items: list[dict[str, Any]] | None,
     payments: list[dict[str, Any]] | None = None,
+    related_documents: list[dict[str, Any]] | None = None,
     cfdi_use: str = DEFAULT_CFDI_USE,
     payment_form: str = DEFAULT_PAYMENT_FORM,
     payment_method: str = DEFAULT_PAYMENT_METHOD,
@@ -266,6 +268,7 @@ def build_facturapi_payload(
         customer=cust_payload,
         items=items_in,
         payments=payments,
+        related_documents=related_documents,
         cfdi_use=cfdi_use,
         payment_form=payment_form,
         payment_method=payment_method,
@@ -285,3 +288,113 @@ def build_facturapi_payload(
 def validate(payload: dict[str, Any]) -> None:
     """Validate an already-built payload."""
     invoices_service.validate_invoice_payload(payload)
+
+
+# ---------- DB persistence ----------
+
+def save_invoice_record(
+    conn,
+    issuer_id: int,
+    *,
+    currency: str,
+    exchange_rate: float | None,
+    payment_form: str,
+    payment_method: str,
+    cfdi_use: str,
+    customer_rfc: str,
+    customer_legal_name: str,
+    customer_zip: str,
+    customer_tax_system: str,
+    customer_email: str | None,
+    export_code: str = "01",
+    tipo_comprobante: str = "I",
+    series: str | None = None,
+    folio_number: int | None = None,
+    order_ref: str | None = None,
+    issue_date: str | None = None,
+    notes: str | None = None,
+) -> int:
+    """Insert invoice header row + optional columns. Returns invoice_local_id."""
+    cur = conn.execute(
+        """
+        INSERT INTO invoices (
+            issuer_id, currency, exchange_rate,
+            payment_form, payment_method, cfdi_use,
+            customer_rfc, customer_legal_name,
+            customer_zip, customer_tax_system, customer_email
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            issuer_id, currency, exchange_rate,
+            payment_form, payment_method, cfdi_use,
+            customer_rfc, customer_legal_name,
+            customer_zip, customer_tax_system, customer_email,
+        ),
+    )
+    invoice_local_id = cur.lastrowid
+    safe_update(
+        conn, "invoices", invoice_local_id,
+        {
+            "export_code": export_code,
+            "tipo_comprobante": tipo_comprobante,
+            "series": series,
+            "folio_number": folio_number,
+            "order_ref": order_ref,
+            "issue_date": issue_date,
+            "notes": notes,
+        },
+    )
+    return invoice_local_id
+
+
+def save_invoice_items(conn, invoice_local_id: int, items: list[dict[str, Any]]) -> None:
+    """Persist Facturapi-format line items into invoice_items table."""
+    if not items:
+        return
+    pragma_rows = conn.execute("PRAGMA table_info(invoice_items)").fetchall()
+    cols = set()
+    for r in pragma_rows:
+        name = r.get("name")
+        if name:
+            cols.add(name)
+    base_cols = ["invoice_id", "quantity", "description", "product_key", "unit_price", "iva_rate"]
+    has_unit_key = "unit_key" in cols
+    has_discount = "discount" in cols
+    insert_cols = base_cols + (["unit_key"] if has_unit_key else []) + (["discount"] if has_discount else [])
+    placeholders = ", ".join(["?"] * len(insert_cols))
+    col_sql = ", ".join(insert_cols)
+    for it in items:
+        base_vals = [
+            invoice_local_id,
+            it["quantity"],
+            it["product"]["description"],
+            it["product"]["product_key"],
+            it["product"]["price"],
+            it["product"]["taxes"][0]["rate"] if it["product"].get("taxes") else 0.16,
+        ]
+        extra_vals: list = []
+        if has_unit_key:
+            extra_vals.append(it["product"].get("unit_key"))
+        if has_discount:
+            extra_vals.append(it.get("discount", 0.0))
+        conn.execute(
+            f"INSERT INTO invoice_items ({col_sql}) VALUES ({placeholders})",
+            tuple(base_vals + extra_vals),
+        )
+
+
+def update_invoice_stamp(
+    conn,
+    invoice_local_id: int,
+    issuer_id: int,
+    *,
+    facturapi_id: str | None,
+    uuid: str | None,
+    total: float | None,
+) -> None:
+    """Stamp result: set facturapi_invoice_id, uuid, total on the invoice row."""
+    conn.execute(
+        "UPDATE invoices SET facturapi_invoice_id = ?, uuid = ?, total = ? WHERE id = ? AND issuer_id = ?",
+        (facturapi_id, uuid, total, invoice_local_id, issuer_id),
+    )
+    conn.commit()

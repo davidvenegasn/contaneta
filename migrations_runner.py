@@ -342,8 +342,8 @@ def _list_migration_files(migrations_dir: str) -> list[tuple[str, str]]:
 
 def _movement_dedup_hash(issuer_id: int, fecha: str, descripcion: str, deposito, retiro) -> str:
     """Misma fórmula que portal/ingest para dedupe de movimientos."""
-    dep = "" if deposito is None else f"{float(deposito):.2f}"
-    ret = "" if retiro is None else f"{float(retiro):.2f}"
+    dep = f"{float(deposito or 0):.2f}"
+    ret = f"{float(retiro or 0):.2f}"
     desc = (descripcion or "").strip()[:500].replace("\r", " ").replace("\n", " ")
     payload = f"{issuer_id}|{fecha or ''}|{desc}|{dep}|{ret}"
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()

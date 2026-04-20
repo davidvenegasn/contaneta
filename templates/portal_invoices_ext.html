@@ -1,0 +1,192 @@
+{% extends "base_portal.html" %}
+{% block content %}
+
+<!-- Month picker -->
+{{ month_picker('/portal/invoices-ext', token|default(''), ym|default(''), ym_label|default('')) }}
+
+<!-- Metric cards -->
+<div class="dashboard-metrics" style="margin-bottom:20px;">
+  <div class="card metric-card metric-card--income">
+    <div class="metric-label">Total ingresos (exportaciones)</div>
+    <div class="metric-value">${{ '{:,.2f}'.format(sum_ingresos|default(0)) }}</div>
+    <div class="metric-sub">{{ ym_label|default('') }}</div>
+  </div>
+  <div class="card metric-card metric-card--expense">
+    <div class="metric-label">Total gastos (importaciones)</div>
+    <div class="metric-value">${{ '{:,.2f}'.format(sum_gastos|default(0)) }}</div>
+    <div class="metric-sub">{{ ym_label|default('') }}</div>
+  </div>
+</div>
+
+<!-- Upload zone -->
+<div class="upload-zone" id="invoiceUploadZone">
+  <div class="upload-zone__inner" id="invoiceUploadInner">
+    <svg class="upload-zone__icon" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7z"/><path d="M14 2v5h5"/><path d="M12 11v6"/><path d="m9 14 3-3 3 3"/>
+    </svg>
+    <p class="upload-zone__text"><strong>Arrastra tus invoices</strong> o <button type="button" class="upload-zone__browse" onclick="document.getElementById('invoiceFileInput').click()">seleccionar archivos</button></p>
+    <p class="invoices-page__upload-hint">Solo PDF — se leerá y guardará automáticamente</p>
+    <input type="file" accept=".pdf" multiple hidden id="invoiceFileInput" aria-label="Seleccionar archivos PDF de invoice">
+  </div>
+</div>
+
+<!-- Invoices list section -->
+<div class="card" style="margin-top:8px;">
+  <div class="card__header card__header--row ui-card__header">
+    <div>
+      <h3 class="card__title section-title">Invoices</h3>
+      <p class="muted u-m0 u-text-sm">Invoices de servicios internacionales del mes.</p>
+    </div>
+    <div class="card__header-actions" style="display:flex; gap:8px; align-items:center;">
+      <button type="button" class="btn btn--sm btn--ghost" id="pageAddInvoiceBtn" title="Agregar invoice">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" width="16" height="16"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        Agregar Invoice
+      </button>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="mov-tabs" id="invoicePageTabs" role="tablist" style="padding:0 20px;">
+    <button type="button" class="mov-tab mov-tab--active" data-fi-filter="all" role="tab" aria-selected="true">Todos</button>
+    <button type="button" class="mov-tab" data-fi-filter="INGRESO" role="tab" aria-selected="false">Ingresos (Exportación)</button>
+    <button type="button" class="mov-tab" data-fi-filter="GASTO" role="tab" aria-selected="false">Gastos (Importación)</button>
+  </div>
+
+  {% set invoices_list = invoices|default([]) %}
+  {% if invoices_list|length > 0 %}
+  <div style="overflow-x:auto; padding:0 4px;">
+    <table class="invoices-table" id="invoicesTable">
+      <thead>
+        <tr>
+          <th>Fecha</th>
+          <th>Invoice #</th>
+          <th>Empresa</th>
+          <th>País</th>
+          <th>Moneda</th>
+          <th style="text-align:right;">Monto</th>
+          <th style="text-align:right;">MXN</th>
+          <th>Tipo</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="invoicesTableBody">
+        {% for inv in invoices_list %}
+        <tr data-tipo="{{ inv.tipo }}" data-id="{{ inv.id }}">
+          <td>{{ inv.fecha[:10] if inv.fecha else '-' }}</td>
+          <td style="font-weight:600;">{{ inv.invoice_number or '-' }}</td>
+          <td title="{{ inv.empresa }}">{{ inv.empresa[:30] if inv.empresa else '-' }}{{ '...' if inv.empresa and inv.empresa|length > 30 else '' }}</td>
+          <td>{{ inv.pais or '-' }}</td>
+          <td>{{ inv.moneda or '-' }}</td>
+          <td style="text-align:right;">{{ '{:,.2f}'.format(inv.monto_original|default(0)) }}</td>
+          <td style="text-align:right; font-weight:600;">${{ '{:,.2f}'.format(inv.monto_mxn|default(0)) }}</td>
+          <td>
+            {% if inv.tipo == 'INGRESO' %}
+            <span class="badge badge--ingreso">Ingreso</span>
+            {% else %}
+            <span class="badge badge--gasto">Gasto</span>
+            {% endif %}
+          </td>
+          <td style="white-space:nowrap;">
+            {% if inv.archivo %}
+            <a href="/api/invoices/foreign/{{ inv.id }}/pdf" target="_blank" class="btn btn--sm btn--ghost" title="Ver PDF original" style="margin-right:2px;">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" width="14" height="14"><path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7z" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 2v5h5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </a>
+            {% endif %}
+            <button type="button" class="btn btn--sm btn--ghost btn--danger fi-delete-btn" data-id="{{ inv.id }}" title="Eliminar">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" width="14" height="14"><path d="M3 6h18M8 6V4h8v2M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="invoices-empty" id="invoicesEmpty">
+    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10A15.3 15.3 0 0 1 12 2"/></svg>
+    <p>No tienes invoices registrados en <strong>{{ ym_label|default('este mes') }}</strong>.</p>
+    <p style="font-size:13px;">Arrastra un PDF arriba o agrega uno manualmente.</p>
+    <button type="button" class="btn btn-primary" id="emptyAddInvoiceBtn" style="margin-top:12px;">Agregar mi primer invoice</button>
+  </div>
+  {% endif %}
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  // Add invoice buttons
+  var addBtn = document.getElementById('pageAddInvoiceBtn');
+  var emptyBtn = document.getElementById('emptyAddInvoiceBtn');
+  if (addBtn) addBtn.addEventListener('click', function() { if (window.openAddInvoiceModal) window.openAddInvoiceModal(); });
+  if (emptyBtn) emptyBtn.addEventListener('click', function() { if (window.openAddInvoiceModal) window.openAddInvoiceModal(); });
+
+  // Tab filters (client-side)
+  var filterTabs = document.querySelectorAll('#invoicePageTabs [data-fi-filter]');
+  var rows = document.querySelectorAll('#invoicesTableBody tr');
+  filterTabs.forEach(function(tab) {
+    tab.addEventListener('click', function() {
+      filterTabs.forEach(function(t) { t.classList.remove('mov-tab--active'); t.setAttribute('aria-selected', 'false'); });
+      tab.classList.add('mov-tab--active');
+      tab.setAttribute('aria-selected', 'true');
+      var f = tab.dataset.fiFilter;
+      rows.forEach(function(r) {
+        r.style.display = (f === 'all' || r.dataset.tipo === f) ? '' : 'none';
+      });
+    });
+  });
+
+  // Delete buttons
+  document.querySelectorAll('.fi-delete-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      if (!confirm('¿Eliminar este invoice?')) return;
+      var id = btn.dataset.id;
+      var csrf = document.querySelector('meta[name="csrf-token"]');
+      fetch('/api/invoices/foreign/' + id, {
+        method: 'DELETE',
+        headers: {'X-CSRF-Token': csrf ? csrf.content : ''},
+        credentials: 'same-origin',
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(res) {
+        if (res.ok) {
+          btn.closest('tr').remove();
+          if (window.portalToast) window.portalToast({type:'success', title:'Invoice eliminado'});
+        } else {
+          if (window.portalToast) window.portalToast({type:'error', title:'Error', message: res.detail || 'No se pudo eliminar'});
+        }
+      })
+      .catch(function() {
+        if (window.portalToast) window.portalToast({type:'error', title:'Error de conexión'});
+      });
+    });
+  });
+
+  // Upload zone
+  var zone = document.getElementById('invoiceUploadZone');
+  var fileInput = document.getElementById('invoiceFileInput');
+  if (zone && fileInput) {
+    zone.addEventListener('dragover', function(e) { e.preventDefault(); zone.classList.add('is-dragover'); });
+    zone.addEventListener('dragleave', function() { zone.classList.remove('is-dragover'); });
+    zone.addEventListener('drop', function(e) {
+      e.preventDefault(); zone.classList.remove('is-dragover');
+      handleFiles(e.dataTransfer.files);
+    });
+    fileInput.addEventListener('change', function() { handleFiles(fileInput.files); fileInput.value = ''; });
+  }
+  function handleFiles(files) {
+    for (var i = 0; i < files.length; i++) {
+      if (!files[i].name.toLowerCase().endsWith('.pdf')) {
+        if (window.portalToast) window.portalToast({type:'error', title:'Solo se aceptan archivos PDF'});
+        continue;
+      }
+      if (window.extractInvoicePDF) {
+        // autoSave=true: extract + save automatically without opening modal
+        window.extractInvoicePDF(files[i], document.getElementById('invoiceUploadInner'), true);
+      }
+    }
+  }
+})();
+</script>
+
+{% endblock %}

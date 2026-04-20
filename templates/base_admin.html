@@ -4,12 +4,13 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>{% block title %}Admin{% endblock %} — ContaNeta</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%236366f1'/%3E%3Ctext x='16' y='22' text-anchor='middle' font-family='system-ui' font-weight='700' font-size='18' fill='white'%3EC%3C/text%3E%3C/svg%3E" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/css/form.css" />
   <style>
-    body { font-family: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif; margin: 0; padding: 16px; background: #f0fdf9; color: #0d1f1c; }
+    body { font-family: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif; margin: 0; padding: 16px; background: #f0fdf9; color: #0d1f1c; line-height: 1.5; text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
     .admin-wrap { max-width: 1200px; margin: 0 auto; }
     .admin-nav { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; padding: 12px; background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
     .admin-nav a { color: #0369a1; text-decoration: none; font-weight: 500; }
@@ -21,7 +22,7 @@
     .card h2 { margin: 0 0 12px; font-size: 1rem; color: #64748b; font-weight: 600; }
     .stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
     .stat { background: #f1f5f9; padding: 12px; border-radius: 8px; text-align: center; }
-    .stat .n { font-size: 1.5rem; font-weight: 700; color: #0f172a; }
+    .stat .n { font-size: 1.5rem; font-weight: 600; color: #0f172a; }
     .stat .label { font-size: 12px; color: #64748b; }
     table { width: 100%; border-collapse: collapse; }
     th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #e2e8f0; }
@@ -44,6 +45,7 @@
     .badge--error { background: #fee2e2; color: #991b1b; }
     .badge--warning { background: #fef9c3; color: #854d0e; }
     .muted { color: #64748b; }
+    .admin-textarea { width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 8px; font-family: inherit; font-size: 14px; resize: vertical; }
     .impersonate-form { display: inline; }
     .impersonate-form button { margin-left: 4px; }
   </style>

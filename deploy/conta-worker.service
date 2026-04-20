@@ -1,0 +1,23 @@
+# systemd unit para ContaNeta Worker (SAT sync + jobs)
+# Copiar a /etc/systemd/system/conta-worker.service
+# sudo systemctl daemon-reload && sudo systemctl enable conta-worker && sudo systemctl start conta-worker
+
+[Unit]
+Description=ContaNeta Worker (SAT sync + jobs)
+After=network.target conta-invoicing.service
+
+[Service]
+Type=simple
+User=conta
+Group=conta
+WorkingDirectory=/var/www/conta-invoicing
+Environment=PATH=/var/www/conta-invoicing/venv/bin
+EnvironmentFile=-/var/www/conta-invoicing/.env
+ExecStart=/var/www/conta-invoicing/venv/bin/python worker.py --loop --sleep=2
+Restart=always
+RestartSec=10
+MemoryMax=512M
+TasksMax=64
+
+[Install]
+WantedBy=multi-user.target

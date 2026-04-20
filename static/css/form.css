@@ -1,7 +1,7 @@
 * { box-sizing: border-box; }
 
 :root{
-  --font-family: "Plus Jakarta Sans", system-ui, -apple-system, Segoe UI, sans-serif;
+  --font-family: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
   --text-2xs: 0.6875rem;
   --text-xs: 0.8125rem;
   --text-sm: 0.9375rem;
@@ -22,9 +22,9 @@
   --muted: #3d524f;
   --border: rgba(13, 31, 28, 0.08);
   --border-strong: rgba(13,31,28,.14);
-  --primary: #14b8a6;
-  --primary-hover: #0d9488;
-  --focus: rgba(20,184,166,.22);
+  --primary: #6366f1;
+  --primary-hover: #4f46e5;
+  --focus: rgba(99,102,241,.22);
   --radius: 14px;
   --shadow: 0 10px 30px rgba(13,31,28,.06);
   --label-color: #2d3d3a;
@@ -46,11 +46,14 @@ body{
   color: var(--text);
   font-size: var(--text-base);
   font-weight: var(--fw-normal);
-  line-height: 1.4;
+  line-height: var(--leading-body, 1.55);
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
 }
 
-h2{ font-size: var(--text-2xl); font-weight: var(--fw-bold); letter-spacing: -0.02em; margin: 8px 0 6px; }
+h2{ font-size: var(--text-2xl); font-weight: var(--fw-semibold); letter-spacing: -0.02em; margin: 8px 0 6px; }
 h3{ font-size: var(--text-md); font-weight: var(--fw-semibold); margin: 0 0 10px; }
 
 /* P31: contenedores flex/grid con min-width:0 para evitar overlap/overflow */
@@ -94,7 +97,7 @@ form{ min-width: 0; max-width: 100%; }
 .tax-global-field__label{
   display: block;
   font-size: var(--text-xs);
-  font-weight: var(--fw-bold);
+  font-weight: var(--fw-semibold);
   color: var(--muted);
   margin-bottom: 6px;
 }
@@ -132,7 +135,7 @@ form{ min-width: 0; max-width: 100%; }
   .tax-global-row{ grid-template-columns: 1fr; min-width: 0; }
 }
 
-label{ font-size: var(--text-2xs, 0.6875rem); font-weight: var(--fw-bold); display: block; margin-bottom: 8px; color: var(--label-color, var(--muted)); letter-spacing: var(--ls-wide, 0.04em); text-transform: uppercase; }
+label{ font-size: var(--text-2xs, 0.6875rem); font-weight: var(--fw-semibold); display: block; margin-bottom: 8px; color: var(--label-color, var(--muted)); letter-spacing: var(--ls-wide, 0.04em); text-transform: uppercase; }
 
 /* Tooltip "?" */
 .tip{
@@ -140,7 +143,7 @@ label{ font-size: var(--text-2xs, 0.6875rem); font-weight: var(--fw-bold); displ
   width: 16px; height: 16px; border-radius: 50%;
   background: var(--border-strong, rgba(13,31,28,.14));
   color: var(--muted, #3d524f);
-  font-size: 10px; font-weight: 700; line-height: 1;
+  font-size: 10px; font-weight: 600; line-height: 1;
   cursor: help; position: relative; margin-left: 5px;
   vertical-align: middle; text-transform: none; letter-spacing: 0;
   flex-shrink: 0;
@@ -371,7 +374,7 @@ input::placeholder, textarea::placeholder{ color:#94a3b8; }
   background: #fff;
   color: var(--muted);
   font-size: var(--text-xs);
-  font-weight: var(--fw-bold);
+  font-weight: var(--fw-semibold);
   cursor: pointer;
   white-space: nowrap;
 }
@@ -406,7 +409,7 @@ input::placeholder, textarea::placeholder{ color:#94a3b8; }
 .conceptos-card .item-head{ display: none; }
 
 .muted{ color: var(--muted); font-size: var(--text-xs); }
-.danger { color: #b00020; font-weight: var(--fw-bold); }
+.danger { color: #b00020; font-weight: var(--fw-semibold); }
 .hidden { display: none; }
 
 button{
@@ -417,7 +420,7 @@ button{
   color: #fff;
   font-family: var(--font-family);
   font-size: var(--text-base);
-  font-weight: var(--fw-bold);
+  font-weight: var(--fw-semibold);
   cursor: pointer;
   transition: transform var(--motion-micro, 150ms) ease, box-shadow var(--motion-micro, 150ms) ease, background var(--motion-micro, 150ms) ease;
 }
@@ -443,7 +446,7 @@ button:focus-visible{
 /* ===== Conceptos layout (alineado con las filas de abajo como “Genera tu factura”) ===== */
 .item-head{
   font-size: var(--text-xs);
-  font-weight: var(--fw-bold);
+  font-weight: var(--fw-semibold);
   color: var(--muted);
   display: grid;
   grid-template-columns: var(--concept-cols);
@@ -668,7 +671,7 @@ details.card > summary { user-select:none; }
 .prodservBtn:hover{ background:#f3f4f6; }
 
 /* Modal ProdServ (form): namespace .form-modal para no colisionar con .modal del portal) */
-.form-modal{ position:fixed; inset:0; z-index:9999; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.form-modal{ position:fixed; inset:0; z-index: var(--z-modal, 400); overflow-y: auto; -webkit-overflow-scrolling: touch; }
 .form-modal__backdrop{ position:absolute; inset:0; background:rgba(0,0,0,.35); cursor:pointer; }
 .form-modal__panel{
   position: relative;
@@ -801,7 +804,7 @@ details.card > summary { user-select:none; }
     content: attr(data-label);
     display: block;
     font-size: var(--text-xs);
-    font-weight: 700;
+    font-weight: 600;
     color: var(--muted);
   }
 
@@ -843,7 +846,7 @@ details.card > summary { user-select:none; }
     content: attr(data-label);
     display: block;
     font-size: var(--text-xs);
-    font-weight: 700;
+    font-weight: 600;
     color: var(--muted);
     margin-bottom: 4px;
   }
@@ -904,15 +907,16 @@ details.card > summary { user-select:none; }
 }
 
 .app-title{
-  font-size:18px;
-  font-weight:800;
-  letter-spacing:.2px;
+  font-size: var(--text-xl, 1.375rem);
+  font-weight: var(--fw-semibold, 600);
+  letter-spacing: var(--ls-tight, -0.03em);
 }
 
 .app-subtitle{
-  margin-top:4px;
-  font-size:12px;
-  opacity:.75;
+  margin-top: 4px;
+  font-size: var(--text-2xs, 0.75rem);
+  font-weight: var(--fw-medium, 500);
+  opacity: 0.85;
 }
 
 .status-pill{
@@ -982,7 +986,7 @@ details.card > summary { user-select:none; }
 .action-bar{
   position: fixed;
   bottom: calc(10px + var(--safe-bottom));
-  z-index: 9999;
+  z-index: var(--z-modal, 400);
 
   display:flex;
   justify-content:space-between;
@@ -1227,7 +1231,7 @@ input:focus, select:focus, textarea:focus{
   min-height: 20px;
   border-radius: 4px;
   border: 1.5px solid #d1d5db;
-  accent-color: #14b8a6;
+  accent-color: var(--primary, #6366f1);
   cursor: pointer;
   transform: translateY(0.5px);
 }
@@ -1320,7 +1324,7 @@ input:focus, select:focus, textarea:focus{
   min-height: 20px;
   border-radius: 4px;
   border: 1.5px solid #d1d5db;
-  accent-color: #14b8a6;
+  accent-color: var(--primary, #6366f1);
   cursor: pointer;
   transform: translateY(0.5px);
 }
@@ -1483,9 +1487,19 @@ input:focus, select:focus, textarea:focus{
   align-items: center;
   gap: var(--space-2, 8px);
   margin-bottom: var(--space-6, 24px);
-  padding: 0;
+  padding: 10px 0;
   list-style: none;
   counter-reset: step;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: var(--surface, #fff);
+  border-bottom: 1px solid transparent;
+  transition: border-color 200ms ease, box-shadow 200ms ease;
+}
+.form-step-indicator.is-stuck{
+  border-bottom-color: var(--border, #e6e8ef);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
 }
 .form-step{
   display: flex;
@@ -1511,9 +1525,9 @@ input:focus, select:focus, textarea:focus{
   transition: background var(--motion-micro, 150ms) ease, color var(--motion-micro, 150ms) ease, border-color var(--motion-micro, 150ms) ease;
 }
 .form-step--active .form-step__number{
-  background: var(--accent-soft, #ccfbf1);
-  color: var(--accent, #14b8a6);
-  border-color: var(--accent, #14b8a6);
+  background: var(--accent-soft, #eef2ff);
+  color: var(--accent, #6366f1);
+  border-color: var(--accent, #6366f1);
 }
 .form-step--active{
   color: var(--text, #0d1f1c);
@@ -1536,7 +1550,7 @@ input:focus, select:focus, textarea:focus{
 }
 .form-step--done + .form-step__connector,
 .form-step--active + .form-step__connector{
-  background: var(--accent, #14b8a6);
+  background: var(--accent, #6366f1);
 }
 
 /* ===== Form section header ===== */
@@ -1595,9 +1609,83 @@ input:focus, select:focus, textarea:focus{
 @media (max-width: 640px){
   .form-step-indicator{
     gap: var(--space-1, 4px);
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 2px;
   }
+  .form-step-indicator::-webkit-scrollbar { display: none; }
   .form-step__connector{
     width: 16px;
+    flex-shrink: 0;
+  }
+  .form-step{
+    flex-shrink: 0;
   }
 }
+
+/* ===== Resumen card — differentiated background ===== */
+#totalsCard{
+  background: var(--surface-1, #fafafa);
+  border: 1.5px solid var(--border-strong, rgba(0,0,0,.10));
+  position: relative;
+}
+#totalsCard::before{
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--gradient-card-shine, linear-gradient(135deg, rgba(99,102,241,.03) 0%, rgba(139,92,246,.03) 100%));
+  pointer-events: none;
+}
+#totalsCard input:disabled{
+  background: var(--surface-0, #fff);
+  font-weight: var(--fw-semibold, 600);
+  color: var(--text, #0f172a);
+}
+/* Total payable — accent highlight */
+#total_payable_preview:disabled{
+  font-size: var(--text-lg, 1.125rem);
+  font-weight: var(--fw-bold, 700) !important;
+  color: var(--primary, #6366f1) !important;
+}
+html.nightmode #totalsCard{
+  background: var(--surface-1, #161b22);
+  border-color: var(--border-strong, rgba(255,255,255,.12));
+}
+
+/* ===== Submit button loading state ===== */
+.btn-loading{
+  pointer-events: none;
+  opacity: .75;
+  position: relative;
+}
+.btn-loading::after{
+  content: '';
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  margin-left: 8px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: btn-spin .6s linear infinite;
+  vertical-align: middle;
+}
+@keyframes btn-spin{
+  to{ transform: rotate(360deg); }
+}
+
+/* ===== Accordion chevron (extras section) ===== */
+.form-accordion-chevron { transition: transform .2s ease; }
+details[open] > .form-accordion-trigger .form-accordion-chevron { transform: rotate(90deg); }
+.form-accordion-trigger::-webkit-details-marker { display: none; }
+
+/* ===== Night mode overrides for invoice form ===== */
+html.nightmode .invoice-form-page,
+html.nightmode .portal .card { background: var(--surface, #161b22); color: var(--text, #e6edf3); }
+html.nightmode .invoice-form-page .card { border-color: var(--border, rgba(255,255,255,.08)); }
+html.nightmode .invoice-form-page h1,
+html.nightmode .invoice-form-page h2,
+html.nightmode .invoice-form-page h3 { color: var(--text, #e6edf3); }

@@ -174,7 +174,7 @@ def create_account(
             ),
         )
         conn.commit()
-        rid = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+        rid = conn.execute("SELECT last_insert_rowid() AS rid").fetchone()["rid"]
         row = db_rows(
             "SELECT id, issuer_id, alias, bank_name, clabe, account_last4, holder_name, rfc_titular, is_active, created_at, updated_at FROM issuer_bank_accounts WHERE id = ? AND issuer_id = ?",
             (rid, issuer_id),

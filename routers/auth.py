@@ -20,11 +20,14 @@ from services import email_sender
 
 logger = logging.getLogger(__name__)
 
+# Dummy bcrypt hash for constant-time login (prevents timing-based user enumeration)
+_DUMMY_HASH = "$2b$12$U6hZVXXPMyR82NvkOKCr2O4o/torbd/ZHVpPFSDM09kGjGX20spOW"
+
 # Cooldown por email: desactivado (no bloquear por intentos fallidos)
 _LOGIN_FAILURES_BY_EMAIL: dict[str, list[float]] = defaultdict(list)
 _EMAIL_FAILURES_WINDOW = 900.0
-_EMAIL_MAX_FAILURES = 99999  # efectivamente desactivado
-_EMAIL_COOLDOWN_SECONDS = 0
+_EMAIL_MAX_FAILURES = 5
+_EMAIL_COOLDOWN_SECONDS = 900  # 15 minutos
 _EMAIL_COOLDOWN_UNTIL: dict[str, float] = {}
 
 
@@ -55,6 +58,7 @@ def _login_error_message(code: str | None) -> str | None:
     # Mensajes genéricos: no revelar "email existe" / "email no existe"
     msgs = {
         "invalid": "Datos inválidos. Intenta de nuevo.",
+        "cooldown": "Demasiados intentos. Espera 15 minutos antes de intentar de nuevo.",
         "csrf": "La sesión de la página expiró. Recarga la página (F5) e intenta de nuevo.",
         "email_or_phone": "Indica tu correo o teléfono.",
         "bad_credentials": "Datos inválidos. Intenta de nuevo.",
@@ -70,8 +74,8 @@ def _signup_error_message(code: str | None) -> str | None:
         "email_or_phone": "Indica tu correo o teléfono.",
         "password": "La contraseña debe tener al menos 8 caracteres.",
         "password_mismatch": "Las contraseñas no coinciden.",
-        "email_exists": "No se pudo crear la cuenta. Intenta de nuevo.",
-        "phone_exists": "No se pudo crear la cuenta. Intenta de nuevo.",
+        "email_exists": "Ya existe una cuenta con este correo. Intenta iniciar sesión o usa otro correo.",
+        "phone_exists": "Ya existe una cuenta con este teléfono. Intenta iniciar sesión o usa otro número.",
         "error": "No se pudo crear la cuenta. Intenta de nuevo.",
     }
     return msgs.get(code or "", None)
@@ -141,12 +145,21 @@ def get_auth_router(templates):
     router = APIRouter()
     cookie_name = session.get_session_cookie_name()
 
-    def _render_login(request: Request, error: str | None = None):
+    def _render_login(request: Request, error: str | None = None, success: str | None = None):
+        # Flash messages from query params
+        if not success:
+            msg = request.query_params.get("msg", "")
+            verified = request.query_params.get("verified", "")
+            if msg == "password_reset_ok":
+                success = "Contraseña actualizada. Inicia sesión con tu nueva contraseña."
+            elif verified == "1":
+                success = "Correo verificado correctamente. Inicia sesión."
         return templates.TemplateResponse(
             "login.html",
             {
                 "request": request,
                 "error": error,
+                "success": success,
                 "csrf_token": csrf_service.generate_csrf_token(),
                 "google_login_url": _google_login_url(request) or "#",
                 "facebook_login_url": _facebook_login_url(request) or "#",
@@ -182,15 +195,20 @@ def get_auth_router(templates):
         phone: str | None = Form(None),
         password: str = Form(...),
         csrf_token: str | None = Form(None),
+        redirect_to: str | None = Form(None),
     ):
         try:
             token_val = (csrf_token or request.headers.get("X-CSRF-Token") or "").strip()
-            if not DEV_MODE and not csrf_service.verify_csrf_token(token_val, max_age_seconds=14400):
+            logger.debug("LOGIN: cred_type=%s login_type=%s", cred_type, login_type)
+            if not csrf_service.verify_csrf_token(token_val):
+                logger.debug("LOGIN: CSRF FAILED")
                 return RedirectResponse(url="/login?error=csrf", status_code=302)
             if rate_limit_service.is_rate_limited(request, "login"):
+                logger.debug("LOGIN: rate limited")
                 time.sleep(2)
                 return RedirectResponse(url="/login?error=invalid", status_code=302)
             if login_type != "credentials" or not password:
+                logger.debug("LOGIN: bad login_type or no password")
                 return RedirectResponse(url="/login?error=invalid", status_code=302)
             email = (email or "").strip().lower() or None
             phone = (phone or "").strip() or None
@@ -198,25 +216,32 @@ def get_auth_router(templates):
                 email = None
             else:
                 phone = None
+            logger.debug("LOGIN: credentials resolved, cred_type=%s", cred_type)
             if not email and not phone:
                 logger.warning("Login: falta email o teléfono")
                 return RedirectResponse(url="/login?error=email_or_phone", status_code=302)
             user = users.get_user_by_email_or_phone(email or phone)
             if not user:
-                logger.warning("Login: usuario no encontrado para email=%s", email)
+                # Constant-time: run bcrypt against dummy hash to prevent timing enumeration
+                users.verify_password(password, _DUMMY_HASH)
+                logger.warning("LOGIN: user not found")
                 if _login_email_cooldown(email):
                     time.sleep(2)
-                    return RedirectResponse(url="/login?error=invalid", status_code=302)
+                    return RedirectResponse(url="/login?error=cooldown", status_code=302)
                 _record_login_failure(email)
                 return RedirectResponse(url="/login?error=bad_credentials", status_code=302)
+            logger.debug("LOGIN: user found id=%s", user["id"])
             hashed = users.get_user_password_hash(user["id"])
-            if not hashed or not users.verify_password(password, hashed):
-                logger.warning("Login: contraseña incorrecta para user_id=%s email=%s", user["id"], email)
+            pwd_ok = users.verify_password(password, hashed) if hashed else False
+            logger.debug("LOGIN: verify user_id=%s result=%s", user["id"], pwd_ok)
+            if not hashed or not pwd_ok:
+                logger.warning("Login: bad password for user_id=%s", user["id"])
                 if _login_email_cooldown(email):
                     time.sleep(2)
-                    return RedirectResponse(url="/login?error=invalid", status_code=302)
+                    return RedirectResponse(url="/login?error=cooldown", status_code=302)
                 _record_login_failure(email)
                 return RedirectResponse(url="/login?error=bad_credentials", status_code=302)
+            logger.debug("LOGIN: password OK, setting session")
             # Login correcto: quitar cooldown de este email para que no quede bloqueado
             if email:
                 _EMAIL_COOLDOWN_UNTIL.pop(email, None)
@@ -236,7 +261,10 @@ def get_auth_router(templates):
                 issuer_id = memberships[0]["issuer_id"]
                 audit.log(action="login", user_id=user["id"], issuer_id=issuer_id, details="credentials", request=request)
                 log_action(request, "login", user_id=user["id"], issuer_id=issuer_id)
-                resp = RedirectResponse(url="/portal/home", status_code=302)
+                # Redirect to original page if available and safe (starts with /)
+                _redir = (redirect_to or "").strip()
+                _target = _redir if _redir and _redir.startswith("/") and not _redir.startswith("//") else "/portal/home"
+                resp = RedirectResponse(url=_target, status_code=302)
                 resp.set_cookie(
                     cookie_name,
                     session.sign_session(user["id"], issuer_id),
@@ -260,20 +288,15 @@ def get_auth_router(templates):
     def register_redirect(request: Request):
         return RedirectResponse(url="/signup", status_code=302)
 
-    @router.get("/signup", response_class=HTMLResponse)
-    def signup_page_public(request: Request, error: str | None = Query(None)):
-        return templates.TemplateResponse(
-            "register.html",
-            {"request": request, "error": _register_error_message(error), "csrf_token": csrf_service.generate_csrf_token(), "form_action": "/auth/signup"},
-        )
+    # /signup GET is registered later (signup_page) with social login support
 
     @router.post("/auth/signup", response_class=RedirectResponse)
     def auth_signup_submit(
         request: Request,
         email: str = Form(...),
         password: str = Form(...),
-        rfc: str = Form(...),
-        razon_social: str = Form(...),
+        rfc: str | None = Form(None),
+        razon_social: str | None = Form(None),
         regimen_fiscal: str = Form("616"),
         cp: str | None = Form(None),
         csrf_token: str | None = Form(None),
@@ -289,28 +312,31 @@ def get_auth_router(templates):
             return RedirectResponse(url="/signup?error=required", status_code=302)
         if not password or len(password) < 8:
             return RedirectResponse(url="/signup?error=password", status_code=302)
-        rfc = sanitize_service.sanitize_rfc(rfc)
-        razon_social = (razon_social or "").strip()[:200]
-        if not rfc or not razon_social:
-            return RedirectResponse(url="/signup?error=required", status_code=302)
+        pw_err = users.validate_password_strength(password)
+        if pw_err:
+            return RedirectResponse(url="/signup?error=password", status_code=302)
+        # RFC is optional — allow signup without fiscal data
+        rfc = sanitize_service.sanitize_rfc(rfc) if rfc else None
+        razon_social = (razon_social or "").strip()[:200] or None
         cp = sanitize_service.sanitize_cp(cp)
         if cp is not None and len(cp) != 5:
             cp = None
         if users.get_user_by_email(email):
             return RedirectResponse(url="/signup?error=error", status_code=302)
+        display_name = razon_social or email.split("@")[0].title()
         try:
             user = users.create_user(
                 email=email,
                 password_hash=users.hash_password(password),
-                name=razon_social,
+                name=display_name,
             )
         except Exception as e:
             logger.exception("Signup create_user: %s", e)
             return RedirectResponse(url="/signup?error=error", status_code=302)
         try:
             issuer_id, _ = issuers.create_issuer_with_token(
-                rfc=rfc,
-                razon_social=razon_social,
+                rfc=rfc or "PENDIENTE",
+                razon_social=razon_social or display_name,
                 regimen_fiscal=(regimen_fiscal or "").strip() or None,
             )
             users.add_membership(user["id"], issuer_id, "owner")
@@ -321,7 +347,7 @@ def get_auth_router(templates):
             action="register",
             user_id=user["id"],
             issuer_id=issuer_id,
-            details=f"email={email[:50]} rfc={rfc}",
+            details=f"email={email[:50]} rfc={rfc or 'PENDIENTE'}",
             request=request,
         )
         try:
@@ -360,6 +386,9 @@ def get_auth_router(templates):
         if not email:
             return RedirectResponse(url="/signup?error=required", status_code=302)
         if not password or len(password) < 8:
+            return RedirectResponse(url="/signup?error=password", status_code=302)
+        pw_err = users.validate_password_strength(password)
+        if pw_err:
             return RedirectResponse(url="/signup?error=password", status_code=302)
         rfc = sanitize_service.sanitize_rfc(rfc)
         razon_social = (razon_social or "").strip()[:200]
@@ -479,7 +508,7 @@ def get_auth_router(templates):
         if password != password_confirm:
             return RedirectResponse(url=f"/reset-password?token={token}&error=mismatch", status_code=302)
         users.update_user_password(user_id, users.hash_password(password))
-        return RedirectResponse(url="/login?reset=1", status_code=302)
+        return RedirectResponse(url="/login?msg=password_reset_ok", status_code=302)
 
     @router.get("/choose-issuer", response_class=HTMLResponse)
     def choose_issuer_page(request: Request):
@@ -573,7 +602,7 @@ def get_auth_router(templates):
                 headers={"Content-Type": "application/x-www-form-urlencoded"},
             )
         if token_res.status_code != 200:
-            logger.warning("Google token exchange failed: %s", token_res.text)
+            logger.warning("Google token exchange failed: status=%s", token_res.status_code)
             return RedirectResponse(url="/login?error=oauth", status_code=302)
         try:
             token_data = token_res.json()
@@ -666,7 +695,7 @@ def get_auth_router(templates):
                 },
             )
         if token_res.status_code != 200:
-            logger.warning("Facebook token exchange failed: %s", token_res.text)
+            logger.warning("Facebook token exchange failed: status=%s", token_res.status_code)
             return RedirectResponse(url="/login?error=oauth", status_code=302)
         try:
             token_data = token_res.json()
@@ -738,7 +767,7 @@ def get_auth_router(templates):
         return templates.TemplateResponse("privacy.html", {"request": request})
 
     @router.get("/signup", response_class=HTMLResponse)
-    def signup_page(request: Request, error: str | None = Query(None)):
+    def signup_page(request: Request, error: str | None = Query(None), email: str | None = Query(None), phone: str | None = Query(None), lt: str | None = Query(None)):
         return templates.TemplateResponse(
             "signup.html",
             {
@@ -749,6 +778,9 @@ def get_auth_router(templates):
                 "facebook_login_url": _facebook_login_url(request) or "#",
                 "google_oauth_configured": bool(os.getenv("GOOGLE_CLIENT_ID", "").strip()),
                 "facebook_oauth_configured": bool(os.getenv("FACEBOOK_APP_ID", "").strip()),
+                "prev_email": email or "",
+                "prev_phone": phone or "",
+                "prev_login_type": lt or "email",
             },
         )
 
@@ -778,16 +810,34 @@ def get_auth_router(templates):
             email = None
         else:
             phone = None
+
+        # Build redirect base with preserved fields
+        from urllib.parse import urlencode, quote
+        _keep = {}
+        if email:
+            _keep["email"] = email
+        if phone:
+            _keep["phone"] = phone
+        if login_type == "phone":
+            _keep["lt"] = "phone"
+
+        def _err_url(code: str) -> str:
+            params = {"error": code, **_keep}
+            return f"/signup?{urlencode(params)}"
+
         if not email and not phone:
-            return RedirectResponse(url="/signup?error=email_or_phone", status_code=302)
+            return RedirectResponse(url=_err_url("email_or_phone"), status_code=302)
         if not password or len(password) < 8:
-            return RedirectResponse(url="/signup?error=password", status_code=302)
+            return RedirectResponse(url=_err_url("password"), status_code=302)
+        pw_err = users.validate_password_strength(password)
+        if pw_err:
+            return RedirectResponse(url=_err_url("password"), status_code=302)
         if password != password_confirm:
-            return RedirectResponse(url="/signup?error=password_mismatch", status_code=302)
+            return RedirectResponse(url=_err_url("password_mismatch"), status_code=302)
         if email and users.get_user_by_email(email):
-            return RedirectResponse(url="/signup?error=email_exists", status_code=302)
+            return RedirectResponse(url=_err_url("email_exists"), status_code=302)
         if phone and users.get_user_by_phone(phone):
-            return RedirectResponse(url="/signup?error=phone_exists", status_code=302)
+            return RedirectResponse(url=_err_url("phone_exists"), status_code=302)
         try:
             user = users.create_user(email=email, phone=phone, password_hash=users.hash_password(password))
         except Exception as e:
@@ -844,7 +894,7 @@ def get_auth_router(templates):
         finally:
             conn.close()
         users.add_membership(user_id, issuer_id, "owner")
-        resp = RedirectResponse(url="/portal/home", status_code=302)
+        resp = RedirectResponse(url="/portal/config/sat", status_code=302)
         resp.set_cookie(
             cookie_name,
             session.sign_session(user_id, issuer_id),
@@ -854,23 +904,8 @@ def get_auth_router(templates):
 
     @router.get("/onboarding", response_class=HTMLResponse)
     def onboarding_page(request: Request):
-        cookie_val = request.cookies.get(cookie_name)
-        session_data = session.verify_session(cookie_val)
-        if not session_data or session_data[0] == 0:
-            return RedirectResponse(url="/login", status_code=302)
-        user_id, issuer_id = session_data[0], session_data[1]
-        if not issuer_id or issuer_id == 0:
-            memberships = users.get_memberships_for_user(user_id)
-            if not memberships:
-                return RedirectResponse(url="/confirmar-perfil", status_code=302)
-            issuer_id = memberships[0]["issuer_id"]
-        issuer = issuers.get_issuer_by_id(issuer_id)
-        if not issuer:
-            return RedirectResponse(url="/confirmar-perfil", status_code=302)
-        return templates.TemplateResponse(
-            "onboarding.html",
-            {"request": request, "error": request.query_params.get("error"), "issuer": issuer, "csrf_token": csrf_service.generate_csrf_token()},
-        )
+        """Legacy onboarding page — now redirects to SAT config (FIEL upload)."""
+        return RedirectResponse(url="/portal/config/sat", status_code=302)
 
     @router.post("/onboarding", response_class=RedirectResponse)
     def onboarding_submit(

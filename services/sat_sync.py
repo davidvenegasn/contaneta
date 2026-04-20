@@ -11,7 +11,7 @@ def get_sat_sync_status(issuer_id: int) -> dict:
     conn = db()
     try:
         running = conn.execute(
-            "SELECT 1 FROM sat_jobs WHERE issuer_id = ? AND status IN ('queued','running') LIMIT 1",
+            "SELECT created_at FROM sat_jobs WHERE issuer_id = ? AND status IN ('queued','running') ORDER BY created_at ASC LIMIT 1",
             (issuer_id,),
         ).fetchone()
         last_ok = conn.execute(
@@ -32,6 +32,18 @@ def get_sat_sync_status(issuer_id: int) -> dict:
     if running:
         status = "running"
         message = "Sincronización en proceso"
+        # Check if job has been running too long (>10 min)
+        try:
+            from datetime import datetime, timezone
+            started = running["created_at"]
+            if started:
+                started_dt = datetime.fromisoformat(started.replace("Z", "+00:00")) if "T" in started else datetime.strptime(started[:19], "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+                elapsed = (datetime.now(timezone.utc) - started_dt).total_seconds()
+                if elapsed > 600:  # 10 minutes
+                    status = "stale"
+                    message = "La sincronización tardó más de lo esperado. Puedes reintentar."
+        except Exception:
+            pass
     elif last_error and last_ok and last_error["t"] and last_ok["t"] and last_error["t"] > last_ok["t"]:
         status = "error"
         message = (last_error["last_error"] or "Error en la última sincronización")[:200]
@@ -82,14 +94,10 @@ def get_month_totals(issuer_id: int, ym: str, direction: str) -> dict:
             ).fetchone()
         if not row:
             total_base = total_iva = total_retenciones = 0.0
-        elif isinstance(row, dict):
+        else:
             total_base = float(row.get("total_base") or 0)
             total_iva = float(row.get("total_iva") or 0)
             total_retenciones = float(row.get("total_retenciones") or 0) if has_retenciones else 0.0
-        else:
-            total_base = float(row[0] or 0)
-            total_iva = float(row[1] or 0)
-            total_retenciones = float(row[2] or 0) if (has_retenciones and len(row) >= 3) else 0.0
         return {
             "total_base": total_base,
             "total_iva": total_iva,

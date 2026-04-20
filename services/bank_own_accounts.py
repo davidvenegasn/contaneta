@@ -92,6 +92,7 @@ def detect_own_account_transfer(
     user_bank_accounts: list[dict[str, Any]],
     statement_owner_name: Optional[str] = None,
     statement_owner_rfc: Optional[str] = None,
+    issuer_rfc: Optional[str] = None,
 ) -> dict[str, Any]:
     """
     Marca si el movimiento es transferencia a/de una cuenta propia registrada.
@@ -100,8 +101,6 @@ def detect_own_account_transfer(
     """
     reasons: list[str] = []
     raw = (mov.get("raw_text_normalized") or mov.get("raw_text_original") or "").upper()
-    if "SPEI" not in raw and "TRASPASO" not in raw:
-        return mov
 
     contraparte = (mov.get("contraparte_nombre") or "").strip()
     rfc_mov = (mov.get("rfc_detectado") or "").strip().upper()
@@ -177,8 +176,12 @@ def detect_own_account_transfer(
                 mov["warnings"] = w
                 return mov
 
-    # Regla 5: RFC
-    if statement_owner_rfc and rfc_mov and statement_owner_rfc.strip().upper() == rfc_mov:
+    # Regla 5: RFC (comparar contra RFC del PDF y contra RFC del issuer)
+    _issuer_rfc_norm = (issuer_rfc or "").strip().upper()
+    if rfc_mov and (
+        (statement_owner_rfc and statement_owner_rfc.strip().upper() == rfc_mov)
+        or (_issuer_rfc_norm and _issuer_rfc_norm == rfc_mov)
+    ):
         mov["es_transferencia_propia_probable"] = True
         mov["impacta_contabilidad"] = False
         mov["categoria_sugerida"] = "CUENTA_PROPIA"
@@ -206,3 +209,34 @@ def detect_own_account_transfer(
                 return mov
 
     return mov
+
+
+def reclassify_own_transfers_by_rfc(conn, issuer_id: int, issuer_rfc: str) -> int:
+    """
+    Retroactive UPDATE: marca como CUENTA_PROPIA los movimientos cuyo
+    rfc_encontrado coincida con el RFC del issuer y que aún no estén
+    clasificados así.  Idempotente.  Devuelve filas actualizadas.
+    """
+    if not issuer_rfc or issuer_id <= 0:
+        return 0
+    rfc = issuer_rfc.strip().upper()
+    if not rfc:
+        return 0
+    # Try both column names (rfc_encontrado vs rfc_detectado) depending on schema
+    for col in ("rfc_encontrado", "rfc_detectado"):
+        try:
+            cur = conn.execute(
+                f"""
+                UPDATE bank_movements
+                SET categoria = 'CUENTA_PROPIA'
+                WHERE issuer_id = ?
+                  AND UPPER(TRIM({col})) = ?
+                  AND COALESCE(categoria, '') != 'CUENTA_PROPIA'
+                """,
+                (issuer_id, rfc),
+            )
+            conn.commit()
+            return cur.rowcount
+        except Exception:
+            continue
+    return 0

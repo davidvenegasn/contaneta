@@ -98,7 +98,7 @@ def get_admin_router(templates):
             sat_recent = []
         return {"error_events": error_events, "jobs_recent": jobs_recent, "sat_recent": sat_recent}
 
-    # ---------- GET: Dashboard ----------
+    # ---------- GET: Dashboard (operations center) ----------
     def _render_dashboard(request: Request, _admin: tuple[int, int, int | None]):
         ym = _ym_now()
         count_users = db_rows("SELECT COUNT(*) AS n FROM users")
@@ -115,7 +115,7 @@ def get_admin_router(templates):
             LEFT JOIN issuers i ON i.id = al.issuer_id
             WHERE al.action = 'login'
             ORDER BY al.id DESC
-            LIMIT 20
+            LIMIT 10
             """
         )
         errors_today = 0
@@ -127,13 +127,16 @@ def get_admin_router(templates):
             errors_today = 0
 
         # SAT jobs stats (24h)
-        sat_jobs_24h = {"queued": 0, "running": 0, "error": 0}
+        sat_jobs_24h = {"queued": 0, "running": 0, "error": 0, "done": 0}
         try:
             for row in db_rows(
                 "SELECT status, COUNT(*) AS n FROM sat_jobs WHERE created_at > datetime('now', '-24 hours') GROUP BY status"
             ):
-                if row["status"] in sat_jobs_24h:
-                    sat_jobs_24h[row["status"]] = row["n"]
+                st = row["status"]
+                if st in sat_jobs_24h:
+                    sat_jobs_24h[st] = row["n"]
+                elif st in ("done", "success", "ok"):
+                    sat_jobs_24h["done"] += row["n"]
         except Exception:
             pass
 
@@ -145,15 +148,62 @@ def get_admin_router(templates):
         except Exception:
             pass
 
+        # Issuers with active cooldown or recent SAT errors
+        problem_issuers = []
+        try:
+            problem_issuers = db_rows(
+                """SELECT i.id, i.rfc, i.razon_social,
+                          ss.direction, ss.cooldown_until, ss.last_error, ss.last_attempt_at,
+                          (SELECT COUNT(*) FROM sat_jobs sj
+                           WHERE sj.issuer_id = i.id AND sj.status = 'error'
+                           AND sj.updated_at > datetime('now', '-24 hours')) AS errors_24h
+                   FROM issuers i
+                   JOIN sat_sync_state ss ON ss.issuer_id = i.id
+                   WHERE ss.cooldown_until > datetime('now')
+                      OR EXISTS (SELECT 1 FROM sat_jobs sj
+                                 WHERE sj.issuer_id = i.id AND sj.status = 'error'
+                                 AND sj.updated_at > datetime('now', '-24 hours'))
+                   ORDER BY errors_24h DESC, ss.cooldown_until DESC"""
+            )
+        except Exception:
+            pass
+
+        # Recent SAT errors count (for requeue button)
+        sat_errors_recent = 0
+        try:
+            r = db_rows(
+                "SELECT COUNT(*) AS n FROM sat_jobs WHERE status = 'error' AND updated_at > datetime('now', '-24 hours')"
+            )
+            sat_errors_recent = r[0]["n"] if r else 0
+        except Exception:
+            pass
+
         sat_cfdi_by_direction = db_rows(
             """SELECT direction, COUNT(*) AS n FROM sat_cfdi
                WHERE fecha_emision IS NOT NULL AND substr(fecha_emision, 1, 7) = ?
                GROUP BY direction""",
             (ym,),
         )
-        sat_requests_by_status = db_rows(
-            "SELECT status, COUNT(*) AS n FROM sat_requests GROUP BY status"
-        )
+
+        # CFDIs missing XML + backfill job stats
+        cfdi_missing_xml = 0
+        try:
+            r = db_rows("SELECT COUNT(*) AS n FROM sat_cfdi WHERE xml_path IS NULL OR TRIM(COALESCE(xml_path, '')) = ''")
+            cfdi_missing_xml = r[0]["n"] if r else 0
+        except Exception:
+            pass
+        backfill_jobs_24h = {"success": 0, "failed": 0}
+        try:
+            for row in db_rows(
+                "SELECT status, COUNT(*) AS n FROM jobs WHERE name = 'sat_xml_backfill' AND created_at > datetime('now', '-24 hours') GROUP BY status"
+            ):
+                st = row["status"]
+                if st == "success":
+                    backfill_jobs_24h["success"] = row["n"]
+                elif st == "failed":
+                    backfill_jobs_24h["failed"] = row["n"]
+        except Exception:
+            pass
 
         # Recent jobs (last 20) for table
         recent_jobs = db_rows(
@@ -173,9 +223,32 @@ def get_admin_router(templates):
         except Exception:
             pass
 
+        # Last backup info
+        last_backup = None
+        backup_dir = os.getenv("BACKUP_DIR", "")
+        if not backup_dir:
+            backup_dir = str(Path(__file__).resolve().parent.parent / "backup")
+        try:
+            if os.path.isdir(backup_dir):
+                db_backups = sorted(
+                    [f for f in os.listdir(backup_dir) if f.startswith("invoicing") and f.endswith(".db.gz")],
+                    reverse=True,
+                )
+                if db_backups:
+                    fpath = os.path.join(backup_dir, db_backups[0])
+                    stat = os.stat(fpath)
+                    last_backup = {
+                        "file": db_backups[0],
+                        "size_mb": round(stat.st_size / (1024 * 1024), 2),
+                        "time": datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M"),
+                        "count": len(db_backups),
+                    }
+        except Exception:
+            pass
+
         audit_events = db_rows(
-            """SELECT id, created_at, action, user_id, issuer_id, target_issuer_id, details,
-                      entity, entity_id, meta_json, ip, user_agent FROM audit_log ORDER BY id DESC LIMIT 20"""
+            """SELECT id, created_at, action, user_id, issuer_id, details
+               FROM audit_log ORDER BY id DESC LIMIT 10"""
         )
         return templates.TemplateResponse(
             "admin_dashboard.html",
@@ -191,12 +264,18 @@ def get_admin_router(templates):
                 "errors_today": errors_today,
                 "sat_jobs_24h": sat_jobs_24h,
                 "needs_review_count": needs_review_count,
+                "problem_issuers": problem_issuers,
+                "sat_errors_recent": sat_errors_recent,
                 "last_logins": last_logins,
                 "sat_cfdi_by_direction": sat_cfdi_by_direction,
-                "sat_requests_by_status": sat_requests_by_status,
                 "recent_jobs": recent_jobs,
                 "recent_errors": recent_errors,
                 "audit_events": audit_events,
+                "last_backup": last_backup,
+                "cfdi_missing_xml": cfdi_missing_xml,
+                "backfill_jobs_24h": backfill_jobs_24h,
+                "csrf_token": csrf_service.generate_csrf_token(),
+                "msg": request.query_params.get("msg"),
             },
         )
 
@@ -385,7 +464,7 @@ def get_admin_router(templates):
         issuer_errors = []
         try:
             issuer_errors = db_rows(
-                "SELECT id, created_at, path, status_code, request_id FROM error_events WHERE issuer_id = ? ORDER BY id DESC LIMIT 10",
+                "SELECT id, created_at, path, status, request_id FROM error_events WHERE issuer_id = ? ORDER BY id DESC LIMIT 10",
                 (issuer_id,),
             )
         except Exception:
@@ -1067,6 +1146,51 @@ a {{ color: #0369a1; text-decoration: none; }}
             },
         )
 
+    # ---------- POST: Requeue recent SAT errors ----------
+    @router.post("/sat-jobs/requeue-recent-errors")
+    def admin_requeue_sat_errors(
+        request: Request,
+        csrf_token: str | None = Form(None),
+        _admin: tuple[int, int, int | None] = Depends(require_admin),
+    ):
+        token_val = (csrf_token or request.headers.get("X-CSRF-Token") or "").strip()
+        if not csrf_service.verify_csrf_token(token_val):
+            raise HTTPException(status_code=403, detail="Token CSRF inválido o expirado")
+        user_id, issuer_id, _ = _admin
+        try:
+            conn = db()
+            try:
+                cur = conn.execute(
+                    """UPDATE sat_jobs SET status = 'queued', last_error = NULL, started_at = NULL, finished_at = NULL
+                       WHERE status = 'error' AND updated_at > datetime('now', '-24 hours')"""
+                )
+                requeued = cur.rowcount
+                # Clear cooldowns for affected issuers
+                conn.execute(
+                    """UPDATE sat_sync_state SET cooldown_until = NULL
+                       WHERE cooldown_until > datetime('now')
+                       AND issuer_id IN (
+                           SELECT DISTINCT issuer_id FROM sat_jobs
+                           WHERE status = 'queued' AND updated_at > datetime('now', '-24 hours')
+                       )"""
+                )
+                conn.commit()
+            finally:
+                conn.close()
+            audit.log(
+                action="admin_requeue_sat_errors",
+                user_id=user_id,
+                issuer_id=issuer_id,
+                details=f"requeued={requeued}",
+                request=request,
+            )
+            return RedirectResponse(
+                url=f"/admin/dashboard?msg=Re-encolados {requeued} SAT job(s)",
+                status_code=303,
+            )
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Error al re-encolar: {e}")
+
     # ---------- Impersonate (JSON body, API) ----------
     from pydantic import BaseModel
 
@@ -1082,6 +1206,11 @@ a {{ color: #0369a1; text-decoration: none; }}
             target_issuer = issuers.get_issuer_by_rfc((rfc or "").strip())
         if not target_issuer:
             raise HTTPException(status_code=400, detail="Issuer no encontrado (issuer_id o rfc válido)")
+        # Verify admin has membership in target issuer (prevent cross-tenant escalation)
+        mem = users.get_membership(user_id, target_issuer["id"])
+        if not mem:
+            logger.warning("Impersonation denied: user_id=%s has no membership for target issuer_id=%s", user_id, target_issuer["id"])
+            raise HTTPException(status_code=403, detail="No tienes acceso a este emisor.")
         audit.log(
             action="impersonate_start",
             user_id=user_id,
@@ -1114,24 +1243,22 @@ a {{ color: #0369a1; text-decoration: none; }}
         body: ImpersonateBody,
         _admin: tuple[int, int, int | None] = Depends(require_admin),
     ):
+        csrf_service.verify_api_csrf(request)
         user_id, current_issuer_id, _ = _admin
         return _do_impersonate(request, user_id, current_issuer_id, body.issuer_id, body.rfc)
 
-    @router.get("/impersonate/{issuer_id:int}", response_class=RedirectResponse)
-    def admin_impersonate_get(
-        request: Request,
-        issuer_id: int,
-        _admin: tuple[int, int, int | None] = Depends(require_admin),
-    ):
-        user_id, current_issuer_id, _ = _admin
-        return _do_impersonate(request, user_id, current_issuer_id, issuer_id, None)
+    # GET /impersonate removed — CSRF risk. Use POST only.
 
     @router.post("/impersonate/{issuer_id:int}", response_class=RedirectResponse)
     def admin_impersonate_post(
         request: Request,
         issuer_id: int,
+        csrf_token: str | None = Form(None),
         _admin: tuple[int, int, int | None] = Depends(require_admin),
     ):
+        token_val = (csrf_token or request.headers.get("X-CSRF-Token") or "").strip()
+        if not csrf_service.verify_csrf_token(token_val):
+            raise HTTPException(status_code=403, detail="Token CSRF inválido o expirado")
         user_id, current_issuer_id, _ = _admin
         return _do_impersonate(request, user_id, current_issuer_id, issuer_id, None)
 

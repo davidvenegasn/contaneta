@@ -38,7 +38,7 @@ def main():
             print(f"  id={r['id']} email={r.get('email')} name={r.get('name')}")
         return
 
-    print(f"Contraseña a verificar: {repr(password_to_check)}")
+    print(f"Contraseña a verificar: {'*' * len(password_to_check)} ({len(password_to_check)} chars)")
     print()
 
     for u in candidates:

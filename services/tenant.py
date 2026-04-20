@@ -20,11 +20,8 @@ def require_issuer_id(issuer: dict[str, Any]) -> int:
         raise TenantViolation("issuer inválido")
     return issuer_id
 
-from __future__ import annotations
 
 import re
-from typing import Any, Mapping
-
 from services.errors import ForbiddenError, NotFoundError
 
 

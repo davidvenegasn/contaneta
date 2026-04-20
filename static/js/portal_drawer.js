@@ -78,6 +78,13 @@
   function closeMobileMenu() {
     document.body.classList.remove('mobile-menu-open');
     if (mobileMenuBtn) mobileMenuBtn.setAttribute('aria-expanded', 'false');
+    // Reset drawer submenu and quick panel
+    var sub = document.getElementById('drawerInvoiceSubmenu');
+    if (sub) sub.hidden = true;
+    var menuPanel = document.getElementById('drawerSubMenuPanel');
+    var quickPanel = document.getElementById('drawerQuickPanel');
+    if (menuPanel) menuPanel.hidden = false;
+    if (quickPanel) quickPanel.hidden = true;
   }
 
   if (mobileMenuBtn) {

@@ -353,7 +353,138 @@ sqlite3 invoicing.db "SELECT id, email, password_changed_at FROM users WHERE pas
 
 ---
 
-## 7. Environment Variables (Operations)
+## 7. Worker (SAT Sync + Jobs)
+
+### Service
+
+```bash
+# Start/stop/restart
+sudo systemctl start conta-worker
+sudo systemctl stop conta-worker
+sudo systemctl restart conta-worker
+
+# View logs
+journalctl -u conta-worker -f
+
+# Status
+systemctl status conta-worker
+```
+
+Service file: `deploy/conta-worker.service`
+
+### How it works
+
+The worker runs in a continuous loop (`worker.py --loop --sleep=2`):
+
+1. **Job processor**: Claims and executes queued jobs (SAT sync, verify, backfill)
+2. **Scheduler** (every 5 min): Checks which issuers need a SAT refresh (cooldown expired), enqueues `sat_refresh_light` jobs
+3. **XML backfill** (every 6 hours): Finds CFDIs missing XML files, enqueues `sat_xml_backfill` jobs to retry downloads
+
+### Job types
+
+| Job | What it does | Timeout |
+|-----|-------------|---------|
+| `sat_refresh_light` | Sync metadata + download XMLs for current month | 600s |
+| `sat_sync_month` | Sync a specific month+direction | 600s |
+| `sat_verify_credentials` | Validate FIEL is correct | 30s |
+| `sat_xml_backfill` | Retry XML download for CFDIs missing xml_path | 600s |
+
+### Tuning
+
+| Env Variable | Default | Purpose |
+|-------------|---------|---------|
+| `SAT_SYNC_COOLDOWN_SECONDS` | `7200` (2h) | Time between syncs per issuer |
+| `SAT_SCHEDULER_INTERVAL` | `300` (5 min) | How often scheduler checks for eligible issuers |
+| `SAT_BACKFILL_INTERVAL` | `21600` (6h) | How often backfill scheduler runs |
+| `JOB_TIMEOUT_SECONDS` | `600` (10 min) | Max time per job before timeout |
+| `JOB_LEASE_SECONDS` | `900` (15 min) | Lease lock duration |
+
+### Troubleshooting
+
+**Worker not processing jobs:**
+```bash
+# Check if running
+systemctl status conta-worker
+
+# Check for stuck jobs
+sqlite3 invoicing.db "SELECT id, name, status, locked_at FROM jobs WHERE status = 'running' ORDER BY id DESC LIMIT 5;"
+
+# Reset stuck jobs (if worker crashed)
+sqlite3 invoicing.db "UPDATE jobs SET status='queued', locked_by=NULL, locked_at=NULL WHERE status='running' AND datetime(locked_at) < datetime('now', '-30 minutes');"
+```
+
+**SAT sync failing for an issuer:**
+```bash
+# Check last error
+sqlite3 invoicing.db "SELECT issuer_id, direction, last_error, last_attempt_at FROM sat_sync_state WHERE last_error IS NOT NULL;"
+
+# Check FIEL validity
+sqlite3 invoicing.db "SELECT issuer_id, validation_ok, validation_message FROM sat_credentials;"
+
+# Force re-sync via admin panel or enqueue directly
+sqlite3 invoicing.db "INSERT INTO jobs (name, issuer_id, payload_json, status) VALUES ('sat_refresh_light', <ISSUER_ID>, '{\"issuer_id\": <ISSUER_ID>}', 'queued');"
+```
+
+---
+
+## 8. Incident Playbooks
+
+### SAT service unavailable
+
+1. Check `sat_sync_state.last_error` for SAT error messages
+2. SAT web service outages are common — jobs auto-retry with exponential backoff (up to 10 min)
+3. If persistent: check SAT status at https://www.sat.gob.mx/
+4. The worker will resume automatically when SAT comes back
+
+### Database locked
+
+```bash
+# Find what's holding the lock
+lsof invoicing.db
+fuser invoicing.db
+
+# If zombie process:
+kill <PID>
+
+# Force WAL checkpoint (after killing zombie)
+sqlite3 invoicing.db "PRAGMA wal_checkpoint(TRUNCATE);"
+
+# Restart services
+sudo systemctl restart conta-invoicing conta-worker
+```
+
+### Storage full
+
+```bash
+# Check disk usage
+df -h /
+du -sh storage/*
+du -sh backup/*
+
+# Clean old backups (keep last 7 days)
+find backup/ -name "invoicing_*.db*" -mtime +7 -delete
+find backup/ -name "storage_*.tar.gz" -mtime +7 -delete
+
+# Clean old XML files (rarely needed — these are small)
+du -sh storage/xml/
+
+# Vacuum database (reclaims space, takes a brief lock)
+sqlite3 invoicing.db "VACUUM;"
+```
+
+### Backup verification
+
+```bash
+# Non-destructive drill — verifies integrity + prints row counts
+bash scripts/backup_verify.sh
+
+# Full restore drill (uses temp copy, does NOT affect live DB)
+# See scripts/restore_latest.sh for production restore procedure
+```
+
+---
+
+## 9. Environment Variables
 
 | Variable | Required (Prod) | Purpose |
 |----------|----------------|---------|
@@ -362,7 +493,7 @@ sqlite3 invoicing.db "SELECT id, email, password_changed_at FROM users WHERE pas
 | `SITE_URL` | **Yes** | Base URL for redirects/callbacks |
 | `APP_DB_PATH` | No | SQLite path (default: `./invoicing.db`) |
 | `ADMIN_PASSWORD` | **Yes** | Admin panel access |
-| `AT_REST_MASTER_KEY` | Recommended | Encryption master key (32 bytes hex/b64) |
+| `AT_REST_MASTER_KEY` | **Yes** | Encryption master key (32 bytes hex). App won't start without it in prod. |
 | `LOG_LEVEL` | No | `INFO` (default) |
 | `LOG_FILE` | No | Path for file logging |
 | `BACKUP_DIR` | No | Backup output directory |
@@ -372,7 +503,7 @@ sqlite3 invoicing.db "SELECT id, email, password_changed_at FROM users WHERE pas
 
 ---
 
-## 8. Deployment Checklist
+## 10. Deployment Checklist
 
 See also: `docs/LAUNCH_CHECKLIST.md`
 
@@ -380,7 +511,7 @@ Pre-deploy:
 - [ ] `.env` configured with production values
 - [ ] `SESSION_SECRET` is a unique 64-char hex string
 - [ ] `ADMIN_PASSWORD` is strong (20+ chars)
-- [ ] `AT_REST_MASTER_KEY` set (or `SESSION_SECRET` serves as fallback)
+- [ ] `AT_REST_MASTER_KEY` set (required — app won't start without it)
 - [ ] Backups configured (cron)
 - [ ] Log rotation configured
 - [ ] SSL/TLS configured (Caddy/Nginx)

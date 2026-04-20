@@ -14,11 +14,6 @@
   </div>
 </header>
 
-<nav class="portal-breadcrumb" aria-label="Breadcrumb" style="margin-bottom:var(--space-4);">
-  <a href="/portal/home">Inicio</a>
-  <span aria-hidden="true">›</span>
-  <span>Conectar SAT</span>
-</nav>
 
 <div class="fiel-layout">
   <div class="fiel-main">
@@ -115,6 +110,8 @@
       <div id="satSyncContent">
         <p class="muted" style="margin:0;">Cargando estado…</p>
       </div>
+      <button type="button" class="btn btn--sm btn--primary" id="satManualSyncBtn" style="margin-top:10px;">Sincronizar ahora</button>
+      <p class="muted" style="font-size:11px;margin-top:4px;">Puede tardar unos minutos. Se ejecuta en segundo plano.</p>
     </div>
     {% endif %}
   </aside>
@@ -299,11 +296,11 @@
   if (window.location.search.indexOf('saved=1') >= 0 && resultEl) {
     resultEl.hidden = false;
     if ({{ 'true' if validation_ok else 'false' }}) {
-      resultContent.innerHTML = '<p style="margin:0;"><span class="fiel-result__ok">✓</span> Credenciales guardadas. FIEL válida. Sincronizando tus facturas… puede tardar unos minutos.</p>';
+      resultContent.innerHTML = '<p style="margin:0;"><span class="fiel-result__ok">✓</span> Credenciales guardadas. FIEL válida. Tus facturas de los últimos 2 meses se descargarán automáticamente en aproximadamente 5 minutos.</p>';
       resultEl.style.background = 'var(--success-bg, rgba(22,163,74,.08))';
       resultEl.style.borderLeft = '4px solid var(--success, #16a34a)';
       if (window.uiSuccessOverlay) {
-        window.uiSuccessOverlay({ title: 'SAT Configurado', message: 'Tus credenciales se guardaron y la FIEL se validó correctamente. La sincronización de facturas ya se inició — puede tardar unos minutos.', actions: [{ label: 'Entendido', onClick: function () { if (window.uiSuccessOverlayClose) window.uiSuccessOverlayClose(); } }] });
+        window.uiSuccessOverlay({ title: 'SAT Configurado', message: 'Tus credenciales se guardaron y la FIEL se validó correctamente. Tus facturas de los últimos 2 meses se descargarán automáticamente en aproximadamente 5 minutos.', actions: [{ label: 'Entendido', onClick: function () { if (window.uiSuccessOverlayClose) window.uiSuccessOverlayClose(); } }] });
       }
     } else {
       var msgEl = document.getElementById('fielSavedValidationMessage');
@@ -342,6 +339,10 @@
   if (!card || !content) return;
   var pollInterval = 8000;
   var timer = null;
+  var pollStart = Date.now();
+  var MAX_POLL_MS = 5 * 60 * 1000; // 5 minutes
+  var errorCount = 0;
+  var MAX_ERRORS = 3;
 
   function fmt(dt) {
     if (!dt) return '—';
@@ -353,11 +354,19 @@
     var html = '';
     var d = data.data || data;
     var pending = d.has_pending_jobs;
+    var elapsed = Date.now() - pollStart;
+    var timedOut = pending && elapsed > MAX_POLL_MS;
 
-    if (pending) {
+    if (pending && !timedOut) {
       html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">';
       html += '<span class="spinner spinner--sm" aria-hidden="true"></span>';
       html += '<span style="font-weight:500;">Sincronizando…</span>';
+      html += '</div>';
+    } else if (timedOut) {
+      html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding:8px 12px;background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;">';
+      html += '<span style="font-size:16px;">⏳</span>';
+      html += '<div><span style="font-weight:500;color:#92400e;">La sincronización está tardando más de lo esperado.</span>';
+      html += '<div style="font-size:12px;color:#92400e;margin-top:2px;">Puedes cerrar esta página. Se completará en segundo plano.</div></div>';
       html += '</div>';
     }
 
@@ -408,7 +417,7 @@
     }
 
     content.innerHTML = html;
-    return pending;
+    return pending && !timedOut;
   }
 
   function poll() {
@@ -416,18 +425,49 @@
       return fetch(url, { credentials: 'same-origin' }).then(function(r) { return r.json().then(function(d) { return { data: d }; }); });
     };
     fetchFn('/api/sat/status').then(function(r) {
+      errorCount = 0;
       var stillPending = renderStatus(r.data || r);
       if (stillPending) {
         timer = setTimeout(poll, pollInterval);
-      } else if (timer) {
+      } else {
+        // Slow poll when idle
         timer = setTimeout(poll, 30000);
       }
     }).catch(function() {
-      content.innerHTML = '<p class="muted" style="margin:0;">No se pudo cargar el estado.</p>';
+      errorCount++;
+      if (errorCount >= MAX_ERRORS) {
+        content.innerHTML = '<div style="padding:8px 12px;background:#fef2f2;border:1px solid #fca5a5;border-radius:8px;font-size:13px;color:#991b1b;">No se pudo cargar el estado de sincronización. <button type="button" onclick="location.reload()" style="color:#991b1b;text-decoration:underline;border:none;background:none;cursor:pointer;font:inherit;">Reintentar</button></div>';
+      } else {
+        timer = setTimeout(poll, pollInterval * 2);
+      }
     });
   }
 
   poll();
+
+  // Manual sync button
+  var syncBtn = document.getElementById('satManualSyncBtn');
+  if (syncBtn) {
+    syncBtn.addEventListener('click', function() {
+      syncBtn.disabled = true;
+      syncBtn.textContent = 'Sincronizando…';
+      var fetchFn = window.portalFetchJSON || function(url, opts) {
+        return fetch(url, Object.assign({ credentials: 'same-origin' }, opts)).then(function(r) { return r.json().then(function(d) { return { data: d }; }); });
+      };
+      fetchFn('/portal/sat/sync', { method: 'POST', headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' } })
+        .then(function() {
+          pollStart = Date.now();
+          pollInterval = 8000;
+          if (timer) clearTimeout(timer);
+          poll();
+          setTimeout(function() { syncBtn.disabled = false; syncBtn.textContent = 'Sincronizar ahora'; }, 30000);
+        })
+        .catch(function() {
+          syncBtn.disabled = false;
+          syncBtn.textContent = 'Sincronizar ahora';
+        });
+    });
+  }
 })();
 </script>
 {% endblock %}

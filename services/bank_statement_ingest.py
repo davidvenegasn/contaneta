@@ -224,8 +224,8 @@ def _movement_dedup_hash(
     issuer_id: int, fecha: str, descripcion: str, deposito: Optional[float], retiro: Optional[float]
 ) -> str:
     """Hash para deduplicar movimientos: mismo issuer + fecha + concepto + montos = mismo movimiento (evita duplicados al subir el mismo edo. dos veces)."""
-    dep = "" if deposito is None else f"{float(deposito):.2f}"
-    ret = "" if retiro is None else f"{float(retiro):.2f}"
+    dep = f"{float(deposito or 0):.2f}"
+    ret = f"{float(retiro or 0):.2f}"
     desc = (descripcion or "").strip()[:500].replace("\r", " ").replace("\n", " ")
     payload = f"{issuer_id}|{fecha or ''}|{desc}|{dep}|{ret}"
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
@@ -324,7 +324,8 @@ def ingest_bank_statement(
                 """,
                 (issuer_id, pdf_path, pdf_sha256),
             )
-        statement_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+        _lid_row = conn.execute("SELECT last_insert_rowid() AS lid").fetchone()
+        statement_id = _lid_row["lid"]
 
         if not table_exists(conn, "bank_movements"):
             conn.commit()
@@ -335,10 +336,29 @@ def ingest_bank_statement(
         has_dup_col = has_column(conn, "bank_movements", "duplicate_hash") and has_column(
             conn, "bank_movements", "bank_account_id"
         )
+        has_movement_hash = has_column(conn, "bank_movements", "movement_hash")
         inserted_count = 0
         duplicate_movements_count = 0
         for i, m in enumerate(movements):
             row = _movement_to_row(m, issuer_id, statement_id, bank_account_id, period_month, i + 1)
+            # Dedup by movement_hash (issuer+fecha+desc+montos) — works cross-file
+            if has_movement_hash:
+                global_hash = _movement_dedup_hash(
+                    issuer_id,
+                    row["fecha"],
+                    row["descripcion"],
+                    row.get("deposito"),
+                    row.get("retiro"),
+                )
+                existing = conn.execute(
+                    "SELECT 1 FROM bank_movements WHERE issuer_id = ? AND movement_hash = ? LIMIT 1",
+                    (issuer_id, global_hash),
+                ).fetchone()
+                if existing:
+                    duplicate_movements_count += 1
+                    continue
+                row["movement_hash"] = global_hash
+            # Fallback: dedup by duplicate_hash (fingerprint within same account)
             dup_hash = row.get("duplicate_hash")
             if has_dup_col and dup_hash:
                 existing = conn.execute(
@@ -348,7 +368,50 @@ def ingest_bank_statement(
                 if existing:
                     duplicate_movements_count += 1
                     continue
-            if mov_cols_021:
+            if mov_cols_021 and has_movement_hash:
+                conn.execute(
+                    """
+                    INSERT INTO bank_movements (
+                        issuer_id, statement_file_id, bank_statement_id, bank_account_id, period_month, movement_index,
+                        fecha, descripcion, raw_description, normalized_description, deposito, retiro, saldo,
+                        amount, direction, tipo, categoria, metodo_hint, contraparte_hint, rfc_encontrado,
+                        counterparty_name_detected, counterparty_rfc_detected, confidence_score,
+                        duplicate_hash, is_possible_duplicate, requires_cfdi, cfdi_match_status, movement_hash, created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?)
+                    """,
+                    (
+                        row["issuer_id"],
+                        row["statement_file_id"],
+                        row["bank_statement_id"],
+                        row["bank_account_id"],
+                        row["period_month"],
+                        row["movement_index"],
+                        row["fecha"],
+                        row["descripcion"],
+                        row["raw_description"],
+                        row["normalized_description"],
+                        row["deposito"],
+                        row["retiro"],
+                        row["saldo"],
+                        row["amount"],
+                        row["direction"],
+                        row["tipo"],
+                        row["categoria"],
+                        row["metodo_hint"],
+                        row["contraparte_hint"],
+                        row["rfc_encontrado"],
+                        row["counterparty_name_detected"],
+                        row["counterparty_rfc_detected"],
+                        row["confidence_score"],
+                        row["duplicate_hash"],
+                        row["is_possible_duplicate"],
+                        row["requires_cfdi"],
+                        row["cfdi_match_status"],
+                        row.get("movement_hash"),
+                        now,
+                    ),
+                )
+            elif mov_cols_021:
                 conn.execute(
                     """
                     INSERT INTO bank_movements (
@@ -553,7 +616,8 @@ def commit_preview_to_db(
                 """,
                 (issuer_id, source_pdf_path, source_pdf_sha256),
             )
-        statement_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+        _lid_row = conn.execute("SELECT last_insert_rowid() AS lid").fetchone()
+        statement_id = _lid_row["lid"]
 
         inserted_count = 0
         duplicate_movements_count = 0

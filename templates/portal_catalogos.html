@@ -1,0 +1,25 @@
+{% extends "base_portal.html" %}
+{% set title = 'Catálogos' %}
+
+{% block content %}
+<div class="ui-page-wrap">
+  <div class="portal-breadcrumb">
+    <a href="/portal/home">Inicio</a> / <span>Catálogos</span>
+  </div>
+  <section class="page-section hub-section ui-v2">
+    <nav class="ui-tabs hub-tabs" role="tablist" aria-label="Catálogos">
+      <a class="hub-tabs__item ui-tab {{ 'hub-tabs__item--active is-active' if active_tab == 'clientes' else '' }}" href="/portal/catalogos?tab=clientes" role="tab" aria-selected="{{ active_tab == 'clientes' }}">Clientes</a>
+      <a class="hub-tabs__item ui-tab {{ 'hub-tabs__item--active is-active' if active_tab == 'productos' else '' }}" href="/portal/catalogos?tab=productos" role="tab" aria-selected="{{ active_tab == 'productos' }}">Productos</a>
+      <a class="hub-tabs__item ui-tab {{ 'hub-tabs__item--active is-active' if active_tab == 'proveedores' else '' }}" href="/portal/catalogos?tab=proveedores" role="tab" aria-selected="{{ active_tab == 'proveedores' }}">Proveedores</a>
+    </nav>
+
+    {% if active_tab == 'clientes' %}
+      {% include "partials/clients_list.html" with context %}
+    {% elif active_tab == 'productos' %}
+      {% include "partials/products_list.html" with context %}
+    {% elif active_tab == 'proveedores' %}
+      {% include "partials/providers_list.html" with context %}
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

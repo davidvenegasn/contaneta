@@ -10,8 +10,13 @@
 .u-mt-2 { margin-top: var(--space-2) !important; }
 .u-mt-6 { margin-top: var(--space-6) !important; }
 .u-mt-6px { margin-top: 6px !important; }
+.u-mr-1 { margin-right: var(--space-1) !important; }
 .u-ml-2 { margin-left: var(--space-2) !important; }
+
+/* Icon size modifier */
+.icon--sm { width: var(--icon-size-sm, 1rem); height: var(--icon-size-sm, 1rem); }
 .u-text-xs { font-size: var(--text-xs) !important; }
+.u-text-sm { font-size: var(--text-sm) !important; }
 .u-text-12 { font-size: 0.75rem !important; }
 .u-fw-semibold { font-weight: var(--fw-semibold) !important; }
 .u-fw-650 { font-weight: 650 !important; }
@@ -72,6 +77,8 @@
 .btn--disabled-state { pointer-events: none !important; opacity: 0.7 !important; }
 /* App header margin */
 .app-header--mb-14 { margin-bottom: 14px !important; }
+/* App header row: flex-wrap desde CSS (elimina inline style="flex-wrap:wrap") */
+.app-header__row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
 .u-d-inline { display: inline !important; }
 .form-reset { margin: 0 !important; padding: 0 !important; }
 /* Badge pequeño (método pago, etc.) */
@@ -82,14 +89,14 @@
    Factura rápida (Inicio): modales
    Mover desde portal_home.html (sin CSS inline).
    ============================== */
-.quick-invoice-modal { position: fixed; inset: 0; z-index: 9000; display: flex; align-items: center; justify-content: center; padding: 16px; }
+.quick-invoice-modal { position: fixed; inset: 0; z-index: var(--z-modal, 400); display: flex; align-items: center; justify-content: center; padding: 16px; }
 .quick-invoice-modal[hidden] { display: none !important; }
 .quick-invoice-modal__backdrop { position: absolute; inset: 0; background: rgba(0,0,0,.4); }
 .quick-invoice-modal__panel { position: relative; background: var(--surface, #fff); border-radius: 16px; box-shadow: 0 20px 50px rgba(0,0,0,.15); max-width: 420px; width: 100%; max-height: 90vh; overflow-y: auto; overscroll-behavior: contain; outline: none; }
 .quick-invoice-modal__panel--precalc { max-width: clamp(520px, 60vw, 720px); }
-body.quick-invoice-modal-open { overflow: hidden; touch-action: none; overscroll-behavior: none; }
+/* quick-invoice-modal-open: consolidado en portal.css bloque scroll-lock */
 .quick-invoice-modal__header { position: sticky; top: 0; z-index: 1; background: var(--surface, #fff); display: flex; align-items: center; justify-content: space-between; padding: 18px 20px; border-bottom: 1px solid var(--border, #e2e8f0); }
-.quick-invoice-modal__title { margin: 0; font-size: 1.2rem; font-weight: 700; }
+.quick-invoice-modal__title { margin: 0; font-size: 1.2rem; font-weight: 600; }
 .quick-invoice-modal__close { background: none; border: none; font-size: 24px; line-height: 1; cursor: pointer; color: var(--text-muted, #64748b); padding: 4px; }
 .quick-invoice-modal__close:hover { color: var(--text, #111); }
 .quick-invoice-modal__desc { margin: 0 20px 14px; font-size: 13px; }
@@ -104,7 +111,7 @@ body.quick-invoice-modal-open { overflow: hidden; touch-action: none; overscroll
 .quick-invoice-modal__section-title { font-weight: 800; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted, #64748b); margin-bottom: 10px; }
 .quick-invoice-modal__totals { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
 .quick-invoice-modal__total-row { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 6px; }
-.quick-invoice-modal__total-row--final { font-weight: 700; font-size: 16px; margin-top: 8px; }
+.quick-invoice-modal__total-row--final { font-weight: 600; font-size: 16px; margin-top: 8px; }
 .quick-invoice-modal__error { padding: 10px 14px; margin: 0 20px 12px; background: rgba(220,38,38,.1); border-radius: 10px; font-size: 13px; color: var(--danger, #b91c1c); border: 1px solid rgba(220,38,38,.25); }
 .quick-invoice-modal__footer { position: sticky; bottom: 0; z-index: 1; background: var(--surface, #fff); display: flex; justify-content: flex-end; gap: 10px; padding: 16px 20px; border-top: 1px solid var(--border); }
 .quick-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
@@ -113,47 +120,55 @@ body.quick-invoice-modal-open { overflow: hidden; touch-action: none; overscroll
   .quick-form-grid { grid-template-columns: 1fr; }
 }
 
-/* Headings — escala tipográfica unificada (más legible) */
+/* Headings — escala Mindtrip: sección 20px/600, H2/H3 escalonados, labels 12px */
 .app-title{
   font-size: var(--text-xl);
-  font-weight: var(--fw-bold);
-  letter-spacing: -0.02em;
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--ls-tight);
   line-height: var(--leading-snug);
 }
 
 .app-subtitle{
   font-size: var(--text-base);
-  font-weight: var(--fw-semibold);
+  font-weight: var(--fw-medium);
   margin-top: 6px;
-  color: var(--label-color, var(--text-muted));
+  color: var(--text-secondary, var(--text-muted));
   line-height: var(--leading-relaxed);
 }
 
 .section-title{
   margin: 0;
   font-size: var(--text-lg);
-  font-weight: var(--fw-bold);
-  letter-spacing: -0.015em;
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--ls-tight);
   line-height: var(--leading-snug);
   color: var(--text);
 }
 
-.portal h2 { font-size: var(--text-2xl); font-weight: var(--fw-bold); line-height: var(--leading-snug); letter-spacing: -0.02em; }
-.portal h3 { font-size: var(--text-xl); font-weight: var(--fw-bold); line-height: var(--leading-snug); letter-spacing: -0.015em; }
+.portal h2 { font-size: var(--text-xl); font-weight: var(--fw-semibold); line-height: var(--leading-snug); letter-spacing: var(--ls-tight); }
+.portal h3 { font-size: var(--text-base); font-weight: var(--fw-semibold); line-height: var(--leading-snug); letter-spacing: var(--ls-tight); }
 
 .portal label,
 .portal .label {
-  font-size: var(--text-sm);
+  font-size: var(--text-2xs);
   font-weight: var(--fw-semibold);
-  color: var(--label-color, var(--text));
+  color: var(--label-color, #374151);
+  letter-spacing: var(--ls-normal);
+  text-transform: none;
 }
 
-/* Simple table styles for portal pages */
+/* Simple table styles for portal pages — tokenized to match .ui-table */
 .table{ width:100%; border-collapse:separate; border-spacing:0; }
-.table th, .table td{ text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: var(--text-sm); font-family: var(--font-family); }
-.table th{ font-size: var(--text-sm); font-weight: var(--fw-bold); text-transform: uppercase; letter-spacing: .04em; color: var(--label-color, var(--text)); }
+.table th, .table td{ text-align: left; padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--border); font-size: var(--text-sm); font-family: var(--font-family); transition: background var(--motion-fast, 100ms) ease; }
+.table th{ font-size: var(--text-sm); font-weight: var(--fw-medium); text-transform: none; letter-spacing: var(--ls-wide, 0.04em); color: var(--text-muted); background: var(--surface-hover); }
+.table th:first-child{ border-radius: var(--radius-xs, 6px) 0 0 0; }
+.table th:last-child{ border-radius: 0 var(--radius-xs, 6px) 0 0; }
 .table td{ font-weight: var(--fw-normal); }
-.table tbody tr:hover td{ background: var(--surface-hover); }
+.table tbody tr:hover td{ background: var(--surface-2, var(--accent-soft)); }
+
+/* Tabular numbers for amount/numeric columns */
+.numeric, .table .numeric { font-variant-numeric: tabular-nums; }
+.table .text-right { font-variant-numeric: tabular-nums; }
 @media (prefers-reduced-motion: no-preference) {
   .table tbody tr td { transition: background-color 150ms ease; }
 }
@@ -174,6 +189,25 @@ body.quick-invoice-modal-open { overflow: hidden; touch-action: none; overscroll
   -webkit-overflow-scrolling: touch;
   overflow-y: visible;
   contain: layout paint;
+  position: relative;
+}
+
+/* Scroll-fade indicator on right edge when content overflows */
+.table-wrap--fade::after{
+  content: "";
+  position: sticky;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 32px;
+  pointer-events: none;
+  background: linear-gradient(to right, transparent, var(--surface-0, #fff));
+  z-index: 2;
+}
+
+/* Mobile: reduce cell padding */
+@media (max-width: 768px) {
+  .table th, .table td { padding: 10px 10px; }
 }
 
 /* Lista de facturas emitidas/recibidas: card y tabla al tamaño del contenido (sin espacio sobrante) */
@@ -245,5 +279,99 @@ body.quick-invoice-modal-open { overflow: hidden; touch-action: none; overscroll
   padding: var(--space-2) var(--space-4);
   font-size: var(--text-sm);
   border-top: 1px solid var(--border);
+}
+
+/* ===== Guides page ===== */
+
+/* Sidebar spacers */
+.rail-spacer  { flex: 1 1 auto; max-height: 32px; }
+.drawer-spacer { flex: 1 1 auto; min-height: 16px; max-height: 32px; }
+
+/* Header */
+.guides-header { margin-bottom: var(--space-6); }
+.guides-header__title { margin: 0 0 var(--space-1); font-size: 1.5rem; font-weight: var(--fw-semibold, 600); }
+.guides-header__subtitle { margin: 0 0 var(--space-4); color: var(--text-secondary, #64748b); font-size: var(--text-sm); }
+
+/* Search */
+.guides-search { margin-bottom: var(--space-3); max-width: 420px; }
+.guides-search__input {
+  width: 100%; padding: 8px 12px;
+  border: 1px solid var(--border, #e2e8f0); border-radius: var(--radius, 8px);
+  font-size: var(--text-sm); background: var(--surface, #fff); color: var(--text, #1e293b);
+  outline: none; transition: border-color .15s;
+}
+.guides-search__input:focus { border-color: var(--primary, #6366f1); box-shadow: 0 0 0 2px rgba(99,102,241,.15); }
+
+/* Chips */
+.guides-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: var(--space-4); }
+.guides-chip {
+  padding: 4px 14px; border: 1px solid var(--border, #e2e8f0); border-radius: var(--radius-pill, 9999px);
+  background: var(--surface, #fff); color: var(--text-secondary, #64748b);
+  font-size: var(--text-xs, .75rem); cursor: pointer; transition: all .15s; line-height: 1.5;
+}
+.guides-chip:hover { border-color: var(--primary, #6366f1); color: var(--primary, #6366f1); }
+.guides-chip.is-active {
+  background: var(--primary, #6366f1); color: #fff; border-color: var(--primary, #6366f1);
+}
+
+/* Section */
+.guides-section { margin-bottom: var(--space-6); }
+.guides-section__title { font-size: 1.125rem; font-weight: var(--fw-semibold, 600); margin: 0 0 var(--space-3); }
+
+/* Grid (cards) */
+.guides-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: var(--space-4);
+}
+
+/* Accordion list (non-grid) */
+.guides-accordion-list { display: flex; flex-direction: column; gap: var(--space-2); }
+
+/* Guide item card */
+.guide-item__title { margin: 0 0 var(--space-1); font-size: 1rem; font-weight: var(--fw-semibold, 600); }
+.guide-item__desc { margin: 0 0 var(--space-3); font-size: var(--text-sm); color: var(--text-secondary, #64748b); }
+.guide-item--coming-soon { opacity: .6; position: relative; }
+
+/* Accordion */
+.guide-accordion { display: flex; flex-direction: column; gap: 0; }
+.guide-accordion__toggle {
+  display: flex; align-items: center; justify-content: space-between; width: 100%;
+  padding: 10px 0; border: none; border-top: 1px solid var(--border, #e2e8f0);
+  background: none; cursor: pointer; font-size: var(--text-sm); color: var(--text, #1e293b);
+  text-align: left; gap: var(--space-2); font-weight: 500;
+}
+.guide-accordion__toggle:hover { color: var(--primary, #6366f1); }
+.guide-accordion__chevron { flex-shrink: 0; transition: transform .2s; }
+.guide-accordion__toggle[aria-expanded="true"] .guide-accordion__chevron { transform: rotate(180deg); }
+
+/* Accordion in list context (outside card) */
+.guides-accordion-list .guide-accordion__toggle {
+  padding: 12px 16px; border: 1px solid var(--border, #e2e8f0); border-radius: var(--radius, 8px);
+  background: var(--surface, #fff);
+}
+.guides-accordion-list .guide-accordion__body { padding: 0 16px 16px; }
+
+.guide-accordion__body {
+  padding: 0 0 8px; font-size: var(--text-sm); color: var(--text-secondary, #64748b); line-height: 1.6;
+}
+.guide-accordion__body ul, .guide-accordion__body ol { margin: var(--space-1) 0; padding-left: 1.25em; }
+.guide-accordion__body li { margin-bottom: 4px; }
+.guide-accordion__body p { margin: var(--space-1) 0; }
+
+/* Badge */
+.guides-badge { display: inline-block; font-size: var(--text-xs, .75rem); padding: 2px 10px; border-radius: var(--radius-pill, 9999px); font-weight: 500; }
+.guides-badge--soon { background: var(--warn-bg, #fef3c7); color: var(--warn-text, #92400e); border: 1px solid var(--warn-border, #fcd34d); }
+
+/* Video placeholder */
+.guide-video-placeholder { position: relative; min-height: 120px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+.guide-video-placeholder__overlay { margin-bottom: var(--space-2); color: var(--text-secondary, #64748b); opacity: .5; }
+.guide-video-placeholder__play { width: 48px; height: 48px; }
+
+/* No results */
+.guides-no-results { text-align: center; padding: var(--space-6); color: var(--text-secondary, #64748b); font-size: var(--text-sm); }
+
+/* Mobile */
+@media (max-width: 600px) {
+  .guides-grid { grid-template-columns: 1fr; }
+  .guides-header__title { font-size: 1.25rem; }
 }
 

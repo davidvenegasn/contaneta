@@ -6,6 +6,25 @@
 (function () {
   'use strict';
 
+  /* ===== Unified scroll-lock for overlays ===== */
+  var _scrollLockCount = 0;
+  window.uiLockScroll = function () {
+    _scrollLockCount++;
+    if (_scrollLockCount === 1) {
+      document.body.style.top = '-' + window.scrollY + 'px';
+      document.body.classList.add('scroll-locked');
+    }
+  };
+  window.uiUnlockScroll = function () {
+    _scrollLockCount = Math.max(0, _scrollLockCount - 1);
+    if (_scrollLockCount === 0) {
+      document.body.classList.remove('scroll-locked');
+      var scrollY = document.body.style.top;
+      document.body.style.top = '';
+      window.scrollTo(0, parseInt(scrollY || '0') * -1);
+    }
+  };
+
   var escapeHtml = function (s) {
     if (s == null) return '';
     var d = document.createElement('div');
@@ -250,7 +269,7 @@
       modalEl.setAttribute('aria-hidden', 'false');
     } catch (_) {}
 
-    try { document.body.classList.add('no-scroll'); } catch (_) {}
+    try { window.uiLockScroll(); } catch (_) {}
 
     // Click backdrop / close buttons
     var clickHandler = function (e) {
@@ -314,13 +333,8 @@
       modalEl.setAttribute('aria-hidden', 'true');
     } catch (_) {}
 
-    // Si ya no hay modales abiertos, restaurar scroll.
-    try {
-      var anyOpen = document.querySelector('.modal.is-open, .form-modal.is-open, .modal:not([hidden]), .form-modal[aria-hidden="false"]');
-      if (!anyOpen) document.body.classList.remove('no-scroll');
-    } catch (_) {
-      try { document.body.classList.remove('no-scroll'); } catch (_) {}
-    }
+    // Restaurar scroll (refcounted: solo libera cuando todos los modales cierran).
+    try { window.uiUnlockScroll(); } catch (_) {}
 
     // Restaurar foco
     try {
@@ -525,6 +539,11 @@
         if (!res.ok) {
           var detail = (parsed && (parsed.error && parsed.error.message || parsed.detail || parsed.message)) || res.statusText || ('Error ' + status);
           if (typeof detail !== 'string') detail = Array.isArray(detail) ? detail.join('; ') : ('Error ' + status);
+          // CSRF token expired: show reload toast instead of generic error
+          if (status === 403 && typeof detail === 'string' && /csrf|token/i.test(detail)) {
+            if (window.uiToast) window.uiToast({ type: 'error', title: 'Tu sesión necesita renovarse', body: 'Recarga la página para continuar.', duration: 0, action: { label: 'Recargar', onClick: function() { location.reload(); } } });
+            return { ok: false, status: status, error: 'csrf', detail: 'Sesión expirada. Recarga la página.' };
+          }
           return { ok: false, status: status, error: 'http', detail: detail };
         }
 
@@ -874,7 +893,7 @@
       if (active) return;
       active = true;
       bar.classList.remove('page-loading-bar--done');
-      bar.classList.add('page-loading-bar--active');
+      bar.classList.add('page-loading-bar--active', 'is-loading');
       bar.setAttribute('aria-hidden', 'false');
       bar.style.transform = 'scaleX(0)';
       requestAnimationFrame(function () {
@@ -886,7 +905,7 @@
       bar.classList.add('page-loading-bar--done');
       bar.setAttribute('aria-hidden', 'true');
       setTimeout(function () {
-        bar.classList.remove('page-loading-bar--done');
+        bar.classList.remove('page-loading-bar--done', 'is-loading');
         bar.style.transform = 'scaleX(0)';
         active = false;
       }, 150);
@@ -973,5 +992,106 @@
     } else {
       onPageReady();
     }
+  })();
+
+  /* ===== Fintech: counter animation for metric values ===== */
+  (function () {
+    var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduceMotion) return;
+
+    function animateValue(el, start, end, duration) {
+      var startTime = null;
+      var prefix = '';
+      var suffix = '';
+      // Detect $ prefix and suffix text
+      var text = el.textContent.trim();
+      if (text.charAt(0) === '$') prefix = '$';
+      function step(ts) {
+        if (!startTime) startTime = ts;
+        var progress = Math.min((ts - startTime) / duration, 1);
+        // ease-out quad
+        var eased = 1 - (1 - progress) * (1 - progress);
+        var current = start + (end - start) * eased;
+        el.textContent = prefix + current.toLocaleString('en-US', {
+          minimumFractionDigits: end % 1 !== 0 ? 2 : 0,
+          maximumFractionDigits: end % 1 !== 0 ? 2 : 0
+        }) + suffix;
+        if (progress < 1) requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+    }
+
+    function initCounters() {
+      var els = document.querySelectorAll('.metric-value');
+      if (!els.length || typeof IntersectionObserver === 'undefined') return;
+      var observer = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (!entry.isIntersecting) return;
+          var el = entry.target;
+          if (el.dataset.counted) return;
+          el.dataset.counted = '1';
+          // Skip compound values (Cuenta propia with multiple divs)
+          if (el.children.length > 0 && el.querySelector('div')) return;
+          var text = el.textContent.trim();
+          var raw = text.replace(/[$,]/g, '');
+          var num = parseFloat(raw);
+          if (isNaN(num) || num === 0) return;
+          animateValue(el, 0, num, 600);
+        });
+      }, { threshold: 0.3 });
+      els.forEach(function (el) { observer.observe(el); });
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initCounters);
+    } else {
+      initCounters();
+    }
+  })();
+
+  /* ===== Table horizontal scroll indicator (has-scroll-right) ===== */
+  (function () {
+    function initTableScrollIndicators() {
+      var wraps = document.querySelectorAll('.table-wrap, .ui-table-wrap');
+      wraps.forEach(function (wrap) {
+        if (wrap._scrollIndicatorInit) return;
+        wrap._scrollIndicatorInit = true;
+        function checkScroll() {
+          var hasMore = wrap.scrollWidth - wrap.scrollLeft - wrap.clientWidth > 1;
+          wrap.classList.toggle('has-scroll-right', hasMore);
+        }
+        wrap.addEventListener('scroll', checkScroll, { passive: true });
+        checkScroll();
+        // Recheck after images/fonts load
+        if (typeof ResizeObserver !== 'undefined') {
+          new ResizeObserver(checkScroll).observe(wrap);
+        }
+      });
+    }
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initTableScrollIndicators);
+    } else {
+      initTableScrollIndicators();
+    }
+    // Re-init after HTMX/AJAX swaps
+    document.addEventListener('htmx:afterSwap', function () {
+      setTimeout(initTableScrollIndicators, 50);
+    });
+  })();
+
+  /* ===== Fintech: topbar scroll shadow ===== */
+  (function () {
+    var topbar = document.querySelector('.portal-topbar');
+    if (!topbar) return;
+    var scrolled = false;
+    function onScroll() {
+      var isScrolled = window.scrollY > 8;
+      if (isScrolled !== scrolled) {
+        scrolled = isScrolled;
+        topbar.classList.toggle('is-scrolled', scrolled);
+      }
+    }
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll(); // initial check
   })();
 })();

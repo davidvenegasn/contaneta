@@ -111,7 +111,24 @@ foreach ($rows as $cred) {
         continue;
     }
 
+    // Extract RFC and legal name from the certificate
+    $certRfc = '';
+    $certName = '';
+    try {
+        $credential = PhpCfdi\Credentials\Credential::openFiles($cerPath, $keyPath, $pass);
+        $certRfc = trim($credential->rfc());
+        $certName = trim($credential->certificate()->legalName());
+    } catch (Throwable $e) {
+        // Non-fatal: extraction is best-effort
+    }
+
     echo "OK FIEL: {$label}\n";
+    if ($certRfc !== '') {
+        echo "CERT_RFC={$certRfc}\n";
+    }
+    if ($certName !== '') {
+        echo "CERT_NAME={$certName}\n";
+    }
 }
 
 if (!$allOk) {

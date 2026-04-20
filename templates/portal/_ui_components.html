@@ -1,15 +1,83 @@
 {# Componentes reutilizables del portal: empty-state, load-error. Ver docs/UI_PATTERNS.md #}
 
-{% macro portal_empty_state(title, desc, id=none, show_icon=true, extra_class='') %}
+{% macro portal_empty_state(title, desc, id=none, show_icon=true, extra_class='', icon_type='document') %}
 <div class="empty-state empty-state--empty {{ extra_class }}"{% if id %} id="{{ id }}"{% endif %}{% if id %} hidden{% endif %}>
   {% if show_icon %}
   <div class="empty-state__icon" aria-hidden="true">
-    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/>
-      <path d="M14 2v5a1 1 0 0 0 1 1h5"/>
-      <path d="M12 12v6"/>
-      <path d="m15 15-3-3-3 3"/>
+    {% if icon_type == 'invoice' %}
+    {# Document with check mark emerging #}
+    <svg class="icon" viewBox="0 0 48 48" fill="none" width="48" height="48">
+      <rect x="8" y="4" width="24" height="32" rx="3" stroke="currentColor" stroke-width="2" fill="none"/>
+      <path d="M32 12h4a3 3 0 0 1 3 3v24a3 3 0 0 1-3 3H16a3 3 0 0 1-3-3v-4" stroke="currentColor" stroke-width="2" fill="none"/>
+      <line x1="14" y1="14" x2="26" y2="14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <line x1="14" y1="20" x2="24" y2="20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <line x1="14" y1="26" x2="20" y2="26" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <circle cx="36" cy="36" r="7" fill="#059669" stroke="none"/>
+      <path d="M33 36l2 2 4-4" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
     </svg>
+    {% elif icon_type == 'bank' %}
+    {# Bank with arrows #}
+    <svg class="icon" viewBox="0 0 48 48" fill="none" width="48" height="48">
+      <path d="M6 18h36" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <path d="M24 8l18 10H6L24 8z" stroke="currentColor" stroke-width="2" fill="none" stroke-linejoin="round"/>
+      <path d="M10 18v14M18 18v14M26 18v14M34 18v14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <path d="M8 32h28" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <path d="M38 38l4-4-4-4" stroke="#059669" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M6 42l-4-4 4-4" stroke="#6366f1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    {% elif icon_type == 'clients' %}
+    {# Two people with plus #}
+    <svg class="icon" viewBox="0 0 48 48" fill="none" width="48" height="48">
+      <circle cx="18" cy="14" r="6" stroke="currentColor" stroke-width="2" fill="none"/>
+      <path d="M6 36c0-5.523 5.373-10 12-10s12 4.477 12 10" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <circle cx="36" cy="16" r="7" fill="rgba(99,102,241,.12)" stroke="none"/>
+      <path d="M36 12v8M32 16h8" stroke="#6366f1" stroke-width="2" stroke-linecap="round"/>
+    </svg>
+    {% elif icon_type == 'products' %}
+    {# Box with price tag #}
+    <svg class="icon" viewBox="0 0 48 48" fill="none" width="48" height="48">
+      <path d="M38 14L24 6 10 14v18l14 8 14-8V14z" stroke="currentColor" stroke-width="2" fill="none" stroke-linejoin="round"/>
+      <path d="M10 14l14 8 14-8" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+      <path d="M24 22v18" stroke="currentColor" stroke-width="2"/>
+      <circle cx="38" cy="36" r="7" fill="rgba(99,102,241,.12)" stroke="none"/>
+      <path d="M36 36h4M38 34v4" stroke="#6366f1" stroke-width="2" stroke-linecap="round"/>
+    </svg>
+    {% elif icon_type == 'quote' %}
+    {# Document with dollar sign #}
+    <svg class="icon" viewBox="0 0 48 48" fill="none" width="48" height="48">
+      <path d="M14 4h14l10 10v26a4 4 0 0 1-4 4H14a4 4 0 0 1-4-4V8a4 4 0 0 1 4-4z" stroke="currentColor" stroke-width="2" fill="none"/>
+      <path d="M28 4v10h10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M24 20v16M28 24h-5.5a2.5 2.5 0 0 0 0 5h3a2.5 2.5 0 0 1 0 5H20" stroke="#6366f1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    {% elif icon_type == 'error' %}
+    {# Cloud with lightning #}
+    <svg class="icon" viewBox="0 0 48 48" fill="none" width="48" height="48">
+      <path d="M14 34a10 10 0 0 1-2-19.8A12 12 0 0 1 34.3 10 8 8 0 0 1 36 26h-2" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <path d="M22 26l-4 8h8l-4 8" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    {% elif icon_type == 'bell' %}
+    {# Calm bell #}
+    <svg class="icon" viewBox="0 0 48 48" fill="none" width="48" height="48">
+      <path d="M18 36a6 6 0 0 0 12 0" stroke="currentColor" stroke-width="2"/>
+      <path d="M12 28c0-8 4-14 12-14s12 6 12 14v4H12v-4z" stroke="currentColor" stroke-width="2" fill="none"/>
+      <path d="M24 10V6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <path d="M8 22c-2 0-4 0-6 0" stroke="#6366f1" stroke-width="1.5" stroke-linecap="round" opacity=".5"/>
+      <path d="M42 22c2 0 4 0 6 0" stroke="#6366f1" stroke-width="1.5" stroke-linecap="round" opacity=".5"/>
+      <path d="M8 16c-1.5-1-3-2-4.5-3" stroke="#6366f1" stroke-width="1.5" stroke-linecap="round" opacity=".5"/>
+      <path d="M40 16c1.5-1 3-2 4.5-3" stroke="#6366f1" stroke-width="1.5" stroke-linecap="round" opacity=".5"/>
+    </svg>
+    {% else %}
+    {# Default: document with lines and check #}
+    <svg class="icon" viewBox="0 0 48 48" fill="none" width="48" height="48">
+      <rect x="8" y="4" width="24" height="32" rx="3" stroke="currentColor" stroke-width="2" fill="none"/>
+      <path d="M32 12h4a3 3 0 0 1 3 3v24a3 3 0 0 1-3 3H16a3 3 0 0 1-3-3v-4" stroke="currentColor" stroke-width="2" fill="none"/>
+      <line x1="14" y1="14" x2="26" y2="14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <line x1="14" y1="20" x2="24" y2="20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <line x1="14" y1="26" x2="20" y2="26" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <circle cx="36" cy="36" r="7" fill="#059669" stroke="none"/>
+      <path d="M33 36l2 2 4-4" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    {% endif %}
   </div>
   {% endif %}
   <div class="empty-state__title">{{ title }}</div>
@@ -22,6 +90,12 @@
 
 {% macro portal_load_error(id_prefix, extra_class='') %}
 <div class="empty-state empty-state--error load-error {{ extra_class }}" id="{{ id_prefix }}" hidden aria-live="polite">
+  <div class="empty-state__icon" aria-hidden="true">
+    <svg class="icon" viewBox="0 0 48 48" fill="none" width="48" height="48">
+      <path d="M14 34a10 10 0 0 1-2-19.8A12 12 0 0 1 34.3 10 8 8 0 0 1 36 26h-2" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <path d="M22 26l-4 8h8l-4 8" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </div>
   <div class="empty-state__title">No pudimos cargar esto ahora.</div>
   <p class="empty-state__desc" id="{{ id_prefix }}Msg">Puedes intentar de nuevo.</p>
   <button type="button" class="btn btn--secondary" id="{{ id_prefix }}Retry">Reintentar</button>

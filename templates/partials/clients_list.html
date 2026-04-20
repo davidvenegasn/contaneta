@@ -3,6 +3,7 @@
 <div class="card ui-card">
   <div class="card-header card-header--with-tools ui-card__header">
     <div class="card-header__left">
+      <h3 class="section-title u-m0">Clientes</h3>
       <div class="table-tools table-tools--inline">
         <form class="table-tools__search" method="get" action="{{ _form_action }}">
           <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -16,7 +17,6 @@
       </div>
     </div>
     <div class="card-header__right">
-      <h3 class="section-title">Clientes</h3>
       <p class="muted u-m0" id="clientsCount">
         {% if total is defined %}
           {% if total > 0 %}
@@ -38,7 +38,7 @@
   <div class="card-list-sep">
     {% if not rows or rows|length == 0 %}
       {% from 'portal/_ui_components.html' import portal_empty_state %}
-      {% call portal_empty_state('Aún no tienes clientes', 'Añade un cliente o crea una factura para que aparezcan aquí automáticamente.') %}
+      {% call portal_empty_state('Tu directorio de clientes está vacío', 'Agrega clientes para facturar más rápido.', icon_type='clients') %}
         <button type="button" class="btn btn-primary" id="addClientBtnEmpty">Añadir cliente</button>
       {% endcall %}
     {% else %}
@@ -59,7 +59,7 @@
             <th>Acciones</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody class="row-stagger">
           {% for r in rows %}
           <tr>
             <td class="bulkTd" hidden>
@@ -131,18 +131,25 @@
         {% if total > 0 %}
           {% set from = (page - 1) * per_page + 1 %}
           {% set to = min(page * per_page, total) %}
-          {% if page == 1 %}Mostrando los primeros {{ to }} de {{ total }}{% else %}Mostrando {{ from }}-{{ to }} de {{ total }}{% endif %}
+          Mostrando {{ from }}-{{ to }} de {{ total }}
         {% endif %}
       </span>
-      <div class="pagination__btns">
+      <div class="pagination__btns pagination-numbers">
         {% set _q = '&q=' ~ (q|default('')|urlencode) if q|default('') else '' %}
-        {% if hub_base %}
-          {% if page > 1 %}<a href="{{ hub_base }}?tab=clientes&page={{ page - 1 }}{{ _q }}" class="btn btn--sm btn--secondary">Anterior</a>{% else %}<span class="btn btn--sm btn--secondary" aria-disabled="true" style="pointer-events:none; opacity:0.6">Anterior</span>{% endif %}
-          {% if page < pages %}<a href="{{ hub_base }}?tab=clientes&page={{ page + 1 }}{{ _q }}" class="btn btn--sm btn--secondary">Siguiente</a>{% else %}<span class="btn btn--sm btn--secondary" aria-disabled="true" style="pointer-events:none; opacity:0.6">Siguiente</span>{% endif %}
-        {% else %}
-          {% if page > 1 %}<a href="?page={{ page - 1 }}{{ _q }}" class="btn btn--sm btn--secondary">Anterior</a>{% else %}<span class="btn btn--sm btn--secondary" aria-disabled="true" style="pointer-events:none; opacity:0.6">Anterior</span>{% endif %}
-          {% if page < pages %}<a href="?page={{ page + 1 }}{{ _q }}" class="btn btn--sm btn--secondary">Siguiente</a>{% else %}<span class="btn btn--sm btn--secondary" aria-disabled="true" style="pointer-events:none; opacity:0.6">Siguiente</span>{% endif %}
-        {% endif %}
+        {% set _base = (hub_base ~ '?tab=clientes&') if hub_base else '?' %}
+        {% if page > 1 %}<a href="{{ _base }}page={{ page - 1 }}{{ _q }}" class="btn btn--sm btn--ghost" aria-label="Página anterior">&lsaquo;</a>{% endif %}
+        {% for p in range(1, pages + 1) %}
+          {% if p == page %}
+            <span class="btn btn--sm btn--primary pagination-numbers__current" aria-current="page">{{ p }}</span>
+          {% elif p == 1 or p == pages or (p >= page - 1 and p <= page + 1) %}
+            <a href="{{ _base }}page={{ p }}{{ _q }}" class="btn btn--sm btn--ghost">{{ p }}</a>
+          {% elif p == 2 and page > 3 %}
+            <span class="pagination-numbers__dots">&hellip;</span>
+          {% elif p == pages - 1 and page < pages - 2 %}
+            <span class="pagination-numbers__dots">&hellip;</span>
+          {% endif %}
+        {% endfor %}
+        {% if page < pages %}<a href="{{ _base }}page={{ page + 1 }}{{ _q }}" class="btn btn--sm btn--ghost" aria-label="Página siguiente">&rsaquo;</a>{% endif %}
       </div>
     </nav>
     {% endif %}
@@ -649,5 +656,4 @@
 })();
 </script>
 
-{% include "components/quick_invoice_modal.html" %}
-<script src="/static/js/quick-invoice.js"></script>
+{# quick_invoice_modal.html + quick-invoice.js now included in base_portal.html #}

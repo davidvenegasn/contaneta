@@ -13,13 +13,13 @@
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     :root {
-      --seg-bg: #f0fdfa;
+      --seg-bg: #f8f9fa;
       --seg-card: #ffffff;
-      --seg-border: #ccfbf1;
-      --seg-text: #0f172a;
-      --seg-muted: #475569;
+      --seg-border: rgba(0, 0, 0, 0.06);
+      --seg-text: #1a1a2e;
+      --seg-muted: #6c757d;
       --seg-accent: #0d9488;
-      --seg-accent-soft: #ccfbf1;
+      --seg-accent-soft: #e6fffa;
     }
     body {
       font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
@@ -56,21 +56,21 @@
       color: var(--seg-accent);
     }
     .seg-hero__icon svg { width: 28px; height: 28px; stroke-width: 1.75; }
-    .seg-hero h1 { margin: 0 0 0.5rem; font-size: 1.75rem; font-weight: 700; letter-spacing: -0.02em; }
+    .seg-hero h1 { margin: 0 0 0.5rem; font-size: 1.75rem; font-weight: 600; letter-spacing: -0.02em; }
     .seg-hero p { margin: 0; font-size: 1rem; color: var(--seg-muted); line-height: 1.5; max-width: 32ch; margin-left: auto; margin-right: auto; }
 
     .seg-section {
       background: var(--seg-card);
-      border: 1px solid var(--seg-border);
+      border: 1px solid transparent;
       border-radius: 16px;
       padding: 1.5rem 1.5rem 1.75rem;
       margin-bottom: 1rem;
-      box-shadow: 0 1px 3px rgba(0,0,0,.04);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.02), 0 6px 16px rgba(0,0,0,0.04);
     }
     .seg-section__title {
       margin: 0 0 0.5rem;
       font-size: 1rem;
-      font-weight: 700;
+      font-weight: 600;
       color: var(--seg-text);
       display: flex;
       align-items: center;

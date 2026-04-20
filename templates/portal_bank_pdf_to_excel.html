@@ -30,7 +30,7 @@
     </div>
     <p class="muted u-mt-2 u-text-xs">
       <button type="button" class="btn btn--secondary btn--sm" id="previewBtn">Vista previa (Banorte)</button>
-      <span class="muted"> — Sin guardar en DB. Luego puedes «Convertir y descargar» para generar el Excel.</span>
+      <span class="muted"> — Solo vista previa. Para guardar, usa «Procesar estados de cuenta» arriba.</span>
     </p>
 
     <section class="bank-accounts-block card p-20 u-mt-14 u-mb-14" id="bankAccountsBlock" aria-labelledby="bankAccountsTitle">
@@ -47,8 +47,21 @@
 
     </div>
 
-    <div id="bank-multi-wrap" class="bank-preview-block card card--invoice-list ui-card p-20 u-mt-6">
+    <div id="pdfProcessingStatus" class="u-mt-4 u-mb-4 u-text-sm muted" hidden></div>
+
+    <div id="bank-multi-wrap" class="bank-preview-block card card--invoice-list ui-card p-20 u-mt-6" hidden>
+      <div id="bankMultiGlobalSummary" class="u-mb-4"></div>
+      <div id="bankMultiFilesSummary" class="u-mb-4" hidden></div>
       <div id="bankMultiFileErrors" class="bank-convert-status__error u-mb-4" hidden></div>
+      <div class="bank-multi-filters u-flex u-gap-2 u-mb-4 u-items-center" style="flex-wrap:wrap;">
+        <button type="button" class="btn btn--sm btn--ghost bank-preview-filter active" data-multi-filter="all">Todos</button>
+        <button type="button" class="btn btn--sm btn--ghost bank-preview-filter" data-multi-filter="IN">Ingresos</button>
+        <button type="button" class="btn btn--sm btn--ghost bank-preview-filter" data-multi-filter="OUT">Gastos</button>
+        <button type="button" class="btn btn--sm btn--ghost bank-preview-filter" data-multi-filter="cuenta_propia">Cuenta propia</button>
+        <button type="button" class="btn btn--sm btn--ghost bank-preview-filter" data-multi-filter="financiero">Financiero</button>
+        <button type="button" class="btn btn--sm btn--ghost bank-preview-filter" data-multi-filter="needs_review">Revisar</button>
+        <button type="button" class="btn btn--sm btn--ghost bank-preview-filter" data-multi-filter="duplicados">Duplicados</button>
+      </div>
       <div class="table-wrap ui-table-wrap">
         <table class="table table--zebra ui-table ui-table--zebra" id="bankMultiTable" aria-label="Movimientos del estado de cuenta">
           <thead>
@@ -65,6 +78,7 @@
           <tbody id="bankMultiBody"></tbody>
         </table>
       </div>
+      <div id="previewCommitMessage" class="u-mt-2 u-text-xs" hidden></div>
     </div>
 
     <div class="bank-convert-status" aria-live="polite">
@@ -251,11 +265,18 @@
   function clearError() {
     if (errorEl) { errorEl.hidden = true; errorEl.textContent = ''; }
   }
-  function setStatus(msg) {}
+  var statusEl = document.getElementById('pdfProcessingStatus');
+  function setStatus(msg) {
+    if (statusEl) {
+      statusEl.textContent = msg || '';
+      statusEl.hidden = !msg;
+    }
+  }
   function setSummary(text) {}
   function resetUi() {
     uploading = false;
     clearError();
+    setStatus('');
     setSummary('');
     if (resultPanel) resultPanel.hidden = true;
     if (qualityPanel) qualityPanel.hidden = true;
@@ -264,6 +285,8 @@
     if (resetBtn) resetBtn.hidden = true;
     if (meta) { meta.hidden = true; meta.textContent = ''; }
     if (input) input.value = '';
+    var mw = document.getElementById('bank-multi-wrap');
+    if (mw) mw.hidden = true;
   }
 
   function fmtSize(n) {
@@ -336,6 +359,24 @@
 
       var movements = Array.isArray(json.movements) ? json.movements : [];
       var summary = json.summary || {};
+
+      if (movements.length === 0) {
+        var hint = (summary.bank_name || '').toUpperCase();
+        var diagMsg = 'No se encontraron movimientos en el PDF.';
+        if (summary.raw_rows_count === 0) {
+          diagMsg += ' El PDF parece no contener texto extraíble (¿es escaneado?).';
+        } else if (summary.sections_detected === 0) {
+          diagMsg += ' No se detectó la sección de movimientos. Verifica que el PDF sea un estado de cuenta bancario.';
+        } else {
+          diagMsg += ' Se detectó la sección pero no se encontraron renglones con formato de fecha válido.';
+        }
+        setStatus(diagMsg);
+        setError(diagMsg);
+        if (window.uiToast) window.uiToast({ type: 'warning', title: '0 movimientos', message: diagMsg });
+        uploading = false;
+        return;
+      }
+
       setStatus('Listo • ' + movements.length + ' movimientos');
       setSummary(movements.length + ' movimientos. Revisa y clasifica abajo. Aún no se guardan.');
 
@@ -439,10 +480,6 @@
     input.addEventListener('change', function () {
       var files = input.files && Array.from(input.files);
       if (!files || files.length === 0) return;
-      if (files.length === 1) {
-        uploadFile(files[0]);
-        return;
-      }
       if (files.length > MAX_FILES) {
         setError('Máximo ' + MAX_FILES + ' archivos por carga.');
         return;
@@ -482,17 +519,23 @@
       if (uploading) return;
       var all = e.dataTransfer && e.dataTransfer.files;
       if (!all || all.length === 0) return;
-      if (all.length === 1) {
-        var dt = new DataTransfer();
-        dt.items.add(all[0]);
-        input.files = dt.files;
-        uploadFile(all[0]);
-        return;
-      }
       var dt2 = new DataTransfer();
       for (var i = 0; i < all.length; i++) dt2.items.add(all[i]);
       input.files = dt2.files;
-      input.dispatchEvent(new Event('change'));
+      // Show file list in UI
+      if (pdfFileList) {
+        pdfFileList.innerHTML = '';
+        Array.from(all).forEach(function (f) {
+          var li = document.createElement('li');
+          li.className = 'u-mb-2';
+          var mb = f.size / (1024 * 1024);
+          li.textContent = (f.name || 'archivo.pdf') + ' • ' + (mb >= 10 ? mb.toFixed(0) : mb.toFixed(1)) + ' MB';
+          pdfFileList.appendChild(li);
+        });
+      }
+      if (pdfFileListWrap) pdfFileListWrap.hidden = false;
+      // Auto-process immediately on drop
+      uploadFilesMulti(Array.from(all));
     });
   }
 
@@ -501,10 +544,6 @@
       var files = input.files && Array.from(input.files);
       if (!files || files.length === 0) {
         if (window.uiToast) window.uiToast({ type: 'info', title: 'Sin archivos', message: 'Selecciona uno o más PDF.' });
-        return;
-      }
-      if (files.length === 1) {
-        uploadFile(files[0]);
         return;
       }
       uploadFilesMulti(files);
@@ -543,7 +582,31 @@
         uploading = false;
         return;
       }
-      setStatus('Listo • ' + (json.movements && json.movements.length) + ' movimientos');
+      var multiMovs = (json.movements && json.movements.length) || 0;
+      if (multiMovs === 0) {
+        setStatus('No se encontraron movimientos en los archivos PDF.');
+        setError('No se encontraron movimientos. Verifica que los PDF sean estados de cuenta bancarios válidos.');
+        if (window.uiToast) window.uiToast({ type: 'warning', title: '0 movimientos', message: 'No se encontraron movimientos en los archivos.' });
+        uploading = false;
+        return;
+      }
+      var autoSave = json.auto_save || {};
+      if (autoSave.saved) {
+        var ins = autoSave.inserted_count || 0;
+        var dup = autoSave.duplicate_movements_count || 0;
+        var pm = autoSave.period_month || '';
+        var msg = ins + ' movimientos guardados.';
+        if (dup > 0) msg += ' ' + dup + ' duplicados omitidos.';
+        setStatus('Listo • ' + multiMovs + ' movimientos • ' + msg);
+        if (window.uiToast) window.uiToast({ type: 'success', title: 'Guardado', message: msg + (pm ? ' Ver en Movimientos (' + pm + ').' : '') });
+        var cmEl = document.getElementById('previewCommitMessage');
+        if (cmEl) {
+          cmEl.hidden = false;
+          cmEl.innerHTML = msg + ' <a href="/portal/movimientos' + (pm ? '?ym=' + pm : '') + '">Ver en Movimientos</a>';
+        }
+      } else {
+        setStatus('Listo • ' + multiMovs + ' movimientos');
+      }
       var multiWrap = document.getElementById('bank-multi-wrap');
       if (multiWrap && typeof window.initBankPreviewMulti === 'function') {
         multiWrap.hidden = false;
@@ -614,13 +677,6 @@
         return '<option value="' + escapeHtml(String(a.id)) + '">' + escapeHtml((a.alias || '') + ' · ' + (a.bank_name || '') + (a.account_last4 ? ' ****' + a.account_last4 : '')) + '</option>';
       });
       ingestSel.innerHTML = '<option value="">— Selecciona una cuenta —</option>' + opts.join('');
-    }
-    var previewCommitSel = document.getElementById('previewCommitAccountId');
-    if (previewCommitSel) {
-      var optsCommit = accounts.filter(function (a) { return a.is_active; }).map(function (a) {
-        return '<option value="' + escapeHtml(String(a.id)) + '">' + escapeHtml((a.alias || '') + ' · ' + (a.bank_name || '') + (a.account_last4 ? ' ****' + a.account_last4 : '')) + '</option>';
-      });
-      previewCommitSel.innerHTML = '<option value="">— Selecciona una cuenta —</option>' + optsCommit.join('');
     }
   }
 
@@ -788,6 +844,8 @@
 
   var CATEGORIES = ['FINANCIERO_PAGO_TARJETA', 'TRANSFERENCIA', 'ALIMENTOS', 'IMPUESTOS', 'COMISION_BANCARIA', 'EFECTIVO', 'NOMINA', 'SUSCRIPCION', 'SERVICIOS', 'SALUD', 'EDUCACION', 'TRANSPORTE', 'OTROS'];
   var BUCKETS = ['NEGOCIO', 'PERSONAL', 'FINANCIERO', 'DESCONOCIDO'];
+  var CAT_LABELS = {"TARJETAS_CREDITO":"Tarjetas de crédito","CUENTA_PROPIA":"Cuenta propia","FINANCIERO_PAGO_TARJETA":"Pago de tarjeta","COMISION_BANCARIA":"Comisión bancaria","GASTO":"Gasto","INGRESO":"Ingreso","TRANSFERENCIA":"Transferencia","ALIMENTOS":"Alimentos","IMPUESTOS":"Impuestos","EFECTIVO":"Efectivo","NOMINA":"Nómina","SERVICIOS":"Servicios","SUSCRIPCION":"Suscripción","SALUD":"Salud","EDUCACION":"Educación","TRANSPORTE":"Transporte","OTROS":"Otros","FINANCIERO":"Financiero","NEGOCIO":"Negocio","PERSONAL":"Personal","DESCONOCIDO":"Desconocido"};
+  function catLabel(c) { return CAT_LABELS[c] || (c || '—').replace(/_/g, ' '); }
   var DEDUCIBLE = ['SI', 'NO', 'DEPENDE'];
 
   var state = movements.length ? movements.map(function (m) {
@@ -896,7 +954,7 @@
       var montoStr = m.es_transferencia_propia_probable ? '(' + fmtMoney(m.direction === 'OUT' ? (m.withdraw || 0) : (m.deposit || 0)) + ')' : (m.direction === 'IN' ? '+' + fmtMoney(montoVal) : (m.direction === 'OUT' ? '−' + fmtMoney(montoVal) : '—'));
       var montoClass = m.es_transferencia_propia_probable ? 'bank-monto-traspaso' : (m.direction === 'IN' ? 'bank-monto-ingreso' : (m.direction === 'OUT' ? 'bank-monto-gasto' : ''));
       var saldo = m.balance != null ? fmtMoney(m.balance) : '—';
-      var catLabel = m.category || '—';
+      var catVal = m.category || '—';
       var editIcon = '<svg class="icon icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>';
       var tr = document.createElement('tr');
       tr.dataset.idx = String(m.idx);
@@ -906,8 +964,8 @@
         '<td>' + tipoBadge + '</td>' +
         '<td class="text-right ' + montoClass + '">' + montoStr + '</td>' +
         '<td class="text-right muted">' + saldo + '</td>' +
-        '<td class="bank-category-cell bank-category-editable" data-idx="' + m.idx + '" data-category="' + escapeHtml(catLabel) + '" title="Clic para cambiar categoría">' +
-        '<span class="badge badge--neutral">' + escapeHtml(catLabel) + '</span></td>' +
+        '<td class="bank-category-cell bank-category-editable" data-idx="' + m.idx + '" data-category="' + escapeHtml(catVal) + '" title="Clic para cambiar categoría">' +
+        '<span class="badge badge--neutral">' + escapeHtml(catLabel(catVal)) + '</span></td>' +
         '<td class="text-right"><button type="button" class="btn btn--sm btn--ghost bank-movement-edit-btn" data-idx="' + m.idx + '" aria-label="Editar">' + editIcon + '</button></td>';
       fragment.appendChild(tr);
     });
@@ -954,14 +1012,14 @@
         CATEGORIES.forEach(function (c) {
           var opt = document.createElement('option');
           opt.value = c;
-          opt.textContent = c;
+          opt.textContent = catLabel(c);
           if (c === (mov.category || '')) opt.selected = true;
           select.appendChild(opt);
         });
         if (mov.category && CATEGORIES.indexOf(mov.category) < 0) {
           var o = document.createElement('option');
           o.value = mov.category;
-          o.textContent = mov.category;
+          o.textContent = catLabel(mov.category);
           o.selected = true;
           select.appendChild(o);
         }
@@ -970,7 +1028,7 @@
         select.focus();
         function closeCategory() {
           mov.category = select.value || mov.category;
-          cell.innerHTML = '<span class="badge badge--neutral">' + escapeHtml(mov.category || '—') + '</span>';
+          cell.innerHTML = '<span class="badge badge--neutral">' + escapeHtml(catLabel(mov.category)) + '</span>';
           cell.dataset.category = mov.category || '';
         }
         select.addEventListener('change', closeCategory);
@@ -1284,7 +1342,7 @@
         var montoClass = m.es_transferencia_propia_probable ? 'bank-monto-traspaso' : (tipo === 'INGRESO' ? 'bank-monto-ingreso' : (tipo === 'GASTO' ? 'bank-monto-gasto' : ''));
         var concept = (m.concepto_resumen || '').trim() || '';
         var conceptDisplay = concept.length > 50 ? concept.substring(0, 50) + '…' : (concept || '—');
-        var catLabel = m.categoria_sugerida || '—';
+        var catRaw = m.categoria_sugerida || '—';
         var saldoStr = m.saldo != null && Number(m.saldo) === m.saldo ? fmtMoney(m.saldo) : '—';
         var previewId = m.preview_id || ('m' + (m._global_idx != null ? m._global_idx : m.idx || 0));
 
@@ -1297,7 +1355,7 @@
           '<td>' + tipoBadge + '</td>' +
           '<td class="text-right ' + montoClass + '">' + montoStr + '</td>' +
           '<td class="text-right muted">' + saldoStr + '</td>' +
-          '<td class="bank-multi-category-editable" title="Clic para cambiar categoría"><span class="badge badge--neutral">' + escapeHtml(catLabel) + '</span></td>' +
+          '<td class="bank-multi-category-editable" title="Clic para cambiar categoría"><span class="badge badge--neutral">' + escapeHtml(catLabel(catRaw)) + '</span></td>' +
           '<td class="text-right"><button type="button" class="btn btn--sm btn--ghost bank-multi-detail-btn" data-preview-id="' + escapeHtml(previewId) + '" aria-label="Ver detalle">Ver detalle</button></td>';
         tbody.appendChild(tr);
 
@@ -1311,7 +1369,7 @@
           cuentaPropiaNote +
           '<dt>Banco</dt><dd>' + escapeHtml(m.bank_name || '—') + '</dd>' +
           '<dt>Archivo</dt><dd>' + escapeHtml(m.source_file_name || '—') + '</dd>' +
-          '<dt>Categoría</dt><dd>' + escapeHtml(catLabel) + '</dd>' +
+          '<dt>Categoría</dt><dd>' + escapeHtml(catLabel(catRaw)) + '</dd>' +
           '<dt>Contraparte</dt><dd>' + escapeHtml(m.contraparte_nombre || '—') + '</dd>' +
           '<dt>RFC</dt><dd>' + escapeHtml(m.rfc_detectado || '—') + '</dd>' +
           '<dt>Referencia</dt><dd>' + escapeHtml(m.referencia || '—') + '</dd>' +
@@ -1358,14 +1416,14 @@
             MULTI_CATEGORIES.forEach(function (c) {
               var opt = document.createElement('option');
               opt.value = c;
-              opt.textContent = c;
+              opt.textContent = catLabel(c);
               if (c === (m.categoria_sugerida || '')) opt.selected = true;
               select.appendChild(opt);
             });
             if (m.categoria_sugerida && MULTI_CATEGORIES.indexOf(m.categoria_sugerida) < 0) {
               var o = document.createElement('option');
               o.value = m.categoria_sugerida;
-              o.textContent = m.categoria_sugerida;
+              o.textContent = catLabel(m.categoria_sugerida);
               o.selected = true;
               select.appendChild(o);
             }
@@ -1374,11 +1432,11 @@
             select.focus();
             select.addEventListener('change', function () {
               m.categoria_sugerida = select.value || m.categoria_sugerida;
-              categoryCell.innerHTML = '<span class="badge badge--neutral">' + escapeHtml(m.categoria_sugerida || '—') + '</span>';
+              categoryCell.innerHTML = '<span class="badge badge--neutral">' + escapeHtml(catLabel(m.categoria_sugerida)) + '</span>';
             });
             select.addEventListener('blur', function () {
               m.categoria_sugerida = select.value || m.categoria_sugerida;
-              categoryCell.innerHTML = '<span class="badge badge--neutral">' + escapeHtml(m.categoria_sugerida || '—') + '</span>';
+              categoryCell.innerHTML = '<span class="badge badge--neutral">' + escapeHtml(catLabel(m.categoria_sugerida)) + '</span>';
             });
           });
         }
@@ -1395,96 +1453,6 @@
       });
     });
 
-    function updatePreviewCommitButton() {
-      var btn = document.getElementById('previewCommitBtn');
-      var sel = document.getElementById('previewCommitAccountId');
-      var hasMovements = (window.__bankMultiMovements && window.__bankMultiMovements.length > 0);
-      var hasAccount = sel && sel.value && sel.value.trim() !== '';
-      if (btn) btn.disabled = !(hasMovements && hasAccount);
-    }
-    updatePreviewCommitButton();
-    var previewCommitSel = document.getElementById('previewCommitAccountId');
-    if (previewCommitSel) previewCommitSel.addEventListener('change', updatePreviewCommitButton);
-
-    var previewCommitBtn = document.getElementById('previewCommitBtn');
-    var previewCommitMessage = document.getElementById('previewCommitMessage');
-    if (previewCommitBtn) {
-      previewCommitBtn.addEventListener('click', function () {
-        var movs = window.__bankMultiMovements;
-        var sel = document.getElementById('previewCommitAccountId');
-        if (!movs || movs.length === 0 || !sel || !sel.value) {
-          if (window.uiToast) window.uiToast({ type: 'warning', title: 'Datos incompletos', message: 'Selecciona una cuenta y asegúrate de tener movimientos en el preview.' });
-          return;
-        }
-        if (!confirm('Se guardarán los movimientos para consultarlos en la página Movimientos. ¿Continuar?')) return;
-        var byFile = {};
-        movs.forEach(function (m) {
-          var key = m.source_file_name || 'preview';
-          if (!byFile[key]) byFile[key] = [];
-          byFile[key].push(m);
-        });
-        var files = [];
-        Object.keys(byFile).forEach(function (fileName) {
-          var group = byFile[fileName];
-          var totalDep = 0, totalRet = 0;
-          group.forEach(function (m) {
-            totalDep += Number(m.monto_deposito) || 0;
-            totalRet += Number(m.monto_retiro) || 0;
-          });
-          var first = group[0];
-          files.push({
-            file_summary: {
-              source_file_name: fileName,
-              bank_name: first.bank_name || '',
-              movements_count: group.length,
-              total_deposito: totalDep,
-              total_retiro: totalRet
-            },
-            movements: group
-          });
-        });
-        previewCommitBtn.disabled = true;
-        if (previewCommitMessage) { previewCommitMessage.hidden = false; previewCommitMessage.textContent = 'Guardando…'; previewCommitMessage.className = 'u-mt-2 u-text-xs muted'; }
-        var fn = window.portalFetchWithTimeout || fetch;
-        fn('/portal/bank/preview/commit', {
-          method: 'POST',
-          credentials: 'same-origin',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ bank_account_id: Number(sel.value), files: files })
-        }).then(function (r) {
-          if (r.status === 401 && window.showSessionExpiredModal) window.showSessionExpiredModal();
-          return r.json().then(function (data) { return { ok: r.ok, data: data }; });
-        }).then(function (res) {
-          previewCommitBtn.disabled = false;
-          if (!previewCommitMessage) return;
-          previewCommitMessage.hidden = false;
-          if (res.ok && res.data && res.data.ok) {
-            previewCommitMessage.className = 'u-mt-2 u-text-xs';
-            previewCommitMessage.style.color = '';
-            var inserted = res.data.inserted_count || 0;
-            var dup = res.data.duplicate_movements_count || 0;
-            var month = res.data.period_month || '';
-            var msg = 'Guardados ' + inserted + ' movimientos.';
-            if (dup > 0) msg += ' ' + dup + ' ya existían (duplicados).';
-            msg += ' <a href="/portal/bank/movements' + (month ? '?period_month=' + month : '') + '">Ver movimientos guardados</a>';
-            previewCommitMessage.innerHTML = msg;
-            if (window.uiToast) window.uiToast({ type: 'success', title: 'Listo', message: inserted + ' movimientos guardados.' });
-          } else {
-            previewCommitMessage.className = 'u-mt-2 u-text-xs';
-            previewCommitMessage.style.color = 'var(--danger, #b91c1c)';
-            previewCommitMessage.textContent = (res.data && res.data.rejection_reason) ? res.data.rejection_reason : 'Error al guardar.';
-          }
-        }).catch(function () {
-          previewCommitBtn.disabled = false;
-          if (previewCommitMessage) {
-            previewCommitMessage.hidden = false;
-            previewCommitMessage.className = 'u-mt-2 u-text-xs';
-            previewCommitMessage.style.color = 'var(--danger, #b91c1c)';
-            previewCommitMessage.textContent = 'Error de red.';
-          }
-        });
-      });
-    }
   };
 })();
 </script>

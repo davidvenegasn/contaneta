@@ -181,15 +181,27 @@ $getServiceForIssuer = function (int $issuerId) use ($getCred, $baseDir, &$servi
         return $serviceCache[$issuerId];
     }
 
-    $getCred->execute([':issuer_id' => $issuerId]);
-    $cred = $getCred->fetch(PDO::FETCH_ASSOC);
-    if (! $cred) {
-        throw new RuntimeException("No hay sat_credentials para issuer_id={$issuerId}");
-    }
+    // Override seguro: si el caller inyecta credenciales desencriptadas vía env,
+    // usarlas en lugar de leer paths/password de la DB (por cifrado at-rest).
+    $overrideCer = getenv('SAT_FIEL_CER_PATH') ?: '';
+    $overrideKey = getenv('SAT_FIEL_KEY_PATH') ?: '';
+    $overridePass = getenv('SAT_FIEL_PASSWORD') ?: '';
 
-    $cerPath = $baseDir . '/' . ltrim((string) $cred['fiel_cer_path'], '/');
-    $keyPath = $baseDir . '/' . ltrim((string) $cred['fiel_key_path'], '/');
-    $pass = (string) $cred['fiel_key_password'];
+    if ($overrideCer && $overrideKey) {
+        $cerPath = $overrideCer;
+        $keyPath = $overrideKey;
+        $pass = $overridePass;
+    } else {
+        $getCred->execute([':issuer_id' => $issuerId]);
+        $cred = $getCred->fetch(PDO::FETCH_ASSOC);
+        if (! $cred) {
+            throw new RuntimeException("No hay sat_credentials para issuer_id={$issuerId}");
+        }
+
+        $cerPath = $baseDir . '/' . ltrim((string) $cred['fiel_cer_path'], '/');
+        $keyPath = $baseDir . '/' . ltrim((string) $cred['fiel_key_path'], '/');
+        $pass = (string) $cred['fiel_key_password'];
+    }
 
     if (! file_exists($cerPath)) {
         throw new RuntimeException("No existe CER: {$cerPath}");

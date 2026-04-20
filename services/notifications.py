@@ -145,10 +145,39 @@ def refresh_for_issuer(issuer_id: int) -> None:
     now = datetime.now(timezone.utc)
     ym = now.strftime("%Y-%m")
 
+    # 0) FIEL not configured — encourage setup
+    try:
+        fiel_row = db_rows(
+            "SELECT validation_ok FROM sat_credentials WHERE issuer_id = ? LIMIT 1",
+            (issuer_id,),
+        )
+        if not fiel_row:
+            create_notification_if_missing(
+                issuer_id=issuer_id,
+                type="fiel_not_configured",
+                title="Conecta tu FIEL",
+                body="Sube tus credenciales SAT para sincronizar facturas automáticamente.",
+                severity=SEVERITY_INFO,
+                action_url="/portal/config/sat",
+                dedupe_parts=["fiel_not_configured"],
+            )
+        elif fiel_row and not fiel_row[0].get("validation_ok"):
+            create_notification_if_missing(
+                issuer_id=issuer_id,
+                type="fiel_validation_pending",
+                title="Valida tu FIEL",
+                body="Tus credenciales SAT están cargadas pero no han sido validadas.",
+                severity=SEVERITY_WARNING,
+                action_url="/portal/config/sat",
+                dedupe_parts=["fiel_validation_pending"],
+            )
+    except Exception:
+        pass
+
     # 1) PPD sin complemento (aprox): usar invoices table si existe
     try:
         conn = db()
-        cols = {r[1] for r in conn.execute("PRAGMA table_info(invoices)").fetchall()} if table_exists(conn, "invoices") else set()
+        cols = {r["name"] for r in conn.execute("PRAGMA table_info(invoices)").fetchall()} if table_exists(conn, "invoices") else set()
         if cols and "payment_method" in cols:
             where = ["issuer_id = ?", "uuid IS NOT NULL", "payment_method = 'PPD'"]
             params: list[Any] = [issuer_id]
@@ -157,7 +186,7 @@ def refresh_for_issuer(issuer_id: int) -> None:
             if "cancelled" in cols:
                 where.append("COALESCE(cancelled,0) = 0")
             row = conn.execute(f"SELECT COUNT(*) AS c FROM invoices WHERE {' AND '.join(where)}", tuple(params)).fetchone()
-            n = int(row["c"] if row and "c" in row.keys() else (row[0] if row else 0))
+            n = int(row["c"]) if row else 0
             if n > 0:
                 create_notification_if_missing(
                     issuer_id=issuer_id,
@@ -250,7 +279,7 @@ def refresh_for_issuer(issuer_id: int) -> None:
                        )"""
                 )
             row = conn.execute(f"SELECT COUNT(*) AS c FROM bank_movements WHERE {' AND '.join(where)}", tuple(params)).fetchone()
-            n = int(row["c"] if row and "c" in row.keys() else (row[0] if row else 0))
+            n = int(row["c"]) if row else 0
             if n > 0:
                 create_notification_if_missing(
                     issuer_id=issuer_id,

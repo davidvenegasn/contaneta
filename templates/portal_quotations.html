@@ -74,7 +74,7 @@
 
       {% from 'portal/_ui_components.html' import portal_empty_state, portal_load_error %}
       {{ portal_load_error('quotLoadError') }}
-      {% call portal_empty_state('Aún no tienes cotizaciones', 'Crea una cotización, comparte el link con tu cliente y él podrá aceptar o rechazarla desde el navegador.', id='quotEmpty') %}
+      {% call portal_empty_state('Envía tu primera cotización', 'Crea una cotización, comparte el link con tu cliente y él podrá aceptar o rechazarla desde el navegador.', id='quotEmpty', icon_type='quote') %}
         <button type="button" class="btn btn-primary" id="quotEmptyBtn">Nueva cotización</button>
       {% endcall %}
     </div>
@@ -286,6 +286,10 @@
     const map = { draft:'Borrador', sent:'Enviada', accepted:'Aceptada', rejected:'Rechazada', converted:'Facturada' };
     return map[s] || s;
   }
+  function statusPillClass(s){
+    const map = { draft:'pill--draft', sent:'pill--sent', accepted:'pill--accepted', rejected:'pill--rejected', converted:'pill--invoiced' };
+    return map[s] || '';
+  }
 
   function formatDate(createdAt){
     if (!createdAt) return '-';
@@ -326,7 +330,7 @@
         <td class="muted">${esc(formatDate(r.created_at))}</td>
         <td><div class="u-fw-semibold">${esc(r.customer_legal_name)}</div><div class="muted u-text-12">${esc(r.customer_rfc || '')}</div></td>
         <td>${total}</td>
-        <td><span class="pill">${esc(status)}</span></td>
+        <td><span class="pill ${statusPillClass(r.status)}">${esc(status)}</span></td>
         <td class="u-text-12">
           ${canCopy ? `<button type="button" class="btn btn-small btn-ghost" data-copy-link="${esc(r.public_token)}" title="Copiar link">Copiar link</button>` : '-'}
         </td>
@@ -762,16 +766,16 @@
     if (quotClientNameManual) { quotClientNameManual.focus(); }
   });
 
-  quotAddLine.addEventListener('click', () => addLine('', 1, 0, 0.16));
-  quotAddProduct.addEventListener('change', function(){
+  if (quotAddLine) quotAddLine.addEventListener('click', () => addLine('', 1, 0, 0.16));
+  if (quotAddProduct) quotAddProduct.addEventListener('change', function(){
     const opt = this.options[this.selectedIndex];
     if (!opt || !opt.value) return;
     addLine(opt.getAttribute('data-desc'), 1, opt.getAttribute('data-price'), opt.getAttribute('data-iva'));
     this.selectedIndex = 0;
   });
 
-  quotSaveDraft.addEventListener('click', () => save(false));
-  quotSend.addEventListener('click', () => save(true));
+  if (quotSaveDraft) quotSaveDraft.addEventListener('click', () => save(false));
+  if (quotSend) quotSend.addEventListener('click', () => save(true));
 
   var quotDiscardDraft = document.getElementById('quotDiscardDraft');
   if (quotDiscardDraft) {

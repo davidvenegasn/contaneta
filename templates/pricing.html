@@ -19,12 +19,12 @@
       --pricing-border: #e2e8f0;
       --pricing-text: #0f172a;
       --pricing-muted: #64748b;
-      --pricing-accent: #0d9488;
-      --pricing-accent-hover: #0f766e;
+      --pricing-accent: #6366f1;
+      --pricing-accent-hover: #4f46e5;
     }
     body { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; margin: 0; padding: 2rem 1rem; background: var(--pricing-bg); min-height: 100vh; }
-    .wrap { max-width: 960px; margin: 0 auto; }
-    h1 { margin: 0 0 0.5rem; font-size: 1.75rem; font-weight: 700; color: var(--pricing-text); }
+    .wrap { max-width: 1040px; margin: 0 auto; }
+    h1 { margin: 0 0 0.5rem; font-size: 1.75rem; font-weight: 600; color: var(--pricing-text); }
     .subtitle { color: var(--pricing-muted); font-size: 1rem; margin-bottom: 1.5rem; }
     .nav-compare { margin-bottom: 2rem; }
     .nav-compare a { font-size: 14px; font-weight: 600; color: var(--pricing-accent); text-decoration: none; }
@@ -33,23 +33,28 @@
     .banner { background: #fef3c7; border: 1px solid #f59e0b; border-radius: 12px; padding: 1rem 1.25rem; margin-bottom: 1.5rem; font-size: 14px; color: #92400e; }
     .banner a { color: #b45309; font-weight: 600; }
     .banner a:visited { color: #b45309; }
-    .plans { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 3rem; }
-    @media (max-width: 560px) { .plans { grid-template-columns: 1fr; } }
-    .plan { background: var(--pricing-card); border: 1px solid var(--pricing-border); border-radius: 16px; padding: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
-    .plan--pro { border-color: var(--pricing-accent); box-shadow: 0 4px 14px rgba(13,148,136,.15); }
-    .plan h2 { margin: 0 0 0.5rem; font-size: 1.125rem; font-weight: 700; }
-    .plan .price { font-size: 1.5rem; font-weight: 800; color: var(--pricing-text); margin-bottom: 0.5rem; }
+    .plans { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.25rem; margin-bottom: 3rem; }
+    @media (max-width: 860px) { .plans { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 480px) { .plans { grid-template-columns: 1fr; } }
+    .plan { background: var(--pricing-card); border: 1px solid var(--pricing-border); border-radius: 16px; padding: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,.06); position: relative; display: flex; flex-direction: column; }
+    .plan--recommended { border-color: var(--pricing-accent); box-shadow: 0 4px 14px rgba(99,102,241,.15); }
+    .plan__badge { position: absolute; top: -10px; right: 12px; background: var(--pricing-accent); color: #fff; font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 10px; }
+    .plan h2 { margin: 0 0 0.5rem; font-size: 1.125rem; font-weight: 600; }
+    .plan .price { font-size: 1.5rem; font-weight: 800; color: var(--pricing-text); margin-bottom: 0.25rem; }
     .plan .price-note { font-size: 12px; color: var(--pricing-muted); margin-bottom: 1rem; }
-    .plan ul { margin: 0 0 1.25rem; padding-left: 1.25rem; font-size: 14px; color: #475569; line-height: 1.6; }
+    .plan ul { margin: 0 0 1.25rem; padding-left: 0; font-size: 13px; color: #475569; line-height: 1.7; list-style: none; flex: 1; }
+    .plan ul li { padding-left: 20px; position: relative; margin-bottom: 2px; }
+    .plan ul li::before { content: '✓'; position: absolute; left: 0; color: var(--pricing-accent); font-weight: 700; font-size: 12px; }
+    .plan ul li.plan-cross::before { content: '—'; color: #cbd5e1; }
     .plan .btn { display: block; width: 100%; text-align: center; padding: 0.75rem 1rem; border-radius: 12px; font-weight: 600; font-size: 15px; text-decoration: none; box-sizing: border-box; }
     .plan .btn--primary { background: var(--pricing-accent); color: #fff; border: none; }
     .plan .btn--primary:hover { background: var(--pricing-accent-hover); }
     .plan .btn--secondary { background: #fff; color: var(--pricing-accent); border: 2px solid var(--pricing-accent); }
-    .plan .btn--secondary:hover { background: #f0fdfa; }
+    .plan .btn--secondary:hover { background: #eef2ff; }
 
     /* Comparador: título de sección */
     .compare-section { margin-top: 3rem; padding-top: 2rem; border-top: 1px solid var(--pricing-border); }
-    .compare-section h2 { margin: 0 0 1rem; font-size: 1.35rem; font-weight: 700; color: var(--pricing-text); }
+    .compare-section h2 { margin: 0 0 1rem; font-size: 1.35rem; font-weight: 600; color: var(--pricing-text); }
     .compare-section .compare-desc { color: var(--pricing-muted); font-size: 14px; margin-bottom: 1.5rem; }
 
     /* Desktop: tabla completa */
@@ -63,22 +68,22 @@
       box-shadow: 0 1px 3px rgba(0,0,0,.06);
     }
     .compare-table th,
-    .compare-table td { padding: 14px 16px; text-align: left; border-bottom: 1px solid var(--pricing-border); }
-    .compare-table thead th { background: #f1f5f9; font-weight: 600; font-size: 14px; color: var(--pricing-text); }
-    .compare-table thead th:first-child { width: 40%; }
-    .compare-table thead th.compare-th--pro { background: rgba(13,148,136,.1); color: var(--pricing-accent); }
+    .compare-table td { padding: 12px 14px; text-align: left; border-bottom: 1px solid var(--pricing-border); font-size: 13px; }
+    .compare-table thead th { background: #f1f5f9; font-weight: 600; font-size: 13px; color: var(--pricing-text); }
+    .compare-table thead th:first-child { width: 30%; }
+    .compare-table thead th.compare-th--pro { background: rgba(99,102,241,.08); color: var(--pricing-accent); }
     .compare-table tbody tr:last-child td { border-bottom: none; }
-    .compare-table tbody td { font-size: 14px; color: #475569; }
+    .compare-table tbody td { color: #475569; }
     .compare-table tbody td:first-child { font-weight: 500; color: var(--pricing-text); }
-    .compare-table .compare-check { color: var(--pricing-accent); font-weight: 700; }
+    .compare-table .compare-check { color: var(--pricing-accent); font-weight: 600; }
     .compare-table .compare-cross { color: #cbd5e1; }
     .compare-table .compare-cta { padding-top: 12px; padding-bottom: 12px; }
     .compare-table .compare-cta .btn {
       display: inline-block;
-      padding: 10px 20px;
+      padding: 8px 16px;
       border-radius: 10px;
       font-weight: 600;
-      font-size: 14px;
+      font-size: 13px;
       text-decoration: none;
       text-align: center;
       white-space: nowrap;
@@ -86,7 +91,7 @@
     .compare-table .compare-cta .btn--primary { background: var(--pricing-accent); color: #fff; border: none; }
     .compare-table .compare-cta .btn--primary:hover { background: var(--pricing-accent-hover); }
     .compare-table .compare-cta .btn--secondary { background: #fff; color: var(--pricing-accent); border: 2px solid var(--pricing-accent); }
-    .compare-table .compare-cta .btn--secondary:hover { background: #f0fdfa; }
+    .compare-table .compare-cta .btn--secondary:hover { background: #eef2ff; }
     @media (max-width: 768px) {
       .compare-table-wrap { display: none; }
     }
@@ -153,7 +158,7 @@
     .compare-accordion__list li::before {
       content: '✓';
       color: var(--pricing-accent);
-      font-weight: 700;
+      font-weight: 600;
     }
     .compare-accordion__cta .btn {
       display: block;
@@ -168,7 +173,7 @@
     .compare-accordion__cta .btn--primary { background: var(--pricing-accent); color: #fff; border: none; }
     .compare-accordion__cta .btn--primary:hover { background: var(--pricing-accent-hover); }
     .compare-accordion__cta .btn--secondary { background: #fff; color: var(--pricing-accent); border: 2px solid var(--pricing-accent); }
-    .compare-accordion__cta .btn--secondary:hover { background: #f0fdfa; }
+    .compare-accordion__cta .btn--secondary:hover { background: #eef2ff; }
 
     .footer-links { text-align: center; font-size: 14px; color: var(--pricing-muted); margin-top: 2rem; }
     .footer-links a { color: var(--pricing-accent); font-weight: 500; text-decoration: none; }
@@ -190,27 +195,61 @@
 
     <div class="plans">
       <div class="plan">
+        <h2>Gratis</h2>
+        <div class="price">$0</div>
+        <div class="price-note">Para siempre</div>
+        <ul>
+          <li>{{ plans.free.invoices_per_month }} facturas/mes</li>
+          <li>{{ plans.free.bank_imports_per_month }} importaciones bancarias</li>
+          <li>{{ plans.free.bank_accounts }} cuenta bancaria</li>
+          <li class="plan-cross">Sin sync SAT</li>
+          <li class="plan-cross">Sin cierre mensual</li>
+        </ul>
+        <a href="/signup" class="btn btn--secondary">Comenzar gratis</a>
+      </div>
+      <div class="plan">
         <h2>Prueba</h2>
         <div class="price">14 días gratis</div>
-        <div class="price-note">Al registrarte con tu RFC</div>
+        <div class="price-note">Todas las funciones Pro</div>
         <ul>
-          <li>Facturación electrónica (CFDI)</li>
-          <li>Sincronización SAT (emitidas y recibidas)</li>
-          <li>Clientes, productos, cotizaciones</li>
-          <li>Descarga XML y PDF</li>
+          <li>{{ plans.trial.invoices_per_month }} facturas/mes</li>
+          <li>{{ plans.trial.sat_syncs_per_month }} syncs SAT</li>
+          <li>{{ plans.trial.bank_imports_per_month }} importaciones bancarias</li>
+          <li>{{ plans.trial.bank_accounts }} cuentas bancarias</li>
+          <li>Cierre mensual</li>
+          <li>Conciliación</li>
         </ul>
         <a href="/signup" class="btn btn--secondary">Comenzar prueba</a>
       </div>
-      <div class="plan plan--pro">
-        <h2>Pro</h2>
-        <div class="price">Próximamente</div>
-        <div class="price-note">Pago mensual · Cancela cuando quieras</div>
+      <div class="plan">
+        <h2>Básico</h2>
+        <div class="price">${{ plans.basic.price_mxn }} <span style="font-size:14px;font-weight:500;">MXN/mes</span></div>
+        <div class="price-note">Cancela cuando quieras</div>
         <ul>
-          <li>Todo lo de Prueba, sin límite de tiempo</li>
-          <li>Soporte prioritario</li>
-          <li>Múltiples emisores (próximamente)</li>
+          <li>{{ plans.basic.invoices_per_month }} facturas/mes</li>
+          <li>{{ plans.basic.sat_syncs_per_month }} syncs SAT</li>
+          <li>{{ plans.basic.bank_imports_per_month }} importaciones bancarias</li>
+          <li>{{ plans.basic.bank_accounts }} cuentas bancarias</li>
+          <li>Cierre mensual</li>
+          <li>Conciliación</li>
         </ul>
-        <a href="/signup" class="btn btn--primary">Crear cuenta</a>
+        <a href="/signup" class="btn btn--secondary">Elegir Básico</a>
+      </div>
+      <div class="plan plan--recommended">
+        <span class="plan__badge">Recomendado</span>
+        <h2>Pro</h2>
+        <div class="price">${{ plans.pro.price_mxn }} <span style="font-size:14px;font-weight:500;">MXN/mes</span></div>
+        <div class="price-note">Cancela cuando quieras</div>
+        <ul>
+          <li>{{ plans.pro.invoices_per_month }} facturas/mes</li>
+          <li>{{ plans.pro.sat_syncs_per_month }} syncs SAT</li>
+          <li>{{ plans.pro.bank_imports_per_month }} importaciones bancarias</li>
+          <li>{{ plans.pro.bank_accounts }} cuentas bancarias</li>
+          <li>Cierre mensual</li>
+          <li>Conciliación automática</li>
+          <li>Soporte prioritario</li>
+        </ul>
+        <a href="/signup" class="btn btn--primary">Elegir Pro</a>
       </div>
     </div>
 
@@ -224,55 +263,75 @@
           <thead>
             <tr>
               <th scope="col">Característica</th>
+              <th scope="col">Gratis</th>
               <th scope="col">Prueba</th>
+              <th scope="col">Básico</th>
               <th scope="col" class="compare-th--pro">Pro</th>
             </tr>
           </thead>
           <tbody>
             <tr>
               <td>Precio</td>
+              <td>$0</td>
               <td>14 días gratis</td>
-              <td>Próximamente (mensual)</td>
+              <td>${{ plans.basic.price_mxn }}/mes</td>
+              <td>${{ plans.pro.price_mxn }}/mes</td>
             </tr>
             <tr>
-              <td>Facturación electrónica (CFDI)</td>
+              <td>Facturas/mes</td>
+              <td>{{ plans.free.invoices_per_month }}</td>
+              <td>{{ plans.trial.invoices_per_month }}</td>
+              <td>{{ plans.basic.invoices_per_month }}</td>
+              <td class="compare-check">{{ plans.pro.invoices_per_month }}</td>
+            </tr>
+            <tr>
+              <td>Sincronización SAT</td>
+              <td class="compare-cross">—</td>
+              <td class="compare-check">{{ plans.trial.sat_syncs_per_month }} syncs</td>
+              <td class="compare-check">{{ plans.basic.sat_syncs_per_month }} syncs</td>
+              <td class="compare-check">{{ plans.pro.sat_syncs_per_month }} syncs</td>
+            </tr>
+            <tr>
+              <td>Importaciones bancarias</td>
+              <td>{{ plans.free.bank_imports_per_month }}</td>
+              <td>{{ plans.trial.bank_imports_per_month }}</td>
+              <td>{{ plans.basic.bank_imports_per_month }}</td>
+              <td class="compare-check">{{ plans.pro.bank_imports_per_month }}</td>
+            </tr>
+            <tr>
+              <td>Cuentas bancarias</td>
+              <td>{{ plans.free.bank_accounts }}</td>
+              <td>{{ plans.trial.bank_accounts }}</td>
+              <td>{{ plans.basic.bank_accounts }}</td>
+              <td class="compare-check">{{ plans.pro.bank_accounts }}</td>
+            </tr>
+            <tr>
+              <td>Cierre mensual</td>
+              <td class="compare-cross">—</td>
+              <td class="compare-check">Incluido</td>
               <td class="compare-check">Incluido</td>
               <td class="compare-check">Incluido</td>
             </tr>
             <tr>
-              <td>Sincronización SAT (emitidas y recibidas)</td>
+              <td>Conciliación automática</td>
+              <td class="compare-cross">—</td>
               <td class="compare-check">Incluido</td>
               <td class="compare-check">Incluido</td>
-            </tr>
-            <tr>
-              <td>Clientes, productos y cotizaciones</td>
               <td class="compare-check">Incluido</td>
-              <td class="compare-check">Incluido</td>
-            </tr>
-            <tr>
-              <td>Descarga XML y PDF</td>
-              <td class="compare-check">Incluido</td>
-              <td class="compare-check">Incluido</td>
-            </tr>
-            <tr>
-              <td>Duración</td>
-              <td>14 días</td>
-              <td class="compare-check">Sin límite</td>
             </tr>
             <tr>
               <td>Soporte prioritario</td>
               <td class="compare-cross">—</td>
+              <td class="compare-cross">—</td>
+              <td class="compare-cross">—</td>
               <td class="compare-check">Incluido</td>
             </tr>
             <tr>
-              <td>Múltiples emisores</td>
-              <td class="compare-cross">—</td>
-              <td><span class="compare-cross">Próximamente</span></td>
-            </tr>
-            <tr>
               <td></td>
-              <td class="compare-cta"><a href="/signup" class="btn btn--secondary">Comenzar prueba</a></td>
-              <td class="compare-cta"><a href="/signup" class="btn btn--primary">Crear cuenta</a></td>
+              <td class="compare-cta"><a href="/signup" class="btn btn--secondary">Gratis</a></td>
+              <td class="compare-cta"><a href="/signup" class="btn btn--secondary">Prueba</a></td>
+              <td class="compare-cta"><a href="/signup" class="btn btn--secondary">Básico</a></td>
+              <td class="compare-cta"><a href="/signup" class="btn btn--primary">Pro</a></td>
             </tr>
           </tbody>
         </table>
@@ -281,36 +340,52 @@
       <!-- Mobile: accordion por plan -->
       <div class="compare-accordion" role="list">
         <div class="compare-accordion__item" data-accordion-item role="listitem">
-          <button type="button" class="compare-accordion__trigger" aria-expanded="false" aria-controls="compare-panel-prueba" id="compare-trigger-prueba">
-            Prueba — 14 días gratis
-          </button>
-          <div id="compare-panel-prueba" class="compare-accordion__panel" role="region" aria-labelledby="compare-trigger-prueba" hidden>
+          <button type="button" class="compare-accordion__trigger" aria-expanded="false">Gratis — $0</button>
+          <div class="compare-accordion__panel" hidden>
             <ul class="compare-accordion__list">
-              <li>Facturación electrónica (CFDI)</li>
-              <li>Sincronización SAT (emitidas y recibidas)</li>
-              <li>Clientes, productos, cotizaciones</li>
-              <li>Descarga XML y PDF</li>
-              <li>14 días de prueba</li>
+              <li>{{ plans.free.invoices_per_month }} facturas/mes</li>
+              <li>{{ plans.free.bank_imports_per_month }} importaciones bancarias</li>
+              <li>{{ plans.free.bank_accounts }} cuenta bancaria</li>
             </ul>
-            <div class="compare-accordion__cta">
-              <a href="/signup" class="btn btn--secondary">Comenzar prueba</a>
-            </div>
+            <div class="compare-accordion__cta"><a href="/signup" class="btn btn--secondary">Comenzar gratis</a></div>
+          </div>
+        </div>
+        <div class="compare-accordion__item" data-accordion-item role="listitem">
+          <button type="button" class="compare-accordion__trigger" aria-expanded="false">Prueba — 14 días gratis</button>
+          <div class="compare-accordion__panel" hidden>
+            <ul class="compare-accordion__list">
+              <li>{{ plans.trial.invoices_per_month }} facturas/mes</li>
+              <li>{{ plans.trial.sat_syncs_per_month }} syncs SAT</li>
+              <li>{{ plans.trial.bank_imports_per_month }} importaciones bancarias</li>
+              <li>Cierre mensual y conciliación</li>
+            </ul>
+            <div class="compare-accordion__cta"><a href="/signup" class="btn btn--secondary">Comenzar prueba</a></div>
+          </div>
+        </div>
+        <div class="compare-accordion__item" data-accordion-item role="listitem">
+          <button type="button" class="compare-accordion__trigger" aria-expanded="false">Básico — ${{ plans.basic.price_mxn }}/mes</button>
+          <div class="compare-accordion__panel" hidden>
+            <ul class="compare-accordion__list">
+              <li>{{ plans.basic.invoices_per_month }} facturas/mes</li>
+              <li>{{ plans.basic.sat_syncs_per_month }} syncs SAT</li>
+              <li>{{ plans.basic.bank_imports_per_month }} importaciones bancarias</li>
+              <li>Cierre mensual y conciliación</li>
+            </ul>
+            <div class="compare-accordion__cta"><a href="/signup" class="btn btn--secondary">Elegir Básico</a></div>
           </div>
         </div>
         <div class="compare-accordion__item compare-accordion__item--pro is-open" data-accordion-item role="listitem">
-          <button type="button" class="compare-accordion__trigger" aria-expanded="true" aria-controls="compare-panel-pro" id="compare-trigger-pro">
-            Pro — Próximamente
-          </button>
-          <div id="compare-panel-pro" class="compare-accordion__panel" role="region" aria-labelledby="compare-trigger-pro">
+          <button type="button" class="compare-accordion__trigger" aria-expanded="true">Pro — ${{ plans.pro.price_mxn }}/mes</button>
+          <div class="compare-accordion__panel">
             <ul class="compare-accordion__list">
-              <li>Todo lo de Prueba</li>
-              <li>Sin límite de tiempo</li>
+              <li>{{ plans.pro.invoices_per_month }} facturas/mes</li>
+              <li>{{ plans.pro.sat_syncs_per_month }} syncs SAT</li>
+              <li>{{ plans.pro.bank_imports_per_month }} importaciones bancarias</li>
+              <li>{{ plans.pro.bank_accounts }} cuentas bancarias</li>
+              <li>Cierre mensual y conciliación</li>
               <li>Soporte prioritario</li>
-              <li>Múltiples emisores (próximamente)</li>
             </ul>
-            <div class="compare-accordion__cta">
-              <a href="/signup" class="btn btn--primary">Crear cuenta</a>
-            </div>
+            <div class="compare-accordion__cta"><a href="/signup" class="btn btn--primary">Elegir Pro</a></div>
           </div>
         </div>
       </div>

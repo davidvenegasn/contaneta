@@ -97,9 +97,30 @@ def _find_all(root: ET.Element, name: str) -> list[ET.Element]:
 
 
 def _norm_desc(s: str) -> str:
+    """Normaliza descripción de concepto CFDI para dedup de productos.
+    Quita sufijos de mes/parcialidad comunes en facturas MX:
+      'Servicio X - Enero 2026 1/2' → 'Servicio X'
+      'Consultoría Febrero 2026'    → 'Consultoría'
+    """
     t = (s or "").strip()
     t = re.sub(r"\s+", " ", t)
-    return t
+    if not t:
+        return t
+    # Meses en español
+    _meses = r"(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)"
+    # Quitar separador + mes + año + parcialidad opcional: "- Enero 2026 1/2"
+    t = re.sub(
+        r"\s*[-–—/|,]\s*" + _meses + r"(?:\s+\d{4})?" + r"(?:\s+\d+\s*/\s*\d+)?\s*$",
+        "", t, flags=re.IGNORECASE,
+    )
+    # Quitar mes + año sin separador al final: "Febrero 2026"
+    t = re.sub(
+        r"\s+" + _meses + r"\s+\d{4}" + r"(?:\s+\d+\s*/\s*\d+)?\s*$",
+        "", t, flags=re.IGNORECASE,
+    )
+    # Quitar parcialidad huérfana: "1/2", "2/3"
+    t = re.sub(r"\s*[-–—]\s*\d+\s*/\s*\d+\s*$", "", t)
+    return t.strip()
 
 
 def _to_float(v: Any) -> Optional[float]:
@@ -230,9 +251,81 @@ def upsert_product_observations_from_cfdi_xml(issuer_id: int, xml_path: str) -> 
                 """,
                 (issuer_id, clave_prod_serv, clave_unidad, unidad, raw_desc, unit_price, moneda),
             )
+            # Auto-create confirmed product (user can edit name/price later)
+            conn.execute(
+                """
+                INSERT INTO products (
+                  issuer_id, name, clave_prod_serv, clave_unidad, unidad,
+                  default_unit_price, default_currency, active,
+                  created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, datetime('now'), datetime('now'))
+                ON CONFLICT(issuer_id, name, clave_prod_serv, clave_unidad) DO UPDATE SET
+                  unidad = COALESCE(excluded.unidad, products.unidad),
+                  default_currency = COALESCE(excluded.default_currency, products.default_currency),
+                  updated_at = datetime('now')
+                """,
+                (issuer_id, raw_desc, clave_prod_serv, clave_unidad, unidad, unit_price, moneda),
+            )
             n += 1
         conn.commit()
         return n
+    finally:
+        conn.close()
+
+
+def backfill_issuer_from_cfdi(issuer_id: int) -> bool:
+    """
+    Extract Emisor/@RegimenFiscal from the first issued CFDI and update the
+    issuer's regimen_fiscal if it is currently NULL.
+    Returns True if an update was made.
+    """
+    conn = db()
+    try:
+        issuer = conn.execute(
+            "SELECT regimen_fiscal FROM issuers WHERE id = ?", (issuer_id,)
+        ).fetchone()
+        if not issuer:
+            return False
+        if issuer["regimen_fiscal"]:
+            return False  # already set
+
+        row = conn.execute(
+            "SELECT xml_path FROM sat_cfdi "
+            "WHERE issuer_id = ? AND direction = 'issued' "
+            "AND xml_path IS NOT NULL AND TRIM(COALESCE(xml_path,'')) != '' "
+            "ORDER BY COALESCE(fecha_emision,'') DESC LIMIT 1",
+            (issuer_id,),
+        ).fetchone()
+        if not row or not row["xml_path"]:
+            return False
+    finally:
+        conn.close()
+
+    try:
+        abs_path = _resolve_xml_abs_path(row["xml_path"])
+        if not os.path.exists(abs_path):
+            return False
+        tree = ET.parse(abs_path)
+        emisor = _find_first(tree.getroot(), "Emisor")
+        if emisor is None:
+            return False
+        regimen = (emisor.attrib.get("RegimenFiscal") or "").strip()
+        if not regimen:
+            return False
+    except Exception as e:
+        logger.warning("backfill_issuer_from_cfdi issuer=%s err=%s", issuer_id, e)
+        return False
+
+    conn = db()
+    try:
+        conn.execute(
+            "UPDATE issuers SET regimen_fiscal = ?, updated_at = datetime('now') "
+            "WHERE id = ? AND (regimen_fiscal IS NULL OR TRIM(regimen_fiscal) = '')",
+            (regimen, issuer_id),
+        )
+        conn.commit()
+        logger.info("backfill_issuer_from_cfdi issuer=%s regimen=%s", issuer_id, regimen)
+        return True
     finally:
         conn.close()
 
@@ -292,8 +385,8 @@ def backfill_catalog_from_existing_cfdi(
 
     for r in rows:
         res.processed += 1
-        xml_path = (r["xml_path"] if isinstance(r, sqlite3.Row) else r[1]) if r else None
-        uuid = (r["uuid"] if isinstance(r, sqlite3.Row) else r[0]) if r else None
+        xml_path = r["xml_path"] if r else None
+        uuid = r["uuid"] if r else None
         try:
             if xml_path:
                 res.clients_upserted += upsert_clients_from_cfdi_xml(issuer_id, str(xml_path))
@@ -304,6 +397,12 @@ def backfill_catalog_from_existing_cfdi(
             res.errors.append(msg)
             logger.warning("backfill_catalog issuer=%s %s", issuer_id, msg, exc_info=True)
             continue
+
+    # Auto-fill issuer régimen fiscal from first CFDI if still missing
+    try:
+        backfill_issuer_from_cfdi(issuer_id)
+    except Exception as e:
+        logger.warning("backfill_issuer_from_cfdi issuer=%s err=%s", issuer_id, e)
 
     return res
 

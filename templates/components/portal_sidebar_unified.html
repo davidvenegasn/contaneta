@@ -1,0 +1,189 @@
+{# Sidebar unificado: cada fila = misma rejilla (icono | texto) → alineación y estado activo continuo. #}
+<div class="portal-sidebar-unified" id="portalDrawer">
+  <nav class="psb" aria-label="Navegación principal">
+    <div class="psb-brand-row">
+      <div class="psb-brand-row__rail">
+        <button type="button" class="rail-brand-toggle" data-drawer-toggle aria-label="Expandir menú" title="Expandir menú">
+          <svg class="rail-brand-toggle__logo" width="24" height="24" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <rect width="32" height="32" rx="8" fill="var(--accent, #6366f1)"/>
+            <text x="16" y="22" text-anchor="middle" font-family="system-ui, sans-serif" font-weight="700" font-size="18" fill="#fff">C</text>
+          </svg>
+          <svg class="rail-brand-toggle__arrow" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span class="rail-tooltip">Expandir</span>
+        </button>
+      </div>
+      <div class="psb-brand-row__drawer">
+        <div class="portal-drawer__head">
+          <span class="portal-drawer__brand" style="display:flex; align-items:center; gap:8px;">
+            <svg width="20" height="20" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect width="32" height="32" rx="8" fill="var(--accent, #6366f1)"/><text x="16" y="22" text-anchor="middle" font-family="system-ui, sans-serif" font-weight="700" font-size="18" fill="#fff">C</text></svg>
+            ContaNeta
+          </span>
+          <button type="button" class="mobile-menu-close" id="mobileMenuClose" aria-label="Cerrar menú">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="psb-scroll">
+      {# Nueva factura: dos controles, una sola pastilla activa en el contenedor #}
+      <div class="psb-dual {{ 'is-active' if (active_page == 'create' or (nav_is_active is defined and nav_is_active('/portal/create'))) else '' }}">
+        <div class="psb-dual__rail">
+          <button type="button" class="rail-item rail-item--cta" id="railNewInvoiceBtn" aria-label="Nueva factura" aria-haspopup="true" aria-expanded="false">
+            <span class="icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.75"/>
+                <path d="M12 8v8M8 12h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+            </span>
+            <span class="rail-tooltip">Nueva factura</span>
+          </button>
+        </div>
+        <div class="psb-dual__drawer">
+          <button type="button" class="drawer-link {{ 'drawer-link--active' if (active_page == 'create' or (nav_is_active is defined and nav_is_active('/portal/create'))) else '' }}" id="drawerNewInvoiceBtn">Nueva factura</button>
+          <div class="drawer-submenu" id="drawerInvoiceSubmenu" hidden>
+            <div id="drawerSubMenuPanel">
+              <button type="button" class="drawer-submenu__item" id="drawerQuickInvoiceBtn">
+                <svg class="drawer-submenu__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                <span>Factura rápida</span>
+              </button>
+              <a class="drawer-submenu__item" href="/portal/create">
+                <svg class="drawer-submenu__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7z"/><path d="M14 2v5h5"/><path d="M8 12h8M8 16h8M8 8h3"/></svg>
+                <span>Factura tradicional</span>
+              </a>
+            </div>
+            <div id="drawerQuickPanel" hidden>
+              <div class="drawer-quick__header">
+                <button type="button" class="drawer-quick__back" id="drawerQuickBack" aria-label="Volver">
+                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+                <strong>Factura rápida</strong>
+              </div>
+              <div class="drawer-quick__field">
+                <label class="drawer-quick__label" for="drawerClientSearch">Cliente</label>
+                <input class="drawer-quick__input" id="drawerClientSearch" placeholder="Buscar por nombre o RFC…" autocomplete="off" />
+                <div class="drawer-quick__results" id="drawerClientResults"></div>
+                <div class="drawer-quick__selected" id="drawerClientSelected" hidden></div>
+              </div>
+              <div class="drawer-quick__field">
+                <label class="drawer-quick__label" for="drawerProductSearch">Producto</label>
+                <input class="drawer-quick__input" id="drawerProductSearch" placeholder="Buscar producto…" autocomplete="off" />
+                <div class="drawer-quick__results" id="drawerProductResults"></div>
+                <div class="drawer-quick__selected" id="drawerProductSelected" hidden></div>
+              </div>
+              <button type="button" class="drawer-quick__submit" id="drawerQuickSubmit" disabled>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                Generar factura
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <a class="psb-nav-link {{ 'is-active' if (active_page == 'home' or (nav_is_active is defined and nav_is_active('/portal/home'))) else '' }}" href="/portal/home">
+        <span class="psb-nav-link__rail">{{ icon_home() }}<span class="rail-tooltip">Inicio</span></span>
+        <span class="psb-nav-link__txt">Inicio</span>
+      </a>
+      <a class="psb-nav-link psb-nav-link--movements {{ 'is-active' if (active_page == 'bank_movements' or (nav_is_active is defined and nav_is_active('/portal/movimientos'))) else '' }}" href="/portal/movimientos">
+        <span class="psb-nav-link__rail">{{ icon_movements() }}<span class="rail-tooltip">Movimientos</span></span>
+        <span class="psb-nav-link__txt">Movimientos</span>
+      </a>
+      <a class="psb-nav-link {{ 'is-active' if (active_page in ['facturas_hub','issued','received'] or (nav_is_active is defined and nav_is_active('/portal/facturas'))) else '' }}" href="/portal/facturas">
+        <span class="psb-nav-link__rail">{{ icon_issued() }}<span class="rail-tooltip">Facturas</span></span>
+        <span class="psb-nav-link__txt">Facturas</span>
+      </a>
+      <a class="psb-nav-link {{ 'is-active' if (active_page == 'invoices_ext' or (nav_is_active is defined and nav_is_active('/portal/invoices-ext'))) else '' }}" href="/portal/invoices-ext">
+        <span class="psb-nav-link__rail"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10A15.3 15.3 0 0 1 12 2"/></svg><span class="rail-tooltip">Invoices</span></span>
+        <span class="psb-nav-link__txt">Invoices</span>
+      </a>
+      <a class="psb-nav-link {{ 'is-active' if (active_page == 'quotations' or (nav_is_active is defined and nav_is_active('/portal/cotizaciones'))) else '' }}" href="/portal/cotizaciones">
+        <span class="psb-nav-link__rail">{{ icon_quotations() }}<span class="rail-tooltip">Cotizaciones</span></span>
+        <span class="psb-nav-link__txt">Cotizaciones</span>
+      </a>
+
+      <div class="psb-section">
+        <div class="psb-section__rail"><div class="psb-section__rule" aria-hidden="true"></div></div>
+        <div class="psb-section__drawer"><span class="drawer-section-label" aria-hidden="true">Catálogos</span></div>
+      </div>
+
+      <a class="psb-nav-link {{ 'is-active' if (active_page in ['catalogos_hub','contactos_hub','clients','providers','products','product_suggestions'] or (nav_is_active is defined and (nav_is_active('/portal/catalogos') or nav_is_active('/portal/contactos') or nav_is_active('/portal/clients') or nav_is_active('/portal/products') or nav_is_active('/portal/providers')))) else '' }}" href="/portal/catalogos">
+        <span class="psb-nav-link__rail">{{ icon_clients() }}<span class="rail-tooltip">Catálogos</span></span>
+        <span class="psb-nav-link__txt">Catálogos</span>
+      </a>
+
+      <span class="psb-grow" aria-hidden="true"></span>
+
+      <a class="psb-nav-link {{ 'is-active' if (active_page == 'guides' or (nav_is_active is defined and nav_is_active('/portal/guides'))) else '' }}" href="/portal/guides">
+        <span class="psb-nav-link__rail">{{ icon_guides() }}<span class="rail-tooltip">Guías</span></span>
+        <span class="psb-nav-link__txt">Guías</span>
+      </a>
+
+      <div class="psb-create-row">
+        <div class="psb-create-row__rail">
+          <button type="button" class="rail-item rail-item--create-btn" id="railCreateBtn" aria-label="Crear nuevo" title="Crear nuevo">
+            <span class="icon" aria-hidden="true">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.75"/>
+                <path d="M12 8v8M8 12h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+            </span>
+            <span class="rail-tooltip">Crear nuevo</span>
+          </button>
+        </div>
+        <div class="psb-create-row__drawer" aria-hidden="true"></div>
+      </div>
+    </div>
+  </nav>
+  <div class="rail-invoice-flyout" id="railInvoiceFlyout" hidden>
+    <div class="rail-invoice-flyout__panels">
+      <div class="rail-invoice-flyout__panel" id="flyoutPanelMain">
+        <button type="button" class="rail-invoice-flyout__option" id="flyoutGoQuick">
+          <span class="rail-invoice-flyout__icon">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+          </span>
+          <div class="rail-invoice-flyout__text">
+            <strong>Factura rápida</strong>
+            <small>Selecciona cliente y producto</small>
+          </div>
+          <svg class="rail-invoice-flyout__chevron" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <a class="rail-invoice-flyout__option" href="/portal/create">
+          <span class="rail-invoice-flyout__icon">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7z"/><path d="M14 2v5h5"/><path d="M8 12h8M8 16h8M8 8h3"/></svg>
+          </span>
+          <div class="rail-invoice-flyout__text">
+            <strong>Factura tradicional</strong>
+            <small>Formulario completo CFDI</small>
+          </div>
+        </a>
+      </div>
+      <div class="rail-invoice-flyout__panel rail-invoice-flyout__panel--sub" id="flyoutPanelQuick">
+        <div class="rail-invoice-flyout__subheader">
+          <button type="button" class="rail-invoice-flyout__back" id="flyoutQuickBack" aria-label="Volver">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <strong>Factura rápida</strong>
+        </div>
+        <div class="rail-invoice-flyout__sep"></div>
+        <div class="rail-invoice-flyout__field">
+          <label class="rail-invoice-flyout__label" for="flyoutClientSearch">Cliente</label>
+          <input class="rail-invoice-flyout__input" id="flyoutClientSearch" placeholder="Buscar por nombre o RFC…" autocomplete="off" />
+          <div class="rail-invoice-flyout__results" id="flyoutClientResults"></div>
+          <div class="rail-invoice-flyout__selected" id="flyoutClientSelected" hidden></div>
+        </div>
+        <div class="rail-invoice-flyout__field">
+          <label class="rail-invoice-flyout__label" for="flyoutProductSearch">Producto</label>
+          <input class="rail-invoice-flyout__input" id="flyoutProductSearch" placeholder="Buscar producto…" autocomplete="off" />
+          <div class="rail-invoice-flyout__results" id="flyoutProductResults"></div>
+          <div class="rail-invoice-flyout__selected" id="flyoutProductSelected" hidden></div>
+        </div>
+        <button type="button" class="rail-invoice-flyout__submit" id="flyoutQuickSubmit" disabled>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+          Generar factura
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

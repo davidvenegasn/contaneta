@@ -2,20 +2,32 @@
 import os
 import json
 import logging
+import re
 import secrets
+import time
 import hashlib
+from typing import Optional
 from datetime import datetime
 from io import BytesIO
 
-from fastapi import APIRouter, Request, Body, Depends, Query, HTTPException
+from fastapi import APIRouter, Request, Body, Depends, Query, HTTPException, File, UploadFile
+from fastapi.responses import JSONResponse
 
 logger = logging.getLogger(__name__)
+
+from services.rate_limit import is_rate_limited
+
+
+def _api_rate_check(request: Request, key: str, *, max_attempts: int = 10, window: float = 60.0):
+    """Raise 429 if rate limited."""
+    if is_rate_limited(request, key, max_attempts=max_attempts, window_seconds=window):
+        raise HTTPException(status_code=429, detail="Demasiadas solicitudes. Intenta en un momento.")
 
 from database import db, db_rows, table_exists, has_column, list_catalog, search_catalog
 from validators import validate_customer, validate_product
 from routers.deps import get_portal_issuer
 from config import BASE_DIR, DEV_FIXTURES
-from facturapi_client import create_invoice, download_invoice, FacturapiError
+from facturapi_client import create_invoice, download_invoice, cancel_invoice as facturapi_cancel, FacturapiError
 try:
     from cfdi_pdf import (
         USO_CFDI,
@@ -38,6 +50,15 @@ from services.schemas import ClientCreate, ProductCreate
 from services import clients_service, products_service
 from services import jobs as jobs_service
 from services import invoices_engine
+from services.sat_sync import get_month_totals as _get_month_totals_raw
+
+
+def _get_month_totals_safe(issuer_id, ym, direction):
+    """Wrapper that never raises — returns zeros on error."""
+    try:
+        return _get_month_totals_raw(issuer_id, ym, direction)
+    except Exception:
+        return {"total_base": 0, "total_iva": 0, "total_retenciones": 0, "total_iva_neto": 0}
 
 router = APIRouter(prefix="/api")
 
@@ -129,13 +150,34 @@ def api_account_status(request: Request, issuer: dict = Depends(get_portal_issue
         last_sync_at = _sync["last_sync_at"]
         sync_status = _sync["status"]
 
-        # P36: plan_label Trial / Pro
-        if subscription_service.is_subscription_active(user_id):
-            plan_label = "Pro"
-        elif subscription_service.is_issuer_trial_active(issuer_id):
-            plan_label = "Trial"
+        # P36: plan_label — use canonical plan from plans service for consistency
+        from services.plans import get_issuer_plan, get_plan_config
+        _plan_name = get_issuer_plan(issuer_id)
+        _plan_cfg = get_plan_config(_plan_name)
+        trial_days_left = None
+        if _plan_name == "free":
+            # For free plan, show Trial if trial active, else hide badge
+            if subscription_service.is_issuer_trial_active(issuer_id):
+                plan_label = "Trial"
+                # Calculate days remaining
+                _trial_row = db_rows(
+                    "SELECT trial_expires_at FROM issuers WHERE id = ? LIMIT 1",
+                    (issuer_id,),
+                )
+                if _trial_row and _trial_row[0].get("trial_expires_at"):
+                    from datetime import datetime, timezone
+                    try:
+                        _exp = datetime.fromisoformat(_trial_row[0]["trial_expires_at"].replace("Z", "+00:00"))
+                        if _exp.tzinfo is None:
+                            _exp = _exp.replace(tzinfo=timezone.utc)
+                        _now = datetime.now(timezone.utc)
+                        trial_days_left = max(0, (_exp - _now).days)
+                    except Exception:
+                        pass
+            else:
+                plan_label = "Gratis"
         else:
-            plan_label = None
+            plan_label = _plan_cfg["label"]
 
     completed = sum([issuer_ok, sat_ok, has_customer, has_product])
     return {
@@ -149,6 +191,99 @@ def api_account_status(request: Request, issuer: dict = Depends(get_portal_issue
         "last_sync_at": last_sync_at,
         "sync_status": sync_status,
         "plan_label": plan_label,
+        "trial_days_left": trial_days_left,
+    }
+
+
+# ----- Global search -----
+@router.get("/search")
+def api_global_search(request: Request, q: str = Query(""), issuer: dict = Depends(get_portal_issuer)):
+    """Search across clients, providers, products, invoices, movements. Returns max 5 per category."""
+    from services.tenant import require_issuer_id
+    issuer_id = require_issuer_id(issuer)
+    q = (q or "").strip()
+    if len(q) < 2:
+        return {"clientes": [], "proveedores": [], "productos": [], "facturas": [], "movimientos": []}
+
+    like = f"%{q}%"
+    limit = 5
+
+    # Clients
+    clientes = db_rows(
+        """SELECT id, rfc, legal_name, alias FROM customer_profiles
+           WHERE issuer_id = ? AND (legal_name LIKE ? OR rfc LIKE ? OR alias LIKE ?)
+           ORDER BY legal_name LIMIT ?""",
+        (issuer_id, like, like, like, limit),
+    ) or []
+    clientes_out = [{"id": c["id"], "nombre": c.get("legal_name") or c.get("alias") or "", "rfc": c.get("rfc") or "", "url": f"/portal/catalogos?tab=clientes&highlight={c['id']}"} for c in clientes]
+
+    # Providers (from received invoices — distinct emitters)
+    proveedores = db_rows(
+        """SELECT rfc_emisor AS rfc, nombre_emisor AS nombre, COUNT(*) AS facturas
+           FROM sat_cfdi
+           WHERE issuer_id = ? AND direction = 'received'
+             AND (nombre_emisor LIKE ? OR rfc_emisor LIKE ?)
+           GROUP BY rfc_emisor
+           ORDER BY facturas DESC LIMIT ?""",
+        (issuer_id, like, like, limit),
+    ) or []
+    proveedores_out = [{"nombre": p.get("nombre") or "", "rfc": p.get("rfc") or "", "facturas": p.get("facturas") or 0, "url": f"/portal/catalogos?tab=proveedores&q={q}"} for p in proveedores]
+
+    # Products
+    productos = db_rows(
+        """SELECT id, description, product_key, unit_price FROM issuer_products
+           WHERE issuer_id = ? AND (description LIKE ? OR product_key LIKE ?)
+           ORDER BY description LIMIT ?""",
+        (issuer_id, like, like, limit),
+    ) or []
+    productos_out = [{"id": p["id"], "nombre": p.get("description") or "", "clave": p.get("product_key") or "", "precio": float(p["unit_price"]) if p.get("unit_price") else 0, "url": f"/portal/catalogos?tab=productos&highlight={p['id']}"} for p in productos]
+
+    # Invoices (both issued and received)
+    facturas = db_rows(
+        """SELECT uuid, direction, fecha_emision, nombre_emisor, nombre_receptor, total, rfc_emisor, rfc_receptor
+           FROM sat_cfdi
+           WHERE issuer_id = ? AND (
+             nombre_receptor LIKE ? OR nombre_emisor LIKE ?
+             OR rfc_receptor LIKE ? OR rfc_emisor LIKE ?
+             OR uuid LIKE ?
+           )
+           ORDER BY fecha_emision DESC LIMIT ?""",
+        (issuer_id, like, like, like, like, like, limit),
+    ) or []
+    facturas_out = []
+    for f in facturas:
+        dir_label = "Emitida" if f.get("direction") == "issued" else "Recibida"
+        nombre = f.get("nombre_receptor") if f.get("direction") == "issued" else f.get("nombre_emisor")
+        tab = "emitidas" if f.get("direction") == "issued" else "recibidas"
+        facturas_out.append({
+            "uuid": f.get("uuid") or "",
+            "tipo": dir_label,
+            "nombre": nombre or "",
+            "total": float(f["total"]) if f.get("total") else 0,
+            "fecha": (f.get("fecha_emision") or "")[:10],
+            "url": f"/portal/facturas?tab={tab}&q={q}",
+        })
+
+    # Bank movements
+    movimientos = []
+    try:
+        if table_exists(db(), "bank_movements"):
+            movimientos = db_rows(
+                """SELECT id, fecha, concepto, monto, tipo FROM bank_movements
+                   WHERE issuer_id = ? AND concepto LIKE ?
+                   ORDER BY fecha DESC LIMIT ?""",
+                (issuer_id, like, limit),
+            ) or []
+    except Exception:
+        pass
+    movimientos_out = [{"id": m["id"], "concepto": m.get("concepto") or "", "monto": float(m["monto"]) if m.get("monto") else 0, "fecha": (m.get("fecha") or "")[:10], "tipo": m.get("tipo") or "", "url": f"/portal/movimientos?q={q}"} for m in movimientos]
+
+    return {
+        "clientes": clientes_out,
+        "proveedores": proveedores_out,
+        "productos": productos_out,
+        "facturas": facturas_out,
+        "movimientos": movimientos_out,
     }
 
 
@@ -418,7 +553,7 @@ def api_products_create(request: Request, payload: ProductCreate = Body(...), is
             (issuer["id"], description, product_key, unit_key, unit_price, iva_rate),
         )
         conn.commit()
-        rid = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+        rid = conn.execute("SELECT last_insert_rowid() AS rid").fetchone()["rid"]
         conn.close()
         return ok({"id": rid})
     except HTTPException:
@@ -616,6 +751,7 @@ def api_invoices_quick(
     Permite overrides mínimos (receptor, concepto, IVA/retenciones) para el precálculo editable en Home.
     """
     csrf_service.verify_api_csrf(request)
+    _api_rate_check(request, "api_invoice", max_attempts=20, window=60.0)
     user_id = getattr(request.state, "user_id", 0) or 0
     if not subscription_service.can_issuer_use_sync_and_timbrado(issuer.get("id"), user_id):
         raise HTTPException(status_code=402, detail="Actualiza tu plan para emitir facturas.")
@@ -843,6 +979,12 @@ def api_invoices_quick(
                 "price_to_send": round(price_to_send, 2),
             }
         )
+    # Replacement flow: if replaces_uuid is set, add related_documents with relationship "04"
+    replaces_uuid = (payload.get("replaces_uuid") or "").strip() or None
+    related_docs = None
+    if replaces_uuid:
+        related_docs = [{"relationship": "04", "documents": [replaces_uuid]}]
+
     payload_fact = invoices_engine.build_facturapi_payload(
         invoice_type="I",
         export_code="01",
@@ -854,6 +996,7 @@ def api_invoices_quick(
             "email": customer_email,
         },
         items=items_fact,
+        related_documents=related_docs,
         cfdi_use=cfdi_use,
         payment_form=payment_form,
         payment_method=payment_method,
@@ -983,7 +1126,221 @@ def api_invoices_quick(
         logger.warning("api_invoices_quick xml/sat_cfdi: %s", e, exc_info=True)
 
     log_action(request, "invoice_created", issuer_id=issuer["id"], invoice_id=fact_id, uuid=(uuid or "")[:36])
-    return {"ok": True, "uuid": uuid, "total": total}
+
+    # Replacement flow: auto-cancel the original invoice
+    cancel_result = None
+    if replaces_uuid and uuid:
+        try:
+            org_id = issuer.get("facturapi_org_id")
+            conn_rep = db()
+            try:
+                orig = conn_rep.execute(
+                    "SELECT id, facturapi_invoice_id FROM invoices WHERE issuer_id = ? AND LOWER(TRIM(uuid)) = LOWER(?) LIMIT 1",
+                    (issuer_id, replaces_uuid),
+                ).fetchone()
+                if orig:
+                    orig = dict(orig)
+                    orig_facturapi_id = orig.get("facturapi_invoice_id")
+                    if orig_facturapi_id and org_id:
+                        fa_result = facturapi_cancel(org_id, orig_facturapi_id, "01")
+                        fa_status = (fa_result.get("status") or "").lower()
+                        fa_cs = (fa_result.get("cancellation_status") or "").lower()
+                        c_status = "accepted" if fa_status == "canceled" else ("pending" if fa_cs == "pending" else "accepted")
+                        c_flag = 1 if c_status == "accepted" else 0
+                        now_iso = datetime.utcnow().isoformat(timespec="seconds")
+                        conn_rep.execute(
+                            """UPDATE invoices
+                               SET cancelled = ?, cancel_status = ?, cancel_motive = '01',
+                                   cancelled_at = ?, replacement_uuid = ?
+                               WHERE id = ? AND issuer_id = ?""",
+                            (c_flag, c_status, now_iso, uuid, orig["id"], issuer_id),
+                        )
+                        # Set replaces_uuid on the new invoice
+                        conn_rep.execute(
+                            "UPDATE invoices SET replaces_uuid = ? WHERE issuer_id = ? AND LOWER(TRIM(uuid)) = LOWER(?)",
+                            (replaces_uuid, issuer_id, uuid),
+                        )
+                        if c_status == "accepted":
+                            conn_rep.execute(
+                                "UPDATE sat_cfdi SET status = 'C', updated_at = datetime('now') WHERE issuer_id = ? AND LOWER(TRIM(uuid)) = LOWER(?) AND direction = 'issued'",
+                                (issuer_id, replaces_uuid),
+                            )
+                        conn_rep.commit()
+                        cancel_result = c_status
+                        log_action(request, "invoice_cancelled", issuer_id=issuer_id, uuid=replaces_uuid[:36], motive="01", cancel_status=c_status)
+            finally:
+                conn_rep.close()
+        except Exception as e:
+            logger.warning("api_invoices_quick auto-cancel: %s", e, exc_info=True)
+            cancel_result = "error"
+
+    return {"ok": True, "uuid": uuid, "total": total, "cancel_result": cancel_result}
+
+
+@router.post("/invoices/{invoice_uuid}/cancel")
+def api_invoices_cancel(
+    request: Request,
+    invoice_uuid: str,
+    payload: dict = Body(...),
+    issuer: dict = Depends(get_portal_issuer),
+):
+    """Cancel a stamped invoice via FacturAPI."""
+    csrf_service.verify_api_csrf(request)
+    _api_rate_check(request, "api_invoice_cancel", max_attempts=5, window=60.0)
+
+    motive = (payload.get("motive") or "").strip()
+    if motive not in ("01", "02", "03", "04"):
+        raise HTTPException(status_code=400, detail="Motivo de cancelación inválido.")
+
+    issuer_id = issuer["id"]
+    uuid_clean = (invoice_uuid or "").strip()
+    if not uuid_clean:
+        raise HTTPException(status_code=400, detail="UUID requerido.")
+
+    conn = db()
+    try:
+        row = conn.execute(
+            "SELECT id, facturapi_invoice_id, uuid, cancelled FROM invoices WHERE issuer_id = ? AND LOWER(TRIM(uuid)) = LOWER(?) LIMIT 1",
+            (issuer_id, uuid_clean),
+        ).fetchone()
+    finally:
+        conn.close()
+
+    if not row:
+        raise HTTPException(status_code=404, detail="Factura no encontrada en registros locales.")
+    row = dict(row)
+    if row.get("cancelled"):
+        raise HTTPException(status_code=400, detail="Esta factura ya fue cancelada.")
+    facturapi_id = row.get("facturapi_invoice_id")
+    if not facturapi_id:
+        raise HTTPException(status_code=400, detail="Factura sin ID de FacturAPI — no se puede cancelar.")
+
+    org_id = issuer.get("facturapi_org_id")
+    if not org_id:
+        raise HTTPException(status_code=400, detail="Configuración de facturación no disponible.")
+
+    try:
+        result = facturapi_cancel(org_id, facturapi_id, motive)
+    except FacturapiError as fe:
+        logger.warning("api_invoices_cancel FacturapiError: issuer_id=%s uuid=%s %s", issuer_id, uuid_clean, fe)
+        raise HTTPException(status_code=400, detail=f"Error al cancelar en FacturAPI: {fe}")
+
+    # Determine cancel status from FacturAPI response
+    fa_status = (result.get("status") or "").lower()
+    fa_cancel_status = (result.get("cancellation_status") or "").lower()
+
+    if fa_status == "canceled":
+        cancel_status = "accepted"
+        cancelled_flag = 1
+    elif fa_cancel_status == "pending":
+        cancel_status = "pending"
+        cancelled_flag = 0
+    else:
+        cancel_status = "accepted"
+        cancelled_flag = 1
+
+    now_iso = datetime.utcnow().isoformat(timespec="seconds")
+    conn = db()
+    try:
+        conn.execute(
+            """UPDATE invoices
+               SET cancelled = ?, cancel_status = ?, cancel_motive = ?, cancelled_at = ?
+               WHERE id = ? AND issuer_id = ?""",
+            (cancelled_flag, cancel_status, motive, now_iso, row["id"], issuer_id),
+        )
+        if cancel_status == "accepted":
+            conn.execute(
+                "UPDATE sat_cfdi SET status = 'C', updated_at = datetime('now') WHERE issuer_id = ? AND LOWER(TRIM(uuid)) = LOWER(?) AND direction = 'issued'",
+                (issuer_id, uuid_clean),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+    log_action(request, "invoice_cancelled", issuer_id=issuer_id, uuid=uuid_clean[:36], motive=motive, cancel_status=cancel_status)
+    return ok({"cancel_status": cancel_status, "uuid": uuid_clean})
+
+
+@router.get("/invoices/{invoice_uuid}/data")
+def api_invoices_data(
+    request: Request,
+    invoice_uuid: str,
+    issuer: dict = Depends(get_portal_issuer),
+):
+    """Return invoice + items data for pre-filling Quick Invoice (replacement flow)."""
+    issuer_id = issuer["id"]
+    uuid_clean = (invoice_uuid or "").strip()
+    if not uuid_clean:
+        raise HTTPException(status_code=400, detail="UUID requerido.")
+
+    conn = db()
+    try:
+        inv = conn.execute(
+            """SELECT id, customer_rfc, customer_legal_name, customer_zip,
+                      customer_tax_system, customer_email,
+                      payment_form, payment_method, cfdi_use, currency
+               FROM invoices
+               WHERE issuer_id = ? AND LOWER(TRIM(uuid)) = LOWER(?)
+               LIMIT 1""",
+            (issuer_id, uuid_clean),
+        ).fetchone()
+        if not inv:
+            raise HTTPException(status_code=404, detail="Factura no encontrada.")
+        inv = dict(inv)
+
+        items_rows = conn.execute(
+            """SELECT description, product_key, unit_key, unit_price, iva_rate, quantity
+               FROM invoice_items WHERE invoice_id = ? ORDER BY id""",
+            (inv["id"],),
+        ).fetchall()
+        items_rows = [dict(r) for r in items_rows]
+
+        # Try to resolve product_id from issuer_products
+        resolved_items = []
+        for it in items_rows:
+            product_id = None
+            match = conn.execute(
+                "SELECT id FROM issuer_products WHERE issuer_id = ? AND description = ? AND product_key = ? LIMIT 1",
+                (issuer_id, it["description"], it["product_key"]),
+            ).fetchone()
+            if match:
+                product_id = dict(match)["id"]
+            resolved_items.append({
+                "product_id": product_id,
+                "description": it["description"],
+                "product_key": it["product_key"],
+                "unit_key": it.get("unit_key"),
+                "unit_price": it["unit_price"],
+                "iva_rate": it.get("iva_rate"),
+                "quantity": it.get("quantity", 1),
+            })
+
+        # Try to resolve customer_id from customer_profiles
+        customer_id = None
+        cust_match = conn.execute(
+            "SELECT id FROM customer_profiles WHERE issuer_id = ? AND rfc = ? LIMIT 1",
+            (issuer_id, inv["customer_rfc"]),
+        ).fetchone()
+        if cust_match:
+            customer_id = dict(cust_match)["id"]
+    finally:
+        conn.close()
+
+    return ok({
+        "customer_id": customer_id,
+        "customer": {
+            "rfc": inv["customer_rfc"],
+            "legal_name": inv["customer_legal_name"],
+            "zip": inv["customer_zip"],
+            "tax_system": inv["customer_tax_system"],
+            "email": inv.get("customer_email"),
+        },
+        "items": resolved_items,
+        "payment_form": inv.get("payment_form"),
+        "payment_method": inv.get("payment_method"),
+        "cfdi_use": inv.get("cfdi_use"),
+        "currency": inv.get("currency"),
+    })
 
 
 @router.post("/invoices/bulk_issue")
@@ -997,6 +1354,7 @@ def api_invoices_bulk_issue(
     Fase 1: simplificado (sin retenciones por cliente).
     """
     csrf_service.verify_api_csrf(request)
+    _api_rate_check(request, "api_bulk_issue", max_attempts=5, window=60.0)
     user_id = getattr(request.state, "user_id", 0) or 0
     if not subscription_service.can_issuer_use_sync_and_timbrado(issuer.get("id"), user_id):
         raise HTTPException(status_code=402, detail="Actualiza tu plan para emitir facturas.")
@@ -1122,7 +1480,7 @@ def api_quotations_list(
             "SELECT COUNT(*) AS c FROM quotations WHERE issuer_id = ?",
             (issuer_id,),
         ).fetchone()
-        total = total_row[0] if total_row else 0
+        total = total_row["c"] if total_row else 0
         rows = conn.execute(
             """
             SELECT q.id, q.folio, q.customer_rfc, q.customer_legal_name, q.customer_email,
@@ -1149,6 +1507,7 @@ def api_quotations_list(
 @router.post("/quotations/create")
 def api_quotations_create(request: Request, payload: dict = Body(...), issuer: dict = Depends(get_portal_issuer)):
     csrf_service.verify_api_csrf(request)
+    _api_rate_check(request, "api_quotation", max_attempts=20, window=60.0)
     try:
         issuer_id = issuer["id"]
         customer_rfc = (payload.get("customer_rfc") or "").strip().upper()
@@ -1176,10 +1535,10 @@ def api_quotations_create(request: Request, payload: dict = Body(...), issuer: d
         year = datetime.now().strftime("%Y")
         prefix = f"Q-{year}-"
         next_num = conn.execute(
-            """SELECT COALESCE(MAX(CAST(SUBSTR(folio, LENGTH(?) + 1) AS INTEGER)), 0) + 1
+            """SELECT COALESCE(MAX(CAST(SUBSTR(folio, LENGTH(?) + 1) AS INTEGER)), 0) + 1 AS n
                FROM quotations WHERE issuer_id = ? AND (folio IS NOT NULL AND folio LIKE ?)""",
             (prefix, issuer_id, prefix + "%"),
-        ).fetchone()[0]
+        ).fetchone()["n"]
         folio = f"{prefix}{next_num:04d}"
         sent_at = datetime.now().isoformat() if status == "sent" else None
         conn.execute(
@@ -1188,7 +1547,7 @@ def api_quotations_create(request: Request, payload: dict = Body(...), issuer: d
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))""",
             (issuer_id, folio, customer_rfc or "", customer_legal_name, customer_email, status, public_token, notes, iva_rate_quote, currency, sent_at),
         )
-        qid = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+        qid = conn.execute("SELECT last_insert_rowid() AS rid").fetchone()["rid"]
         for idx, it in enumerate(items):
             desc = (it.get("description") or "").strip()
             if not desc:
@@ -1333,6 +1692,7 @@ def api_quotations_update_status(request: Request, payload: dict = Body(...), is
 
 @router.post("/quotations/respond")
 def api_quotations_respond(request: Request, payload: dict = Body(...)):
+    _api_rate_check(request, "quotation_respond", max_attempts=15, window=60.0)
     public_token = (payload.get("public_token") or "").strip()
     action = (payload.get("action") or "").strip().lower()
     if not public_token:
@@ -1578,10 +1938,9 @@ def api_invoices_issued(
         "fecha_emision IS NOT NULL",
         "substr(fecha_emision,1,7) = ?",
         "(total IS NULL OR total >= 0.01)",
-        "xml_path IS NOT NULL AND TRIM(COALESCE(xml_path,'')) != ''",
     ]
     params = [issuer_id, ym]
-    
+
     # Deduplicate subquery (same as portal route)
     dedup_subquery = """
         id IN (
@@ -1591,9 +1950,8 @@ def api_invoices_issued(
                     ORDER BY (CASE WHEN COALESCE(total,0) >= 0.01 THEN 0 ELSE 1 END), id
                 ) AS rn
                 FROM sat_cfdi
-                WHERE issuer_id = ? AND direction = 'issued' AND fecha_emision IS NOT NULL 
+                WHERE issuer_id = ? AND direction = 'issued' AND fecha_emision IS NOT NULL
                   AND substr(fecha_emision,1,7) = ? AND (total IS NULL OR total >= 0.01)
-                  AND xml_path IS NOT NULL AND TRIM(COALESCE(xml_path,'')) != ''
             ) WHERE rn = 1
         )
     """
@@ -1712,10 +2070,9 @@ def api_invoices_received(
         "substr(fecha_emision,1,7) = ?",
         "total IS NOT NULL AND total >= 0.01",
         "(tipo_comprobante IS NULL OR UPPER(TRIM(tipo_comprobante)) != 'N')",
-        "xml_path IS NOT NULL AND TRIM(COALESCE(xml_path,'')) != ''",
     ]
     params = [issuer_id, ym]
-    
+
     # Deduplicate subquery
     dedup_subquery = """
         id IN (
@@ -1725,10 +2082,9 @@ def api_invoices_received(
                     ORDER BY id
                 ) AS rn
                 FROM sat_cfdi
-                WHERE issuer_id = ? AND direction = 'received' AND fecha_emision IS NOT NULL 
-                  AND substr(fecha_emision,1,7) = ? AND total IS NOT NULL AND total >= 0.01 
+                WHERE issuer_id = ? AND direction = 'received' AND fecha_emision IS NOT NULL
+                  AND substr(fecha_emision,1,7) = ? AND total IS NOT NULL AND total >= 0.01
                   AND (tipo_comprobante IS NULL OR UPPER(TRIM(tipo_comprobante)) != 'N')
-                  AND xml_path IS NOT NULL AND TRIM(COALESCE(xml_path,'')) != ''
             ) WHERE rn = 1
         )
     """
@@ -1916,7 +2272,7 @@ def api_pending_invoices(
 ):
     try:
         conn = db()
-        cols = {r[1] for r in conn.execute("PRAGMA table_info(invoices)").fetchall()}
+        cols = {r["name"] for r in conn.execute("PRAGMA table_info(invoices)").fetchall()}
         where = ["issuer_id = ?", "uuid IS NOT NULL", "payment_method = 'PPD'"]
         params = [issuer["id"]]
         if "status" in cols:
@@ -2171,6 +2527,7 @@ def api_month_close_post(
     issuer: dict = Depends(get_portal_issuer),
     body: dict = Body(...),
 ):
+    csrf_service.verify_api_csrf(request)
     from services import month_close as mc
     issuer_id = int(issuer.get("id") or 0)
     if issuer_id <= 0:
@@ -2206,6 +2563,47 @@ def api_matching_preview(
     return ok(result)
 
 
+# ---------- Recent Activity API ----------
+
+@router.get("/activity")
+def api_activity(
+    request: Request,
+    issuer: dict = Depends(get_portal_issuer),
+    limit: int = Query(20, ge=1, le=100),
+):
+    """Recent CFDIs (issued + received) for the activity feed / notification drawer."""
+    from datetime import date as _date
+    issuer_id = int(issuer.get("id") or 0)
+    if issuer_id <= 0:
+        raise HTTPException(status_code=401, detail="Sesión inválida")
+    if not table_exists(db(), "sat_cfdi"):
+        return ok_list([], 0)
+    rows = db_rows(
+        """
+        SELECT direction, fecha_emision, nombre, total, uuid FROM (
+          SELECT direction, fecha_emision, nombre_receptor AS nombre, total, uuid FROM sat_cfdi
+          WHERE issuer_id = ? AND direction = 'issued' AND fecha_emision IS NOT NULL
+            AND (total IS NULL OR total >= 0.01)
+          UNION ALL
+          SELECT direction, fecha_emision, nombre_emisor AS nombre, total, uuid FROM sat_cfdi
+          WHERE issuer_id = ? AND direction = 'received' AND fecha_emision IS NOT NULL
+            AND total IS NOT NULL AND total >= 0.01
+            AND (tipo_comprobante IS NULL OR UPPER(TRIM(tipo_comprobante)) != 'N')
+        ) ORDER BY fecha_emision DESC LIMIT ?
+        """,
+        (issuer_id, issuer_id, limit),
+    )
+    today = _date.today()
+    for a in rows:
+        try:
+            fd = datetime.strptime((a["fecha_emision"] or "")[:10], "%Y-%m-%d").date()
+            d = (today - fd).days
+            a["time_ago"] = "Hoy" if d == 0 else "Ayer" if d == 1 else f"Hace {d} días"
+        except (ValueError, TypeError):
+            a["time_ago"] = (a.get("fecha_emision") or "")[:10] or "-"
+    return ok_list(rows, len(rows))
+
+
 # ---------- Notifications API ----------
 
 @router.get("/notifications")
@@ -2229,12 +2627,31 @@ def api_notification_mark_read(
     notification_id: int,
     issuer: dict = Depends(get_portal_issuer),
 ):
+    csrf_service.verify_api_csrf(request)
     from services import notifications as notif_service
     issuer_id = int(issuer.get("id") or 0)
     if issuer_id <= 0:
         raise HTTPException(status_code=401, detail="Sesión inválida")
     success = notif_service.mark_read(issuer_id, notification_id)
     return ok({"marked": success})
+
+
+@router.post("/notifications/mark-all-read")
+def api_notifications_mark_all_read(
+    request: Request,
+    issuer: dict = Depends(get_portal_issuer),
+):
+    csrf_service.verify_api_csrf(request)
+    from services import notifications as notif_service
+    issuer_id = int(issuer.get("id") or 0)
+    if issuer_id <= 0:
+        raise HTTPException(status_code=401, detail="Sesión inválida")
+    items = notif_service.list_notifications(issuer_id, unread_only=True, limit=200)
+    count = 0
+    for n in items:
+        if notif_service.mark_read(issuer_id, n["id"]):
+            count += 1
+    return ok({"marked": count})
 
 
 # ── SAT Sync Status ──────────────────────────────────────────────
@@ -2293,3 +2710,917 @@ def api_sat_status(issuer: dict = Depends(get_portal_issuer)):
         "recent_jobs": recent_jobs,
         "has_pending_jobs": has_queued,
     })
+
+
+# ── Manual Movements ─────────────────────────────────────────────
+@router.post("/movements/manual")
+def api_manual_movement_create(
+    request: Request,
+    issuer: dict = Depends(get_portal_issuer),
+    body: dict = Body(...),
+):
+    """Create a manual income/expense movement."""
+    csrf_service.verify_api_csrf(request)
+    issuer_id = int(issuer.get("id") or 0)
+    if issuer_id <= 0:
+        raise HTTPException(status_code=401, detail="Sesión inválida")
+    from services import manual_movements as mm
+    mm.ensure_table()
+    fecha = (body.get("fecha") or "").strip()
+    descripcion = (body.get("descripcion") or "").strip()
+    monto = body.get("monto")
+    tipo = (body.get("tipo") or "").strip().upper()
+    categoria = (body.get("categoria") or "").strip() or None
+    notas = (body.get("notas") or "").strip() or None
+    forma_pago = (body.get("forma_pago") or "").strip() or None
+    contraparte = (body.get("contraparte") or "").strip() or None
+    moneda = (body.get("moneda") or "MXN").strip().upper()
+    if not fecha or not descripcion or not monto or not tipo:
+        raise HTTPException(status_code=422, detail="fecha, descripcion, monto y tipo son requeridos")
+    try:
+        monto = float(monto)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=422, detail="monto debe ser numérico")
+    if monto <= 0:
+        raise HTTPException(status_code=422, detail="monto debe ser mayor a 0")
+    row = mm.create(issuer_id, fecha, descripcion, monto, tipo, categoria, notas,
+                    forma_pago=forma_pago, contraparte=contraparte, moneda=moneda)
+    return ok(row)
+
+
+@router.get("/movements/manual")
+def api_manual_movements_list(
+    request: Request,
+    issuer: dict = Depends(get_portal_issuer),
+    ym: Optional[str] = Query(None),
+    tipo: Optional[str] = Query(None),
+    limit: int = Query(200, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+):
+    """List manual movements for the current issuer."""
+    issuer_id = int(issuer.get("id") or 0)
+    if issuer_id <= 0:
+        raise HTTPException(status_code=401, detail="Sesión inválida")
+    from services import manual_movements as mm
+    mm.ensure_table()
+    items = mm.list_movements(issuer_id, period_month=ym, tipo=tipo, limit=limit, offset=offset)
+    total = mm.count_movements(issuer_id, period_month=ym)
+    return ok_list(items, total)
+
+
+@router.delete("/movements/manual/{movement_id}")
+def api_manual_movement_delete(movement_id: int, request: Request, issuer: dict = Depends(get_portal_issuer)):
+    """Delete a manual movement."""
+    csrf_service.verify_api_csrf(request)
+    issuer_id = int(issuer.get("id") or 0)
+    if issuer_id <= 0:
+        raise HTTPException(status_code=401, detail="Sesión inválida")
+    from services import manual_movements as mm
+    mm.ensure_table()
+    deleted = mm.delete(issuer_id, movement_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Movimiento no encontrado")
+    return ok({"deleted": True})
+
+
+# ── Foreign Invoices ─────────────────────────────────────────────
+@router.post("/movements/invoice")
+def api_foreign_invoice_create(
+    request: Request,
+    issuer: dict = Depends(get_portal_issuer),
+    body: dict = Body(...),
+):
+    """Create a foreign invoice record."""
+    csrf_service.verify_api_csrf(request)
+    issuer_id = int(issuer.get("id") or 0)
+    if issuer_id <= 0:
+        raise HTTPException(status_code=401, detail="Sesión inválida")
+    from services import foreign_invoices as fi
+    fi.ensure_table()
+    tipo = (body.get("tipo") or "").strip().upper()
+    fecha = (body.get("fecha") or "").strip()
+    invoice_number = (body.get("invoice_number") or "").strip()
+    empresa = (body.get("empresa") or "").strip()
+    descripcion = (body.get("descripcion") or "").strip()
+    moneda = (body.get("moneda") or "USD").strip()
+    monto_original = body.get("monto_original")
+    tipo_cambio = body.get("tipo_cambio")
+    if not all([tipo, fecha, invoice_number, empresa, descripcion, monto_original, tipo_cambio]):
+        raise HTTPException(status_code=422, detail="Campos requeridos: tipo, fecha, invoice_number, empresa, descripcion, monto_original, tipo_cambio")
+    try:
+        monto_original = float(monto_original)
+        tipo_cambio = float(tipo_cambio)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=422, detail="monto_original y tipo_cambio deben ser numéricos")
+    if monto_original <= 0 or tipo_cambio <= 0:
+        raise HTTPException(status_code=422, detail="monto y tipo de cambio deben ser mayores a 0")
+    pais = (body.get("pais") or "").strip() or None
+    tax_id = (body.get("tax_id") or "").strip() or None
+    forma_pago = (body.get("forma_pago") or "").strip() or None
+    referencia_pago = (body.get("referencia_pago") or "").strip() or None
+    notas = (body.get("notas") or "").strip() or None
+    row = fi.create(
+        issuer_id, tipo, fecha, invoice_number, empresa, descripcion,
+        moneda, monto_original, tipo_cambio, forma_pago=forma_pago,
+        pais=pais, tax_id=tax_id, referencia_pago=referencia_pago, notas=notas,
+    )
+    return ok(row)
+
+
+@router.get("/invoices/foreign")
+def api_foreign_invoices_list(
+    request: Request,
+    issuer: dict = Depends(get_portal_issuer),
+    ym: Optional[str] = Query(None),
+    tipo: Optional[str] = Query(None),
+    limit: int = Query(200, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+):
+    """List foreign invoices for the current issuer."""
+    issuer_id = int(issuer.get("id") or 0)
+    if issuer_id <= 0:
+        raise HTTPException(status_code=401, detail="Sesión inválida")
+    from services import foreign_invoices as fi
+    fi.ensure_table()
+    items = fi.list_invoices(issuer_id, period_month=ym, tipo=tipo, limit=limit, offset=offset)
+    total = fi.count_invoices(issuer_id, period_month=ym)
+    return ok_list(items, total)
+
+
+@router.delete("/invoices/foreign/{invoice_id}")
+def api_foreign_invoice_delete(invoice_id: int, request: Request, issuer: dict = Depends(get_portal_issuer)):
+    """Delete a foreign invoice."""
+    csrf_service.verify_api_csrf(request)
+    issuer_id = int(issuer.get("id") or 0)
+    if issuer_id <= 0:
+        raise HTTPException(status_code=401, detail="Sesión inválida")
+    from services import foreign_invoices as fi
+    fi.ensure_table()
+    conn = db()
+    try:
+        cur = conn.execute("DELETE FROM foreign_invoices WHERE id = ? AND issuer_id = ?", (invoice_id, issuer_id))
+        conn.commit()
+        deleted = cur.rowcount > 0
+    finally:
+        conn.close()
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Invoice no encontrado")
+    return ok({"deleted": True})
+
+
+@router.get("/invoices/foreign/{invoice_id}/pdf")
+def api_foreign_invoice_pdf(invoice_id: int, request: Request, issuer: dict = Depends(get_portal_issuer)):
+    """Serve the stored PDF for a foreign invoice (opens in browser)."""
+    from fastapi.responses import FileResponse
+    issuer_id = int(issuer.get("id") or 0)
+    if issuer_id <= 0:
+        raise HTTPException(status_code=401, detail="Sesión inválida")
+    rows = db_rows("SELECT archivo FROM foreign_invoices WHERE id = ? AND issuer_id = ?", (invoice_id, issuer_id))
+    if not rows or not rows[0].get("archivo"):
+        raise HTTPException(status_code=404, detail="PDF no disponible")
+    archivo_rel = rows[0]["archivo"]
+    storage_root = os.environ.get("APP_STORAGE_PATH", "").strip() or os.path.join(os.path.dirname(os.path.dirname(__file__)), "storage")
+    abs_path = os.path.normpath(os.path.join(storage_root, archivo_rel))
+    # Security: ensure path is under storage_root
+    if not abs_path.startswith(os.path.normpath(storage_root)):
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+    if not os.path.isfile(abs_path):
+        raise HTTPException(status_code=404, detail="Archivo no encontrado")
+    from services import file_access_log
+    file_access_log.log_file_access(
+        request=request, action="view_foreign_invoice_pdf",
+        issuer_id=issuer_id, user_id=getattr(getattr(request, "state", None), "user_id", None),
+        file_path=archivo_rel,
+        entity="foreign_invoice", entity_id=str(invoice_id),
+    )
+    return FileResponse(abs_path, media_type="application/pdf", headers={"Content-Disposition": "inline"})
+
+
+# ── Exchange rates ──────────────────────────────────────────────
+
+@router.get("/exchange-rate")
+def api_exchange_rate(
+    request: Request,
+    issuer: dict = Depends(get_portal_issuer),
+    moneda: str = Query("USD"),
+    period: str = Query(None),
+):
+    """Get exchange rate for a currency+month."""
+    from services.exchange_rates import get_rate
+    if not period:
+        period = datetime.now().strftime("%Y-%m")
+    rate = get_rate(moneda, period)
+    return ok({"moneda": moneda.upper(), "period": period, "rate": rate})
+
+
+@router.get("/exchange-rates")
+def api_exchange_rates_list(
+    request: Request,
+    issuer: dict = Depends(get_portal_issuer),
+    moneda: str = Query(None),
+):
+    """List exchange rates."""
+    from services.exchange_rates import list_rates
+    rates = list_rates(moneda=moneda)
+    return ok_list(rates, len(rates))
+
+
+@router.post("/exchange-rates")
+def api_exchange_rate_set(
+    request: Request,
+    issuer: dict = Depends(get_portal_issuer),
+    body: dict = Body(...),
+):
+    """Set an exchange rate for a currency+month."""
+    csrf_service.verify_api_csrf(request)
+    from services.exchange_rates import set_rate, get_rate
+    moneda = (body.get("moneda") or "").strip().upper()
+    period = (body.get("period") or "").strip()
+    rate = body.get("rate")
+    if not moneda or not period or not rate:
+        raise HTTPException(status_code=422, detail="moneda, period, rate requeridos")
+    try:
+        rate = float(rate)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=422, detail="rate debe ser numérico")
+    if rate <= 0:
+        raise HTTPException(status_code=422, detail="rate debe ser mayor a 0")
+    set_rate(moneda, period, rate, source="user")
+    return ok({"moneda": moneda, "period": period, "rate": rate})
+
+
+@router.post("/invoices/extract-pdf")
+def api_invoice_extract_pdf(
+    request: Request,
+    issuer: dict = Depends(get_portal_issuer),
+    file: UploadFile = File(...),
+    auto_save: bool = Query(False, alias="auto_save"),
+):
+    """Extract invoice data from a PDF.  When auto_save=true, also persist.
+    Sync endpoint so FastAPI runs it in a threadpool (pdfplumber + SQLite are blocking).
+    """
+    csrf_service.verify_api_csrf(request)
+    _api_rate_check(request, "invoice_extract_pdf", max_attempts=12, window=60.0)
+    if not file.filename or not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Solo se aceptan archivos PDF")
+    max_pdf_size = 15 * 1024 * 1024
+    import tempfile
+    tmp_path = None
+    try:
+        size = 0
+        chunks: list[bytes] = []
+        while True:
+            chunk = file.file.read(1024 * 1024)
+            if not chunk:
+                break
+            size += len(chunk)
+            if size > max_pdf_size:
+                raise HTTPException(status_code=400, detail="PDF demasiado grande (máx 15 MB)")
+            chunks.append(chunk)
+        if size <= 0:
+            raise HTTPException(status_code=400, detail="Archivo vacío")
+        content = b"".join(chunks)
+        if not content.startswith(b"%PDF"):
+            raise HTTPException(status_code=400, detail="El archivo no parece ser un PDF válido")
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+            tmp.write(content)
+            tmp_path = tmp.name
+        import pdfplumber
+        text = ""
+        tables: list[list] = []
+        with pdfplumber.open(tmp_path) as pdf:
+            for page in pdf.pages:
+                page_text = page.extract_text()
+                if page_text:
+                    text += page_text + "\n"
+                try:
+                    for t in (page.extract_tables() or []):
+                        if t:
+                            tables.append(t)
+                except Exception:
+                    pass
+        if not text.strip():
+            raise HTTPException(status_code=400, detail="No se pudo extraer texto del PDF. Puede ser un PDF escaneado (imagen).")
+        data = _parse_invoice_text(text, tables)
+
+        if auto_save:
+            issuer_id = int(issuer.get("id") or 0)
+            if issuer_id <= 0:
+                raise HTTPException(status_code=401, detail="Sesión inválida")
+            from services import foreign_invoices as fi
+            fi.ensure_table()
+            # Fill defaults for auto-save
+            from services.exchange_rates import get_rate
+            moneda = data.get("moneda") or "USD"
+            tipo = data.get("tipo") or "GASTO"
+            fecha = data.get("fecha") or datetime.now().strftime("%Y-%m-%d")
+            period = fecha[:7] if len(fecha) >= 7 else datetime.now().strftime("%Y-%m")
+            tipo_cambio = get_rate(moneda, period)
+            inv_num = data.get("invoice_number") or (file.filename or "").replace(".pdf", "").replace(".PDF", "") or "PDF-IMPORT"
+            empresa = data.get("empresa") or "Empresa extranjera"
+            descripcion = data.get("descripcion") or (", ".join(data.get("productos") or [])[:200]) or "Invoice importado desde PDF"
+            monto = data.get("monto_original") or 0
+            if monto <= 0:
+                return ok({**data, "auto_saved": False, "reason": "no_amount"})
+            # Deduplication check
+            if fi.is_duplicate(issuer_id, inv_num, empresa):
+                return ok({**data, "auto_saved": False, "duplicate": True, "reason": "duplicate"})
+            # Save PDF to storage
+            archivo_rel = None
+            try:
+                storage_root = os.environ.get("APP_STORAGE_PATH", "").strip() or os.path.join(os.path.dirname(os.path.dirname(__file__)), "storage")
+                fi_dir = os.path.join(storage_root, "foreign_invoices", str(issuer_id))
+                os.makedirs(fi_dir, exist_ok=True)
+                safe_name = re.sub(r"[^\w\-.]", "_", file.filename or "invoice.pdf")[:80]
+                dest = os.path.join(fi_dir, f"{inv_num}_{safe_name}")
+                if os.path.exists(dest):
+                    # Add timestamp to avoid overwrite
+                    base, ext = os.path.splitext(dest)
+                    dest = f"{base}_{int(time.time())}{ext}"
+                import shutil
+                shutil.copy2(tmp_path, dest)
+                archivo_rel = os.path.relpath(dest, storage_root)
+            except Exception:
+                logger.warning("Could not save foreign invoice PDF to storage", exc_info=True)
+            row = fi.create(
+                issuer_id, tipo, fecha, inv_num, empresa, descripcion,
+                moneda, monto, tipo_cambio,
+                forma_pago=data.get("forma_pago"),
+                pais=data.get("pais"),
+                tax_id=data.get("tax_id"),
+                archivo=archivo_rel,
+            )
+            return ok({**data, "auto_saved": True, "record": row, "tipo_cambio_used": tipo_cambio})
+
+        return ok(data)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error extracting invoice PDF")
+        raise HTTPException(status_code=500, detail=f"Error al procesar PDF: {str(e)}")
+    finally:
+        if tmp_path:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+
+
+# ── Invoice PDF parser ──────────────────────────────────────────
+
+_MONTH_MAP = {
+    "january": "01", "february": "02", "march": "03", "april": "04",
+    "may": "05", "june": "06", "july": "07", "august": "08",
+    "september": "09", "october": "10", "november": "11", "december": "12",
+    "jan": "01", "feb": "02", "mar": "03", "apr": "04",
+    "jun": "06", "jul": "07", "aug": "08", "sep": "09",
+    "oct": "10", "nov": "11", "dec": "12",
+    "enero": "01", "febrero": "02", "marzo": "03", "abril": "04",
+    "mayo": "05", "junio": "06", "julio": "07", "agosto": "08",
+    "septiembre": "09", "octubre": "10", "noviembre": "11", "diciembre": "12",
+}
+
+_COUNTRY_MAP = {
+    "United States": "US", "USA": "US", "U.S.A.": "US", "U.S.": "US",
+    "Canada": "CA", "United Kingdom": "GB", "UK": "GB", "Great Britain": "GB",
+    "Germany": "DE", "Deutschland": "DE", "France": "FR",
+    "Spain": "ES", "España": "ES",
+    "Colombia": "CO", "Argentina": "AR", "Chile": "CL",
+    "Brazil": "BR", "Brasil": "BR",
+    "Mexico": "MX", "México": "MX",
+    "Italy": "IT", "Italia": "IT",
+    "Netherlands": "NL", "Portugal": "PT",
+    "Australia": "AU", "New Zealand": "NZ",
+    "Japan": "JP", "China": "CN", "India": "IN",
+    "Ireland": "IE", "Switzerland": "CH",
+    "Israel": "IL", "Singapore": "SG",
+    "Denmark": "DK", "Danmark": "DK", "DENMARK": "DK",
+    "Sweden": "SE", "Norway": "NO", "Finland": "FI",
+    "Belgium": "BE", "Austria": "AT",
+}
+
+_COMPANY_SUFFIXES = re.compile(
+    r"\b(?:Inc\.?|LLC|Ltd\.?|Corp\.?|GmbH|SA\b|S\.?A\.?\s*de\s*C\.?V\.?|"
+    r"S\.?L\.?|S\.?R\.?L\.?|Co\.?|PLC|AG|BV|NV|Pty|Limited|Corporation|Company|Incorporated)\b",
+    re.IGNORECASE,
+)
+
+_SKIP_HEADER_RE = re.compile(
+    r"^(?:Invoice|Date|Bill\s*To|Ship\s*To|To:|Sold\s*To|Remit|Due|Terms|Page|P\.?O\.?\s|"
+    r"Phone|Fax|Email|Tel|www\.|http|Tax\s*ID|EIN|VAT|TIN|Subtotal|Total|\d{1,2}[/\-\.]\d|"
+    r"\d{4}-\d{2}|Amount|Payment|Balance|Description|Item|Qty|Quantity|Rate|Price|Unit|"
+    r"Issued|Paid|Order|Status|Account|Billing|Receipt|Ref|Reference|"
+    r"Statement|Period|Subscription|Thank|Dear|Hello|Hi\b|Note|Memo)",
+    re.IGNORECASE,
+)
+
+
+def _parse_date(raw: str) -> str | None:
+    """Try to normalize a date string to YYYY-MM-DD."""
+    raw = raw.strip()
+    # Strip ordinal suffixes: 24th → 24, 1st → 1, 2nd → 2, 3rd → 3
+    cleaned = re.sub(r"(\d{1,2})(?:st|nd|rd|th)\b", r"\1", raw)
+    # ISO
+    if re.match(r"\d{4}-\d{2}-\d{2}$", cleaned):
+        return cleaned
+    # Named month: "15 March 2024" / "15 March, 2024"
+    m = re.match(r"(\d{1,2})\s+(\w+),?\s+(\d{4})$", cleaned)
+    if m:
+        day, mon, year = m.group(1), m.group(2).lower(), m.group(3)
+        if mon in _MONTH_MAP:
+            return f"{year}-{_MONTH_MAP[mon]}-{day.zfill(2)}"
+    # Named month: "March 15, 2024" / "March 15 2024"
+    m = re.match(r"(\w+)\s+(\d{1,2}),?\s+(\d{4})$", cleaned)
+    if m:
+        mon, day, year = m.group(1).lower(), m.group(2), m.group(3)
+        if mon in _MONTH_MAP:
+            return f"{year}-{_MONTH_MAP[mon]}-{day.zfill(2)}"
+    # DD/MM/YYYY or MM/DD/YYYY (also handles 2-digit year)
+    parts = re.split(r"[/\-\.]", cleaned)
+    if len(parts) == 3:
+        if len(parts[2]) == 2:
+            parts[2] = "20" + parts[2]
+        try:
+            a, b, c = int(parts[0]), int(parts[1]), int(parts[2])
+        except ValueError:
+            return cleaned
+        if c > 1900:
+            if a > 12:  # DD/MM/YYYY
+                return f"{c}-{str(b).zfill(2)}-{str(a).zfill(2)}"
+            else:  # MM/DD/YYYY (US default)
+                return f"{c}-{str(a).zfill(2)}-{str(b).zfill(2)}"
+        elif a > 1900:  # YYYY/MM/DD
+            return f"{a}-{str(b).zfill(2)}-{str(c).zfill(2)}"
+    return cleaned
+
+
+def _parse_amount(raw: str) -> float | None:
+    """Parse an amount string handling US and EU formats."""
+    raw = raw.strip()
+    # Remove currency symbols
+    raw = re.sub(r"[€$£¥]", "", raw).strip()
+    raw = re.sub(r"^(USD|EUR|GBP|CAD|MXN)\s*", "", raw, flags=re.IGNORECASE).strip()
+    raw = re.sub(r"\s*(USD|EUR|GBP|CAD|MXN)$", "", raw, flags=re.IGNORECASE).strip()
+    if not raw:
+        return None
+    # European: 1.234,56 → 1234.56
+    if re.match(r"[\d\.]+,\d{2}$", raw):
+        raw = raw.replace(".", "").replace(",", ".")
+    else:
+        raw = raw.replace(",", "")
+    try:
+        v = float(raw)
+        return v if v > 0 else None
+    except ValueError:
+        return None
+
+
+def _extract_amounts_from_tables(tables: list) -> list[dict]:
+    """Extract item descriptions and amounts from pdfplumber tables."""
+    items: list[dict] = []
+    for table in tables:
+        if not table or len(table) < 2:
+            continue
+        header = table[0]
+        if not header:
+            continue
+        # Find description and amount columns by header text
+        desc_col = amt_col = qty_col = rate_col = None
+        header_lower = [(str(h or "").lower().strip()) for h in header]
+        for i, h in enumerate(header_lower):
+            if any(k in h for k in (
+                "description", "item", "service", "concept", "producto", "descripci",
+                "detalle", "partida", "product", "line item", "memo", "nombre",
+            )):
+                desc_col = i
+            if any(k in h for k in ("amount", "total", "monto", "importe", "betrag", "sum")):
+                amt_col = i
+            if any(k in h for k in ("qty", "quantity", "cantidad", "menge", "units", "hours", "hrs")):
+                qty_col = i
+            if any(k in h for k in ("rate", "price", "precio", "unit", "preis", "cost", "tarifa")):
+                rate_col = i
+        if desc_col is None:
+            # Try first text column
+            for i, h in enumerate(header_lower):
+                if h and not any(c.isdigit() for c in h):
+                    desc_col = i
+                    break
+        if amt_col is None and rate_col is not None:
+            amt_col = rate_col
+        for row in table[1:]:
+            if not row:
+                continue
+            desc = str(row[desc_col] or "").strip() if desc_col is not None and desc_col < len(row) else ""
+            amt_str = str(row[amt_col] or "").strip() if amt_col is not None and amt_col < len(row) else ""
+            # Skip subtotal/total/tax rows in table items
+            if desc and re.match(r"^(subtotal|total|tax|iva|vat|impuesto|descuento|discount|shipping|envío)", desc, re.IGNORECASE):
+                continue
+            if desc and len(desc) > 2:
+                amt = _parse_amount(amt_str) if amt_str else None
+                items.append({"descripcion": desc, "monto": amt})
+    return items
+
+
+def _parse_invoice_text(text: str, tables: list | None = None) -> dict:
+    """Parse invoice text and extract structured fields."""
+    result: dict = {
+        "invoice_number": None,
+        "fecha": None,
+        "empresa": None,
+        "pais": None,
+        "moneda": None,
+        "monto_original": None,
+        "descripcion": None,
+        "tax_id": None,
+        "productos": [],
+        "forma_pago": None,
+        "tipo": None,
+    }
+    lines = [l.strip() for l in text.strip().split("\n") if l.strip()]
+
+    # ── Invoice number ──────────────────────────────────────────
+    # Known keywords that are NOT invoice numbers
+    _NOT_INVOICE_NUM = {"order", "seller", "receipt", "invoice", "date", "from", "to", "item", "price", "total", "paid", "id",
+                         "number", "details", "summary", "description", "amount", "created", "status", "type"}
+    for pat in [
+        r"(?:Invoice|Inv|Factura|Receipt|Bill|Rechnung|Nota)\s*(?:#|No\.?|Number|Num|Número|Nr\.?)\s*[:\s]*([A-Za-z0-9][\w\-\/\.]+)",
+        r"(?:Invoice\s+ID|Order\s+ID|Order\s*#|Ref|Reference|Referencia)\s*[:\s#]*([A-Za-z0-9][\w\-\/\.]+)",
+        r"(?:Invoice|INV|FACTURA|RECEIPT)[ \t]*[:#\-]+[:#\- \t]*([A-Za-z0-9][\w\-\/\.]+)",
+        r"(?:Invoice|Factura)\s+([A-Za-z0-9][\w\-]{3,30})",
+        r"#\s*([A-Z0-9][\w\-]{2,20})",
+    ]:
+        m = re.search(pat, text, re.IGNORECASE)
+        if m:
+            val = m.group(1).strip().rstrip(".")
+            if len(val) >= 2 and val.lower() not in _NOT_INVOICE_NUM:
+                result["invoice_number"] = val
+                break
+
+    # ── Date ────────────────────────────────────────────────────
+    _DATE_LABEL = (
+        r"(?:Date|Fecha|Invoice\s*Date|Issue\s*Date|Datum|"
+        r"Issued\s*(?:at|on)?|Billed\s*(?:On|Date)?|"
+        r"Order\s*Created|Paid\s*(?:on|In\s*Full)?|Due\s*(?:On|Date)?)"
+    )
+    date_patterns = [
+        # Labeled dates
+        _DATE_LABEL + r"\s*[:\s]+(\d{4}-\d{2}-\d{2})",
+        _DATE_LABEL + r"\s*[:\s]+(\d{1,2}[/\-\.]\d{1,2}[/\-\.]\d{2,4})",
+        _DATE_LABEL + r"\s*[:\s]+(\w+\s+\d{1,2}(?:st|nd|rd|th)?,?\s*\d{4})",
+        _DATE_LABEL + r"\s*[:\s]+(\d{1,2}(?:st|nd|rd|th)?\s+\w+,?\s*\d{4})",
+        # Unlabeled ISO
+        r"(\d{4}-\d{2}-\d{2})",
+        # Unlabeled named month (with optional ordinal suffix)
+        r"(\w+\s+\d{1,2}(?:st|nd|rd|th)?,?\s+\d{4})",
+        r"(\d{1,2}(?:st|nd|rd|th)?\s+\w+\s+\d{4})",
+        # Unlabeled numeric
+        r"(\d{1,2}[/\-\.]\d{1,2}[/\-\.]\d{4})",
+    ]
+    for pat in date_patterns:
+        m = re.search(pat, text, re.IGNORECASE)
+        if m:
+            parsed = _parse_date(m.group(1))
+            if parsed and re.match(r"\d{4}-\d{2}-\d{2}$", parsed):
+                result["fecha"] = parsed
+                break
+            elif parsed:
+                result["fecha"] = parsed
+                break
+
+    # ── Currency (detect early, affects amount parsing) ─────────
+    if re.search(r"\bUSD\b|\bUS\s*\$|\bUS\s*Dollar", text, re.IGNORECASE):
+        result["moneda"] = "USD"
+    elif re.search(r"\bEUR\b|€|\bEuro\b", text, re.IGNORECASE):
+        result["moneda"] = "EUR"
+    elif re.search(r"\bGBP\b|£|\bPound\s*Sterling", text, re.IGNORECASE):
+        result["moneda"] = "GBP"
+    elif re.search(r"\bCAD\b|\bCanadian\s*Dollar", text, re.IGNORECASE):
+        result["moneda"] = "CAD"
+    elif re.search(r"\bCHF\b|\bSwiss\s*Franc", text, re.IGNORECASE):
+        result["moneda"] = "CHF"
+    elif re.search(r"\$", text) and not re.search(r"\bMXN\b|\bpeso", text, re.IGNORECASE):
+        result["moneda"] = "USD"  # $ without MXN context → USD
+
+    # ── Total amount (find the grand total, not subtotals) ──────
+    amount_patterns = [
+        # Specific "grand total" / "balance due" / "amount due" (most specific)
+        r"(?:Grand\s*Total|Amount\s*Due|Balance\s*Due|Total\s*Due|Total\s*a\s*Pagar|Importe\s*Total)\s*[:\s]*[€$£]?\s*([\d.,]+)",
+        # "Total" (not Subtotal) at end of document (reverse search — last match wins)
+        r"(?<![Ss]ub)\bTotal\s*[:\s]*[€$£]?\s*([\d.,]+)",
+        # Amount with currency symbol/code
+        r"(?<![Ss]ub)\b(?:Total|Amount)\s*[:\s]*(?:USD|EUR|GBP|CAD)?\s*[€$£]?\s*([\d.,]+)",
+    ]
+    # For "Total", prefer the LAST occurrence (usually the grand total)
+    best_total = None
+    for pat in amount_patterns:
+        matches = list(re.finditer(pat, text, re.IGNORECASE))
+        if matches:
+            # Use last match for "Total" (grand total usually at bottom)
+            raw = matches[-1].group(1)
+            val = _parse_amount(raw)
+            if val and val > 0:
+                if best_total is None or (pat == amount_patterns[0]):
+                    best_total = val
+                    break
+    if best_total:
+        result["monto_original"] = best_total
+
+    # ── Company name ────────────────────────────────────────────
+    # The company name is almost always the FIRST line of the PDF
+    # (the sender/issuer puts their name at the top).
+
+    # Strategy 1: "Invoice from X" / "Bill From: X" (explicit label)
+    from_m = re.search(
+        r"(?:Invoice\s+from|Bill\s*From|Billed?\s*By|Issued\s*By|Seller|Emisor|Proveedor)\s*[:\s]+(.+)",
+        text, re.IGNORECASE,
+    )
+    if from_m:
+        name = re.split(r"\s{2,}|\t|\|", from_m.group(1).strip())[0].strip()
+        if 2 < len(name) < 120 and not re.match(r"^\d", name):
+            result["empresa"] = name
+
+    # Strategy 2: First line of the document (most common — company name at top)
+    _MONTH_NAMES_RE = re.compile(
+        r"\b(?:January|February|March|April|May|June|July|August|September|October|November|December|"
+        r"Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b", re.IGNORECASE,
+    )
+    # Detect "Bill To" / "Billed To" zone — lines after this are the BUYER, not the seller
+    _BILL_TO_RE = re.compile(r"^(?:Bill\s*To|Billed?\s*To|Sold\s*To|Ship\s*To|Purchaser|Customer|Comprador|Cliente)\b", re.IGNORECASE)
+    _SELLER_RE = re.compile(r"^(?:Seller|From|Bill\s*From|Billed?\s*By|Issued\s*By|Vendor|Emisor|Proveedor)\b", re.IGNORECASE)
+    if not result["empresa"]:
+        in_bill_to = False
+        after_email = 0  # count lines after an email (likely buyer info)
+        for line in lines[:20]:
+            # Track bill-to / seller sections
+            if _BILL_TO_RE.match(line):
+                in_bill_to = True
+                continue
+            if _SELLER_RE.match(line):
+                in_bill_to = False
+                after_email = 0
+                continue
+            # Skip blank separator lines that might end the bill-to zone
+            if in_bill_to:
+                # Country names or short location lines end the zone
+                if re.match(r"^[A-Z]{2,}$", line) and len(line) <= 30:
+                    in_bill_to = False
+                continue
+            # After an email line, skip 1-2 lines (likely buyer name + country)
+            if after_email > 0:
+                after_email -= 1
+                # ALL-CAPS country name ends the post-email skip zone
+                if re.match(r"^[A-Z]{2,}$", line) and len(line) <= 30:
+                    after_email = 0
+                continue
+            if len(line) < 2 or len(line) > 120:
+                continue
+            if _SKIP_HEADER_RE.match(line):
+                continue
+            # Skip lines that are just numbers/dates
+            if re.match(r"^[\d\s\-/\.\,\(\):]+$", line):
+                continue
+            # Skip date-range lines: "February 24th 2026 to March 23rd 2026"
+            month_hits = _MONTH_NAMES_RE.findall(line)
+            if len(month_hits) >= 2:
+                continue
+            # Skip lines that are a date with some label: "Issued at: 2026-02-17"
+            if re.search(r"\d{4}-\d{2}-\d{2}", line) and len(line) < 60:
+                continue
+            # Skip lines with "Paid", "In Full", date references
+            if re.match(r"^(?:Paid|Issued|Order|Status|Account|Billing|Period|Statement|Receipt)\b", line, re.IGNORECASE):
+                continue
+            # Skip lines containing email addresses or URLs
+            if "@" in line:
+                after_email = 2  # skip next 1-2 lines (buyer name + country)
+                continue
+            if re.search(r"https?://|www\.", line, re.IGNORECASE):
+                continue
+            # Skip address lines (start with number + street name)
+            if re.match(r"^\d+\s+\w+\s+(St|Ave|Blvd|Dr|Road|Rd|Lane|Ln|Way|Calle|Av|Col)\b", line, re.IGNORECASE):
+                continue
+            # Skip lines that look like dates: "Month Nth, YYYY", "YYYY-MM-DD", etc.
+            if re.match(r"^\w+\s+\d{1,2}(?:st|nd|rd|th)?,?\s+\d{4}", line, re.IGNORECASE):
+                continue
+            # Skip lines that contain a month name + year (likely date/period info)
+            if _MONTH_NAMES_RE.search(line) and re.search(r"\d{4}", line):
+                continue
+            result["empresa"] = line
+            break
+
+    # Strategy 3: Line containing a company suffix (Inc., LLC, GmbH, etc.)
+    if not result["empresa"]:
+        for line in lines[:15]:
+            if _COMPANY_SUFFIXES.search(line):
+                name = re.sub(r"^[\d\.\)\-]+\s*", "", line).strip()
+                if 3 < len(name) < 120:
+                    result["empresa"] = name
+                    break
+
+    # Clean empresa: strip trailing INVOICE / RECEIPT / FACTURA labels
+    if result["empresa"]:
+        result["empresa"] = re.sub(
+            r"\s*[-–|]\s*(?:INVOICE|RECEIPT|FACTURA|RECHNUNG|BILL|NOTA)\s*$",
+            "", result["empresa"], flags=re.IGNORECASE,
+        ).strip()
+        result["empresa"] = re.sub(
+            r"\s+(?:INVOICE|RECEIPT|FACTURA|RECHNUNG|BILL|NOTA)\s*$",
+            "", result["empresa"], flags=re.IGNORECASE,
+        ).strip()
+
+    # ── Tax ID ──────────────────────────────────────────────────
+    tax_patterns = [
+        r"(?:Tax\s*ID|EIN|VAT\s*(?:No\.?|Number|ID)?|TIN|RFC|GST\s*(?:No\.?)?|ABN|NIF|CIF|GSTIN|Tax\s*Number|Tax\s*Reg)\s*[:\s#]*([A-Za-z0-9][\w\-\.]{3,25})",
+        r"(?:Tax\s*Registration)\s*[:\s]*([A-Za-z0-9][\w\-\.]{3,25})",
+    ]
+    for pat in tax_patterns:
+        m = re.search(pat, text, re.IGNORECASE)
+        if m:
+            result["tax_id"] = m.group(1).strip()
+            break
+
+    # ── Products / line items ───────────────────────────────────
+    # Priority 1: pdfplumber tables (most reliable for structured invoices)
+    table_items = _extract_amounts_from_tables(tables or [])
+    if table_items:
+        result["productos"] = [it["descripcion"] for it in table_items if it.get("descripcion")]
+        if not result["monto_original"]:
+            table_sum = sum(it.get("monto") or 0 for it in table_items)
+            if table_sum > 0:
+                result["monto_original"] = table_sum
+
+    # Priority 2: Text-based extraction — find items section
+    # Detect the start of the items section by looking for table headers
+    _ITEM_HEADER_RE = re.compile(
+        r"^(?:Description|Items?\b|Item\s*Description|Line\s*Items?|Services?|"
+        r"Concepto|Descripción|Descripcion|Productos?|Detalle|Partida|"
+        r"Service\s*Description|Product\s*Name|Product|"
+        r"#\s+Description|#\s+Item|No\.\s+Description)",
+        re.IGNORECASE,
+    )
+    _TABLE_COL_WORDS = {
+        "qty", "quantity", "rate", "price", "amount", "unit", "total",
+        "hrs", "hours", "cantidad", "precio", "monto", "importe",
+        "menge", "preis", "betrag", "#", "no", "no.",
+    }
+    _ITEMS_END_RE = re.compile(
+        r"^(?:Subtotal|Sub\s*Total|Total|Tax|IVA|VAT|Discount|Descuento|"
+        r"Shipping|Envío|Notes?|Terms|Payment|Thank|Gracias|Bank|IBAN|SWIFT)\b",
+        re.IGNORECASE,
+    )
+
+    def _clean_item_desc(raw: str) -> str:
+        """Strip trailing qty/rate/amount numbers from an item description line."""
+        s = raw
+        for _ in range(8):
+            prev = s
+            # $1,234.56 or €1.234,56
+            s = re.sub(r"\s+[\$€£][\d,\.]+\s*$", "", s).strip()
+            # 1,234.56 or 1234.56 (bare amounts)
+            s = re.sub(r"\s+[\d,]+\.\d{2}\s*$", "", s).strip()
+            # Bare integers (qty)
+            s = re.sub(r"\s+\d{1,4}\s*$", "", s).strip()
+            # "40 hrs" / "2 units" / "500 GB"
+            s = re.sub(r"\s+\d{1,6}\s+(?:hrs?|units?|pcs?|ea|GB|TB|MB|KB)\s*$", "", s, flags=re.IGNORECASE).strip()
+            # "x 2" or "x2"
+            s = re.sub(r"\s+x\s*\d+\s*$", "", s, flags=re.IGNORECASE).strip()
+            # Period/date fragments like "Jan 2026"
+            s = re.sub(r"\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+\d{4}\s*$", "", s, flags=re.IGNORECASE).strip()
+            if s == prev:
+                break
+        return s
+
+    if not result["productos"]:
+        in_items = False
+        items_collected = []
+        for line in lines:
+            # Detect items section start
+            if _ITEM_HEADER_RE.match(line):
+                in_items = True
+                continue
+            if not in_items:
+                continue
+            # Detect items section end
+            if _ITEMS_END_RE.match(line):
+                break
+            # Skip empty / tiny lines
+            if len(line) < 3:
+                continue
+            # Split on wide spaces/tabs to get columns
+            parts = re.split(r"\s{2,}|\t", line)
+            desc_part = parts[0].strip() if parts else ""
+            if not desc_part or len(desc_part) < 2:
+                continue
+            # Skip lines that are only numbers/currency
+            if re.match(r"^[\d\$€£\.,\s\-]+$", desc_part):
+                continue
+            # Skip sub-header rows (all words are column header words)
+            words = [w.lower().rstrip(".") for w in desc_part.split()]
+            if words and all(w in _TABLE_COL_WORDS for w in words):
+                continue
+            # Clean trailing numeric columns
+            desc_clean = _clean_item_desc(desc_part)
+            if desc_clean and len(desc_clean) > 2:
+                items_collected.append(desc_clean)
+        if items_collected:
+            result["productos"] = items_collected[:10]
+
+    # Priority 3: Single labeled description (no table/list)
+    # e.g. "Item: Cloud Hosting Service" or "For: Website Development"
+    if not result["productos"]:
+        for pat in [
+            r"(?:Item|Product|Service|Concept|Concepto)\s*[:\s]+([^\n]{5,})",
+            r"(?:Detalle|Partida|Línea)\s*[:\s]+([^\n]{5,})",
+        ]:
+            m = re.search(pat, text, re.IGNORECASE)
+            if m:
+                desc = _clean_item_desc(m.group(1).strip())
+                if desc and len(desc) > 3:
+                    result["productos"] = [desc[:200]]
+                    break
+
+    # ── Description (build from products or labeled section) ────
+    if result["productos"]:
+        result["descripcion"] = "; ".join(result["productos"])[:200]
+    else:
+        desc_patterns = [
+            r"(?:Description|Service|Concept|Descripción|Concepto|Memo|Notes?|Subject|Regarding|Re:)\s*[:\s]*\n?\s*(.+)",
+            r"(?:For|Por)\s*[:\s]+(.{10,})",
+        ]
+        for pat in desc_patterns:
+            m = re.search(pat, text, re.IGNORECASE)
+            if m:
+                desc = m.group(1).strip()
+                desc = re.split(r"\s{2,}|\t", desc)[0].strip()
+                if len(desc) > 3:
+                    result["descripcion"] = desc[:200]
+                    break
+
+    # ── Country ─────────────────────────────────────────────────
+    for name, code in _COUNTRY_MAP.items():
+        if re.search(r"\b" + re.escape(name) + r"\b", text, re.IGNORECASE):
+            result["pais"] = code
+            break
+    # Detect from state abbreviations (US)
+    if not result["pais"] and re.search(r"\b(?:CA|NY|TX|FL|IL|WA|MA|PA|OH|GA|NC|NJ|VA|AZ|CO|TN)\s+\d{5}", text):
+        result["pais"] = "US"
+
+    # ── Payment method ──────────────────────────────────────────
+    pay_text = text.lower()
+    if "swift" in pay_text or "wire transfer" in pay_text or "bank transfer" in pay_text or "transferencia" in pay_text:
+        result["forma_pago"] = "SWIFT"
+    elif "paypal" in pay_text:
+        result["forma_pago"] = "PayPal"
+    elif "wise" in pay_text or "transferwise" in pay_text:
+        result["forma_pago"] = "Wise"
+    elif "stripe" in pay_text:
+        result["forma_pago"] = "Stripe"
+    elif "payoneer" in pay_text:
+        result["forma_pago"] = "Payoneer"
+    elif re.search(r"\bcredit\s*card|tarjeta|visa|mastercard|amex", pay_text):
+        result["forma_pago"] = "CREDITO"
+
+    # ── Type (INGRESO vs GASTO) ─────────────────────────────────
+    # Foreign invoices uploaded by the user are almost always GASTOS
+    # (subscriptions, services they paid for). INGRESO only if the user
+    # is clearly the SELLER (e.g. "Invoice from [user's company]").
+    # "Bill To" means the user is being billed → GASTO, not INGRESO.
+    result["tipo"] = "GASTO"
+
+    return result
+
+
+# ── Historical Metrics (6-month trend) ───────────────────────────
+@router.get("/metrics/trend")
+def api_metrics_trend(
+    request: Request,
+    issuer: dict = Depends(get_portal_issuer),
+    months: int = Query(6, ge=1, le=12),
+):
+    """Return monthly totals for issued/received over the last N months (for sparklines and charts)."""
+    issuer_id = int(issuer.get("id") or 0)
+    if issuer_id <= 0:
+        raise HTTPException(status_code=401, detail="Sesión inválida")
+    from datetime import date
+    today = date.today()
+    result = []
+    y, m = today.year, today.month
+    # Build list of last N months (inclusive of current)
+    ym_list = []
+    for _ in range(months):
+        ym_list.append(f"{y:04d}-{m:02d}")
+        m -= 1
+        if m <= 0:
+            m = 12
+            y -= 1
+    ym_list.reverse()
+    for ym in ym_list:
+        tot_issued = _get_month_totals_safe(issuer_id, ym, "issued")
+        tot_received = _get_month_totals_safe(issuer_id, ym, "received")
+        result.append({
+            "ym": ym,
+            "ingresos": tot_issued.get("total_base", 0),
+            "gastos": tot_received.get("total_base", 0),
+            "iva_cobrado": tot_issued.get("total_iva_neto", 0),
+            "iva_pagado": tot_received.get("total_iva", 0),
+        })
+    return ok(result)

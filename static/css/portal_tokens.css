@@ -6,23 +6,37 @@
  */
 
 :root {
-  /* ----- Tipografía (base 16px) ----- */
-  --font-family: "Plus Jakarta Sans", system-ui, -apple-system, Segoe UI, sans-serif;
+  /* ----- Tipografía: Inter + escala tipo Mindtrip (títulos grandes / secciones / cuerpo / secundario) ----- */
+  --font-family: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
 
-  --text-2xs: 0.6875rem;   /* 11px */
-  --text-xs: 0.8125rem;    /* 13px */
-  --text-sm: 0.9375rem;    /* 15px */
-  --text-base: 1rem;       /* 16px */
-  --text-md: 1.0625rem;   /* 17px */
-  --text-lg: 1.25rem;     /* 20px — títulos sección */
-  --text-xl: 1.3125rem;   /* 21px — H3 */
-  --text-2xl: 1.5rem;     /* 24px — H2 */
-  --text-3xl: 1.75rem;    /* 28px — H1 */
+  --text-micro: 0.6875rem;  /* 11px */
+  --text-2xs: 0.75rem;      /* 12px — meta, captions, pills */
+  --text-xs: 0.8125rem;     /* 13px — labels compactos */
+  --text-sm: 0.875rem;      /* 14px — texto secundario, tabs, UI pequeña */
+  --text-base: 1rem;        /* 16px — cuerpo, títulos de tarjeta */
+  --text-md: 1.0625rem;     /* 17px */
+  --text-lg: 1.25rem;       /* 20px — subtítulos de sección (“Things to do”) */
+  --text-xl: 1.375rem;      /* 22px — H2 / bloques */
+  --text-2xl: 1.5rem;       /* 24px */
+  --text-3xl: 1.75rem;      /* 28px */
+  --text-display: 2rem;     /* 32px — título principal de pantalla (“Your trips”) */
+  --text-display-lg: 2.25rem; /* 36px — hero */
 
   --fw-normal: 400;
   --fw-medium: 500;
   --fw-semibold: 600;
   --fw-bold: 700;
+
+  /* Letter-spacing (títulos grandes: ligeramente más apretado) */
+  --ls-tight: -0.03em;
+  --ls-normal: 0;
+  --ls-wide: 0.04em;
+
+  /* Aliases de encabezado (pesos: display/H1 bold; sección semibold) */
+  --heading-1: var(--fw-bold) var(--text-display)/var(--leading-tight) var(--font-family);
+  --heading-2: var(--fw-semibold) var(--text-lg)/var(--leading-snug) var(--font-family);
+  --heading-3: var(--fw-semibold) var(--text-base)/var(--leading-snug) var(--font-family);
+  --heading-4: var(--fw-medium) var(--text-sm)/var(--leading-snug) var(--font-family);
 
   --leading-tight: 1.25;
   --leading-snug: 1.375;
@@ -30,53 +44,76 @@
   --leading-relaxed: 1.6;
   --leading-body: 1.55;
 
-  /* ----- Colores ----- */
-  --bg: #ffffff;
-  --bg-subtle: #ffffff;
+  /* ----- Colores (Fintech: indigo-violet) ----- */
+  --bg: #fafafa;
+  --bg-subtle: #f5f5f7;
   --surface: #ffffff;
-  --surface-hover: #fafafb;
+  --surface-hover: #f8f9fa;
 
-  --text: #0d1f1c;
-  --text-muted: #3d524f;
+  /* Surface hierarchy */
+  --surface-0: #ffffff;
+  --surface-1: #fafafa;
+  --surface-2: #f1f3f5;
+  --surface-3: #e9ecef;
+
+  --text: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #64748b;
   --text-inverse: #ffffff;
 
-  --border: rgba(13, 31, 28, 0.08);
-  --border-strong: rgba(13, 31, 28, 0.14);
+  --border: rgba(0, 0, 0, 0.06);
+  --border-strong: rgba(0, 0, 0, 0.12);
 
-  --primary: #14b8a6;
-  --primary-hover: #0d9488;
+  --primary: #6366f1;
+  --primary-hover: #4f46e5;
+  --primary-light: #eef2ff;
   --accent: var(--primary);
   --accent-hover: var(--primary-hover);
-  --accent-soft: #ccfbf1;
-  --accent-border: #99f6e4;
+  --accent-soft: #eef2ff;
+  --accent-border: #c7d2fe;
 
-  --track-inactive: #e5e7eb;
-  --track-active: #14b8a6;
+  --track-inactive: #e2e8f0;
+  --track-active: var(--primary);
 
   --success: #059669;
-  --success-bg: #d1fae5;
-  --success-border: #6ee7b7;
+  --success-bg: #ecfdf5;
+  --success-border: #a7f3d0;
+  --success-text: #065f46;
 
   --warn: #d97706;
   --warning: var(--warn);
-  --warn-bg: #fef3c7;
-  --warn-border: #fcd34d;
+  --warn-bg: #fffbeb;
+  --warn-border: #fde68a;
+  --warn-text: #92400e;
 
-  --danger: #dc2626;
-  --danger-bg: #fee2e2;
-  --danger-border: #fca5a5;
+  --danger: #ef4444;
+  --danger-bg: #fef2f2;
+  --danger-border: #fecaca;
+  --danger-text: #991b1b;
 
-  --neutral: #6b7280;
-  --neutral-bg: #f3f4f6;
-  --neutral-border: #e5e7eb;
+  --neutral: #64748b;
+  --neutral-bg: #f1f5f9;
+  --neutral-border: #e2e8f0;
+
+  --info: #3b82f6;
+  --info-bg: #eff6ff;
+  --info-border: #bfdbfe;
+  --info-text: #1e40af;
 
   --muted: var(--text-muted);
-  /* Labels y títulos secundarios: más visibles que muted, menos que text */
-  --label-color: #2d3d3a;
-  --focus: rgba(20, 184, 166, 0.22);
-  /* A11Y: anillo de foco visible (solo :focus-visible) */
+  --label-color: #334155;
+  --card-bg: var(--surface-0);
+  --link: var(--primary);
+  --error: var(--danger);
+  --error-hover: #dc2626;
+  --focus: rgba(99, 102, 241, 0.22);
   --focus-ring: 2px solid var(--accent);
   --focus-ring-offset: 2px;
+
+  /* Gradients (fintech premium) */
+  --gradient-primary: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  --gradient-success: linear-gradient(135deg, #059669 0%, #10b981 100%);
+  --gradient-card-shine: linear-gradient(135deg, rgba(99,102,241,0.03) 0%, rgba(139,92,246,0.03) 100%);
 
   /* ----- Spacing (escala 4px) ----- */
   --space-0: 0;
@@ -101,36 +138,41 @@
   --sidebar-gap: var(--sidebar-content-gap);
 
   /* ----- Page layout (Mindtrip-style: mismo padding en todas las vistas) ----- */
-  --page-pad-top: 28px;
+  --page-pad-top: 32px;
   --page-pad-bottom: 40px;
-  --page-pad-x: 28px;
+  --page-pad-x: 32px;
   --page-max-width: 1120px;
 
   /* ----- Radius ----- */
   --radius-xs: 6px;
-  --radius-sm: 12px;
-  --radius: 14px;
-  --radius-md: 14px;
-  --radius-lg: 18px;
+  --radius-sm: 10px;
+  --radius: 12px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
   --radius-full: 9999px;
 
   /* ----- Sombras ----- */
-  --shadow-1: 0 6px 18px rgba(13, 31, 28, 0.06);
-  --shadow-2: 0 12px 34px rgba(13, 31, 28, 0.10);
-  --shadow-3: 0 22px 70px rgba(13, 31, 28, 0.18);
+  --shadow-1: 0 6px 18px rgba(0, 0, 0, 0.05);
+  --shadow-2: 0 12px 34px rgba(0, 0, 0, 0.08);
+  --shadow-3: 0 22px 70px rgba(0, 0, 0, 0.14);
   --shadow-sm: var(--shadow-1);
   --shadow-md: var(--shadow-3);
   --shadow-focus: 0 0 0 3px var(--accent-soft);
 
+  /* Card-specific shadows (layered for depth) */
+  --shadow-card: 0 1px 4px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04);
+  --shadow-card-hover: 0 4px 12px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.04);
+  --shadow-card-active: 0 1px 2px rgba(0, 0, 0, 0.04);
+
   /* ----- Componentes (alturas unificadas) ----- */
-  --input-height: 46px;
-  --btn-height: 46px;
-  --btn-height-sm: 38px;
+  --input-height: 42px;
+  --btn-height: 42px;
+  --btn-height-sm: 34px;
   --btn-height-lg: 48px;
 
   /* ----- Section / card spacing ----- */
-  --card-padding: 22px;
-  --section-gap: 22px;
+  --card-padding: 28px;
+  --section-gap: 28px;
 
   /* ----- Layout / safe areas ----- */
   --safe-top: env(safe-area-inset-top, 0px);
@@ -141,21 +183,68 @@
   --bg-grad: none;
 
   --sidebar-w: 260px;
-  --main-pad: 22px;
+  --main-pad: 28px;
   --concept-cols: 120px minmax(260px, 2.2fr) minmax(220px, 1.6fr) 170px 140px 260px 44px;
 
   /* ----- Iconos (estilo único: stroke redondo, look premium) ----- */
-  --icon-stroke: 1.75;
-  --icon-size: 1.25em;
-  --icon-size-sm: 1rem;
-  --icon-size-lg: 1.5rem;
+  --icon-stroke: 1.5;
+  --icon-size: 1.125em;
+  --icon-size-sm: 0.875rem;
+  --icon-size-lg: 1.25rem;
 
-  /* ----- P48: Motion (Phantom-style, consistencia). Respetar prefers-reduced-motion. ----- */
-  --motion-micro: 150ms;   /* hovers, focus, micro-interacciones */
-  --motion-modal: 200ms;  /* modales, drawers, overlays */
-  --motion-page: 180ms;   /* entrada/salida de página */
-  --ease-out: cubic-bezier(0.25, 0.1, 0.25, 1);
+  /* ----- Motion (fintech: snappy + polished) ----- */
+  --motion-fast: 100ms;
+  --motion-normal: 160ms;
+  --motion-micro: 100ms;
+  --motion-modal: 250ms;
+  --motion-slow: 300ms;
+  --motion-page: 180ms;
+  --anim-duration-fast: 200ms;
+  --anim-duration-normal: 400ms;
+  --anim-duration-slow: 600ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-in-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* ----- Z-index stack (coherent layering) ----- */
+  --z-sidebar: 100;
+  --z-topbar: 200;
+  --z-tabbar: 250;
+  --z-dropdown: 9000;
+  --z-drawer: 9500;
+  --z-modal-backdrop: 9900;
+  --z-modal: 9950;
+  --z-toast: 10000;
+  --z-modal-top: 10050;
+  --z-calendar: 10100;
+  --z-debug: 10200;
+  --z-progress: 10300;
+}
+
+/* Global focus styles — WCAG AA accessible ring */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent, #6366f1);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+:where(a, button, [tabindex]):focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Reduce motion globally */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --anim-duration-fast: 0ms;
+    --anim-duration-normal: 0ms;
+    --anim-duration-slow: 0ms;
+    --motion-fast: 0ms;
+    --motion-normal: 0ms;
+    --motion-micro: 0ms;
+    --motion-modal: 0ms;
+    --motion-slow: 0ms;
+    --motion-page: 0ms;
+  }
 }
 
 /* Page spacing: móvil */

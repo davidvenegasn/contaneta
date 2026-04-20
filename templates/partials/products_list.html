@@ -1,0 +1,455 @@
+{# Lista de productos. Usar en /portal/products o en hub /portal/catalogos?tab=productos. #}
+{% set _form_action = (hub_base ~ '?tab=productos') if hub_base else '/portal/products' %}
+<div class="card ui-card">
+  <div class="card-header card-header--with-tools ui-card__header">
+    <div class="card-header__left">
+      <div class="table-tools table-tools--inline">
+        <form class="table-tools__search" method="get" action="{{ _form_action }}">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M16.2 16.2 21 21" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+          </svg>
+          <input class="input ui-input" type="search" name="q" value="{{ q|default('')|e }}" placeholder="Buscar por nombre o clave" autocomplete="off" />
+        </form>
+        <button id="newBtn" type="button" class="btn btn-primary">Nuevo producto</button>
+        <button id="bulkToggleBtn" type="button" class="btn btn--secondary" aria-pressed="false">Escoger varios</button>
+      </div>
+    </div>
+    <div class="card-header__right">
+      <h3 class="section-title">Productos</h3>
+      <p class="muted u-m0" id="productsCount">
+        {% if total is defined %}
+          {% if total > 0 %}
+            {% set from = (page - 1) * per_page + 1 %}
+            {% set to = min(page * per_page, total) %}
+            {% if page == 1 and to == min(per_page, total) %}Mostrando los primeros {{ to }} de {{ total }}{% else %}Mostrando {{ from }}-{{ to }} de {{ total }}{% endif %}
+          {% else %}Sin datos{% endif %}
+        {% else %}
+          {% if rows and rows|length %}Mostrando los primeros {{ rows|length }}{% else %}Sin datos{% endif %}
+        {% endif %}
+      </p>
+    </div>
+  </div>
+
+  <p class="card-legend muted">
+    Catálogo confirmado. Puedes editar y activar/desactivar productos. Para crear rápido desde CFDI, usa "Productos sugeridos".
+  </p>
+
+  <div class="card-list-sep">
+    {% if not rows or rows|length == 0 %}
+      {% from 'portal/_ui_components.html' import portal_empty_state %}
+      {% call portal_empty_state('Aún no tienes productos', 'Crea tu catálogo para facturar en segundos.', icon_type='products') %}
+        <button type="button" class="btn btn-primary" id="newBtnEmpty">Crear producto</button>
+        <a class="btn btn--secondary" href="/portal/products/suggestions">Ver productos sugeridos</a>
+      {% endcall %}
+    {% else %}
+    <div id="productsBulkBar" class="u-flex u-items-center u-gap-2 u-mb-2" hidden>
+      <button type="button" class="btn btn--secondary" id="bulkInvoiceBtn">Usar para factura</button>
+      <button type="button" class="btn btn--secondary" id="bulkDeleteBtn">Borrar seleccionados</button>
+      <button type="button" class="btn btn-ghost" id="bulkCancelBtn">Cancelar</button>
+      <span class="muted u-text-12" id="bulkCountText"></span>
+    </div>
+    <div class="table-wrap">
+      <table class="table ui-table ui-table--zebra">
+        <thead>
+          <tr>
+            <th id="bulkTh" hidden style="width:40px;">
+              <input type="checkbox" id="bulkSelectAll" aria-label="Seleccionar todos" />
+            </th>
+            <th>Nombre</th>
+            <th>Precio</th>
+            <th>IVA</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in rows %}
+          <tr>
+            <td class="bulkTd" hidden>
+              <input type="checkbox" class="js-bulk-item" data-id="{{ r.id }}" aria-label="Seleccionar {{ r.name|e }}" />
+            </td>
+            <td class="u-fw-650">{{ r.name }}</td>
+            <td>{{ '$' ~ ('{:,.2f}'.format(r.default_unit_price|float)) if r.default_unit_price is not none else '—' }}</td>
+            <td class="muted">{{ '16%' }}</td>
+            <td>
+              <div class="u-flex u-gap-2 u-items-center">
+                <button type="button" class="icon-btn js-edit" title="Editar" aria-label="Editar {{ (r.name or 'producto')|e }}"
+                  data-id="{{ r.id }}"
+                  data-name="{{ (r.name or '')|e }}"
+                  data-prodserv="{{ (r.clave_prod_serv or '')|e }}"
+                  data-unitkey="{{ (r.clave_unidad or '')|e }}"
+                  data-unidad="{{ (r.unidad or '')|e }}"
+                  data-price="{{ r.default_unit_price if r.default_unit_price is not none else '' }}"
+                  data-currency="{{ (r.default_currency or '')|e }}"
+                  data-active="{{ r.active }}"
+                >
+                  <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M12 20h9" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+                    <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4 11.5-11.5Z" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </button>
+                <button type="button" class="icon-btn js-invoice" title="Usar para factura" aria-label="Usar {{ (r.name or 'producto')|e }} para factura" data-id="{{ r.id }}" data-name="{{ (r.name or '')|e }}">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <rect x="3" y="3" width="18" height="18" rx="5" fill="currentColor"/>
+                    <path d="M12 7.25v9.5" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/>
+                    <path d="M7.25 12h9.5" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/>
+                  </svg>
+                </button>
+                <button type="button" class="icon-btn js-delete" title="Borrar" aria-label="Borrar {{ (r.name or 'producto')|e }}" data-id="{{ r.id }}" data-name="{{ (r.name or '')|e }}">
+                  <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M3 6h18" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+                    <path d="M8 6V4h8v2" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M6.5 6l1 15h9l1-15" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M10 11v6M14 11v6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+                  </svg>
+                </button>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if pages is defined and pages > 1 %}
+    <nav class="table-pagination u-mt-3" aria-label="Paginación de productos">
+      <span class="pagination__page">
+        {% if total > 0 %}
+          {% set from = (page - 1) * per_page + 1 %}
+          {% set to = min(page * per_page, total) %}
+          {% if page == 1 %}Mostrando los primeros {{ to }} de {{ total }}{% else %}Mostrando {{ from }}-{{ to }} de {{ total }}{% endif %}
+        {% endif %}
+      </span>
+      <div class="pagination__btns">
+        {% set _q = '&q=' ~ (q|default('')|urlencode) if q|default('') else '' %}
+        {% if page > 1 %}<a href="{{ _form_action }}&page={{ page - 1 }}{{ _q }}" class="btn btn--sm btn--secondary">Anterior</a>{% else %}<span class="btn btn--sm btn--secondary" aria-disabled="true" style="pointer-events:none; opacity:0.6">Anterior</span>{% endif %}
+        {% if page < pages %}<a href="{{ _form_action }}&page={{ page + 1 }}{{ _q }}" class="btn btn--sm btn--secondary">Siguiente</a>{% else %}<span class="btn btn--sm btn--secondary" aria-disabled="true" style="pointer-events:none; opacity:0.6">Siguiente</span>{% endif %}
+      </div>
+    </nav>
+    {% endif %}
+    {% endif %}
+  </div>
+</div>
+
+<div class="modal" id="prodModal" role="dialog" aria-modal="true" aria-labelledby="prodModalTitle" aria-label="Editar producto" hidden aria-hidden="true">
+  <div class="modal__backdrop" data-close="true"></div>
+  <div class="modal__panel">
+    <div class="modal__head">
+      <div>
+        <div class="modal__title" id="prodModalTitle">Producto</div>
+        <div class="modal__subtitle">Editar catálogo confirmado.</div>
+      </div>
+      <button type="button" class="icon-btn" data-close="true" aria-label="Cerrar">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M6 6l12 12" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+          <path d="M18 6 6 18" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+        </svg>
+      </button>
+    </div>
+    <div class="modal__body">
+      <input type="hidden" id="pId" />
+      <div class="field">
+        <label class="label">Nombre *</label>
+        <input id="pName" class="input" type="text" autocomplete="off" />
+      </div>
+      <div class="grid-2">
+        <div class="field">
+          <label class="label">Clave ProdServ</label>
+          <input id="pProdServ" class="input" type="text" autocomplete="off" placeholder="84111500" />
+        </div>
+        <div class="field">
+          <label class="label">Clave unidad</label>
+          <input id="pUnitKey" class="input" type="text" autocomplete="off" placeholder="E48" />
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="field">
+          <label class="label">Unidad</label>
+          <input id="pUnidad" class="input" type="text" autocomplete="off" placeholder="Unidad de servicio" />
+        </div>
+        <div class="field">
+          <label class="label">Moneda</label>
+          <input id="pCurrency" class="input" type="text" autocomplete="off" placeholder="MXN" />
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="field">
+          <label class="label">Precio default</label>
+          <input id="pPrice" class="input" type="number" step="0.01" min="0" placeholder="0.00" />
+        </div>
+        <div class="field">
+          <label class="label">Activo</label>
+          <select id="pActive" class="input">
+            <option value="1">Sí</option>
+            <option value="0">No</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="modal__foot">
+      <button type="button" class="btn btn-ghost" data-close="true">Cancelar</button>
+      <button type="button" class="btn btn-primary" id="saveBtn">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  function $(id){ return document.getElementById(id); }
+  var modal = $('prodModal');
+  var saveBtn = $('saveBtn');
+  var newBtn = $('newBtn');
+  var newBtnEmpty = $('newBtnEmpty');
+  var bulkToggleBtn = $('bulkToggleBtn');
+  var bulkBar = $('productsBulkBar');
+  var bulkTh = $('bulkTh');
+  var bulkSelectAll = $('bulkSelectAll');
+  var bulkInvoiceBtn = $('bulkInvoiceBtn');
+  var bulkDeleteBtn = $('bulkDeleteBtn');
+  var bulkCancelBtn = $('bulkCancelBtn');
+  var bulkCountText = $('bulkCountText');
+  var bulkMode = false;
+  var selected = new Set();
+
+  function openModal() {
+    if (!modal) return;
+    if (typeof window.openPortalModal === 'function') window.openPortalModal(modal, { returnFocusEl: newBtn || newBtnEmpty });
+    else {
+      modal.hidden = false;
+      modal.setAttribute('aria-hidden', 'false');
+      document.body.classList.add('no-scroll');
+      if (typeof window.uiTrapFocus === 'function') window.uiTrapFocus(modal);
+    }
+  }
+  function closeModal() {
+    if (!modal) return;
+    if (typeof window.closePortalModal === 'function') window.closePortalModal(modal);
+    else {
+      if (typeof window.uiReleaseFocusTrap === 'function') window.uiReleaseFocusTrap();
+      modal.hidden = true;
+      modal.setAttribute('aria-hidden', 'true');
+      document.body.classList.remove('no-scroll');
+    }
+  }
+  function fill(p) {
+    $('pId').value = p.id || '';
+    $('pName').value = p.name || '';
+    $('pProdServ').value = p.clave_prod_serv || '';
+    $('pUnitKey').value = p.clave_unidad || '';
+    $('pUnidad').value = p.unidad || '';
+    $('pPrice').value = (p.default_unit_price != null ? String(p.default_unit_price) : '');
+    $('pCurrency').value = p.default_currency || '';
+    $('pActive').value = (p.active != null ? String(p.active) : '1');
+  }
+
+  function openNew() { fill({}); openModal(); setTimeout(function(){ $('pName').focus(); }, 80); }
+
+  if (newBtn) newBtn.addEventListener('click', openNew);
+  if (newBtnEmpty) newBtnEmpty.addEventListener('click', openNew);
+
+  document.querySelectorAll('.js-edit').forEach(function (b) {
+    b.addEventListener('click', function () {
+      fill({
+        id: b.getAttribute('data-id'),
+        name: b.getAttribute('data-name'),
+        clave_prod_serv: b.getAttribute('data-prodserv'),
+        clave_unidad: b.getAttribute('data-unitkey'),
+        unidad: b.getAttribute('data-unidad'),
+        default_unit_price: b.getAttribute('data-price'),
+        default_currency: b.getAttribute('data-currency'),
+        active: b.getAttribute('data-active')
+      });
+      openModal();
+    });
+  });
+
+  document.querySelectorAll('.js-delete').forEach(function (b) {
+    b.addEventListener('click', async function () {
+      var id = b.getAttribute('data-id');
+      var name = b.getAttribute('data-name') || 'este producto';
+      if (!id) return;
+      if (typeof window.portalConfirm === 'function') {
+        var ok = await window.portalConfirm({
+          title: 'Borrar producto',
+          message: '¿Seguro que quieres borrar "' + name + '"? Esta acción no se puede deshacer.',
+          confirmLabel: 'Sí, borrar',
+          cancelLabel: 'Cancelar'
+        });
+        if (!ok) return;
+      } else {
+        if (!confirm('¿Borrar "' + name + '"?')) return;
+      }
+      try {
+        var res = await (window.portalFetchJSON
+          ? window.portalFetchJSON('/portal/products/' + encodeURIComponent(id) + '/delete', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({})
+            }, { timeoutMs: 30000, retry: 0 })
+          : Promise.resolve({ ok: false, detail: 'Helper no disponible' })
+        );
+        if (!res || !res.ok || !res.data || !res.data.ok) {
+          var msg = (res && res.data && (res.data.detail || res.data.message)) ? String(res.data.detail || res.data.message) : ((res && res.detail) || 'No se pudo borrar.');
+          if (window.uiToast) window.uiToast({ type: 'danger', title: 'Error', message: msg });
+          return;
+        }
+        if (window.uiToast) window.uiToast({ type: 'success', title: 'Borrado', message: 'Producto eliminado.' });
+        setTimeout(function(){ window.location.reload(); }, 300);
+      } catch (e) {
+        if (window.uiToast) window.uiToast({ type: 'danger', title: 'Error', message: (e && e.message) || 'Error de red.' });
+      }
+    });
+  });
+
+  document.querySelectorAll('.js-invoice').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var id = b.getAttribute('data-id');
+      if (!id) return;
+      if (window.QuickInvoice && typeof window.QuickInvoice.open === 'function') {
+        window.QuickInvoice.open({ preselectedProductId: id });
+      } else {
+        if (window.uiToast) window.uiToast({ type: 'danger', title: 'Error', message: 'Factura rápida no disponible. Refresca la página.' });
+      }
+    });
+  });
+
+  if (saveBtn) saveBtn.addEventListener('click', async function () {
+    var payload = {
+      id: $('pId').value || null,
+      name: $('pName').value,
+      clave_prod_serv: $('pProdServ').value,
+      clave_unidad: $('pUnitKey').value,
+      unidad: $('pUnidad').value,
+      default_unit_price: $('pPrice').value,
+      default_currency: $('pCurrency').value,
+      active: $('pActive').value
+    };
+    if (window.uiSetButtonLoading) window.uiSetButtonLoading(saveBtn, true, 'Guardando…');
+    try {
+      var res = await (window.portalFetchJSON
+        ? window.portalFetchJSON('/portal/products/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          }, { timeoutMs: 30000, retry: 0 })
+        : Promise.resolve({ ok: false, detail: 'Helper no disponible' })
+      );
+      if (window.uiSetButtonLoading) window.uiSetButtonLoading(saveBtn, false);
+      if (!res || !res.ok || !res.data || !res.data.ok) {
+        var msg = (res && res.data && (res.data.detail || res.data.message)) ? String(res.data.detail || res.data.message) : ((res && res.detail) || 'No se pudo guardar.');
+        if (window.uiToast) window.uiToast({ type: 'danger', title: 'Error', message: msg });
+        return;
+      }
+      closeModal();
+      if (window.uiToast) window.uiToast({ type: 'success', title: 'Guardado', message: 'Producto actualizado.' });
+      setTimeout(function(){ window.location.reload(); }, 400);
+    } catch (e) {
+      if (window.uiSetButtonLoading) window.uiSetButtonLoading(saveBtn, false);
+      if (window.uiToast) window.uiToast({ type: 'danger', title: 'Error', message: (e && e.message) || 'Error de red.' });
+    }
+  });
+
+  function setBulkMode(on) {
+    bulkMode = !!on;
+    if (bulkToggleBtn) {
+      bulkToggleBtn.setAttribute('aria-pressed', bulkMode ? 'true' : 'false');
+      bulkToggleBtn.textContent = bulkMode ? 'Cancelar selección' : 'Escoger varios';
+    }
+    if (bulkBar) bulkBar.hidden = !bulkMode;
+    if (bulkTh) bulkTh.hidden = !bulkMode;
+    document.querySelectorAll('.bulkTd').forEach(function (td) { td.hidden = !bulkMode; });
+    if (!bulkMode) {
+      selected.clear();
+      document.querySelectorAll('.js-bulk-item').forEach(function (cb) { cb.checked = false; });
+      if (bulkSelectAll) bulkSelectAll.checked = false;
+      refreshBulkCount();
+    }
+  }
+
+  function refreshBulkCount() {
+    if (bulkCountText) bulkCountText.textContent = selected.size ? (selected.size + ' seleccionados') : '';
+  }
+
+  if (bulkToggleBtn) bulkToggleBtn.addEventListener('click', function () {
+    setBulkMode(!bulkMode);
+  });
+  if (bulkCancelBtn) bulkCancelBtn.addEventListener('click', function () {
+    setBulkMode(false);
+  });
+
+  document.querySelectorAll('.js-bulk-item').forEach(function (cb) {
+    cb.addEventListener('change', function () {
+      var id = cb.getAttribute('data-id');
+      if (!id) return;
+      if (cb.checked) selected.add(String(id));
+      else selected.delete(String(id));
+      refreshBulkCount();
+    });
+  });
+
+  if (bulkSelectAll) bulkSelectAll.addEventListener('change', function () {
+    var checked = !!bulkSelectAll.checked;
+    document.querySelectorAll('.js-bulk-item').forEach(function (cb) {
+      cb.checked = checked;
+      var id = cb.getAttribute('data-id');
+      if (!id) return;
+      if (checked) selected.add(String(id));
+      else selected.delete(String(id));
+    });
+    refreshBulkCount();
+  });
+
+  if (bulkInvoiceBtn) bulkInvoiceBtn.addEventListener('click', function () {
+    if (!selected.size) {
+      if (window.uiToast) window.uiToast({ type: 'info', title: 'Selecciona productos', message: 'Elige uno o más productos para facturar.' });
+      return;
+    }
+    if (window.QuickInvoice && typeof window.QuickInvoice.open === 'function') {
+      var lines = Array.from(selected).map(function (id) { return { product_id: Number(id), quantity: 1 }; });
+      window.QuickInvoice.open({ presetLines: lines });
+    } else {
+      if (window.uiToast) window.uiToast({ type: 'danger', title: 'Error', message: 'Factura rápida no disponible. Refresca la página.' });
+    }
+  });
+
+  if (bulkDeleteBtn) bulkDeleteBtn.addEventListener('click', async function () {
+    if (!selected.size) {
+      if (window.uiToast) window.uiToast({ type: 'info', title: 'Selecciona productos', message: 'Elige uno o más productos para borrar.' });
+      return;
+    }
+    var ok = true;
+    if (typeof window.portalConfirm === 'function') {
+      ok = await window.portalConfirm({
+        title: 'Borrar productos',
+        message: '¿Seguro que quieres borrar ' + selected.size + ' productos? Esta acción no se puede deshacer.',
+        confirmLabel: 'Sí, borrar',
+        cancelLabel: 'Cancelar'
+      });
+    } else {
+      ok = confirm('¿Borrar ' + selected.size + ' productos?');
+    }
+    if (!ok) return;
+
+    try {
+      for (const id of selected) {
+        var res = await (window.portalFetchJSON
+          ? window.portalFetchJSON('/portal/products/' + encodeURIComponent(id) + '/delete', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({})
+            }, { timeoutMs: 30000, retry: 0 })
+          : Promise.resolve({ ok: false, detail: 'Helper no disponible' })
+        );
+        if (!res || !res.ok || !res.data || !res.data.ok) {
+          throw new Error('No se pudo borrar el producto ' + id);
+        }
+      }
+      if (window.uiToast) window.uiToast({ type: 'success', title: 'Borrado', message: 'Productos eliminados.' });
+      setTimeout(function(){ window.location.reload(); }, 300);
+    } catch (e) {
+      if (window.uiToast) window.uiToast({ type: 'danger', title: 'Error', message: (e && e.message) || 'No se pudo borrar.' });
+    }
+  });
+
+  setBulkMode(false);
+})();
+</script>

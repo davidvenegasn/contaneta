@@ -11,13 +11,12 @@ from fastapi.responses import HTMLResponse, Response, RedirectResponse
 from fastapi import Request
 
 from config import BASE_DIR
-from database import db, table_exists, safe_update
+from database import db, table_exists
 from facturapi_client import create_invoice, download_invoice, FacturapiError
 from validators import validate_customer
 from services.form_parse import parse_items_from_form, parse_payments_from_form
 from services import csrf as csrf_service, audit, subscription as subscription_service
 from services.action_log import log_action
-from services import invoices_service
 from services import invoices_engine
 from services import file_access_log
 from routers.deps import get_portal_issuer
@@ -308,70 +307,19 @@ def _submit_impl(templates, request: Request, issuer: dict, form):
         exchange = float(exchange_rate)
 
     conn = db()
-    cur = conn.execute(
-        """
-        INSERT INTO invoices (
-            issuer_id, currency, exchange_rate,
-            payment_form, payment_method, cfdi_use,
-            customer_rfc, customer_legal_name,
-            customer_zip, customer_tax_system, customer_email
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            issuer["id"],
-            currency.upper(),
-            exchange,
-            payment_form,
-            payment_method,
-            cfdi_use_val,
-            customer_rfc.upper(),
-            customer_legal_name,
-            customer_zip,
-            customer_tax_system,
-            customer_email or None,
-        ),
+    invoice_local_id = invoices_engine.save_invoice_record(
+        conn, issuer["id"],
+        currency=currency.upper(), exchange_rate=exchange,
+        payment_form=payment_form, payment_method=payment_method, cfdi_use=cfdi_use_val,
+        customer_rfc=customer_rfc.upper(), customer_legal_name=customer_legal_name,
+        customer_zip=customer_zip, customer_tax_system=customer_tax_system,
+        customer_email=customer_email or None, export_code=export_code,
+        tipo_comprobante=tipo_comprobante, series=serie or None,
+        folio_number=folio_number, order_ref=order_ref or None,
+        issue_date=issue_date or None, notes=notes or None,
     )
-    invoice_local_id = cur.lastrowid
-    safe_update(
-        conn,
-        "invoices",
-        invoice_local_id,
-        {
-            "export_code": export_code,
-            "tipo_comprobante": tipo_comprobante,
-            "series": serie or None,
-            "folio_number": folio_number,
-            "order_ref": order_ref or None,
-            "issue_date": issue_date or None,
-            "notes": notes or None,
-        },
-    )
-
     if items:
-        for it in items:
-            cols = {r[1] for r in conn.execute("PRAGMA table_info(invoice_items)").fetchall()}
-            base_cols = ["invoice_id", "quantity", "description", "product_key", "unit_price", "iva_rate"]
-            base_vals = [
-                invoice_local_id,
-                it["quantity"],
-                it["product"]["description"],
-                it["product"]["product_key"],
-                it["product"]["price"],
-                it["product"]["taxes"][0]["rate"],
-            ]
-            extra = {}
-            if "unit_key" in cols:
-                extra["unit_key"] = it["product"].get("unit_key")
-            if "discount" in cols:
-                extra["discount"] = it.get("discount", 0.0)
-            insert_cols = base_cols + list(extra.keys())
-            insert_vals = base_vals + list(extra.values())
-            placeholders = ", ".join(["?"] * len(insert_cols))
-            col_sql = ", ".join(insert_cols)
-            conn.execute(
-                f"INSERT INTO invoice_items ({col_sql}) VALUES ({placeholders})",
-                tuple(insert_vals),
-            )
+        invoices_engine.save_invoice_items(conn, invoice_local_id, items)
     conn.commit()
 
     if save_customer:
@@ -443,9 +391,9 @@ def _submit_impl(templates, request: Request, issuer: dict, form):
     uuid = invoice.get("uuid")
     total = invoice.get("total")
 
-    conn.execute(
-        "UPDATE invoices SET facturapi_invoice_id = ?, uuid = ?, total = ? WHERE id = ? AND issuer_id = ?",
-        (fact_id, uuid, total, invoice_local_id, issuer["id"]),
+    invoices_engine.update_invoice_stamp(
+        conn, invoice_local_id, issuer["id"],
+        facturapi_id=fact_id, uuid=uuid, total=total,
     )
     if tipo_comprobante == "P" and payments_payload and table_exists(conn, "payment_relations"):
         try:

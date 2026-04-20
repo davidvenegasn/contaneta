@@ -23,6 +23,13 @@ def _user_from_row(row) -> dict:
     return {"id": d.get("id"), "email": d.get("email"), "phone": d.get("phone"), "name": d.get("name")}
 
 
+def validate_password_strength(plain: str) -> str | None:
+    """Retorna mensaje de error si el password es débil, o None si es válido."""
+    if len(plain) < 8:
+        return "La contraseña debe tener mínimo 8 caracteres."
+    return None
+
+
 def hash_password(plain: str) -> str:
     return bcrypt.hashpw(plain.encode("utf-8"), bcrypt.gensalt()).decode("ascii")
 

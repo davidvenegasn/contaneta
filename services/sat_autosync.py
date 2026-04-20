@@ -81,7 +81,7 @@ def enqueue_sat_sync(
             (issuer_id, job_type, direction),
         )
         conn.commit()
-        job_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+        job_id = conn.execute("SELECT last_insert_rowid() AS rid").fetchone()["rid"]
         logger.info("Enqueued sat_jobs id=%s issuer=%s dir=%s", job_id, issuer_id, direction)
         return job_id
     finally:
@@ -156,8 +156,8 @@ def get_eligible_issuers(
                 (direction, direction, DEDUPE_WINDOW_HOURS, active_days, batch),
             ).fetchall()
             for row in rows:
-                iid = row["issuer_id"] if isinstance(row, dict) else row[0]
-                rfc = row["rfc"] if isinstance(row, dict) else row[1]
+                iid = row["issuer_id"]
+                rfc = row["rfc"]
                 results.append({"issuer_id": iid, "rfc": rfc, "direction": direction})
         return results
     finally:
@@ -174,7 +174,7 @@ def _consecutive_failures(conn, issuer_id: int, direction: str) -> int:
     ).fetchall()
     count = 0
     for row in rows:
-        st = row["status"] if isinstance(row, dict) else row[0]
+        st = row["status"]
         if st == "error":
             count += 1
         else:

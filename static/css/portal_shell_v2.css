@@ -148,7 +148,7 @@
   height: 40px;
   border-radius: 12px;
   border: none;
-  background: linear-gradient(135deg, var(--primary, #0d9488) 0%, #0f766e 100%);
+  background: linear-gradient(135deg, var(--primary, #6366f1) 0%, #4f46e5 100%);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -180,7 +180,7 @@
 .portal-rail__brand-name {
   display: none;
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 600;
   color: #fff;
   white-space: nowrap;
   overflow: hidden;
@@ -231,8 +231,8 @@
 }
 
 .portal-rail__item--active {
-  background: var(--primary-light, rgba(13, 148, 136, 0.12));
-  color: var(--primary, #0d9488);
+  background: var(--primary-light, rgba(99, 102, 241, 0.12));
+  color: var(--primary, #6366f1);
 }
 
 .portal-rail__icon {
@@ -439,11 +439,11 @@
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--primary, #0d9488), #0f766e);
+  background: linear-gradient(135deg, var(--primary, #6366f1), #4f46e5);
 }
 
 .portal-drawer__brand-name {
-  font-weight: 700;
+  font-weight: 600;
   font-size: 1.1rem;
   color: var(--text, #1e293b);
 }
@@ -484,7 +484,7 @@
 
 .portal-drawer__section-title {
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--text-muted, #64748b);
@@ -509,8 +509,8 @@
 }
 
 .portal-drawer__item--active {
-  background: var(--primary-light, rgba(13, 148, 136, 0.12));
-  color: var(--primary, #0d9488);
+  background: var(--primary-light, rgba(99, 102, 241, 0.12));
+  color: var(--primary, #6366f1);
 }
 
 .portal-drawer__item .portal-drawer__icon {
@@ -594,7 +594,7 @@
 /* Dropdown usuario cuando se abre desde el rail: posición fija junto al rail */
 .user-menu.user-menu--from-rail {
   position: fixed !important;
-  z-index: 1100;
+  z-index: var(--z-dropdown);
   min-width: 260px;
   max-height: calc(100vh - 24px);
   overflow-y: auto;

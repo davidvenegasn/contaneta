@@ -35,17 +35,17 @@
     <div class="cfdi-detail-header__top">
       <div class="portal-breadcrumb">
         <a href="/portal/home">Inicio</a> /
-        <a href="{{ '/portal/invoices/issued' if direction == 'issued' else '/portal/invoices/received' }}">{{ 'Facturas emitidas' if direction == 'issued' else 'Facturas recibidas' }}</a>
+        <a href="{{ '/portal/facturas?tab=issued' if direction == 'issued' else '/portal/facturas?tab=received' }}">{{ 'Facturas emitidas' if direction == 'issued' else 'Facturas recibidas' }}</a>
         / <span>Detalle CFDI</span>
       </div>
-      <a href="{{ '/portal/invoices/issued' if direction == 'issued' else '/portal/invoices/received' }}" class="btn btn--ghost btn--sm">← Volver al listado</a>
+      <a href="{{ '/portal/facturas?tab=issued' if direction == 'issued' else '/portal/facturas?tab=received' }}" class="btn btn--ghost btn--sm">← Volver al listado</a>
     </div>
   </header>
   <div class="cfdi-detail-grid cfdi-detail-grid--narrow">
     <div class="card cfdi-detail-notfound-card">
       <p class="muted u-m0">CFDI no encontrado</p>
       <p class="cfdi-detail-notfound-desc u-mt-4">El comprobante con UUID <code>{{ requested_uuid or '—' }}</code> no existe o no tienes permiso para verlo.</p>
-      <a href="{{ '/portal/invoices/issued' if direction == 'issued' else '/portal/invoices/received' }}" class="btn btn--primary u-mt-4">Ir al listado</a>
+      <a href="{{ '/portal/facturas?tab=issued' if direction == 'issued' else '/portal/facturas?tab=received' }}" class="btn btn--primary u-mt-4">Ir al listado</a>
     </div>
   </div>
   {% else %}
@@ -53,10 +53,10 @@
     <div class="cfdi-detail-header__top">
       <div class="portal-breadcrumb">
         <a href="/portal/home">Inicio</a> /
-        <a href="{{ '/portal/invoices/issued' if direction == 'issued' else '/portal/invoices/received' }}">{{ 'Facturas emitidas' if direction == 'issued' else 'Facturas recibidas' }}</a>
+        <a href="{{ '/portal/facturas?tab=issued' if direction == 'issued' else '/portal/facturas?tab=received' }}">{{ 'Facturas emitidas' if direction == 'issued' else 'Facturas recibidas' }}</a>
         / <span>Detalle CFDI</span>
       </div>
-      <a href="{{ '/portal/invoices/issued' if direction == 'issued' else '/portal/invoices/received' }}" class="btn btn--ghost btn--sm">← Volver al listado</a>
+      <a href="{{ '/portal/facturas?tab=issued' if direction == 'issued' else '/portal/facturas?tab=received' }}" class="btn btn--ghost btn--sm">← Volver al listado</a>
     </div>
 
     <!-- Acciones arriba -->
@@ -85,6 +85,9 @@
         {% endif %}
         <button type="button" class="btn btn--sm btn--ghost" id="copyUuidBtn" data-uuid="{{ cfdi.uuid or '' }}" title="Copiar UUID">Copiar UUID</button>
         <a href="{{ request.url }}" class="btn btn--sm btn--ghost" target="_blank" rel="noopener" title="Abrir en nueva pestaña">Abrir en nueva pestaña</a>
+        {% if direction == 'issued' and invoice_record and cfdi.status|default('')|upper in ['V','VIGENTE','1'] and not invoice_record.cancelled %}
+          <button type="button" class="btn btn--sm btn--danger-outline" id="cancelInvoiceBtn">Cancelar factura</button>
+        {% endif %}
       </div>
     </div>
   </header>
@@ -143,8 +146,25 @@
         </div>
         <div class="cfdi-detail-dl__row">
           <dt class="muted">Estatus SAT</dt>
-          <dd>{{ status_badge(cfdi.status) }}</dd>
+          <dd>
+            {{ status_badge(cfdi.status) }}
+            {% if invoice_record and invoice_record.cancel_status == 'pending' %}
+              <span class="badge badge--warn" style="margin-left:6px">Cancelación pendiente</span>
+            {% endif %}
+          </dd>
         </div>
+        {% if invoice_record and invoice_record.replacement_uuid %}
+        <div class="cfdi-detail-dl__row">
+          <dt class="muted">Reemplazada por</dt>
+          <dd><a href="/portal/cfdi/issued/{{ invoice_record.replacement_uuid }}" class="cfdi-detail-link">{{ invoice_record.replacement_uuid[:8] }}…</a></dd>
+        </div>
+        {% endif %}
+        {% if invoice_record and invoice_record.replaces_uuid %}
+        <div class="cfdi-detail-dl__row">
+          <dt class="muted">Reemplaza a</dt>
+          <dd><a href="/portal/cfdi/issued/{{ invoice_record.replaces_uuid }}" class="cfdi-detail-link">{{ invoice_record.replaces_uuid[:8] }}…</a></dd>
+        </div>
+        {% endif %}
         {% if cfdi.tipo_comprobante is not none and cfdi.tipo_comprobante != '' %}
         <div class="cfdi-detail-dl__row">
           <dt class="muted">Tipo comprobante</dt>
@@ -199,6 +219,39 @@
     </div>
   </div>
 
+  {# ===== Cancel Invoice Modal ===== #}
+  {% if direction == 'issued' and invoice_record and cfdi.status|default('')|upper in ['V','VIGENTE','1'] and not invoice_record.cancelled %}
+  <div class="confirm-modal" id="cancelModal" hidden aria-modal="true" role="dialog" aria-labelledby="cancelModalTitle">
+    <div class="confirm-modal__card" style="max-width:480px">
+      <h2 class="confirm-modal__title" id="cancelModalTitle">Cancelar factura</h2>
+      <p class="confirm-modal__text">¿Por qué cancelas esta factura?</p>
+      <div id="cancelMotiveStep" style="display:flex;flex-direction:column;gap:10px">
+        <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer">
+          <input type="radio" name="cancelMotive" value="01" style="margin-top:3px">
+          <span><strong>Error en los datos</strong> — voy a crear una nueva</span>
+        </label>
+        <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer">
+          <input type="radio" name="cancelMotive" value="02" checked style="margin-top:3px">
+          <span><strong>Error en los datos</strong> — sin reemplazo</span>
+        </label>
+        <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer">
+          <input type="radio" name="cancelMotive" value="03" style="margin-top:3px">
+          <span><strong>No se realizó</strong> la operación</span>
+        </label>
+        <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer">
+          <input type="radio" name="cancelMotive" value="04" style="margin-top:3px">
+          <span>Relacionada a <strong>factura global</strong></span>
+        </label>
+      </div>
+      <p id="cancelError" class="confirm-modal__text" style="color:var(--error,#dc2626);display:none"></p>
+      <div class="confirm-modal__actions" style="margin-top:20px">
+        <button type="button" class="btn btn--sm confirm-modal__btn--cancel" id="cancelModalClose">Volver</button>
+        <button type="button" class="btn btn--sm confirm-modal__btn--danger" id="cancelModalConfirm">Continuar</button>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
   <script>
   (function() {
     function copyUuidAndToast(uuid) {
@@ -234,6 +287,126 @@
       }
       var dl = e.target && e.target.closest ? e.target.closest('[data-download-toast]') : null;
       if (dl && window.portalToast) window.portalToast({ type: 'success', title: 'Descargado', message: 'El archivo se está descargando.' });
+    });
+
+    // ===== Cancel Invoice Logic =====
+    var cancelBtn = document.getElementById('cancelInvoiceBtn');
+    var cancelModal = document.getElementById('cancelModal');
+    var cancelClose = document.getElementById('cancelModalClose');
+    var cancelConfirm = document.getElementById('cancelModalConfirm');
+    var cancelError = document.getElementById('cancelError');
+    var invoiceUuid = {{ (cfdi.uuid or '')|tojson }};
+
+    function showCancelModal() {
+      if (cancelModal) { cancelModal.hidden = false; }
+    }
+    function hideCancelModal() {
+      if (cancelModal) { cancelModal.hidden = true; }
+      if (cancelError) { cancelError.style.display = 'none'; cancelError.textContent = ''; }
+    }
+
+    if (cancelBtn) cancelBtn.addEventListener('click', showCancelModal);
+    if (cancelClose) cancelClose.addEventListener('click', hideCancelModal);
+    if (cancelModal) cancelModal.addEventListener('click', function(e) {
+      if (e.target === cancelModal) hideCancelModal();
+    });
+
+    function getSelectedMotive() {
+      var radios = document.querySelectorAll('input[name="cancelMotive"]');
+      for (var i = 0; i < radios.length; i++) {
+        if (radios[i].checked) return radios[i].value;
+      }
+      return '02';
+    }
+
+    function getCsrf() {
+      var el = document.querySelector('meta[name="csrf-token"]');
+      return el ? el.getAttribute('content') : '';
+    }
+
+    if (cancelConfirm) cancelConfirm.addEventListener('click', function() {
+      var motive = getSelectedMotive();
+
+      if (motive === '01') {
+        // Replacement flow: fetch original data, then open Quick Invoice
+        hideCancelModal();
+        if (window.uiToast) window.uiToast({ type: 'info', title: 'Cargando datos de la factura…', timeout: 3000 });
+        fetch('/api/invoices/' + encodeURIComponent(invoiceUuid) + '/data', { credentials: 'same-origin' })
+          .then(function(r) { return r.json(); })
+          .then(function(res) {
+            if (!res || !res.ok) {
+              if (window.uiToast) window.uiToast({ type: 'danger', title: 'Error', message: res.detail || 'No se pudo cargar la factura.' });
+              return;
+            }
+            var d = res.data || res;
+            var items = d.items || [];
+            var presetLines = items.filter(function(it) { return it.product_id; }).map(function(it) {
+              return { product_id: it.product_id, quantity: it.quantity || 1 };
+            });
+            var openOpts = {
+              replaces_uuid: invoiceUuid,
+              prefillCfdiUse: d.cfdi_use,
+              prefillPaymentForm: d.payment_form,
+              prefillPaymentMethod: d.payment_method,
+              prefillCurrency: d.currency,
+              allowPartial: true
+            };
+            if (d.customer_id) openOpts.preselectedCustomerId = d.customer_id;
+            if (presetLines.length) {
+              openOpts.presetLines = presetLines;
+            } else if (items.length && items[0].product_id) {
+              openOpts.preselectedProductId = items[0].product_id;
+            }
+            if (window.QuickInvoice && window.QuickInvoice.open) {
+              window.QuickInvoice.open(openOpts);
+            } else {
+              if (window.uiToast) window.uiToast({ type: 'danger', title: 'Error', message: 'Factura rápida no disponible en esta página.' });
+            }
+          })
+          .catch(function(err) {
+            if (window.uiToast) window.uiToast({ type: 'danger', title: 'Error', message: (err && err.message) || 'Error de conexión.' });
+          });
+        return;
+      }
+
+      // Motives 02/03/04: direct cancel
+      cancelConfirm.disabled = true;
+      cancelConfirm.textContent = 'Cancelando…';
+      if (cancelError) { cancelError.style.display = 'none'; }
+
+      var csrf = getCsrf();
+      var headers = { 'Content-Type': 'application/json' };
+      if (csrf) headers['X-CSRF-Token'] = csrf;
+
+      fetch('/api/invoices/' + encodeURIComponent(invoiceUuid) + '/cancel', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: headers,
+        body: JSON.stringify({ motive: motive })
+      })
+      .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
+      .then(function(res) {
+        cancelConfirm.disabled = false;
+        cancelConfirm.textContent = 'Continuar';
+        if (res.ok && res.data && res.data.ok !== false) {
+          hideCancelModal();
+          var cs = (res.data.data && res.data.data.cancel_status) || res.data.cancel_status || 'accepted';
+          if (cs === 'pending') {
+            if (window.uiToast) window.uiToast({ type: 'info', title: 'Cancelación en proceso', message: 'El receptor tiene 72 horas para aceptar o rechazar.', timeout: 6000 });
+          } else {
+            if (window.uiToast) window.uiToast({ type: 'success', title: 'Factura cancelada', message: '' });
+          }
+          setTimeout(function() { window.location.reload(); }, 1500);
+        } else {
+          var msg = (res.data && res.data.detail) || 'Error al cancelar.';
+          if (cancelError) { cancelError.textContent = msg; cancelError.style.display = 'block'; }
+        }
+      })
+      .catch(function(err) {
+        cancelConfirm.disabled = false;
+        cancelConfirm.textContent = 'Continuar';
+        if (cancelError) { cancelError.textContent = (err && err.message) || 'Error de conexión.'; cancelError.style.display = 'block'; }
+      });
     });
   })();
   </script>

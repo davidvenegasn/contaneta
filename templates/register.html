@@ -7,22 +7,32 @@
   <link rel="stylesheet" href="/static/css/form.css">
   <link rel="stylesheet" href="/static/css/auth.css">
   <style>
+    :root { --primary: #6366f1; --border: #e2e8f0; --border-strong: #cbd5e1; --radius: 12px; --card-bg: #fff; --shadow: 0 1px 3px rgba(0,0,0,.08); --bg: #f8fafc; --muted: #64748b; }
     body { max-width: 440px; margin: 2rem auto; padding: 0 1rem; }
     .auth-card { padding: 1.5rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card-bg); box-shadow: var(--shadow); }
     .auth-card h1 { margin: 0 0 0.5rem; font-size: 1.25rem; }
-    .auth-card .muted { margin-bottom: 1rem; font-size: 14px; }
+    .auth-card .muted { margin-bottom: 1rem; font-size: 14px; color: var(--muted); }
     .auth-card .danger { color: #c00; margin-bottom: 1rem; font-size: 14px; }
     .auth-card label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 0.25rem; }
     .auth-card input, .auth-card select { width: 100%; padding: 0.5rem 0.75rem; margin-bottom: 1rem; border-radius: 12px; border: 1px solid var(--border-strong); box-sizing: border-box; }
     .auth-card button[type="submit"] { width: 100%; padding: 0.6rem; margin-top: 0.25rem; }
     .auth-footer { margin-top: 1.25rem; text-align: center; font-size: 14px; }
-    .auth-footer a { color: var(--primary); }
+    .auth-footer a { color: var(--primary, #6366f1); }
+    /* Collapsible fiscal section */
+    .fiscal-toggle { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0; margin-bottom: 0.75rem; cursor: pointer; font-size: 13px; color: var(--primary, #6366f1); font-weight: 500; border: none; background: none; width: 100%; text-align: left; }
+    .fiscal-toggle:hover { text-decoration: underline; }
+    .fiscal-toggle__arrow { display: inline-block; transition: transform 0.2s; font-size: 10px; }
+    .fiscal-toggle__arrow.is-open { transform: rotate(90deg); }
+    .fiscal-fields { display: none; animation: slideDown 0.2s ease; }
+    .fiscal-fields.is-open { display: block; }
+    .fiscal-hint { font-size: 12px; color: var(--muted); margin: -0.5rem 0 1rem; }
+    @keyframes slideDown { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
   </style>
 </head>
 <body>
   <div class="auth-card">
     <h1>Crear cuenta</h1>
-    <p class="muted">Registro con correo y datos fiscales. Entras directo al portal.</p>
+    <p class="muted">Crea tu cuenta en segundos. Podrás agregar tu RFC después.</p>
     {% if error %}
       <p class="danger">{{ error }}</p>
     {% endif %}
@@ -32,25 +42,45 @@
       <input type="email" name="email" id="email" placeholder="tu@correo.com" autocomplete="email" required />
       <label for="password">Contraseña *</label>
       <input type="password" name="password" id="password" placeholder="Mínimo 8 caracteres" autocomplete="new-password" required minlength="8" />
-      <label for="rfc">RFC *</label>
-      <input type="text" name="rfc" id="rfc" placeholder="RFC persona moral o física" autocomplete="off" required maxlength="13" />
-      <label for="razon_social">Razón social / Nombre fiscal *</label>
-      <input type="text" name="razon_social" id="razon_social" placeholder="Nombre o razón social" autocomplete="organization" required />
-      <label for="regimen_fiscal">Régimen fiscal *</label>
-      <select name="regimen_fiscal" id="regimen_fiscal">
-        <option value="616">616 - Sin obligaciones fiscales</option>
-        <option value="612">612 - Personas físicas con actividades empresariales</option>
-        <option value="626">626 - Régimen simplificado de confianza (RESICO)</option>
-        <option value="601">601 - General de ley personas morales</option>
-        <option value="603">603 - Personas morales con fines no lucrativos</option>
-      </select>
-      <label for="cp">Código postal (opcional)</label>
-      <input type="text" name="cp" id="cp" placeholder="5 dígitos" autocomplete="postal-code" maxlength="10" />
+
+      <button type="button" class="fiscal-toggle" id="fiscal-toggle" aria-expanded="false" aria-controls="fiscal-fields">
+        <span class="fiscal-toggle__arrow" id="fiscal-arrow">▶</span>
+        Tengo mi RFC a la mano
+      </button>
+
+      <div class="fiscal-fields" id="fiscal-fields">
+        <label for="rfc">RFC</label>
+        <input type="text" name="rfc" id="rfc" placeholder="RFC persona moral o física" autocomplete="off" maxlength="13" />
+        <label for="razon_social">Razón social / Nombre fiscal</label>
+        <input type="text" name="razon_social" id="razon_social" placeholder="Nombre o razón social" autocomplete="organization" />
+        <label for="regimen_fiscal">Régimen fiscal</label>
+        <select name="regimen_fiscal" id="regimen_fiscal">
+          <option value="616">616 - Sin obligaciones fiscales</option>
+          <option value="612">612 - Personas físicas con actividades empresariales</option>
+          <option value="626">626 - Régimen simplificado de confianza (RESICO)</option>
+          <option value="601">601 - General de ley personas morales</option>
+          <option value="603">603 - Personas morales con fines no lucrativos</option>
+        </select>
+        <label for="cp">Código postal</label>
+        <input type="text" name="cp" id="cp" placeholder="5 dígitos" autocomplete="postal-code" maxlength="10" />
+      </div>
+
       <button type="submit" class="btn btn-primary">Crear cuenta y entrar</button>
     </form>
     <div class="auth-footer">
       ¿Ya tienes cuenta? <a class="auth-link" href="/login">Entrar con email</a> · <a class="auth-link" href="/pricing">Ver planes</a>
     </div>
   </div>
+  <script>
+    const toggle = document.getElementById('fiscal-toggle');
+    const fields = document.getElementById('fiscal-fields');
+    const arrow  = document.getElementById('fiscal-arrow');
+    toggle.addEventListener('click', () => {
+      const open = fields.classList.toggle('is-open');
+      arrow.classList.toggle('is-open', open);
+      toggle.setAttribute('aria-expanded', open);
+      if (open) document.getElementById('rfc').focus();
+    });
+  </script>
 </body>
 </html>

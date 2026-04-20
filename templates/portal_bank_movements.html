@@ -7,12 +7,12 @@
       {{ month_picker('/portal/movimientos', token|default(''), ym|default(period_month|default('')), ym_label|default('')) }}
     </div>
     <div class="dashboard-metrics">
-      <div class="card metric-card">
+      <div class="card metric-card metric-card--income">
         <div class="metric-label">Total ingresos</div>
         <div class="metric-value">${{ '{:,.2f}'.format(sum_ingresos|default(0)) }}</div>
         <div class="metric-sub">{{ ym_label|default('') }}</div>
       </div>
-      <div class="card metric-card">
+      <div class="card metric-card metric-card--expense">
         <div class="metric-label">Total gastos</div>
         <div class="metric-value">${{ '{:,.2f}'.format(sum_gastos|default(0)) }}</div>
         <div class="metric-sub">{{ ym_label|default('') }}</div>
@@ -22,21 +22,58 @@
         <div class="metric-value">{{ total_count|default(0) }}</div>
         <div class="metric-sub">{{ ym_label|default('') }}</div>
       </div>
+      <div class="card metric-card">
+        <div class="metric-label">Cuenta propia</div>
+        <div class="metric-value metric-value--compact">
+          <div>Entradas: ${{ '{:,.2f}'.format(cuenta_propia_entradas|default(0)) }}</div>
+          <div>Salidas: ${{ '{:,.2f}'.format(cuenta_propia_salidas|default(0)) }}</div>
+        </div>
+        <div class="metric-sub">{{ ym_label|default('') }}</div>
+      </div>
+      {# Conciliación card hidden — not useful yet #}
     </div>
+  </div>
+
+  <!-- Upload zone: drag & drop bank statements -->
+  <div class="upload-zone" id="movUploadZone">
+    <div class="upload-zone__inner" id="movUploadInner">
+      <svg class="upload-zone__icon" viewBox="0 0 24 24" fill="none" width="32" height="32"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 2v6h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 18v-6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="m9 15 3-3 3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <p class="upload-zone__text"><strong>Arrastra tus estados de cuenta</strong> o <button type="button" class="upload-zone__browse" onclick="document.getElementById('movFileInput').click()">seleccionar archivos</button></p>
+      <input type="file" accept=".pdf" multiple hidden id="movFileInput">
+    </div>
+    <div class="upload-zone__feedback" id="movUploadFeedback" hidden></div>
   </div>
 
   <div class="card card--invoice-list ui-card">
     <div class="card__header card__header--row ui-card__header">
       <div>
-        <h3 class="card__title section-title">Movimientos bancarios</h3>
-        <p class="muted u-m0 u-text-sm">Del estado de cuenta del mes seleccionado. Los movimientos se asocian al mes de su estado de cuenta.</p>
+        <h3 class="card__title section-title">Movimientos</h3>
+        <p class="muted u-m0 u-text-sm">Del estado de cuenta del mes seleccionado.</p>
       </div>
-      <div class="card__header-actions">
+      <div class="card__header-actions" style="display:flex; gap:8px; align-items:center;">
+        <a href="/portal/convertir-edo-cuenta" class="btn btn--sm btn--ghost" title="Importar estado de cuenta bancario">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" width="16" height="16"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/><path d="m7 10 5 5 5-5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 15V3" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
+          Importar
+        </a>
+        <button type="button" class="btn btn--sm btn--ghost" id="addMovBtn" title="Agregar movimiento">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" width="16" height="16"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          Agregar movimiento
+        </button>
+        <button type="button" class="btn btn--sm btn--ghost" id="addInvoiceBtn" title="Agregar invoice extranjero">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" width="16" height="16"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.75"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10A15.3 15.3 0 0 1 12 2" stroke="currentColor" stroke-width="1.75"/></svg>
+          Agregar Invoice
+        </button>
         <button type="button" class="btn btn--sm btn--ghost filters-toggle" id="filtersToggleBtn" aria-expanded="false" aria-controls="movementsFiltersPanel">
           <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true" width="18" height="18"><path d="M4 6h16M4 12h10M4 18h6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
           <span>Filtros</span>
         </button>
       </div>
+    </div>
+    <!-- Tabs: Todos | Banco | Manuales -->
+    <div class="mov-tabs" id="movTabs">
+      <button type="button" class="mov-tab mov-tab--active" data-tab="all">Todos</button>
+      <button type="button" class="mov-tab" data-tab="bank">Banco</button>
+      <button type="button" class="mov-tab" data-tab="manual">Manuales <span class="mov-tab__count" id="manualMovCount"></span></button>
     </div>
 
     <div class="filters-panel filters-panel--inline" id="movementsFiltersPanel" hidden aria-hidden="true">
@@ -127,10 +164,10 @@
     (function () {
       var btn = document.querySelector('.bank-movements-delete-all');
       if (!btn) return;
-      btn.addEventListener('click', function () {
+      btn.addEventListener('click', async function () {
         var confirmFn = window.portalConfirm || window.uiConfirm;
         if (!confirmFn) {
-          if (confirm('¿Borrar todos los movimientos? Esta acción no se puede deshacer.\n\nSe eliminarán todos los movimientos de tu cuenta.')) doDelete();
+          doDelete();
           return;
         }
         confirmFn({
@@ -156,7 +193,6 @@
             })
             .catch(function () {
               if (window.uiToast) window.uiToast({ type: 'danger', title: 'Error', message: 'No se pudieron borrar los movimientos.' });
-              else alert('No se pudieron borrar los movimientos.');
             });
         }
       });
@@ -176,6 +212,33 @@
     })();
     </script>
 
+    {% set active_filters = [] %}
+    {% if tipo %}{% set _ = active_filters.append(('Tipo: ' ~ tipo, 'tipo')) %}{% endif %}
+    {% if statement_id %}{% set _ = active_filters.append(('Estado de cuenta', 'statement_id')) %}{% endif %}
+    {% if hide_own_transfers %}{% set _ = active_filters.append(('Sin traspasos', 'hide_own_transfers')) %}{% endif %}
+    {% if hide_financial %}{% set _ = active_filters.append(('Sin financieros', 'hide_financial')) %}{% endif %}
+    {% if only_real_expenses %}{% set _ = active_filters.append(('Solo gastos reales', 'only_real_expenses')) %}{% endif %}
+    {% if cfdi_match_status %}{% set _ = active_filters.append(('CFDI: ' ~ cfdi_match_status, 'cfdi_match_status')) %}{% endif %}
+    {% if match_filter %}{% set _ = active_filters.append(('Conciliación: ' ~ match_filter, 'match_filter')) %}{% endif %}
+    {% if search %}{% set _ = active_filters.append(('Buscar: ' ~ search, 'search')) %}{% endif %}
+    {% if active_filters %}
+    <div class="active-filters-bar">
+      {% for label, param in active_filters %}
+      <span class="active-filter-chip">{{ label }}<button type="button" class="active-filter-chip__remove" data-remove-filter="{{ param }}" aria-label="Quitar filtro">&times;</button></span>
+      {% endfor %}
+    </div>
+    <script>
+    document.querySelectorAll('[data-remove-filter]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var param = btn.dataset.removeFilter;
+        var url = new URL(window.location);
+        url.searchParams.delete(param);
+        window.location = url.toString();
+      });
+    });
+    </script>
+    {% endif %}
+
     <div class="card__body ui-card__body">
       {% if not movements or movements|length == 0 %}
         <div class="empty-state empty-state--empty">
@@ -193,37 +256,50 @@
               <th>Concepto</th>
               <th>Tipo</th>
               <th class="text-right">Monto</th>
-              <th class="text-right">Saldo</th>
+              <th>Banco</th>
               <th>Categoría</th>
-              <th>Factura probable</th>
+              <th style="min-width:140px;">Factura probable</th>
               <th class="text-right">Acciones</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody class="row-stagger">
             {% for m in movements %}
             {% set monto_val = (m.deposito or 0) if (m.deposito is not none and m.deposito != '') else (0 - (m.retiro or 0) if (m.retiro is not none and m.retiro != '') else 0) %}
             {% set es_ingreso = (m.deposito is not none and m.deposito != '' and (m.deposito or 0) > 0) %}
             {% set es_gasto = (m.retiro is not none and m.retiro != '' and (m.retiro or 0) > 0) %}
             {% set tipo_label = 'Ingreso' if es_ingreso else ('Gasto' if es_gasto else '—') %}
+            {% set es_cuenta_propia = (m.categoria or '') == 'CUENTA_PROPIA' %}
             {% set concepto_display = (m.concepto or m.descripcion or '—') %}
             {% set concepto_short = concepto_display[:50] + '…' if concepto_display|length > 50 else concepto_display %}
-            <tr class="bank-movements-row" data-movement-id="{{ m.id }}" data-descripcion="{{ (m.descripcion or '')|e }}" data-categoria="{{ (m.categoria or '')|e }}">
-              <td class="muted u-nowrap">{{ m.fecha or '—' }}</td>
-              <td class="concepto-cell bank-movements-concept-editable bank-concept-editable" title="Clic para editar">{{ concepto_short }}</td>
+            <tr class="bank-movements-row{% if es_cuenta_propia %} bank-row-cuenta-propia{% endif %}" data-movement-id="{{ m.id }}" data-descripcion="{{ (m.descripcion or '')|e }}" data-categoria="{{ (m.categoria or '')|e }}">
+              <td class="muted u-nowrap">{{ m.fecha|fecha_corta }}</td>
+              <td class="concepto-cell bank-movements-concept-editable bank-concept-editable" title="{{ concepto_display }}">{{ concepto_short }}</td>
               <td>
-                {% if es_ingreso %}<span class="badge badge--success">Ingreso</span>
+                {% if es_cuenta_propia %}<span class="badge badge--neutral">Cuenta propia</span>
+                {% elif es_ingreso %}<span class="badge badge--success">Ingreso</span>
                 {% elif es_gasto %}<span class="badge badge--warn">Gasto</span>
                 {% else %}<span class="badge badge--neutral">—</span>{% endif %}
+                {% if not es_cuenta_propia %}
+                  {% if m.probable_cfdi_uuid and ((m.probable_cfdi_status == 'confirmed') or (m.probable_cfdi_score is not none and m.probable_cfdi_score >= 80)) %}
+                    <span class="concil-icon concil-icon--ok" title="Conciliado">
+                      <svg viewBox="0 0 16 16" fill="none" width="14" height="14"><circle cx="8" cy="8" r="7" stroke="#22c55e" stroke-width="1.5"/><path d="M5 8.5l2 2 4-4" stroke="#22c55e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </span>
+                  {% elif es_gasto %}
+                    <span class="concil-icon concil-icon--pending" title="Sin factura">
+                      <svg viewBox="0 0 16 16" fill="none" width="14" height="14"><circle cx="8" cy="8" r="7" stroke="#f59e0b" stroke-width="1.5"/><path d="M8 5v3" stroke="#f59e0b" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="11" r="0.75" fill="#f59e0b"/></svg>
+                    </span>
+                  {% endif %}
+                {% endif %}
               </td>
               <td class="text-right {% if es_ingreso %}bank-monto-ingreso{% elif es_gasto %}bank-monto-gasto{% endif %}">
                 {% if es_ingreso %}+${{ '{:,.2f}'.format(m.deposito) }}{% elif es_gasto %}−${{ '{:,.2f}'.format(m.retiro) }}{% else %}—{% endif %}
               </td>
-              <td class="text-right muted">{% if m.saldo is not none and m.saldo != '' %}${{ '{:,.2f}'.format(m.saldo) }}{% else %}—{% endif %}</td>
-              <td class="bank-movements-category-editable bank-category-editable bank-category-dropdown" title="Clic para abrir menú y elegir otra categoría"><span class="badge badge--neutral">{{ m.categoria or '—' }}</span><span class="bank-category-chevron" aria-hidden="true"> ▼</span></td>
+              <td class="muted u-text-xs">{{ m.bank_name|default(m.statement_bank_name|default('—')) }}</td>
+              <td class="bank-movements-category-editable bank-category-editable bank-category-dropdown" title="Clic para abrir menú y elegir otra categoría"><span class="badge badge--neutral">{{ (m.categoria or '')|humanize_category }}</span><span class="bank-category-chevron" aria-hidden="true"> ▼</span></td>
               <td>
                 {% if m.probable_cfdi_uuid and ((m.probable_cfdi_status == 'confirmed') or (m.probable_cfdi_score is not none and m.probable_cfdi_score >= 80)) %}
                   <div class="u-text-xs">
-                    <a href="/portal/cfdi/received/{{ m.probable_cfdi_uuid }}" class="link-none" title="Ver CFDI">{{ m.probable_cfdi_uuid[:8] }}…{{ m.probable_cfdi_uuid[-4:] }}</a>
+                    <a href="/portal/cfdi/received/{{ m.probable_cfdi_uuid }}" class="link-none cfdi-match-link" title="Ver CFDI">{{ m.probable_cfdi_uuid[:8] }}…{{ m.probable_cfdi_uuid[-4:] }}<svg class="icon-external" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>
                     {% if m.probable_cfdi_score is not none %}
                       <span class="badge badge--{{ 'success' if m.probable_cfdi_score >= 90 else ('warning' if m.probable_cfdi_score >= 80 else 'neutral') }} badge--xs" title="Score">{{ m.probable_cfdi_score }}</span>
                     {% endif %}
@@ -317,6 +393,8 @@
       <script>
       (function () {
         var MULTI_CATEGORIES = ['CUENTA_PROPIA', 'FINANCIERO_PAGO_TARJETA', 'TRANSFERENCIA', 'ALIMENTOS', 'IMPUESTOS', 'COMISION_BANCARIA', 'EFECTIVO', 'NOMINA', 'TARJETAS_CREDITO', 'SERVICIOS', 'OTROS'];
+        var CAT_LABELS = {"TARJETAS_CREDITO":"Tarjetas de crédito","CUENTA_PROPIA":"Cuenta propia","FINANCIERO_PAGO_TARJETA":"Pago de tarjeta","COMISION_BANCARIA":"Comisión bancaria","GASTO":"Gasto","INGRESO":"Ingreso","TRANSFERENCIA":"Transferencia","ALIMENTOS":"Alimentos","IMPUESTOS":"Impuestos","EFECTIVO":"Efectivo","NOMINA":"Nómina","SERVICIOS":"Servicios","SUSCRIPCION":"Suscripción","SALUD":"Salud","EDUCACION":"Educación","TRANSPORTE":"Transporte","OTROS":"Otros","FINANCIERO":"Financiero"};
+        function catLabel(c) { return CAT_LABELS[c] || (c || '—').replace(/_/g, ' '); }
         function escapeHtml(s) { return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
         function getHeaders() {
           var h = { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' };
@@ -370,14 +448,14 @@
               MULTI_CATEGORIES.forEach(function (c) {
                 var opt = document.createElement('option');
                 opt.value = c;
-                opt.textContent = c;
+                opt.textContent = catLabel(c);
                 if (c === cat) opt.selected = true;
                 select.appendChild(opt);
               });
               if (cat && MULTI_CATEGORIES.indexOf(cat) < 0) {
                 var o = document.createElement('option');
                 o.value = cat;
-                o.textContent = cat;
+                o.textContent = catLabel(cat);
                 o.selected = true;
                 select.appendChild(o);
               }
@@ -388,11 +466,11 @@
               function commitCategory() {
                 if (!categoryCell.querySelector('select')) return;
                 var val = select.value || '';
-                categoryCell.innerHTML = '<span class="badge badge--neutral">' + escapeHtml(val || '—') + '</span><span class="bank-category-chevron" aria-hidden="true"> ▼</span>';
+                categoryCell.innerHTML = '<span class="badge badge--neutral">' + escapeHtml(catLabel(val)) + '</span><span class="bank-category-chevron" aria-hidden="true"> ▼</span>';
                 patchMovement(id, { categoria: val }).then(function () {
                   row.setAttribute('data-categoria', val);
                   row.querySelectorAll('.bank-movement-ver-detalle').forEach(function (b) { b.setAttribute('data-categoria', val); });
-                }).catch(function () { categoryCell.innerHTML = '<span class="badge badge--neutral">' + escapeHtml(cat || '—') + '</span><span class="bank-category-chevron" aria-hidden="true"> ▼</span>'; });
+                }).catch(function () { categoryCell.innerHTML = '<span class="badge badge--neutral">' + escapeHtml(catLabel(cat)) + '</span><span class="bank-category-chevron" aria-hidden="true"> ▼</span>'; });
               }
               select.addEventListener('change', commitCategory);
               select.addEventListener('blur', commitCategory);
@@ -473,21 +551,221 @@
               }
             }
             closeModal();
-          }).catch(function () { alert('No se pudo guardar el movimiento.'); });
+          }).catch(function () { if (window.uiToast) window.uiToast({ type: 'danger', title: 'Error', message: 'No se pudo guardar el movimiento.' }); });
         });
       })();
       </script>
       {% set next_offset = offset + limit %}
       {% set prev_offset = offset - limit %}
-      <nav class="bank-movements-pagination u-mt-8" aria-label="Paginación">
+      <nav class="bank-movements-pagination u-mt-8" aria-label="Paginación" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
         {% if offset > 0 %}
         <a href="?ym={{ (ym|default(period_month|default('')))|urlencode }}&statement_id={{ statement_id|urlencode }}&tipo={{ tipo|urlencode }}&categoria={{ categoria|urlencode }}&cfdi_match_status={{ cfdi_match_status|urlencode }}&match_filter={{ match_filter|urlencode }}&min_confidence={{ min_confidence if min_confidence is not none else '' }}&search={{ search|urlencode }}&hide_own_transfers={{ '1' if hide_own_transfers else '' }}&hide_financial={{ '1' if hide_financial else '' }}&only_real_expenses={{ '1' if only_real_expenses else '' }}&limit={{ limit }}&offset={{ prev_offset }}" class="btn btn--sm btn--secondary">Anterior</a>
         {% endif %}
         {% if next_offset < total_count %}
         <a href="?ym={{ (ym|default(period_month|default('')))|urlencode }}&statement_id={{ statement_id|urlencode }}&tipo={{ tipo|urlencode }}&categoria={{ categoria|urlencode }}&cfdi_match_status={{ cfdi_match_status|urlencode }}&match_filter={{ match_filter|urlencode }}&min_confidence={{ min_confidence if min_confidence is not none else '' }}&search={{ search|urlencode }}&hide_own_transfers={{ '1' if hide_own_transfers else '' }}&hide_financial={{ '1' if hide_financial else '' }}&only_real_expenses={{ '1' if only_real_expenses else '' }}&limit={{ limit }}&offset={{ next_offset }}" class="btn btn--sm btn--secondary">Siguiente</a>
         {% endif %}
+        <a href="/portal/bank/movements/export?ym={{ (ym|default(period_month|default('')))|urlencode }}&statement_id={{ statement_id|urlencode }}&tipo={{ tipo|urlencode }}&categoria={{ categoria|urlencode }}&cfdi_match_status={{ cfdi_match_status|urlencode }}&match_filter={{ match_filter|urlencode }}&search={{ search|urlencode }}&hide_own_transfers={{ '1' if hide_own_transfers else '' }}&hide_financial={{ '1' if hide_financial else '' }}&only_real_expenses={{ '1' if only_real_expenses else '' }}" class="btn btn--sm btn--secondary" style="margin-left:auto;" title="Exportar a Excel">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" width="14" height="14"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/><path d="m7 10 5 5 5-5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 15V3" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
+          Exportar Excel
+        </a>
       </nav>
       {% endif %}
     </div>
+    <!-- Manual movements section (hidden by default, shown when tab="manual") -->
+    <div class="manual-movements-section" id="manualMovSection" hidden>
+      <div class="u-p-4">
+        <table class="table table--sm" id="manualMovTable">
+          <thead>
+            <tr><th>Fecha</th><th>Descripción</th><th>Tipo</th><th>Monto</th><th>Categoría</th><th></th></tr>
+          </thead>
+          <tbody id="manualMovTableBody">
+            <tr><td colspan="6" class="muted" style="text-align:center;padding:24px;">Cargando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
   </div>
+
+  <!-- Tabs + Manual movements JS -->
+  <script>
+  (function(){
+    var tabs = document.querySelectorAll('#movTabs .mov-tab');
+    var bankSection = document.querySelector('.card__body, .invoice-list-wrapper') || document.getElementById('movementsFiltersPanel');
+    // Get the bank content — everything between tabs and manual section
+    var card = document.querySelector('.card--invoice-list');
+    var manualSection = document.getElementById('manualMovSection');
+    var bankElements = [];
+    if (card) {
+      var children = card.children;
+      for (var ci = 0; ci < children.length; ci++) {
+        var child = children[ci];
+        if (child.id === 'movTabs' || child.classList.contains('card__header')) continue;
+        if (child.id === 'manualMovSection') continue;
+        bankElements.push(child);
+      }
+    }
+
+    var currentTab = 'all';
+    function showTab(tab) {
+      currentTab = tab;
+      tabs.forEach(function(t) { t.classList.toggle('mov-tab--active', t.dataset.tab === tab); });
+      bankElements.forEach(function(el) { el.hidden = (tab === 'manual'); });
+      if (manualSection) manualSection.hidden = (tab !== 'manual' && tab !== 'all');
+      if (tab === 'manual') loadManualMovements();
+    }
+
+    tabs.forEach(function(t) {
+      t.addEventListener('click', function() { showTab(t.dataset.tab); });
+    });
+
+    // Manual movements CRUD
+    var ym = '{{ ym|default(period_month|default("")) }}';
+    var tbody = document.getElementById('manualMovTableBody');
+    var countEl = document.getElementById('manualMovCount');
+    var CAT_LABELS = {{ '{' }}{% for k, v in [('SERVICIOS','Servicios'),('ALIMENTOS','Alimentos'),('NOMINA','Nómina'),('IMPUESTOS','Impuestos'),('EFECTIVO','Efectivo'),('GASTO','Gasto'),('INGRESO','Ingreso'),('OTROS','Otros')] %}'{{ k }}':'{{ v }}'{% if not loop.last %},{% endif %}{% endfor %}{{ '}' }};
+
+    function loadManualMovements() {
+      fetch('/api/movements/manual?ym=' + encodeURIComponent(ym) + '&limit=200')
+        .then(function(r) { return r.json(); })
+        .then(function(res) {
+          var items = (res.data || []);
+          if (countEl) countEl.textContent = items.length ? '(' + items.length + ')' : '';
+          if (!items.length) {
+            tbody.innerHTML = '<tr><td colspan="6" class="muted" style="text-align:center;padding:24px;">Sin movimientos manuales este mes. Usa el formulario de arriba para agregar uno.</td></tr>';
+            return;
+          }
+          tbody.innerHTML = items.map(function(m) {
+            var tipoCls = m.tipo === 'INGRESO' ? 'color:var(--success,#059669)' : 'color:var(--danger,#ef4444)';
+            var cat = CAT_LABELS[m.categoria] || m.categoria || '—';
+            return '<tr>' +
+              '<td>' + (m.fecha || '').slice(0, 10) + '</td>' +
+              '<td>' + (m.descripcion || '') + '</td>' +
+              '<td style="' + tipoCls + ';font-weight:600;">' + (m.tipo === 'INGRESO' ? '↑ Ingreso' : '↓ Gasto') + '</td>' +
+              '<td style="font-weight:600;">$' + Number(m.monto || 0).toLocaleString('es-MX', {minimumFractionDigits:2, maximumFractionDigits:2}) + '</td>' +
+              '<td>' + cat + '</td>' +
+              '<td><button type="button" class="btn btn--sm btn--ghost" data-delete-manual="' + m.id + '" title="Eliminar">✕</button></td>' +
+            '</tr>';
+          }).join('');
+          // Delete handlers
+          tbody.querySelectorAll('[data-delete-manual]').forEach(function(btn) {
+            btn.addEventListener('click', async function() {
+              var confirmFn = window.portalConfirm || window.uiConfirm;
+              var ok = confirmFn
+                ? await confirmFn({ title: 'Eliminar movimiento', message: '¿Eliminar este movimiento manual?', confirmLabel: 'Sí, eliminar', cancelLabel: 'Cancelar' })
+                : true;
+              if (!ok) return;
+              var csrf = document.querySelector('meta[name="csrf-token"]');
+              var token = csrf ? csrf.content : '';
+              fetch('/api/movements/manual/' + btn.dataset.deleteManual, {
+                method: 'DELETE',
+                headers: { 'X-CSRF-Token': token }
+              }).then(function(r) { return r.json(); })
+              .then(function(res) {
+                if (res.ok) loadManualMovements();
+                else if (window.portalToast) window.portalToast({ type: 'error', title: 'Error al eliminar' });
+              });
+            });
+          });
+        })
+        .catch(function() { tbody.innerHTML = '<tr><td colspan="6" class="muted" style="text-align:center;padding:24px;">Error al cargar</td></tr>'; });
+    }
+
+    // Load count on page load
+    fetch('/api/movements/manual?ym=' + encodeURIComponent(ym) + '&limit=1')
+      .then(function(r) { return r.json(); })
+      .then(function(res) {
+        var total = res.meta && res.meta.total || 0;
+        if (countEl) countEl.textContent = total ? '(' + total + ')' : '';
+      }).catch(function(){});
+
+    // "Add manual" button opens the creation panel
+    var addMovBtn = document.getElementById('addMovBtn');
+    if (addMovBtn) {
+      addMovBtn.addEventListener('click', function() {
+        if (window.openAddMovementModal) window.openAddMovementModal();
+      });
+    }
+    var addInvBtn = document.getElementById('addInvoiceBtn');
+    if (addInvBtn) {
+      addInvBtn.addEventListener('click', function() {
+        if (window.openAddInvoiceModal) window.openAddInvoiceModal();
+      });
+    }
+  })();
+
+  // ── Drag & drop upload zone ──
+  (function() {
+    var zone = document.getElementById('movUploadZone');
+    var inner = document.getElementById('movUploadInner');
+    var feedback = document.getElementById('movUploadFeedback');
+    var fileInput = document.getElementById('movFileInput');
+    if (!zone || !fileInput) return;
+
+    ['dragenter', 'dragover'].forEach(function(ev) {
+      zone.addEventListener(ev, function(e) { e.preventDefault(); e.stopPropagation(); zone.classList.add('is-dragover'); });
+    });
+    ['dragleave', 'drop'].forEach(function(ev) {
+      zone.addEventListener(ev, function(e) { e.preventDefault(); e.stopPropagation(); zone.classList.remove('is-dragover'); });
+    });
+
+    zone.addEventListener('drop', function(e) {
+      var files = e.dataTransfer && e.dataTransfer.files;
+      if (files && files.length) handleFiles(files);
+    });
+    fileInput.addEventListener('change', function() {
+      if (fileInput.files && fileInput.files.length) handleFiles(fileInput.files);
+    });
+
+    function handleFiles(files) {
+      var pdfs = [];
+      for (var i = 0; i < files.length; i++) {
+        if (files[i].name.toLowerCase().endsWith('.pdf')) pdfs.push(files[i]);
+      }
+      if (!pdfs.length) {
+        if (window.uiToast) window.uiToast({ type: 'warning', message: 'Solo se aceptan archivos PDF' });
+        return;
+      }
+      feedback.hidden = false;
+      feedback.innerHTML = '';
+      var item = document.createElement('div');
+      item.className = 'upload-zone__feedback-item';
+      item.textContent = 'Procesando ' + pdfs.length + ' archivo' + (pdfs.length > 1 ? 's' : '') + '...';
+      feedback.appendChild(item);
+
+      var fd = new FormData();
+      for (var i = 0; i < pdfs.length; i++) {
+        fd.append('files', pdfs[i], pdfs[i].name);
+      }
+
+      fetch('/portal/bank/pdf-to-excel/preview-multi', { method: 'POST', body: fd, credentials: 'same-origin' })
+        .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
+        .then(function(res) {
+          if (res.ok && res.data && res.data.ok) {
+            var d = res.data;
+            var parts = [];
+            if (d.files_summary) {
+              d.files_summary.forEach(function(fs) {
+                var label = (fs.bank_name || '') + (fs.period_start ? ' — ' + (fs.period_end || fs.period_start).substring(0, 7) : '');
+                parts.push(label || fs.file_name);
+              });
+            }
+            var count = (d.auto_save && d.auto_save.inserted_count) || (d.global_summary && d.global_summary.total_movements) || 0;
+            var msg = count + ' movimientos importados';
+            if (parts.length) msg = parts.join(', ') + ': ' + msg;
+            item.innerHTML = '<span style="color:var(--success,#059669)">&#10003;</span> ' + msg;
+            setTimeout(function() { window.location.reload(); }, 1500);
+          } else {
+            var errMsg = (res.data && res.data.detail) || 'Error al procesar';
+            if (res.data && res.data.file_errors && res.data.file_errors.length) {
+              errMsg = res.data.file_errors.map(function(e) { return e.file_name + ': ' + e.error; }).join('; ');
+            }
+            item.innerHTML = '<span style="color:var(--error,#dc2626)">&#10007;</span> ' + errMsg;
+          }
+        })
+        .catch(function(err) {
+          item.innerHTML = '<span style="color:var(--error,#dc2626)">&#10007;</span> Error de red';
+        });
+    }
+  })();
+  </script>
 {% endblock %}

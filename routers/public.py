@@ -6,6 +6,7 @@ from fastapi.responses import HTMLResponse, Response, RedirectResponse
 
 from database import db
 from services import quotations
+from services.plans import PLANS
 
 def get_public_router(templates):
     router = APIRouter()
@@ -24,6 +25,7 @@ def get_public_router(templates):
                 "request": request,
                 "reason": reason,
                 "trial_expired": reason == "trial_expired",
+                "plans": PLANS,
             },
         )
 
@@ -100,14 +102,14 @@ def get_public_router(templates):
         if not row:
             conn.close()
             return HTMLResponse("<p>Cotización no encontrada.</p>", status_code=404)
-        if dict(row)["status"] not in ("draft", "sent"):
+        if row["status"] not in ("draft", "sent"):
             conn.close()
             quote = quotations.get_quotation_by_public_token(token)
             return templates.TemplateResponse(
                 "public_quotation_responded.html",
                 {"request": request, "quotation": quote or {}},
             )
-        qid = dict(row)["id"]
+        qid = row["id"]
         if status == "accepted":
             conn.execute(
                 """UPDATE quotations SET status = ?, responded_at = datetime('now'), updated_at = datetime('now'),

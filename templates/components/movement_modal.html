@@ -1,0 +1,244 @@
+<!-- ── Modal 1: Agregar Movimiento ── -->
+<div id="addMovementModal" class="modal movement-modal" role="dialog" aria-modal="true"
+     aria-labelledby="addMovementTitle" aria-label="Agregar Movimiento" hidden>
+  <div class="modal__backdrop movement-modal__backdrop" data-modal-close="addMovementModal"></div>
+  <div class="movement-modal__panel" tabindex="-1">
+    <div class="movement-modal__header">
+      <h2 id="addMovementTitle" class="movement-modal__title">Agregar Movimiento</h2>
+      <button type="button" class="movement-modal__close" data-modal-close="addMovementModal" aria-label="Cerrar">&times;</button>
+    </div>
+    <div class="movement-modal__body">
+      <form id="addMovementForm" autocomplete="off">
+        <!-- Tipo toggle - default GASTO -->
+        <div class="mm-tipo-toggle" id="mmTipoToggle">
+          <button type="button" class="mm-tipo-btn" data-tipo="INGRESO">Ingreso</button>
+          <button type="button" class="mm-tipo-btn mm-tipo-btn--active" data-tipo="GASTO">Gasto</button>
+        </div>
+        <input type="hidden" name="tipo" id="mmTipo" value="GASTO">
+        <!-- Fecha (visible, pre-selected to today) -->
+        <label class="form-field">
+          <span class="form-label">Fecha</span>
+          <input type="date" name="fecha" id="mmFechaHidden" value="">
+        </label>
+        <!-- Monto (autofocus target) -->
+        <label class="form-field">
+          <span class="form-label">Monto</span>
+          <div class="mm-input-money">
+            <span class="mm-input-money__prefix">$</span>
+            <input type="number" name="monto" id="mmMonto" step="0.01" min="0.01" placeholder="0.00" required>
+            <select name="moneda" id="mmMoneda" class="mm-input-money__currency">
+              <option value="MXN" selected>MXN</option>
+              <option value="USD">USD</option>
+              <option value="EUR">EUR</option>
+              <option value="GBP">GBP</option>
+              <option value="CAD">CAD</option>
+              <option value="CHF">CHF</option>
+              <option value="JPY">JPY</option>
+            </select>
+          </div>
+        </label>
+        <!-- Concepto -->
+        <label class="form-field">
+          <span class="form-label">Concepto</span>
+          <input type="text" name="descripcion" id="mmDesc" placeholder="Ej: Taxi al aeropuerto, Pago de renta, Venta en efectivo..." required>
+        </label>
+        <!-- Forma de Pago -->
+        <label class="form-field">
+          <span class="form-label">Forma de Pago</span>
+          <select name="forma_pago" id="mmFormaPago" required>
+            <option value="">Seleccionar...</option>
+            <option value="EFECTIVO">Efectivo</option>
+            <option value="TRANSFERENCIA">Transferencia</option>
+            <option value="DEBITO">Tarjeta de débito</option>
+            <option value="CREDITO">Tarjeta de crédito</option>
+            <option value="CHEQUE">Cheque</option>
+            <option value="DEPOSITO">Depósito (Oxxo/tienda)</option>
+            <option value="DIGITAL">PayPal/Digital</option>
+            <option value="OTRO">Otro</option>
+          </select>
+        </label>
+        <!-- More details toggle -->
+        <button type="button" class="mm-more-details-toggle" id="mmMoreToggle">＋ Más detalles</button>
+        <div class="mm-more-details" id="mmMoreSection" hidden>
+          <label class="form-field">
+            <span class="form-label">Categoría</span>
+            <select name="categoria" id="mmCat">
+              <option value="">Sin categoría</option>
+              <option value="SERVICIOS">Servicios</option>
+              <option value="ALIMENTOS">Alimentos</option>
+              <option value="NOMINA">Nómina</option>
+              <option value="IMPUESTOS">Impuestos</option>
+              <option value="EFECTIVO">Efectivo</option>
+              <option value="GASTO">Gasto general</option>
+              <option value="INGRESO">Ingreso general</option>
+              <option value="OTROS">Otros</option>
+            </select>
+          </label>
+          <label class="form-field">
+            <span class="form-label">Quién pagó / Quién recibió <span class="form-label--optional">(opcional)</span></span>
+            <input type="text" name="contraparte" id="mmContraparte" placeholder="Nombre de la persona, negocio o referencia">
+          </label>
+          <label class="form-field">
+            <span class="form-label">Notas <span class="form-label--optional">(opcional)</span></span>
+            <textarea name="notas" id="mmNotas" rows="2" placeholder="Detalles adicionales, número de referencia, etc."></textarea>
+          </label>
+        </div>
+      </form>
+    </div>
+    <div id="addMovementError" class="movement-modal__error" hidden role="alert"></div>
+    <div class="movement-modal__footer">
+      <button type="button" class="btn btn-ghost" data-modal-close="addMovementModal">Cancelar</button>
+      <button type="button" class="btn btn-primary" id="addMovementSubmit">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal 2: Agregar Invoice Extranjero ── -->
+<div id="addInvoiceModal" class="modal movement-modal" role="dialog" aria-modal="true"
+     aria-labelledby="addInvoiceTitle" aria-label="Agregar Invoice" hidden>
+  <div class="modal__backdrop movement-modal__backdrop" data-modal-close="addInvoiceModal"></div>
+  <div class="movement-modal__panel movement-modal__panel--wide" tabindex="-1">
+    <div class="movement-modal__header">
+      <h2 id="addInvoiceTitle" class="movement-modal__title">Agregar Invoice</h2>
+      <button type="button" class="movement-modal__close" data-modal-close="addInvoiceModal" aria-label="Cerrar">&times;</button>
+    </div>
+    <div class="movement-modal__body">
+      <!-- Mini upload zone -->
+      <div class="invoice-modal-upload" id="invoiceModalUpload">
+        <div class="invoice-modal-upload__inner" id="invoiceModalUploadInner">
+          <svg class="upload-zone__icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg>
+          <span>Arrastra tu invoice PDF o <button type="button" class="upload-zone__browse" id="invoiceModalBrowse">seleccionar archivo</button></span>
+          <input type="file" accept=".pdf" hidden id="invoiceModalFileInput" aria-label="Seleccionar archivo PDF">
+        </div>
+      </div>
+      <form id="addInvoiceForm" autocomplete="off">
+        <!-- Tipo toggle -->
+        <div class="mm-tipo-toggle" id="fiTipoToggle">
+          <button type="button" class="mm-tipo-btn mm-tipo-btn--active" data-tipo="INGRESO">Ingreso (Exportación)</button>
+          <button type="button" class="mm-tipo-btn" data-tipo="GASTO">Gasto (Importación)</button>
+        </div>
+        <input type="hidden" name="tipo" id="fiTipo" value="INGRESO">
+        <!-- Row 1: Fecha + Invoice Number -->
+        <div class="mm-grid mm-grid--2">
+          <label class="form-field">
+            <span class="form-label">Fecha del invoice</span>
+            <input type="date" name="fecha" id="fiFecha" required>
+          </label>
+          <label class="form-field">
+            <span class="form-label">Invoice Number / Folio</span>
+            <input type="text" name="invoice_number" id="fiNumber" placeholder="INV-2024-001" required>
+          </label>
+        </div>
+        <!-- Empresa -->
+        <label class="form-field">
+          <span class="form-label">Empresa / Cliente extranjero</span>
+          <input type="text" name="empresa" id="fiEmpresa" placeholder="Company Name LLC" required>
+        </label>
+        <!-- País + Tax ID -->
+        <div class="mm-grid mm-grid--2">
+          <label class="form-field">
+            <span class="form-label">País</span>
+            <select name="pais" id="fiPais">
+              <option value="">Seleccionar...</option>
+              <option value="US">Estados Unidos</option>
+              <option value="CA">Canadá</option>
+              <option value="ES">España</option>
+              <option value="GB">Reino Unido</option>
+              <option value="DE">Alemania</option>
+              <option value="FR">Francia</option>
+              <option value="CO">Colombia</option>
+              <option value="AR">Argentina</option>
+              <option value="CL">Chile</option>
+              <option value="BR">Brasil</option>
+              <option value="OTHER">Otro</option>
+            </select>
+          </label>
+          <label class="form-field">
+            <span class="form-label">Tax ID extranjero <span class="form-label--optional">(opcional)</span></span>
+            <input type="text" name="tax_id" id="fiTaxId" placeholder="EIN, VAT number, etc.">
+          </label>
+        </div>
+        <!-- Descripción -->
+        <label class="form-field">
+          <span class="form-label">Descripción del servicio</span>
+          <textarea name="descripcion" id="fiDesc" rows="2" placeholder="Descripción del servicio prestado o recibido" required></textarea>
+        </label>
+        <!-- Moneda + Monto + Tipo de cambio -->
+        <div class="mm-grid mm-grid--3">
+          <label class="form-field">
+            <span class="form-label">Moneda</span>
+            <select name="moneda" id="fiMoneda">
+              <option value="USD">USD</option>
+              <option value="EUR">EUR</option>
+              <option value="GBP">GBP</option>
+              <option value="CAD">CAD</option>
+              <option value="OTHER">Otra</option>
+            </select>
+          </label>
+          <label class="form-field">
+            <span class="form-label">Monto original</span>
+            <input type="number" name="monto_original" id="fiMontoOrig" step="0.01" min="0.01" placeholder="0.00" required>
+          </label>
+          <label class="form-field">
+            <span class="form-label">Tipo de cambio</span>
+            <input type="number" name="tipo_cambio" id="fiTipoCambio" step="0.0001" min="0.01" placeholder="Ej: 17.25" required>
+          </label>
+        </div>
+        <!-- Equivalente MXN -->
+        <div class="mm-mxn-equiv" id="fiEquivMxn">Equivalente: <strong>$0.00 MXN</strong></div>
+        <!-- Forma de cobro/pago + Referencia -->
+        <div class="mm-grid mm-grid--2">
+          <label class="form-field">
+            <span class="form-label">Forma de cobro/pago</span>
+            <select name="forma_pago" id="fiFormaPago">
+              <option value="">Seleccionar...</option>
+              <option value="SWIFT">Transferencia internacional (SWIFT/Wire)</option>
+              <option value="PAYPAL">PayPal</option>
+              <option value="WISE">Wise</option>
+              <option value="STRIPE">Stripe</option>
+              <option value="CREDITO">Tarjeta de crédito</option>
+              <option value="PAYONEER">Payoneer</option>
+              <option value="OTRO">Otro</option>
+            </select>
+          </label>
+          <label class="form-field">
+            <span class="form-label">Referencia de pago <span class="form-label--optional">(opcional)</span></span>
+            <input type="text" name="referencia_pago" id="fiRefPago" placeholder="Número de transacción o referencia">
+          </label>
+        </div>
+        <!-- Notas -->
+        <label class="form-field">
+          <span class="form-label">Notas <span class="form-label--optional">(opcional)</span></span>
+          <textarea name="notas" id="fiNotas" rows="2" placeholder="Notas adicionales"></textarea>
+        </label>
+      </form>
+    </div>
+    <div id="addInvoiceError" class="movement-modal__error" hidden role="alert"></div>
+    <div class="movement-modal__footer">
+      <button type="button" class="btn btn-ghost" data-modal-close="addInvoiceModal">Cancelar</button>
+      <button type="button" class="btn btn-primary" id="addInvoiceSubmit">Guardar Invoice</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: Actividad Reciente ── -->
+<div id="activityModal" class="modal movement-modal" role="dialog" aria-modal="true"
+     aria-labelledby="activityModalTitle" aria-label="Actividad Reciente" hidden>
+  <div class="modal__backdrop movement-modal__backdrop" data-modal-close="activityModal"></div>
+  <div class="movement-modal__panel" tabindex="-1">
+    <div class="movement-modal__header">
+      <h2 id="activityModalTitle" class="movement-modal__title">Actividad Reciente</h2>
+      <button type="button" class="movement-modal__close" data-modal-close="activityModal" aria-label="Cerrar">&times;</button>
+    </div>
+    <div class="movement-modal__tabs">
+      <button type="button" class="movement-modal__tab movement-modal__tab--active" data-filter="all">Todas</button>
+      <button type="button" class="movement-modal__tab" data-filter="received">Recibidas</button>
+      <button type="button" class="movement-modal__tab" data-filter="issued">Emitidas</button>
+    </div>
+    <div class="movement-modal__body movement-modal__body--scroll" id="activityModalBody">
+      <ul class="activity-modal__list" id="activityModalList">
+        <li class="activity-modal__loading">Cargando...</li>
+      </ul>
+    </div>
+  </div>
+</div>

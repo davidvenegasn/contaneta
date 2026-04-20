@@ -1,0 +1,407 @@
+/* Sidebar unificado: cada fila = rejilla icono | texto (sin dos columnas independientes). */
+
+/* No pisar position/display de portal_rail.css: fixed + flex mantienen el rail fuera del flujo;
+   si el sidebar es position:relative + block, .portal-main queda debajo del viewport (~100vh) y parece pantalla en blanco. */
+.portal-sidebar-unified {
+  overflow: hidden;
+}
+
+/* Icono Movimientos: mismo contraste que el rail legacy */
+.psb-nav-link--movements .icon path {
+  stroke-width: 2;
+  transition: stroke-width 0.2s ease;
+}
+.psb-nav-link--movements.is-active .icon path {
+  stroke-width: 3;
+}
+
+nav.psb {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 28px 0 12px;
+  gap: 8px;
+}
+
+.psb-scroll {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  /* Aire entre la marca (ContaNeta) y el bloque de navegación (Nueva factura en adelante) */
+  margin-top: 32px;
+}
+
+/* ── Brand (misma rejilla que el resto) ── */
+.psb-brand-row {
+  display: grid;
+  grid-template-columns: var(--rail-w) minmax(0, var(--rail-expand-w));
+  align-items: center;
+  width: 100%;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+@media (min-width: 1100px) {
+  .portal-shell-wrap:not(.drawer-open) .psb-brand-row {
+    grid-template-columns: var(--rail-w) 0fr;
+  }
+  .portal-shell-wrap:not(.drawer-open) .psb-brand-row__drawer {
+    overflow: hidden;
+    visibility: hidden;
+    min-width: 0;
+    height: 0;
+    padding: 0;
+    margin: 0;
+  }
+}
+
+.psb-brand-row__rail {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.psb-brand-row__drawer {
+  min-width: 0;
+}
+
+.portal-drawer__head {
+  margin-bottom: 0;
+}
+
+/* ── Enlaces: un solo <a> = pastilla activa continua ── */
+.psb-nav-link {
+  display: grid;
+  grid-template-columns: var(--rail-w) minmax(0, var(--rail-expand-w));
+  align-items: stretch;
+  min-height: 40px;
+  width: 100%;
+  box-sizing: border-box;
+  text-decoration: none;
+  color: #0f172a;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  border-radius: 12px;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+@media (min-width: 1100px) {
+  .portal-shell-wrap:not(.drawer-open) .psb-nav-link {
+    grid-template-columns: var(--rail-w) 0fr;
+  }
+  .portal-shell-wrap:not(.drawer-open) .psb-nav-link__txt {
+    overflow: hidden;
+    visibility: hidden;
+    white-space: nowrap;
+    min-width: 0;
+    padding: 0;
+    width: 0;
+  }
+}
+
+.psb-nav-link__rail {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+}
+
+.psb-nav-link__rail .icon {
+  width: 20px;
+  height: 20px;
+}
+
+.psb-nav-link--movements .psb-nav-link__rail .icon {
+  width: 22px;
+  height: 22px;
+}
+
+.psb-nav-link__txt {
+  display: flex;
+  align-items: center;
+  padding: 0 8px 0 4px;
+  min-height: 40px;
+  line-height: 1.25;
+  box-sizing: border-box;
+}
+
+.psb-nav-link:hover {
+  background: #f4f4f5;
+}
+
+.psb-nav-link.is-active {
+  background: var(--accent-soft, #eef2ff);
+  color: var(--primary);
+}
+
+.psb-nav-link.is-active .psb-nav-link__rail .icon {
+  color: var(--primary);
+}
+
+/* Tooltips solo con menú cerrado */
+.portal-shell-wrap.drawer-open .psb-nav-link .rail-tooltip {
+  display: none !important;
+}
+
+.portal-shell-wrap.drawer-open .portal-drawer__brand > svg {
+  display: none;
+}
+
+.portal-shell-wrap.drawer-open .rail-brand-toggle__arrow {
+  transform: rotate(180deg);
+}
+
+.portal-shell-wrap.drawer-open .rail-tooltip {
+  display: none;
+}
+
+/* ── Fila doble: Nueva factura ── */
+.psb-dual {
+  display: grid;
+  grid-template-columns: var(--rail-w) minmax(0, var(--rail-expand-w));
+  align-items: stretch;
+  min-height: 40px;
+  width: 100%;
+  box-sizing: border-box;
+  position: relative;
+  border-radius: 12px;
+}
+
+.portal-shell-wrap:not(.drawer-open) .psb-dual {
+  grid-template-columns: var(--rail-w) 0fr;
+}
+
+.portal-shell-wrap:not(.drawer-open) .psb-dual__drawer {
+  overflow: hidden;
+  visibility: hidden;
+  min-width: 0;
+  width: 0;
+  padding: 0;
+}
+
+.psb-dual.is-active::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;
+  background: var(--accent-soft, #eef2ff);
+  z-index: 0;
+  pointer-events: none;
+}
+
+.psb-dual > * {
+  position: relative;
+  z-index: 1;
+}
+
+.psb-dual__rail {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.psb-dual__rail .rail-item {
+  transform: none;
+}
+
+.psb-dual__rail .rail-item:hover {
+  transform: none;
+}
+
+.psb-dual.is-active .rail-item,
+.psb-dual.is-active .drawer-link {
+  background: transparent !important;
+}
+
+.psb-dual.is-active .rail-item::after {
+  display: none !important;
+}
+
+.psb-dual.is-active .rail-item,
+.psb-dual.is-active .drawer-link.drawer-link--active {
+  color: var(--primary);
+}
+
+.psb-dual__drawer {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  min-width: 0;
+  padding-left: 4px;
+}
+
+.psb-dual .drawer-link {
+  margin-left: 0 !important;
+  padding: 6px 4px !important;
+  border-radius: 0;
+  background: transparent !important;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  white-space: nowrap;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  color: #0f172a;
+}
+
+.psb-dual .drawer-link.drawer-link--active {
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.psb-dual .drawer-submenu {
+  margin-top: 4px;
+  width: 100%;
+  max-width: calc(var(--rail-expand-w) - 8px);
+}
+
+/* ── Sección CATÁLOGOS (misma rejilla) ── */
+.psb-section {
+  display: grid;
+  grid-template-columns: var(--rail-w) minmax(0, var(--rail-expand-w));
+  align-items: center;
+  min-height: 28px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+@media (min-width: 1100px) {
+  .portal-shell-wrap:not(.drawer-open) .psb-section {
+    grid-template-columns: var(--rail-w) 0fr;
+  }
+  .portal-shell-wrap:not(.drawer-open) .psb-section__drawer {
+    overflow: hidden;
+    visibility: hidden;
+    min-width: 0;
+    width: 0;
+  }
+}
+
+.psb-section__rail {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.psb-section__rule {
+  width: 22px;
+  height: 1px;
+  background: var(--border, rgba(0, 0, 0, 0.08));
+}
+
+.psb-section__drawer {
+  min-width: 0;
+  padding-left: 4px;
+}
+
+.psb-section .drawer-section-label {
+  margin: 0;
+  padding: 4px 0 2px;
+  line-height: 1.15;
+}
+
+/* ── Espaciador flexible ── */
+.psb-grow {
+  flex: 1 1 auto;
+  min-height: 8px;
+  max-height: 120px;
+}
+
+/* ── Crear (solo icono en rail; celda texto vacía) ── */
+.psb-create-row {
+  display: grid;
+  grid-template-columns: var(--rail-w) minmax(0, var(--rail-expand-w));
+  align-items: center;
+  min-height: 40px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+@media (min-width: 1100px) {
+  .portal-shell-wrap:not(.drawer-open) .psb-create-row {
+    grid-template-columns: var(--rail-w) 0fr;
+  }
+}
+
+.psb-create-row__rail {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.psb-create-row__drawer {
+  min-width: 0;
+}
+
+/* Flyout: posición fija (left/top por JS desde el botón) */
+#railInvoiceFlyout.rail-invoice-flyout {
+  position: fixed;
+  z-index: 300;
+  left: auto;
+  top: auto;
+}
+
+/* Night mode */
+html.nightmode .psb-nav-link {
+  color: var(--text, #e6edf3);
+}
+
+html.nightmode .psb-nav-link:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+html.nightmode .psb-nav-link.is-active {
+  background: rgba(129, 140, 248, 0.14);
+  color: var(--accent, #818cf8);
+}
+
+html.nightmode .psb-dual.is-active::before {
+  background: rgba(129, 140, 248, 0.14);
+}
+
+html.nightmode .psb-dual .drawer-link {
+  color: var(--text, #e6edf3);
+}
+
+html.nightmode .psb-section__rule {
+  background: var(--border, rgba(255, 255, 255, 0.08));
+}
+
+/* ── Móvil: menú hamburguesa ── */
+@media (max-width: 1099px) {
+  body.mobile-menu-open .psb-brand-row,
+  body.mobile-menu-open .psb-nav-link,
+  body.mobile-menu-open .psb-dual,
+  body.mobile-menu-open .psb-section,
+  body.mobile-menu-open .psb-create-row {
+    grid-template-columns: 48px 1fr !important;
+  }
+
+  body.mobile-menu-open .psb-brand-row__drawer,
+  body.mobile-menu-open .psb-nav-link__txt,
+  body.mobile-menu-open .psb-dual__drawer,
+  body.mobile-menu-open .psb-section__drawer {
+    visibility: visible !important;
+    overflow: visible !important;
+    width: auto !important;
+    height: auto !important;
+    min-width: 0 !important;
+  }
+
+  body.mobile-menu-open nav.psb {
+    padding: 16px 12px 20px;
+  }
+}

@@ -36,7 +36,7 @@
             <th class="th--w-200">Acciones</th>
           </tr>
         </thead>
-        <tbody id="provTbody">
+        <tbody id="provTbody" class="row-stagger">
           <tr><td colspan="5"><div class="skeleton skeleton-line"></div></td></tr>
           <tr><td colspan="5"><div class="skeleton skeleton-line"></div></td></tr>
           <tr><td colspan="5"><div class="skeleton skeleton-line"></div></td></tr>
@@ -57,7 +57,7 @@
         </svg>
         Agregar primer proveedor
       </button>
-      <a href="/portal/invoices/received" class="btn btn-ghost">Ver facturas recibidas</a>
+      <a href="/portal/facturas?tab=received" class="btn btn-ghost">Ver facturas recibidas</a>
     {% endcall %}
   </div>
 
@@ -97,7 +97,7 @@
         <div id="providerInvoicesList" class="provider-invoices-panel__list"></div>
         {% from 'portal/_ui_components.html' import portal_empty_state, portal_load_error %}
         {% call portal_empty_state('No hay facturas para este proveedor', 'Si esperabas ver facturas, intenta sincronizar con SAT o revisa Facturas recibidas.', id='providerInvoicesEmpty', extra_class='provider-drawer__empty') %}
-          <a href="/portal/invoices/received" class="btn btn--secondary provider-drawer__link">Ver facturas recibidas</a>
+          <a href="/portal/facturas?tab=received" class="btn btn--secondary provider-drawer__link">Ver facturas recibidas</a>
         {% endcall %}
         {{ portal_load_error('providerInvoicesError', extra_class='provider-drawer__error') }}
       </div>
@@ -113,7 +113,7 @@
           <a id="providerInvoicesDownloadPdf" href="#" class="btn btn--sm" target="_blank" rel="noopener">Descargar PDF</a>
           <a id="providerInvoicesDownloadExcel" href="#" class="btn btn--sm btn--ghost" target="_blank" rel="noopener">Descargar Excel</a>
         </div>
-        <a id="providerInvoicesVerTodas" href="/portal/invoices/received" class="btn btn--ghost provider-drawer__link">Ver todas en Facturas recibidas</a>
+        <a id="providerInvoicesVerTodas" href="/portal/facturas?tab=received" class="btn btn--ghost provider-drawer__link">Ver todas en Facturas recibidas</a>
       </footer>
     </aside>
   </div>
@@ -569,7 +569,7 @@
       panelRfc.textContent = currentProviderRfc ? 'RFC ' + currentProviderRfc : '';
       panelRfc.hidden = !currentProviderRfc;
     }
-    panelVerTodas.href = '/portal/invoices/received';
+    panelVerTodas.href = '/portal/facturas?tab=received';
     panel.hidden = false;
     panel.setAttribute('aria-hidden', 'false');
     panel.classList.add('is-open');
@@ -724,7 +724,7 @@
 .grid-2{ display:grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .grid-3{ display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
 .field{ display:flex; flex-direction:column; gap: 8px; }
-.label{ font-size: 12px; color: var(--muted); font-weight: 700; }
+.label{ font-size: 12px; color: var(--muted); font-weight: 600; }
 
 @media (max-width: 860px){
   .page-head{ flex-direction:column; align-items:stretch; }

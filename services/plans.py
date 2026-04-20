@@ -26,7 +26,7 @@ PLANS = {
         "price_mxn": 0,
     },
     "trial": {
-        "label": "Prueba (14 dias)",
+        "label": "Prueba (14 días)",
         "invoices_per_month": 50,
         "sat_syncs_per_month": 10,
         "bank_accounts": 3,
@@ -36,7 +36,7 @@ PLANS = {
         "price_mxn": 0,
     },
     "basic": {
-        "label": "Basico",
+        "label": "Básico",
         "invoices_per_month": 50,
         "sat_syncs_per_month": 10,
         "bank_accounts": 3,
@@ -251,9 +251,16 @@ def get_plan_summary(issuer_id: int) -> dict[str, Any]:
     config = get_plan_config(plan_name)
     usage = get_usage(issuer_id)
 
+    # Show "Trial" instead of "Gratis" when trial is active (consistent with header badge)
+    label = config["label"]
+    if plan_name == "free":
+        from services.subscription import is_issuer_trial_active
+        if is_issuer_trial_active(issuer_id):
+            label = "Trial"
+
     return {
         "plan": plan_name,
-        "plan_label": config["label"],
+        "plan_label": label,
         "price_mxn": config["price_mxn"],
         "limits": {
             "invoices": {"used": usage["invoices_count"], "limit": config["invoices_per_month"]},
@@ -263,5 +270,5 @@ def get_plan_summary(issuer_id: int) -> dict[str, Any]:
             "month_close": config["month_close"],
             "matching": config["matching"],
         },
-        "all_plans": {k: {"label": v["label"], "price_mxn": v["price_mxn"], "invoices": v["invoices_per_month"], "sat_syncs": v["sat_syncs_per_month"]} for k, v in PLANS.items()},
+        "all_plans": {k: {"label": v["label"], "price_mxn": v["price_mxn"], "invoices": v["invoices_per_month"], "sat_syncs": v["sat_syncs_per_month"], "bank_imports": v["bank_imports_per_month"], "bank_accounts": v["bank_accounts"], "month_close": v["month_close"], "matching": v["matching"]} for k, v in PLANS.items()},
     }

@@ -1,10 +1,13 @@
 """Conexiones y helpers para invoicing.db y catalogs.db."""
+import logging
 import os
 import sqlite3
 import time
 
 from config import CATALOGS_DB, DB_PATH
 from contextlib import contextmanager
+
+logger = logging.getLogger(__name__)
 
 
 def _row_factory(cursor, row):
@@ -17,8 +20,9 @@ def db() -> sqlite3.Connection:
     conn = sqlite3.connect(DB_PATH, timeout=30)
     conn.row_factory = _row_factory
     conn.execute("PRAGMA foreign_keys = ON;")
-    conn.execute("PRAGMA busy_timeout = 5000;")
+    conn.execute("PRAGMA busy_timeout = 30000;")
     conn.execute("PRAGMA journal_mode = WAL;")
+    conn.execute("PRAGMA wal_autocheckpoint = 1000;")
     return conn
 
 
@@ -41,7 +45,7 @@ def transaction(conn: sqlite3.Connection):
         try:
             conn.rollback()
         except Exception:
-            pass
+            logger.warning("transaction rollback failed", exc_info=True)
         raise
 
 
@@ -76,19 +80,24 @@ def table_exists(conn: sqlite3.Connection, name: str) -> bool:
 def has_column(conn: sqlite3.Connection, table: str, column: str) -> bool:
     rows = conn.execute(f"PRAGMA table_info({table})").fetchall()
     for r in rows:
-        if isinstance(r, dict):
-            name = r.get("name")
-        else:
-            name = r[1] if len(r) > 1 else None
+        name = r.get("name") if isinstance(r, dict) else (r[1] if len(r) > 1 else None)
         if name == column:
             return True
     return False
 
 
+_SAFE_UPDATE_TABLES = frozenset({
+    "invoices", "invoice_items", "customers", "products", "issuers", "users",
+    "quotations", "quotation_items", "bank_movements", "bank_statements",
+    "sat_cfdi", "sat_credentials", "plan_usage", "jobs", "notifications",
+})
+
 def safe_update(conn: sqlite3.Connection, table: str, row_id: int, data: dict, *, issuer_id: int | None = None) -> None:
     """Actualiza solo columnas que existan en el schema actual. Si issuer_id se pasa, añade filtro de tenant."""
     if not data:
         return
+    if table not in _SAFE_UPDATE_TABLES:
+        raise ValueError(f"safe_update: table '{table}' not in allowed whitelist")
     rows = conn.execute(f"PRAGMA table_info({table})").fetchall()
     cols = set()
     for r in rows:

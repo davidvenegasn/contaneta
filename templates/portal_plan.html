@@ -4,13 +4,13 @@
   <header class="app-header app-header--mb-14">
     <div class="app-header__left">
       <div class="app-title">Mi plan</div>
-      <div class="app-subtitle muted">Estado de tu suscripcion, limites y opciones para cambiar de plan.</div>
+      <div class="app-subtitle muted">Estado de tu suscripción, límites y opciones para cambiar de plan.</div>
     </div>
   </header>
 
   {% if success %}
   <div class="card u-mb-14 card--success-bg">
-    <p class="u-m0">Pago completado. Tu plan Pro esta activo.</p>
+    <p class="u-m0">Pago completado. Tu plan Pro está activo.</p>
   </div>
   {% endif %}
   {% if canceled %}
@@ -28,63 +28,63 @@
     {% endif %}
 
     {% if subscription %}
-      <p><strong>Suscripcion Stripe:</strong> {{ subscription.status or 'inactive' }}</p>
+      <div style="margin-top:8px;">
+        {% if subscription.status == 'active' %}
+          <span class="badge badge--success">Suscripción activa</span>
+        {% elif subscription.status == 'trialing' %}
+          <span class="badge badge--info">Periodo de prueba</span>
+        {% elif subscription.status == 'past_due' %}
+          <span class="badge badge--warn">Pago pendiente</span>
+        {% else %}
+          <span class="badge badge--neutral">{{ subscription.status or 'Sin suscripción' }}</span>
+        {% endif %}
+      </div>
       {% if subscription.current_period_end %}
-      <p class="muted"><strong>Proximo vencimiento:</strong> {{ subscription.current_period_end[:10] }}</p>
+      <p class="muted u-text-sm" style="margin-top:6px;">Próximo vencimiento: {{ subscription.current_period_end[:10] }}</p>
       {% endif %}
     {% endif %}
   </div>
 
   <div class="card u-mb-14">
     <h2 class="u-m0 u-mb-3 u-text-base">Uso del mes</h2>
-    <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap:12px;">
+    <div class="plan-usage-grid">
       {% set limits = plan_summary.limits %}
 
-      <div style="border:1px solid #e2e8f0; border-radius:10px; padding:12px;">
-        <div style="font-weight:600; font-size:14px;">Facturas</div>
-        <div style="margin-top:6px;">
-          <span style="font-size:20px; font-weight:700;">{{ limits.invoices.used }}</span>
-          <span class="muted">/ {{ limits.invoices.limit }}</span>
+      {# Macro for usage bars with traffic-light colors #}
+      {% macro usage_card(label, used, limit) %}
+      <div class="plan-usage-card">
+        <div class="plan-usage-card__label">{{ label }}</div>
+        <div class="plan-usage-card__value">
+          <span class="plan-usage-card__num">{{ used }}</span>
+          <span class="muted">/ {{ limit }}</span>
         </div>
-        {% if limits.invoices.limit > 0 %}
-        <div style="margin-top:6px; background:#e2e8f0; border-radius:4px; height:6px; overflow:hidden;">
-          <div style="background:{{ '#ef4444' if limits.invoices.used >= limits.invoices.limit else '#22c55e' }}; height:100%; width:{{ [100, (limits.invoices.used / limits.invoices.limit * 100)|int]|min }}%;"></div>
+        {% if limit > 0 %}
+        {% set pct = [100, (used / limit * 100)|int]|min %}
+        <div class="plan-usage-bar">
+          <div class="plan-usage-bar__fill plan-usage-bar__fill--{{ 'danger' if pct >= 90 else ('warn' if pct >= 70 else 'success') }}" style="width:{{ pct }}%;"></div>
         </div>
         {% endif %}
       </div>
+      {% endmacro %}
 
-      <div style="border:1px solid #e2e8f0; border-radius:10px; padding:12px;">
-        <div style="font-weight:600; font-size:14px;">Syncs SAT</div>
-        <div style="margin-top:6px;">
-          <span style="font-size:20px; font-weight:700;">{{ limits.sat_syncs.used }}</span>
-          <span class="muted">/ {{ limits.sat_syncs.limit }}</span>
-        </div>
-        {% if limits.sat_syncs.limit > 0 %}
-        <div style="margin-top:6px; background:#e2e8f0; border-radius:4px; height:6px; overflow:hidden;">
-          <div style="background:{{ '#ef4444' if limits.sat_syncs.used >= limits.sat_syncs.limit else '#22c55e' }}; height:100%; width:{{ [100, (limits.sat_syncs.used / limits.sat_syncs.limit * 100)|int]|min }}%;"></div>
-        </div>
-        {% else %}
-        <div class="muted u-text-xs" style="margin-top:4px;">No incluido en tu plan</div>
-        {% endif %}
-      </div>
+      {{ usage_card("Facturas", limits.invoices.used, limits.invoices.limit) }}
+      {{ usage_card("Syncs SAT", limits.sat_syncs.used, limits.sat_syncs.limit) }}
 
-      <div style="border:1px solid #e2e8f0; border-radius:10px; padding:12px;">
-        <div style="font-weight:600; font-size:14px;">Importar bancos</div>
-        <div style="margin-top:6px;">
-          <span style="font-size:20px; font-weight:700;">{{ limits.bank_imports.used }}</span>
-          <span class="muted">/ {{ limits.bank_imports.limit }}</span>
+      {% if limits.sat_syncs.limit == 0 %}
+      {# Override: show "not included" instead of bar #}
+      {% endif %}
+
+      {{ usage_card("Importar bancos", limits.bank_imports.used, limits.bank_imports.limit) }}
+
+      <div class="plan-usage-card">
+        <div class="plan-usage-card__label">Cuentas bancarias</div>
+        <div class="plan-usage-card__value">
+          <span class="muted">Límite: {{ limits.bank_accounts.limit }}</span>
         </div>
       </div>
 
-      <div style="border:1px solid #e2e8f0; border-radius:10px; padding:12px;">
-        <div style="font-weight:600; font-size:14px;">Cuentas bancarias</div>
-        <div style="margin-top:6px;">
-          <span class="muted">Limite: {{ limits.bank_accounts.limit }}</span>
-        </div>
-      </div>
-
-      <div style="border:1px solid #e2e8f0; border-radius:10px; padding:12px;">
-        <div style="font-weight:600; font-size:14px;">Cierre mensual</div>
+      <div class="plan-usage-card">
+        <div class="plan-usage-card__label">Cierre mensual</div>
         <div style="margin-top:6px;">
           {% if limits.month_close %}
           <span class="badge badge--success">Incluido</span>
@@ -94,8 +94,8 @@
         </div>
       </div>
 
-      <div style="border:1px solid #e2e8f0; border-radius:10px; padding:12px;">
-        <div style="font-weight:600; font-size:14px;">Conciliacion</div>
+      <div class="plan-usage-card">
+        <div class="plan-usage-card__label">Conciliación</div>
         <div style="margin-top:6px;">
           {% if limits.matching %}
           <span class="badge badge--success">Incluido</span>
@@ -109,17 +109,24 @@
 
   <div class="card">
     <h2 class="u-m0 u-mb-3 u-text-base">Planes disponibles</h2>
-    <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap:14px;">
+    <div class="plan-cards-grid">
       {% for key, p in plan_summary.all_plans.items() %}
-      <div style="border:{{ '2px solid #3b82f6' if key == plan_summary.plan else '1px solid #e2e8f0' }}; border-radius:14px; padding:16px; {% if key == plan_summary.plan %}background:#eff6ff;{% endif %}">
-        <div style="font-weight:700; font-size:16px;">{{ p.label }}</div>
-        <div style="margin-top:6px; font-size:20px; font-weight:700;">
+      <div class="plan-card {{ 'plan-card--current' if key == plan_summary.plan else '' }} {{ 'plan-card--recommended' if key == 'pro' and key != plan_summary.plan else '' }}">
+        {% if key == 'pro' and key != plan_summary.plan %}
+        <span class="badge badge--primary plan-card__badge">Recomendado</span>
+        {% endif %}
+        <div class="plan-card__name">{{ p.label }}</div>
+        <div class="plan-card__price">
           {% if p.price_mxn > 0 %}${{ p.price_mxn }} <span class="muted" style="font-size:14px;">MXN/mes</span>{% else %}Gratis{% endif %}
         </div>
-        <div class="muted" style="margin-top:8px; font-size:13px;">
-          {{ p.invoices }} facturas/mes<br>
-          {% if p.sat_syncs > 0 %}{{ p.sat_syncs }} syncs SAT{% else %}Sin sync SAT{% endif %}
-        </div>
+        <ul class="plan-card__features">
+          <li>{{ p.invoices }} facturas/mes</li>
+          <li>{% if p.sat_syncs > 0 %}{{ p.sat_syncs }} syncs SAT{% else %}Sin sync SAT{% endif %}</li>
+          <li>{{ p.bank_imports|default(0) }} importaciones bancarias</li>
+          <li>{{ p.bank_accounts|default(1) }} cuenta{{ 's' if p.bank_accounts|default(1) > 1 else '' }} bancaria{{ 's' if p.bank_accounts|default(1) > 1 else '' }}</li>
+          <li>{% if p.month_close|default(false) %}Cierre mensual{% else %}Sin cierre mensual{% endif %}</li>
+          <li>{% if p.matching|default(false) %}Conciliación automática{% else %}Sin conciliación{% endif %}</li>
+        </ul>
         {% if key == plan_summary.plan %}
         <div style="margin-top:12px;">
           <span class="badge badge--success">Plan actual</span>
@@ -133,6 +140,32 @@
       {% endfor %}
     </div>
   </div>
+
+  <style>
+    .plan-usage-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+    .plan-usage-card { border: 1px solid var(--border, #e2e8f0); border-radius: 10px; padding: 12px; }
+    .plan-usage-card__label { font-weight: 600; font-size: 14px; }
+    .plan-usage-card__value { margin-top: 6px; }
+    .plan-usage-card__num { font-size: 20px; font-weight: 600; }
+    .plan-usage-bar { margin-top: 6px; background: var(--neutral-bg, #e2e8f0); border-radius: 4px; height: 6px; overflow: hidden; }
+    .plan-usage-bar__fill { height: 100%; border-radius: 4px; transition: width .3s ease; }
+    .plan-usage-bar__fill--success { background: var(--success, #22c55e); }
+    .plan-usage-bar__fill--warn { background: var(--warn, #d97706); }
+    .plan-usage-bar__fill--danger { background: var(--danger, #ef4444); }
+    .plan-cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+    .plan-card { border: 1px solid var(--border, #e2e8f0); border-radius: 14px; padding: 16px; position: relative; }
+    .plan-card--current { border: 2px solid var(--primary, #6366f1); background: var(--accent-soft, #eff6ff); }
+    .plan-card--recommended { border-color: var(--primary, #6366f1); box-shadow: 0 4px 16px rgba(99,102,241,.12); }
+    .plan-card__badge { position: absolute; top: -10px; right: 12px; }
+    .plan-card__name { font-weight: 700; font-size: 17px; letter-spacing: -0.01em; }
+    .plan-card__price { margin-top: 6px; font-size: 24px; font-weight: 700; letter-spacing: -0.02em; }
+    .plan-card__features { margin: 10px 0 0; padding-left: 0; font-size: 13px; color: var(--muted, #64748b); list-style: none; }
+    .plan-card__features li { margin-bottom: 4px; padding-left: 20px; position: relative; }
+    .plan-card__features li::before { content: '✓'; position: absolute; left: 0; color: var(--success, #059669); font-weight: 700; font-size: 12px; }
+    .plan-card--recommended .plan-upgrade-btn { background: var(--gradient-primary, linear-gradient(135deg, #6366f1, #8b5cf6)); border: none; font-weight: 700; padding: 10px 20px; font-size: 15px; }
+    .badge--primary { background: var(--primary, #6366f1); color: #fff; }
+    .badge--info { background: #3b82f6; color: #fff; }
+  </style>
 
   <script>
   document.querySelectorAll('.plan-upgrade-btn').forEach(function(btn) {
@@ -152,11 +185,10 @@
           }
           btn.disabled = false;
           if (window.uiToast) window.uiToast({ type: 'danger', title: 'Error', message: (r && r.data && r.data.detail) || 'No se pudo iniciar el pago.' });
-          else alert('No se pudo iniciar el pago.');
         })
         .catch(function() {
           btn.disabled = false;
-          alert('Error de conexion.');
+          if (window.uiToast) window.uiToast({ type: 'danger', title: 'Error de conexión', message: 'Revisa tu conexión e intenta de nuevo.' });
         });
     });
   });

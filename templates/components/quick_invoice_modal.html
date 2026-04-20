@@ -11,7 +11,10 @@
     <p id="quickInvoiceModalDesc" class="quick-invoice-modal__desc muted">Precálculo editable. Puedes ajustar receptor, concepto e impuestos antes de timbrar.</p>
     <div class="quick-invoice-modal__body">
       <div class="quick-invoice-modal__section">
-        <div class="quick-invoice-modal__section-title">Receptor</div>
+        <div class="quick-invoice-modal__section-title" style="display:flex;align-items:center;justify-content:space-between;">
+          <span>Receptor</span>
+          <button type="button" class="btn btn--sm btn--ghost" id="quickModalChangeCustomer" style="font-size:12px;padding:2px 8px;">Cambiar</button>
+        </div>
         <div class="quick-invoice-modal__row">
           <span id="quickModalCustomerRfc" class="muted u-text-12"></span>
         </div>
@@ -44,7 +47,10 @@
       </div>
 
       <div class="quick-invoice-modal__section">
-        <div class="quick-invoice-modal__section-title">Concepto</div>
+        <div class="quick-invoice-modal__section-title" style="display:flex;align-items:center;justify-content:space-between;">
+          <span>Concepto</span>
+          <button type="button" class="btn btn--sm btn--ghost" id="quickModalChangeProduct" style="font-size:12px;padding:2px 8px;">Cambiar</button>
+        </div>
         <div id="quickModalItemsSummary" class="qi-items-summary" hidden></div>
         <div id="quickModalSingleConcept">
         <div class="quick-form-grid">
@@ -269,7 +275,7 @@
       </button>
     </div>
     <div class="form-modal__body">
-      <input id="quickProdservModalInput" class="form-modal__input" placeholder="Buscar…" autocomplete="off" />
+      <input id="quickProdservModalInput" class="form-modal__input" placeholder="Buscar…" autocomplete="off" aria-label="Buscar clave de producto o servicio" />
       <div id="quickProdservModalResults" class="form-modal__results"></div>
     </div>
   </div>
@@ -284,7 +290,7 @@
       <button type="button" class="quick-invoice-modal__close" id="qiClientPickerClose" aria-label="Cerrar" data-close="true">&times;</button>
     </div>
     <div class="quick-invoice-modal__body">
-      <input id="qiClientPickerSearch" class="input" placeholder="Buscar por razón social o RFC…" autocomplete="off" />
+      <input id="qiClientPickerSearch" class="input" placeholder="Buscar por razón social o RFC…" autocomplete="off" aria-label="Buscar cliente por razón social o RFC" />
       <div id="qiClientPickerCount" class="muted u-mt-2 u-text-12"></div>
       <div id="qiClientPickerList" class="qi-picker-list" role="listbox" aria-label="Clientes"></div>
     </div>
@@ -300,7 +306,7 @@
       <button type="button" class="quick-invoice-modal__close" id="qiProductPickerClose" aria-label="Cerrar" data-close="true">&times;</button>
     </div>
     <div class="quick-invoice-modal__body">
-      <input id="qiProductPickerSearch" class="input" placeholder="Buscar producto…" autocomplete="off" />
+      <input id="qiProductPickerSearch" class="input" placeholder="Buscar producto…" autocomplete="off" aria-label="Buscar producto" />
       <div id="qiProductPickerCount" class="muted u-mt-2 u-text-12"></div>
       <div id="qiProductPickerList" class="qi-picker-list" role="listbox" aria-label="Productos"></div>
     </div>

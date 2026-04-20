@@ -42,6 +42,7 @@ def build_invoice_payload(
     customer: dict[str, Any],
     items: list[dict[str, Any]] | None,
     payments: list[dict[str, Any]] | None = None,
+    related_documents: list[dict[str, Any]] | None = None,
     cfdi_use: str,
     payment_form: str,
     payment_method: str,
@@ -79,6 +80,8 @@ def build_invoice_payload(
         payload["items"] = items
     if payments is not None:
         payload["payments"] = payments
+    if related_documents:
+        payload["related_documents"] = related_documents
     if series:
         payload["series"] = series
     if folio_number is not None:

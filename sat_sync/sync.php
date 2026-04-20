@@ -192,17 +192,20 @@ $service = new Service($requestBuilder, $webClient);
 // === Upsert statement (se reutiliza en cada ventana) ===
 $upsert = $pdo->prepare(
     'INSERT INTO sat_cfdi (
-        issuer_id, direction, uuid, fecha_emision, rfc_emisor, rfc_receptor, total, moneda, status, metadata_json, updated_at
+        issuer_id, direction, uuid, fecha_emision, rfc_emisor, nombre_emisor, rfc_receptor, nombre_receptor, total, moneda, status, tipo_comprobante, metadata_json, updated_at
      ) VALUES (
-        :issuer_id, :direction, :uuid, :fecha_emision, :rfc_emisor, :rfc_receptor, :total, :moneda, :status, :metadata_json, datetime(\'now\')
+        :issuer_id, :direction, :uuid, :fecha_emision, :rfc_emisor, :nombre_emisor, :rfc_receptor, :nombre_receptor, :total, :moneda, :status, :tipo_comprobante, :metadata_json, datetime(\'now\')
      )
      ON CONFLICT(issuer_id, direction, uuid) DO UPDATE SET
         fecha_emision=excluded.fecha_emision,
         rfc_emisor=excluded.rfc_emisor,
+        nombre_emisor=excluded.nombre_emisor,
         rfc_receptor=excluded.rfc_receptor,
+        nombre_receptor=excluded.nombre_receptor,
         total=excluded.total,
         moneda=excluded.moneda,
         status=excluded.status,
+        tipo_comprobante=excluded.tipo_comprobante,
         metadata_json=excluded.metadata_json,
         updated_at=datetime(\'now\')'
 );
@@ -341,16 +344,20 @@ $runOneWindow = function (DateTimeImmutable $from, DateTimeImmutable $to) use (
         $count = 0;
         foreach ($reader->metadata() as $uuid => $m) {
             $uuidNorm = strtolower((string) $m->uuid);
+            $monto = property_exists($m, 'monto') ? (float)$m->monto : (float)($m->total ?? 0);
             $upsert->execute([
                 ':issuer_id' => $issuerId,
                 ':direction' => $direction,
                 ':uuid' => $uuidNorm,
                 ':fecha_emision' => (string)($m->fechaEmision ?? ''),
                 ':rfc_emisor' => (string)($m->rfcEmisor ?? ''),
+                ':nombre_emisor' => (string)($m->nombreEmisor ?? ''),
                 ':rfc_receptor' => (string)($m->rfcReceptor ?? ''),
-                ':total' => (float)($m->total ?? 0),
+                ':nombre_receptor' => (string)($m->nombreReceptor ?? ''),
+                ':total' => $monto,
                 ':moneda' => (string)($m->moneda ?? 'MXN'),
                 ':status' => (string)($m->estatus ?? ''),
+                ':tipo_comprobante' => (string)($m->efectoComprobante ?? ''),
                 ':metadata_json' => json_encode($m, JSON_UNESCAPED_UNICODE),
             ]);
             $count++;

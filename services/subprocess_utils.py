@@ -29,16 +29,26 @@ def run_cmd(
     if not args:
         raise ValueError("args vacío")
     try:
-        r = subprocess.run(
+        proc = subprocess.Popen(
             [str(a) for a in args],
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
             cwd=cwd,
             env=env,
-            timeout=int(timeout),
+        )
+        try:
+            stdout_data, stderr_data = proc.communicate(timeout=int(timeout))
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait()
+            raise
+        r = subprocess.CompletedProcess(
+            args=proc.args, returncode=proc.returncode,
+            stdout=stdout_data, stderr=stderr_data,
         )
     except subprocess.TimeoutExpired as e:
-        logger.exception("subprocess timeout: %s", args[:2])
+        logger.exception("subprocess timeout (killed): %s", args[:2])
         raise ExternalServiceError(
             code="SUBPROCESS_TIMEOUT",
             public_message="No pudimos completar la acción con SAT. Intenta de nuevo.",
