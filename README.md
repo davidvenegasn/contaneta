@@ -10,7 +10,7 @@ El schema de la base de datos se gestiona **solo por migraciones**. Al arrancar 
 
 - **Crear/actualizar schema:** No hace falta ejecutar ningún script manual; las migraciones se aplican al iniciar la app.
 - **Documentación completa:** [MIGRATIONS.md](MIGRATIONS.md) — cómo funciona el runner, cómo crear una migración nueva, cómo probar con DB desde cero o DB vieja, y qué hacer si aparecen errores WAL/SHM (`invoicing.db-wal`, `invoicing.db-shm`).
-- **Operación:** [OPERATIONS.md](OPERATIONS.md) — un solo lugar para operar: checklist de producción, deploy, backups, restore, health, cron (worker SAT y backups) y logging. Pensado para que cualquier persona pueda seguir los pasos sin ser programador.
+- **Operación:** [OPERATIONS.md](docs/ops/OPERATIONS.md) — un solo lugar para operar: checklist de producción, deploy, backups, restore, health, cron (worker SAT y backups) y logging. Pensado para que cualquier persona pueda seguir los pasos sin ser programador.
 
 ---
 
@@ -60,7 +60,7 @@ El portal **no depende de `?token=` en la URL**. El token se usa solo para inici
 
 **Seguridad mínima:** Cookie con `HttpOnly`, `SameSite=Lax`, `Secure` según entorno (`COOKIE_SECURE=1` en producción). TTL configurable con `SESSION_TTL_DAYS` (por defecto 7). Se recomienda definir `SESSION_SECRET` en producción.
 
-**Guía self-serve SAT (flujo completo):** Para que cualquier usuario siga el flujo desde registro hasta factura rápida — Conectar SAT (FIEL), validar, sincronizar, ver emitidas/recibidas y descargar XML/PDF — ver **[SELF_SERVE_SAT.md](SELF_SERVE_SAT.md)**.
+**Guía self-serve SAT (flujo completo):** Para que cualquier usuario siga el flujo desde registro hasta factura rápida — Conectar SAT (FIEL), validar, sincronizar, ver emitidas/recibidas y descargar XML/PDF — ver **[SELF_SERVE_SAT.md](docs/guides/SELF_SERVE_SAT.md)**.
 
 ---
 

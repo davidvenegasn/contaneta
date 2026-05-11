@@ -7,4 +7,4 @@ Estos scripts estaban en la raíz del proyecto como `db_migrate_*.py` y han sido
 - `migrations/*.sql` (aplicadas en orden por `migrations_runner.apply_migrations()`)
 - Lógica Python inline en `migrations_runner.py` (versiones 003, 004, 006, 008, 011, 014, 016)
 
-Ver **MIGRATION_LEGACY_MAP.md** en la raíz del proyecto para la relación script → migración equivalente.
+Ver **docs/archive/MIGRATION_LEGACY_MAP.md** en la raíz del proyecto para la relación script → migración equivalente.

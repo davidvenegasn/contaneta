@@ -1,6 +1,6 @@
 # Runbook de operación — Conta Invoicing
 
-> **Consolidado en [OPERATIONS.md](OPERATIONS.md).** Este archivo se mantiene por referencia; para operar (backup, restore, cron SAT, health, checklist de producción) usa **OPERATIONS.md**.
+> **Consolidado en [OPERATIONS.md](docs/ops/OPERATIONS.md).** Este archivo se mantiene por referencia; para operar (backup, restore, cron SAT, health, checklist de producción) usa **OPERATIONS.md**.
 
 Guía para **operar** el sistema en producción: desplegar, hacer backups, restaurar y revisar que todo funcione. **Operable por ti aunque no seas programador:** los comandos se pueden copiar y pegar; solo sustituye las rutas indicadas por las de tu servidor.
 
@@ -147,7 +147,7 @@ Ejecuta primero el backup de la DB y luego el de storage. Usa las mismas variabl
 
 ## 4. Restore (restaurar desde backup)
 
-Guía rápida en la raíz del proyecto: **`RESTORE.md`**.  
+Guía rápida en la raíz del proyecto: **`docs/ops/RESTORE.md`**.  
 Pasos detallados (comandos copy-paste): **`scripts/restore.md`**.
 
 En ambos se indica:
@@ -318,8 +318,8 @@ Si quieres **retención de 14 días** en los backups:
 | Backup base de datos | `./scripts/backup_db.sh` (retención: `BACKUP_RETAIN_DAYS`) |
 | Backup storage (XMLs) | `./scripts/backup_storage_xml.sh` (retención: `BACKUP_RETAIN_DAYS`) |
 | Backup completo (DB + storage) | `./scripts/backup_all.sh` |
-| Restaurar DB o storage | **RESTORE.md** y **scripts/restore.md** |
+| Restaurar DB o storage | **docs/ops/RESTORE.md** y **scripts/restore.md** |
 | Seguir una petición en logs | Cabecera `X-Request-ID` → `grep "<id>" /ruta/app.log` |
 | Worker SAT (cola) | `python3 scripts/sat_worker.py` |
 
-Más detalles: migraciones **MIGRATIONS.md**; variables de entorno y seguridad **README**, **.env.example**, **SECURITY_MINIMUM.md**.
+Más detalles: migraciones **MIGRATIONS.md**; variables de entorno y seguridad **README**, **.env.example**, **docs/archive/SECURITY_MINIMUM.md**.

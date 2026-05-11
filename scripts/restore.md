@@ -160,4 +160,4 @@ Sigue primero **toda** la sección 1 (restaurar DB) y luego **toda** la sección
   `mv PROYECTO/storage.old PROYECTO/storage`  
   y reiniciar la app.
 
-Más detalles de operación en **OPERATIONS.md** (deploy, backup, cron, health).
+Más detalles de operación en **docs/ops/OPERATIONS.md** (deploy, backup, cron, health).
