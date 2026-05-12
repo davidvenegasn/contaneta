@@ -1658,8 +1658,25 @@ def register_bank_routes(router, templates):
                         ym_val = r.get("ym") or ""
                         if ym_val:
                             months_with_movements.append({"ym": ym_val, "n": int(r.get("n") or 0), "label": ym_to_label(ym_val)})
+            # Balance mismatch banner data
+            balance_mismatch_info = None
+            if table_exists(conn, "bank_statements") and has_column(conn, "bank_statements", "has_balance_mismatch"):
+                _bm_rows = conn.execute(
+                    "SELECT id, has_balance_mismatch, opening_balance, closing_balance, computed_closing_balance, balance_diff FROM bank_statements WHERE issuer_id = ? AND period_month = ? AND has_balance_mismatch = 1",
+                    (issuer_id, period_month),
+                ).fetchall()
+                if _bm_rows:
+                    _bm = _db_row_to_dict(_bm_rows[0])
+                    balance_mismatch_info = {
+                        "statement_id": _bm["id"],
+                        "opening": float(_bm.get("opening_balance") or 0),
+                        "expected_closing": float(_bm.get("closing_balance") or 0),
+                        "computed_closing": float(_bm.get("computed_closing_balance") or 0),
+                        "diff": float(_bm.get("balance_diff") or 0),
+                    }
         except Exception as e:
             logger.warning("portal movimientos: error cargando datos (%s), mostrando lista vacía", e)
+            balance_mismatch_info = None
         finally:
             if conn is not None:
                 try:
@@ -1710,6 +1727,7 @@ def register_bank_routes(router, templates):
                 only_real_expenses=1 if only_real_expenses else 0,
                 statements_opt=statements_opt,
                 concil_stats=concil_stats,
+                balance_mismatch=balance_mismatch_info,
                 csrf_token=csrf_service.generate_csrf_token(),
             )
         except Exception as e:

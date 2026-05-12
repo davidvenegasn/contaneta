@@ -485,6 +485,8 @@ def ingest_bank_statement(
                     ),
                 )
             inserted_count += 1
+        # Balance mismatch detection
+        _check_balance_mismatch(conn, statement_id, metadata)
         conn.commit()
         return {
             "ok": True,
@@ -505,6 +507,34 @@ def ingest_bank_statement(
             conn.close()
         except Exception:
             pass
+
+
+def _check_balance_mismatch(conn: Any, statement_id: int, metadata: dict[str, Any]) -> None:
+    """Compare opening + movements vs closing balance. Update bank_statements if mismatch."""
+    if not has_column(conn, "bank_statements", "has_balance_mismatch"):
+        return
+    opening = metadata.get("opening_balance")
+    closing = metadata.get("closing_balance")
+    if opening is None or closing is None:
+        return
+    try:
+        opening = float(opening)
+        closing = float(closing)
+    except (TypeError, ValueError):
+        return
+    row = conn.execute(
+        "SELECT COALESCE(SUM(deposito), 0) AS dep, COALESCE(SUM(retiro), 0) AS ret FROM bank_movements WHERE bank_statement_id = ?",
+        (statement_id,),
+    ).fetchone()
+    sum_dep = float(row[0] if isinstance(row, (tuple, list)) else row["dep"])
+    sum_ret = float(row[1] if isinstance(row, (tuple, list)) else row["ret"])
+    computed = opening + sum_dep - sum_ret
+    diff = abs(computed - closing)
+    has_mismatch = 1 if diff > 0.01 else 0
+    conn.execute(
+        "UPDATE bank_statements SET has_balance_mismatch = ?, computed_closing_balance = ?, balance_diff = ? WHERE id = ?",
+        (has_mismatch, round(computed, 2), round(diff, 2), statement_id),
+    )
 
 
 def _statement_fingerprint_preview(
@@ -805,6 +835,8 @@ def commit_preview_to_db(
                             ),
                         )
                 inserted_count += 1
+        # Balance mismatch detection
+        _check_balance_mismatch(conn, statement_id, metadata)
         conn.commit()
         return {
             "ok": True,
