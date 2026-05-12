@@ -3067,7 +3067,6 @@ body.month-picker-open .portal-shell {
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 280px;
-  display: block;
 }
 
 .bank-concept-editable,
