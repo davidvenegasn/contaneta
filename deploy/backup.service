@@ -1,0 +1,22 @@
+[Unit]
+Description=ContaNeta daily SQLite backup to S3
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=contaneta
+Group=contaneta
+WorkingDirectory=/opt/contaneta/app
+ExecStart=/opt/contaneta/app/scripts/backup_to_s3.sh
+Environment=APP_DB_PATH=/opt/contaneta/data/invoicing.db
+Environment=BACKUP_S3_BUCKET=s3://contaneta-backups-prod
+TimeoutStartSec=600
+StandardOutput=journal
+StandardError=journal
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/tmp /var/log/contaneta
+PrivateTmp=true

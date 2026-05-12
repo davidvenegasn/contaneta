@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+# backup_to_s3.sh.example — Production backup script for ContaNeta.
+# Rename to backup_to_s3.sh and configure before use.
+# Cron: 0 3 * * * /opt/contaneta/app/scripts/backup_to_s3.sh
+set -euo pipefail
+
+# ---------- Configuration ----------
+DB_PATH="${APP_DB_PATH:-/opt/contaneta/data/invoicing.db}"
+S3_BUCKET="${BACKUP_S3_BUCKET:-s3://contaneta-backups-prod}"
+RETENTION_DAYS=30
+LOG_FILE="/var/log/contaneta/backup.log"
+TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+BACKUP_DIR="/tmp/contaneta_backup_${TIMESTAMP}"
+
+log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG_FILE"; }
+
+# ---------- Step 1: Atomic SQLite backup ----------
+log "Starting backup of $DB_PATH"
+mkdir -p "$BACKUP_DIR"
+BACKUP_FILE="${BACKUP_DIR}/invoicing_${TIMESTAMP}.db"
+
+sqlite3 "$DB_PATH" ".backup '${BACKUP_FILE}'"
+log "SQLite backup created: $BACKUP_FILE ($(du -h "$BACKUP_FILE" | cut -f1))"
+
+# ---------- Step 2: Integrity check ----------
+INTEGRITY=$(sqlite3 "$BACKUP_FILE" "PRAGMA integrity_check;" 2>&1)
+if [ "$INTEGRITY" != "ok" ]; then
+    log "ERROR: Backup integrity check failed: $INTEGRITY"
+    rm -rf "$BACKUP_DIR"
+    exit 1
+fi
+log "Integrity check: OK"
+
+# ---------- Step 3: Compress ----------
+COMPRESSED="${BACKUP_FILE}.gz"
+gzip -9 "$BACKUP_FILE"
+log "Compressed: $(du -h "$COMPRESSED" | cut -f1)"
+
+# ---------- Step 4: Upload to S3 ----------
+S3_KEY="daily/${TIMESTAMP}/invoicing_${TIMESTAMP}.db.gz"
+aws s3 cp "$COMPRESSED" "${S3_BUCKET}/${S3_KEY}" --storage-class STANDARD_IA
+log "Uploaded to ${S3_BUCKET}/${S3_KEY}"
+
+# ---------- Step 5: Verify upload ----------
+aws s3 ls "${S3_BUCKET}/${S3_KEY}" > /dev/null 2>&1
+log "Verified: file exists in S3"
+
+# ---------- Step 6: Rotate old backups ----------
+CUTOFF=$(date -d "${RETENTION_DAYS} days ago" +%Y%m%d 2>/dev/null || date -v-${RETENTION_DAYS}d +%Y%m%d)
+DELETED=0
+while IFS= read -r key; do
+    dir_date=$(echo "$key" | grep -oP 'daily/\K\d{8}' || true)
+    if [ -n "$dir_date" ] && [ "$dir_date" -lt "$CUTOFF" ]; then
+        aws s3 rm "${S3_BUCKET}/${key}"
+        DELETED=$((DELETED + 1))
+    fi
+done < <(aws s3 ls "${S3_BUCKET}/daily/" --recursive | awk '{print $4}')
+log "Rotated $DELETED backups older than $RETENTION_DAYS days"
+
+# ---------- Cleanup ----------
+rm -rf "$BACKUP_DIR"
+log "Backup complete. Duration: ${SECONDS}s"
