@@ -372,7 +372,8 @@ def register_invoices_routes(router, templates):
                 """, (issuer_id,))
                 for m in months:
                     m["label"] = ym_to_label(m["ym"])
-                month_totals = _get_month_totals(issuer_id, ym, "received")
+                _ppd_filter = "PPD" if tab == "ppd" else None
+                month_totals = _get_month_totals(issuer_id, ym, "received", metodo_pago=_ppd_filter)
                 base_extra.update({
                     "rows": rows,
                     "months": months,

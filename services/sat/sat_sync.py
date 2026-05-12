@@ -57,7 +57,7 @@ def get_sat_sync_status(issuer_id: int) -> dict:
     return {"last_sync_at": last_sync_at, "status": status, "message": message}
 
 
-def get_month_totals(issuer_id: int, ym: str, direction: str) -> dict:
+def get_month_totals(issuer_id: int, ym: str, direction: str, metodo_pago: str = None) -> dict:
     """Totales del mes para emitidas o recibidas: base (subtotal), IVA y retenciones."""
     conn = db()
     try:
@@ -68,7 +68,10 @@ def get_month_totals(issuer_id: int, ym: str, direction: str) -> dict:
             base_where += " AND (total IS NULL OR total >= 0.01)"
         else:
             base_where += " AND total IS NOT NULL AND total >= 0.01 AND (tipo_comprobante IS NULL OR UPPER(TRIM(tipo_comprobante)) != 'N')"
-        params = (issuer_id, direction, ym)
+        params: list = [issuer_id, direction, ym]
+        if metodo_pago:
+            base_where += " AND UPPER(TRIM(COALESCE(metodo_pago,''))) = ?"
+            params.append(metodo_pago.upper().strip())
         has_retenciones = has_column(conn, "sat_cfdi", "retenciones")
         if has_retenciones:
             row = conn.execute(
