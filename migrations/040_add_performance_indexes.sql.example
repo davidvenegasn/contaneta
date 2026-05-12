@@ -1,0 +1,22 @@
+-- Performance indexes — rename to 040_add_performance_indexes.sql to activate
+-- All use IF NOT EXISTS for idempotency
+
+-- HIGH: Worker job dedupe/claim hot path
+CREATE INDEX IF NOT EXISTS idx_jobs_issuer_name_hash_status
+    ON jobs (issuer_id, name, payload_hash, status);
+
+-- HIGH: Admin dashboard status counts + portal deduction checks
+CREATE INDEX IF NOT EXISTS idx_sat_cfdi_issuer_direction_status
+    ON sat_cfdi (issuer_id, direction, status);
+
+-- HIGH: Invoice creation + catalog sync profile lookups
+CREATE INDEX IF NOT EXISTS idx_customer_profiles_issuer_rfc
+    ON customer_profiles (issuer_id, rfc);
+
+-- MEDIUM: Reconciliation page aggregations
+CREATE INDEX IF NOT EXISTS idx_bank_movements_issuer_period_cat
+    ON bank_movements (issuer_id, period_month, categoria);
+
+-- MEDIUM: Pending invoice listings
+CREATE INDEX IF NOT EXISTS idx_invoices_issuer_pm_date
+    ON invoices (issuer_id, payment_method, issue_date DESC);
