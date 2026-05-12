@@ -1,223 +1,68 @@
-# Conta Invoicing MVP
+# ContaNeta
 
-Aplicación de facturación y portal con integración SAT (CFDI).
+Multi-tenant invoicing platform for Mexican tax compliance (CFDI/SAT). Server-rendered portal with FastAPI, SQLite, and Jinja2.
 
----
+## Stack
 
-## Database lifecycle
+- **Backend:** Python 3.11+, FastAPI, SQLite (WAL mode), Gunicorn
+- **Frontend:** Jinja2 templates, vanilla JS/CSS (no build step)
+- **Billing:** Stripe (subscriptions + webhooks)
+- **SAT integration:** PHP scripts via subprocess (FIEL validation, CFDI XML sync)
 
-El schema de la base de datos se gestiona **solo por migraciones**. Al arrancar la app se ejecutan las migraciones pendientes sobre `invoicing.db` (o la ruta en `APP_DB_PATH`).
-
-- **Crear/actualizar schema:** No hace falta ejecutar ningún script manual; las migraciones se aplican al iniciar la app.
-- **Documentación completa:** [MIGRATIONS.md](MIGRATIONS.md) — cómo funciona el runner, cómo crear una migración nueva, cómo probar con DB desde cero o DB vieja, y qué hacer si aparecen errores WAL/SHM (`invoicing.db-wal`, `invoicing.db-shm`).
-- **Operación:** [OPERATIONS.md](docs/ops/OPERATIONS.md) — un solo lugar para operar: checklist de producción, deploy, backups, restore, health, cron (worker SAT y backups) y logging. Pensado para que cualquier persona pueda seguir los pasos sin ser programador.
-
----
-
-## Arranque
+## Quick Start
 
 ```bash
-uvicorn app:app --reload
-# o
+# 1. Clone and enter the project
+git clone <repo-url> && cd conta_invoicing_mvp_PRO_clean
+
+# 2. Run the setup script (creates venv, installs deps)
+bash scripts/setup_dev.sh
+
+# 3. Copy and configure environment
+cp .env.example .env
+# Edit .env — defaults work for local dev
+
+# 4. Start the server (auto-applies DB migrations on startup)
 ./run_server.sh
-```
 
-Configuración: ver sección **Variables de entorno** más abajo.
-
----
-
-## Variables de entorno
-
-| Variable | Uso | Recomendación |
-|----------|-----|----------------|
-| `ENV` | `dev` (default) o `prod`. Define defaults de `DEV_MODE` y `COOKIE_SECURE`. | En producción: `ENV=prod`. |
-| `APP_DB_PATH` | Ruta al archivo SQLite (por defecto `invoicing.db` en la raíz). | Opcional en desarrollo. |
-| `APP_STORAGE_PATH` | Root de `storage/` (uploads, exports, XMLs, credenciales). Si no se define, usa `./storage` dentro del proyecto. | En producción: ruta absoluta (ej. `/var/app/storage`). |
-| `DEV_MODE` | Modo desarrollo (ej. log de emails en consola). Default según ENV. | En producción `0`. |
-| `ALLOW_DEMO_PORTAL` | `1` = sin cookie válida, rutas HTML pueden usar issuer demo. Default `0`: sin cookie → redirect `/login`. | Solo desarrollo local; en prod no definir (0). |
-| `DEV_TOKEN` | Token del issuer demo cuando `ALLOW_DEMO_PORTAL=1`. Debe existir en `issuer_tokens`. | Solo desarrollo; no exponer en producción. |
-| `SESSION_SECRET` | Clave para firmar la cookie de sesión (valor fijo). | **Obligatorio en producción**; generar con `secrets.token_hex(32)`. |
-| `SESSION_TTL_DAYS` | Días de validez de la cookie (por defecto 7). | Ajustar según política. |
-| `COOKIE_SECURE` | `1` = cookie solo por HTTPS. Default: 0 en local, 1 en prod. | En local con HTTP: `0`. En prod con HTTPS: `1`. |
-| `FIRM_USER_EMAIL` | Email del usuario “firma” (admin interno). | Opcional. |
-| `SITE_URL` | URL base del sitio (para OAuth, verificación de correo y reset password). | En producción con dominio propio. |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` | Envío de correos (verificación, recuperación de contraseña). | En producción para emails reales. Sin SMTP y con `DEV_MODE=1`, los enlaces se loguean en consola. |
-| `GOOGLE_CLIENT_ID` | OAuth Google (login con Google). | Opcional. |
-| `FACEBOOK_APP_ID` | OAuth Facebook (login con Facebook). | Opcional. |
-
-Registro y login usan **bcrypt** para el hash de contraseñas. Rate limit por IP: login 5 intentos/60 s, registro/signup 3/60 s, forgot password 3/60 s. Los tokens de verificación y reset se guardan en DB como hash (nunca en claro).
-
----
-
-## Autenticación (portal)
-
-El portal **no depende de `?token=` en la URL**. El token se usa solo para iniciar sesión una vez.
-
-1. **Login:** Ir a `/login` e ingresar el token (o abrir `/login?token=TU_TOKEN`). Si el token es válido (`issuer_tokens`, `active=1`), se crea una sesión y se guarda una **cookie httpOnly** (`portal_session`). Redirige al portal sin token en la URL.
-2. **Navegación:** Las rutas del portal y las APIs usan la cookie para identificar al emisor. No hace falta volver a pasar el token.
-3. **Logout:** GET o POST `/logout` borra la cookie y redirige a la página pública.
-4. **Compatibilidad:** Si alguien entra con `?token=...` en una URL del portal, se inicia sesión y se redirige a la misma ruta sin el token.
-
-**Seguridad mínima:** Cookie con `HttpOnly`, `SameSite=Lax`, `Secure` según entorno (`COOKIE_SECURE=1` en producción). TTL configurable con `SESSION_TTL_DAYS` (por defecto 7). Se recomienda definir `SESSION_SECRET` en producción.
-
-**Guía self-serve SAT (flujo completo):** Para que cualquier usuario siga el flujo desde registro hasta factura rápida — Conectar SAT (FIEL), validar, sincronizar, ver emitidas/recibidas y descargar XML/PDF — ver **[SELF_SERVE_SAT.md](docs/guides/SELF_SERVE_SAT.md)**.
-
----
-
-## Convertir Edo. de Cuenta (PDF → Excel)
-
-En el portal: **Sidebar → “Convertir Edo. de Cuenta”** (`/portal/bank/pdf-to-excel`).
-
-- Sube un PDF (estado de cuenta) y descarga un **.xlsx**.
-- Si el PDF no trae tablas detectables, se genera un Excel con hoja **RAW** (texto línea por línea).
-
-**Dependencias:** `pdfplumber`, `pandas`, `openpyxl` (en `requirements.txt`).
-
-### Registro público
-
-Cualquier persona puede crear cuenta en **`/signup`** (o `/register`, que redirige a `/signup`): correo, contraseña (mín. 8 caracteres), RFC, razón social, régimen fiscal y código postal (opcional). La app crea en la base:
-
-- **users:** email (único), password_hash (bcrypt), nombre, active=1.
-- **issuers:** RFC, razón social, régimen fiscal y un token legacy en `issuer_tokens` (para transición).
-- **memberships:** un registro con `role = 'owner'` vinculando al usuario con el nuevo emisor.
-
-Tras el registro se inicia sesión por cookie y se redirige a `/portal/home`; el portal opera sin token en la URL. Se envía un correo de **verificación** (enlace `/verify-email?token=...`); si no hay SMTP configurado y `DEV_MODE=1`, el enlace se imprime en logs. **Recuperación de contraseña:** `/forgot` (solicitar por email) y `/reset-password?token=...` (establecer nueva contraseña); tokens con hash en DB, expiración 2 h.
-
-**Roles (memberships):** `owner` (cliente dueño del emisor), `admin` (superadministrador), `staff` (equipo), `viewer` (solo lectura), `accountant` (contador, legado).
-
-### Token legacy (transición)
-
-El acceso por **`/login?token=XXX`** sigue soportado: si el token existe en `issuer_tokens` y está activo, se crea sesión por cookie y se redirige al portal. No es necesario volver a pasar el token en la URL.
-
-### Primera vez / sin usuarios (enlace para entrar)
-
-Si aún no hay usuarios ni tokens en la base, crea un usuario demo y obtén el enlace directo:
-
-```bash
+# 5. Create a demo user (first time only)
 python scripts/ensure_demo_user.py
+# Then open http://127.0.0.1:8000/login?token=demo
 ```
 
-El script crea un emisor "Usuario Demo (desarrollo)" con token `demo` (o el que definas en `DEV_TOKEN`) si no existe, e imprime el **enlace para entrar a ese usuario**:
+The server runs at `http://127.0.0.1:8000`. The portal is at `/portal/home`.
 
-- **Enlace directo al portal (ese usuario):** `http://127.0.0.1:8000/portal/home?token=demo`
-- Con sesión: `http://127.0.0.1:8000/login?token=demo` → te redirige al portal y ya no necesitas el token en la URL.
-
-Con `ALLOW_DEMO_PORTAL=1` y `DEV_MODE=1`, si existe el usuario con token `demo`, puedes ir directo a `http://127.0.0.1:8000/portal/home` (sin token) y entrarás como demo. Por defecto `ALLOW_DEMO_PORTAL=0`: sin cookie se redirige a `/login`.
-
-### Cómo probar en local
-
-1. Arrancar la app: `uvicorn app:app --reload`
-2. Si no hay usuarios: ejecutar `python scripts/ensure_demo_user.py` y usar el enlace que imprime.
-3. Obtener un token válido (por ejemplo desde la base: `issuer_tokens.token` de un emisor activo).
-4. Abrir en el navegador: `http://127.0.0.1:8000/login?token=TU_TOKEN` (o ir a `http://127.0.0.1:8000/login` y pegar el token en el formulario).
-5. Tras el login serás redirigido a `/portal/home`. Navega por el portal: las URLs ya no llevan `?token=`.
-6. Probar logout: en el menú de usuario (avatar/chevron) → "Cerrar sesión", o ir a `http://127.0.0.1:8000/logout`. Vuelve a `/`; si intentas entrar a `/portal/home` sin cookie, serás redirigido a `/login`.
-
-**Nota:** Con `ALLOW_DEMO_PORTAL=1` y `DEV_MODE=1`, si no hay cookie ni token, el portal permite entrar con el emisor demo (token `DEV_TOKEN`). Por defecto `ALLOW_DEMO_PORTAL=0`: sin cookie válida siempre se redirige a `/login` (no hay “brinco” al demo). El emisor demo debe existir en la base (creado con `ensure_demo_user.py`).
-
-### Smoke test (registro, login y portal)
-
-Prueba automatizada del flujo: **registro** (email + contraseña) → **confirmar perfil** (nombre + crear issuer) → **onboarding** (RFC y razón social) → **login** → **GET /portal/home**. Valida códigos de respuesta (200/302) y que la página del portal contenga el contenido esperado. Si algo falla, el script imprime en qué paso falló y un fragmento de la respuesta.
-
-**Requisitos:** `requests` (incluido en `requirements.txt`). Servidor corriendo en `http://127.0.0.1:8000` o indicar otro puerto/URL.
+## Tests
 
 ```bash
-# Con el servidor ya levantado (por defecto puerto 8000)
-python3 scripts/smoke_onboarding.py
-
-# Servidor en otro puerto
-python3 scripts/smoke_onboarding.py --port 8010
-
-# Arrancar el servidor temporalmente en 8010 y ejecutar el test
-python3 scripts/smoke_onboarding.py --start-server --port 8010
-
-# URL base explícita
-python3 scripts/smoke_onboarding.py --base-url http://127.0.0.1:8000
+.venv/bin/pytest -q                              # All tests (17 currently)
+.venv/bin/pytest tests/test_health.py -v          # Single file
+.venv/bin/pytest tests/test_health.py::test_name  # Single test
 ```
 
-Salida esperada si todo va bien: `OK. Smoke onboarding: registro → confirmar perfil → onboarding (RFC) → login → /portal/home.`
+## Project Structure
 
----
+```
+app.py                  # FastAPI app, middleware, startup
+routers/
+  portal.py             # Portal HTML routes (/portal/*)
+  api.py                # JSON API routes (/api/*)
+  billing.py            # Stripe webhooks and billing
+  deps.py               # Shared dependencies (auth, tenant resolution)
+services/               # Business logic (stateless functions)
+database.py             # SQLite connection factory, helpers
+templates/              # Jinja2 templates (Spanish UI)
+static/                 # CSS, JS, images (no bundler)
+migrations/             # Numbered SQL files (auto-applied on startup)
+sat_sync/               # PHP scripts for SAT/CFDI integration
+tests/                  # Pytest suite
+scripts/                # Dev/ops utilities
+```
 
-## Impersonación (solo admin)
+## Key Documentation
 
-Los usuarios con **rol `admin`** en alguna membership pueden “entrar como” otro emisor (por `issuer_id` o `rfc`). Toda acción queda registrada en `audit_log`.
-
-### Permisos
-
-- **Solo rol `admin`** puede impersonar. Los usuarios con rol `owner`, `staff` o `viewer` no pueden (403).
-- En Panel Admin → Issuers solo los admin ven el botón "Entrar como"; la búsqueda por RFC/razón social/email está disponible para admin y owner.
-
-### Cómo desactivar la impersonación
-
-- En la base: quitar el rol admin de memberships, por ejemplo `UPDATE memberships SET role = 'owner' WHERE role = 'admin';`
-- No asignar `role = 'admin'` a nadie si no quieres que nadie pueda impersonar.
-
-### Auditoría
-
-En `audit_log` se registran: `login`, `logout`, `impersonate`, `stop_impersonate`, `download_xml`, `download_pdf`, `cfdi_view`, `register`, `admin_ops`, etc. La tabla incluye columnas `entity`, `entity_id`, `meta_json`, `ip`, `user_agent` (migración 011). Cualquier trigger de sync SAT debería llamar a `audit.log(action="sync_sat_trigger", ...)`.
-
-### Seguridad
-
-- Solo usuarios con al menos una membership con `role = 'admin'` pueden usar la impersonación.
-- Cualquier uso de impersonación (entrar y salir) se registra en la tabla `audit_log` (acción `impersonate` o `stop_impersonate`).
-
-### Pasos manuales para probar
-
-1. **Tener un usuario admin**  
-   En la base, asigna rol `admin` a un usuario en alguna membership:
-   ```sql
-   -- Ejemplo: dar rol admin al usuario con id 1 en el issuer 1
-   UPDATE memberships SET role = 'admin' WHERE user_id = 1 AND issuer_id = 1;
-   ```
-   (Si la tabla no tiene filas, crea antes un usuario y una membership con `INSERT` en `users` y `memberships`.)
-
-2. **Iniciar sesión como ese usuario**  
-   Login normal (email/teléfono + contraseña o token) y que la sesión sea para un issuer donde ese usuario tenga rol `admin`.
-
-3. **Impersonar**  
-   Desde el panel Admin → Issuers: clic en **"Entrar como"** (enlace a `GET /admin/impersonate/{issuer_id}`). O por API:  
-   - Por **issuer_id**:
-     ```bash
-     curl -X POST http://127.0.0.1:8000/admin/impersonate \
-       -H "Content-Type: application/json" \
-       -d '{"issuer_id": 2}' \
-       -c cookies.txt -b cookies.txt -L
-     ```
-   - Por **rfc**:
-     ```bash
-     curl -X POST http://127.0.0.1:8000/admin/impersonate \
-       -H "Content-Type: application/json" \
-       -d '{"rfc": "XAXX010101000"}' \
-       -c cookies.txt -b cookies.txt -L
-     ```
-   Debes haber hecho antes login y guardado la cookie en `cookies.txt` (por ejemplo con un login vía `curl` o desde el navegador y exportar cookies). La respuesta es una **redirección 302 a `/portal/home`**; al seguirla verás el portal del emisor suplantado.
-
-4. **Comprobar en el portal**  
-   En el portal debe verse el nombre/alias del emisor suplantado y el banner “Estás viendo el portal como **&lt;emisor&gt;**” con el enlace **“Volver a mi cuenta”**.
-
-5. **Salir de la impersonación**  
-   - En la UI: clic en **“Volver a mi cuenta”** (en el banner o en el menú de usuario).  
-   - O por API:
-     ```bash
-     curl -X POST http://127.0.0.1:8000/admin/stop-impersonate -b cookies.txt -L
-     ```
-   Tras esto se restaura la sesión a tu emisor original y se redirige a `/portal/home`.
-
-6. **Verificar auditoría**  
-   En la base:
-   ```sql
-   SELECT * FROM audit_log WHERE action IN ('impersonate', 'stop_impersonate') ORDER BY created_at DESC;
-   ```
-   Deben aparecer filas con `action = 'impersonate'` (al entrar como otro emisor) y `action = 'stop_impersonate'` (al volver a tu cuenta).
-
-### Tests rápidos (manual)
-
-| Paso | Acción | Resultado esperado |
-|------|--------|--------------------|
-| 1 | Usuario sin rol admin hace POST `/admin/impersonate` con body `{"issuer_id": 2}` | 403 Solo administradores |
-| 2 | Usuario admin hace POST `/admin/impersonate` con `{"issuer_id": id_inexistente}` | 400 Issuer no encontrado |
-| 3 | Usuario admin hace POST `/admin/impersonate` con `{"issuer_id": N}` (válido) | 302 → `/portal/home`, portal del issuer N |
-| 4 | En portal, comprobar banner y menú | Banner “Estás viendo el portal como …” y opción “Volver a mi cuenta” |
-| 5 | Clic en “Volver a mi cuenta” o POST `/admin/stop-impersonate` | 302 → `/portal/home`, portal del emisor original |
-| 6 | Consultar `audit_log` | Filas `impersonate` y `stop_impersonate` con `user_id` del admin y `target_issuer_id` correcto |
+- [CLAUDE.md](CLAUDE.md) — Architecture, conventions, and dev guidelines
+- [DEPLOY_GUIDE.md](DEPLOY_GUIDE.md) — Production deployment
+- [docs/ops/OPERATIONS.md](docs/ops/OPERATIONS.md) — Operations runbook
+- [docs/guides/](docs/guides/) — Admin, auth, billing, and SAT guides
+- [MIGRATIONS.md](MIGRATIONS.md) — Database migration system
