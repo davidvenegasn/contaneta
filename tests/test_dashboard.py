@@ -106,12 +106,12 @@ class TestDashboardEndpointOk:
         # At least one of these must be present in the page
         assert has_alerts or has_all_clear or has_empty, "Expected alert cards, all-clear message, or empty state"
 
-    def test_should_contain_next_actions_section(self, issuer_with_data):
+    def test_should_contain_activity_feed(self, issuer_with_data):
         _, cookies = issuer_with_data
         client = TestClient(app, raise_server_exceptions=False, cookies=cookies)
         r = client.get("/portal/home")
         assert r.status_code == 200
-        assert "next-actions-list" in r.text or "Siguiente paso" in r.text
+        assert "activity-feed" in r.text or "Actividad reciente" in r.text
 
     def test_should_contain_trend_chart_container(self, issuer_with_data):
         _, cookies = issuer_with_data
@@ -120,12 +120,12 @@ class TestDashboardEndpointOk:
         assert r.status_code == 200
         assert "trendChartContainer" in r.text
 
-    def test_should_reference_12_month_trend(self, issuer_with_data):
+    def test_should_reference_trend_chart(self, issuer_with_data):
         _, cookies = issuer_with_data
         client = TestClient(app, raise_server_exceptions=False, cookies=cookies)
         r = client.get("/portal/home")
         assert r.status_code == 200
-        assert "months=12" in r.text or "12 meses" in r.text
+        assert "months=6" in r.text or "Tendencia" in r.text
 
     def test_should_contain_quick_actions_section(self, issuer_with_data):
         _, cookies = issuer_with_data
