@@ -40,6 +40,19 @@ def parse_statement(bank_name: str, pdf_path: str) -> list[dict[str, Any]]:
     return parser_fn(pdf_path)
 
 
+def _register_builtin_parsers() -> None:
+    """Register all built-in parsers."""
+    try:
+        from services.bank.parsers.bbva import EXPERIMENTAL as bbva_exp
+        from services.bank.parsers.bbva import parse_bbva
+        register_parser("BBVA", parse_bbva, experimental=bbva_exp)
+    except ImportError:
+        pass
+
+
+_register_builtin_parsers()
+
+
 def list_parsers() -> dict[str, dict[str, Any]]:
     """Return info about all registered parsers."""
     return {
