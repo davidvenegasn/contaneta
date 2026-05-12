@@ -1,0 +1,450 @@
+/**
+ * responsive.css — Targeted mobile responsive fixes for all portal pages.
+ *
+ * Loaded AFTER portal.css and all component CSS so overrides cascade correctly.
+ * Breakpoints follow existing codebase conventions:
+ *   1099px — sidebar collapse (already in portal_rail.css)
+ *    980px — dashboard grid collapse (already in portal.css)
+ *    768px — primary mobile breakpoint
+ *    640px — compact mobile / invoice card view
+ *    480px — small phones
+ *    419px — very narrow (iPhone SE / 360px)
+ *    390px — ultra-narrow safe-area
+ */
+
+/* ==========================================================================
+   A) TABLES — horizontal scroll wrapper at < 768px
+   Ensures all data tables get touch-friendly horizontal scrolling.
+   Existing .table-wrap gets -webkit-overflow-scrolling in portal.css;
+   this adds the missing overflow-x: auto for the generic .table-wrap class
+   and a min-width on tables so columns don't crush.
+   ========================================================================== */
+
+@media (max-width: 767px) {
+  /* Generic table wrappers: ensure horizontal scroll */
+  .table-wrap,
+  [id$="TableWrap"] {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    max-width: 100%;
+  }
+
+  /* Tables inside scroll wrappers: enforce minimum readable width */
+  .table-wrap > table,
+  [id$="TableWrap"] > table {
+    min-width: 580px;
+  }
+
+  /* Exception: tables that are reflowed into cards at 640px should not have min-width */
+  .card--invoice-list .table-wrap > table,
+  .table-wrap--overflow > .bank-movements-table {
+    min-width: 0;
+  }
+
+  /* Scroll hint: subtle gradient fade on right edge when scrollable */
+  .table-wrap {
+    position: relative;
+  }
+}
+
+
+/* ==========================================================================
+   B) SIDEBAR / RAIL — already handled in portal_rail.css (1099px breakpoint).
+   The hamburger toggle is defined and wired in portal_rail.css.
+   These rules polish edge cases not yet covered.
+   ========================================================================== */
+
+@media (max-width: 767px) {
+  /* Ensure drawer doesn't exceed viewport on small phones */
+  body.mobile-menu-open .portal-sidebar-unified {
+    max-width: 85vw;
+  }
+}
+
+
+/* ==========================================================================
+   C) CARDS & GRID LAYOUTS — stack vertically on mobile
+   The .grid-2 and .grid-3 classes are used in modal forms (products,
+   clients, providers) but never defined in CSS. Define them as grids
+   with mobile-first stacking.
+   ========================================================================== */
+
+/* Grid utility classes: desktop = columns, mobile = stack */
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3, 12px);
+}
+
+.grid-3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: var(--space-3, 12px);
+}
+
+.grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-3, 12px);
+}
+
+@media (max-width: 767px) {
+  .grid-2,
+  .grid-3,
+  .grid-4 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Dashboard chart card + legend: stack on mobile */
+@media (max-width: 767px) {
+  .dashboard-chart-card__head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-2, 8px);
+  }
+
+  .dashboard-chart-card__legend {
+    flex-wrap: wrap;
+    gap: var(--space-2, 8px) var(--space-4, 16px);
+  }
+}
+
+
+/* ==========================================================================
+   D) FORMS — full-width inputs on mobile
+   ========================================================================== */
+
+@media (max-width: 767px) {
+  /* All form inputs, selects, textareas: full width on mobile */
+  .portal .field,
+  .portal .form-group {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .portal .field .input,
+  .portal .field input,
+  .portal .field select,
+  .portal .field textarea,
+  .portal .form-group .input,
+  .portal .form-group input,
+  .portal .form-group select,
+  .portal .form-group textarea {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  /* CFDI detail grid rows: stack label/value on narrow screens */
+  .cfdi-detail-dl__row {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+}
+
+
+/* ==========================================================================
+   E) MODALS — full-screen on very small screens (< 480px)
+   ========================================================================== */
+
+@media (max-width: 479px) {
+  .modal {
+    padding: 0 !important;
+  }
+
+  .modal__panel {
+    max-width: 100vw !important;
+    max-height: 100vh !important;
+    max-height: 100dvh !important;
+    width: 100vw !important;
+    min-width: 0 !important;
+    height: 100vh;
+    height: 100dvh;
+    border-radius: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* Size variants also go full-screen */
+  .modal__panel--sm,
+  .modal__panel--lg,
+  .modal__panel--full {
+    max-width: 100vw !important;
+  }
+
+  .modal__head {
+    padding: 14px 16px;
+    padding-top: calc(14px + env(safe-area-inset-top, 0px));
+  }
+
+  .modal__body {
+    padding: 16px;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  .modal__foot {
+    padding: 12px 16px;
+    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+
+/* ==========================================================================
+   F) CHARTS / METRICS — stack horizontally-laid metrics vertically
+   The dashboard-metrics grid already handles 2x2 at 768px. This adds
+   chart legend wrapping and ensures canvas-based charts don't overflow.
+   ========================================================================== */
+
+@media (max-width: 767px) {
+  /* Chart canvases must not exceed container width */
+  .dashboard-chart-card canvas,
+  .chart-container canvas {
+    max-width: 100%;
+    height: auto !important;
+  }
+
+  /* KPI/metric rows that are flex-based: stack vertically */
+  .bank-result__grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .bank-preview-kpis {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 419px) {
+  .bank-result__grid,
+  .bank-preview-kpis {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+/* ==========================================================================
+   G) TYPOGRAPHY — slightly smaller headings on mobile
+   The page-title already scales at 768px (portal.css). This adds
+   h2/h3 scaling and section-title compaction.
+   ========================================================================== */
+
+@media (max-width: 767px) {
+  .portal h1 {
+    font-size: var(--text-2xl, 1.5rem);
+  }
+
+  .portal h2,
+  .portal .section-title {
+    font-size: var(--text-lg, 1.25rem);
+  }
+
+  .portal h3 {
+    font-size: var(--text-md, 1.0625rem);
+  }
+
+  /* Page title compact variant (home greeting) */
+  .page-title--compact {
+    font-size: 1.25rem;
+  }
+
+  /* CFDI detail section titles */
+  .cfdi-detail-section-title {
+    font-size: var(--text-base, 1rem);
+  }
+}
+
+@media (max-width: 479px) {
+  .portal h1 {
+    font-size: var(--text-xl, 1.375rem);
+  }
+
+  .portal h2,
+  .portal .section-title {
+    font-size: var(--text-md, 1.0625rem);
+  }
+
+  .page-title--compact {
+    font-size: 1.125rem;
+  }
+}
+
+
+/* ==========================================================================
+   H) BUTTONS — full-width action buttons on mobile
+   ========================================================================== */
+
+@media (max-width: 479px) {
+  /* Modal footer buttons: fill available width */
+  .modal__foot .btn {
+    flex: 1;
+    min-width: 0;
+    justify-content: center;
+  }
+
+  /* Page header actions: stack vertically */
+  .page-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-3, 12px);
+  }
+
+  .page-header .btn,
+  .page-header a.btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* FIEL actions: already handled in portal.css at 480px */
+
+  /* Provider drawer footer: full-width buttons */
+  .provider-drawer__foot .btn {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+
+/* ==========================================================================
+   I) MONTH PICKER — compact on mobile
+   ========================================================================== */
+
+@media (max-width: 767px) {
+  /* Trigger button: slightly smaller on mobile */
+  .month-picker__trigger {
+    padding: 6px 10px;
+    font-size: var(--text-sm, 0.875rem);
+    gap: 6px;
+  }
+
+  /* Trigger icon: smaller */
+  .month-picker__trigger-icon {
+    padding: 5px;
+  }
+
+  /* Year navigation arrows: smaller */
+  .ym-nav {
+    min-width: 32px;
+    min-height: 32px;
+    padding: 4px;
+  }
+
+  /* Dropdown: ensure it stays within viewport */
+  .month-picker__dropdown {
+    min-width: 240px;
+    max-width: calc(100vw - 32px);
+  }
+
+  /* Month grid: slightly tighter padding */
+  .month-picker__month {
+    padding: 8px 6px;
+    font-size: var(--text-xs, 0.75rem);
+  }
+}
+
+@media (max-width: 479px) {
+  /* On very small screens, center the dropdown */
+  .month-picker__dropdown {
+    position: fixed;
+    left: 50% !important;
+    right: auto !important;
+    top: 50% !important;
+    transform: translate(-50%, -50%);
+    z-index: var(--z-calendar, 300);
+    max-width: calc(100vw - 24px);
+  }
+
+  .month-picker__dropdown.is-open {
+    animation: none;
+  }
+}
+
+
+/* ==========================================================================
+   J) PAGINATION — simplified on mobile (hide page numbers, show prev/next)
+   ========================================================================== */
+
+@media (max-width: 479px) {
+  /* Hide individual page number buttons, keep prev/next arrows */
+  .pagination-numbers .btn:not([aria-label="Página anterior"]):not([aria-label="Página siguiente"]),
+  .pagination-numbers .pagination-numbers__current,
+  .pagination-numbers .pagination-numbers__dots {
+    display: none;
+  }
+
+  /* Prev/next buttons: bigger touch targets */
+  .pagination-numbers .btn[aria-label="Página anterior"],
+  .pagination-numbers .btn[aria-label="Página siguiente"] {
+    min-width: 44px;
+    min-height: 44px;
+    font-size: var(--text-lg, 1.25rem);
+    padding: var(--space-2, 8px) var(--space-3, 12px);
+  }
+
+  /* Center the simplified pagination */
+  .pagination-numbers {
+    justify-content: center;
+    gap: var(--space-3, 12px);
+  }
+
+  /* Main pagination wrapper: center content */
+  .pagination {
+    justify-content: center;
+  }
+
+  /* Pagination info text (e.g., "Mostrando 1-10 de 50"): smaller */
+  .pagination__info,
+  .pagination span:first-child {
+    font-size: var(--text-2xs, 0.6875rem);
+    text-align: center;
+    width: 100%;
+  }
+}
+
+
+/* ==========================================================================
+   K) ADDITIONAL MOBILE POLISH
+   ========================================================================== */
+
+/* Provider/client drawer summary grid: already handled at 400px in portal.css */
+
+/* Datos fiscales: already stacks at 480px in portal.css */
+
+/* FIEL layout: already stacks at 900px in portal.css */
+
+/* Quotation lines: already reflow at 640px in portal.css */
+
+/* ── Settings cards: stack on mobile ── */
+@media (max-width: 767px) {
+  .datos-fiscales-row {
+    grid-template-columns: 1fr;
+  }
+
+  .fiel-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── onboarding / tip banners: full width ── */
+@media (max-width: 479px) {
+  .tip-banner {
+    flex-direction: column;
+    align-items: stretch;
+    text-align: center;
+  }
+
+  .tip-banner .btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* ── Print: hide mobile-only elements ── */
+@media print {
+  .mobile-tab-bar,
+  .topbar-hamburger,
+  .mobile-menu-close {
+    display: none !important;
+  }
+}
