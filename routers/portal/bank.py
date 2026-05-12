@@ -82,9 +82,9 @@ def register_bank_routes(router, templates):
             logger.exception("convertir-edo-cuenta: error en render completo (%s), usando página mínima", e)
             try:
                 return templates.TemplateResponse(
+                    request,
                     "portal_convertir_edo_cuenta_minimal.html",
                     {
-                        "request": request,
                         "csrf_token": csrf_service.generate_csrf_token(),
                         "preview_movements": [],
                         "preview_summary": {},

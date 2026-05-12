@@ -423,9 +423,9 @@ def _submit_impl(templates, request: Request, issuer: dict, form):
     log_action(request, "invoice_created", issuer_id=issuer["id"], invoice_id=fact_id, uuid=(uuid or "")[:36])
 
     return templates.TemplateResponse(
+        request,
         "success.html",
         {
-            "request": request,
             "token": "",
             "facturapi_invoice_id": fact_id,
             "uuid": uuid,

@@ -264,9 +264,9 @@ def get_admin_router(templates):
                FROM audit_log ORDER BY id DESC LIMIT 10"""
         )
         return templates.TemplateResponse(
+            request,
             "admin_dashboard.html",
             {
-                "request": request,
                 "active_page": "dashboard",
                 "count_users": count_users[0]["n"] if count_users else 0,
                 "count_issuers": count_issuers[0]["n"] if count_issuers else 0,
@@ -323,8 +323,9 @@ def get_admin_router(templates):
             if r.get("max_role") is None:
                 r["max_role"] = "-"
         return templates.TemplateResponse(
+            request,
             "admin_users.html",
-            {"request": request, "active_page": "users", "users": rows},
+            {"active_page": "users", "users": rows},
         )
 
     # ---------- GET: Issuers (con búsqueda RFC/email) ----------
@@ -394,9 +395,9 @@ def get_admin_router(templates):
                    ORDER BY i.id"""
             )
         return templates.TemplateResponse(
+            request,
             "admin_issuers.html",
             {
-                "request": request,
                 "active_page": "issuers",
                 "issuers": rows,
                 "search_q": search,
@@ -484,9 +485,9 @@ def get_admin_router(templates):
             pass
 
         return templates.TemplateResponse(
+            request,
             "admin_issuer_detail.html",
             {
-                "request": request,
                 "active_page": "issuers",
                 "issuer": issuer,
                 "meta": meta,
@@ -593,9 +594,9 @@ def get_admin_router(templates):
             pass
 
         return templates.TemplateResponse(
+            request,
             "admin_jobs.html",
             {
-                "request": request,
                 "active_page": "jobs",
                 "jobs": rows,
                 "sat_jobs": sat_rows,
@@ -641,9 +642,9 @@ def get_admin_router(templates):
             result_pretty = job.get("result_json") or ""
 
         return templates.TemplateResponse(
+            request,
             "admin_job_detail.html",
             {
-                "request": request,
                 "active_page": "jobs",
                 "job": job,
                 "payload_pretty": payload_pretty,
@@ -761,9 +762,9 @@ def get_admin_router(templates):
         except Exception:
             pass
         return templates.TemplateResponse(
+            request,
             "admin_sat_jobs.html",
             {
-                "request": request,
                 "active_page": "sat-jobs",
                 "sat_jobs": rows,
                 "filter_status": (status or "").strip(),
@@ -804,9 +805,9 @@ def get_admin_router(templates):
             except Exception:
                 pass
         return templates.TemplateResponse(
+            request,
             "admin_sat_job_detail.html",
             {
-                "request": request,
                 "active_page": "sat-jobs",
                 "job": job,
                 "sync_state": sync_state,
@@ -852,9 +853,9 @@ def get_admin_router(templates):
         except Exception:
             events = []
         return templates.TemplateResponse(
+            request,
             "admin_errors.html",
             {
-                "request": request,
                 "active_page": "errors",
                 "events": events,
                 "can_view_internal": can_view_internal,
@@ -871,8 +872,9 @@ def get_admin_router(templates):
         if not ev:
             raise HTTPException(status_code=404, detail="Evento no encontrado")
         return templates.TemplateResponse(
+            request,
             "admin_error_detail.html",
-            {"request": request, "active_page": "errors", "event": ev},
+            {"active_page": "errors", "event": ev},
         )
 
     # ---------- GET: Memberships ----------
@@ -890,8 +892,9 @@ def get_admin_router(templates):
                ORDER BY m.id"""
         )
         return templates.TemplateResponse(
+            request,
             "admin_memberships.html",
-            {"request": request, "active_page": "memberships", "memberships": rows},
+            {"active_page": "memberships", "memberships": rows},
         )
 
     # ---------- GET: Admin status/health (conteos) ----------
@@ -1010,9 +1013,9 @@ a {{ color: #0369a1; text-decoration: none; }}
         _admin: tuple[int, int, int | None] = Depends(require_admin_or_owner),
     ):
         return templates.TemplateResponse(
+            request,
             "admin_ops.html",
             {
-                "request": request,
                 "active_page": "ops",
                 "message": None,
                 "result": None,
@@ -1147,9 +1150,9 @@ a {{ color: #0369a1; text-decoration: none; }}
             message_ok = False
 
         return templates.TemplateResponse(
+            request,
             "admin_ops.html",
             {
-                "request": request,
                 "active_page": "ops",
                 "message": "Listo." if message_ok else "Error (ver resultado).",
                 "message_ok": message_ok,

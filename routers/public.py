@@ -15,15 +15,15 @@ def get_public_router(templates):
     @router.get("/demo", response_class=HTMLResponse)
     def demo_page(request: Request):
         """Página demo interactiva: tabs SAT Sync, Emitidas, Factura rápida, Cotizaciones; mock UI + CTA al portal."""
-        return templates.TemplateResponse("demo.html", {"request": request})
+        return templates.TemplateResponse(request, "demo.html", {})
 
     @router.get("/pricing", response_class=HTMLResponse)
     def pricing_page(request: Request, reason: str | None = Query(None)):
         """Página de planes. CTA a /signup. Sin Stripe aún; lista para añadirlo después."""
         return templates.TemplateResponse(
+            request,
             "pricing.html",
             {
-                "request": request,
                 "reason": reason,
                 "trial_expired": reason == "trial_expired",
                 "plans": PLANS,
@@ -38,7 +38,7 @@ def get_public_router(templates):
     @router.get("/seguridad", response_class=HTMLResponse)
     def seguridad_page(request: Request):
         """Página de seguridad tipo fintech: sesiones, aislamiento por cuenta, FIEL solo para sync; enlaces a términos y privacidad."""
-        return templates.TemplateResponse("seguridad.html", {"request": request})
+        return templates.TemplateResponse(request, "seguridad.html", {})
 
     @router.get("/trust", response_class=RedirectResponse)
     @router.get("/security", response_class=RedirectResponse)
@@ -72,12 +72,14 @@ def get_public_router(templates):
             )
         if quote["status"] not in ("draft", "sent"):
             return templates.TemplateResponse(
+                request,
                 "public_quotation_responded.html",
-                {"request": request, "quotation": quote},
+                {"quotation": quote},
             )
         return templates.TemplateResponse(
+            request,
             "public_quotation.html",
-            {"request": request, "quotation": quote},
+            {"quotation": quote},
         )
 
     @router.post("/public/cotizacion/respond", response_class=HTMLResponse)
@@ -107,8 +109,9 @@ def get_public_router(templates):
             conn.close()
             quote = quotations.get_quotation_by_public_token(token)
             return templates.TemplateResponse(
+                request,
                 "public_quotation_responded.html",
-                {"request": request, "quotation": quote or {}},
+                {"quotation": quote or {}},
             )
         qid = row["id"]
         if status == "accepted":
@@ -127,8 +130,9 @@ def get_public_router(templates):
         conn.close()
         quote = quotations.get_quotation_by_public_token(token)
         return templates.TemplateResponse(
+            request,
             "public_quotation_thanks.html",
-            {"request": request, "quotation": quote, "action": status},
+            {"quotation": quote, "action": status},
         )
 
     return router

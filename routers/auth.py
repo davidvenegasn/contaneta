@@ -156,9 +156,9 @@ def get_auth_router(templates):
             elif verified == "1":
                 success = "Correo verificado correctamente. Inicia sesión."
         return templates.TemplateResponse(
+            request,
             "login.html",
             {
-                "request": request,
                 "error": error,
                 "success": success,
                 "csrf_token": csrf_service.generate_csrf_token(),
@@ -451,8 +451,9 @@ def get_auth_router(templates):
     @router.get("/forgot", response_class=HTMLResponse)
     def forgot_page(request: Request, error: str | None = Query(None), sent: str | None = Query(None)):
         return templates.TemplateResponse(
+            request,
             "forgot_password.html",
-            {"request": request, "error": _forgot_error_message(error), "sent": sent == "1", "csrf_token": csrf_service.generate_csrf_token()},
+            {"error": _forgot_error_message(error), "sent": sent == "1", "csrf_token": csrf_service.generate_csrf_token()},
         )
 
     @router.post("/forgot", response_class=RedirectResponse)
@@ -480,8 +481,9 @@ def get_auth_router(templates):
     @router.get("/reset-password", response_class=HTMLResponse)
     def reset_password_page(request: Request, token: str = Query(""), error: str | None = Query(None)):
         return templates.TemplateResponse(
+            request,
             "reset_password.html",
-            {"request": request, "token": token, "error": _reset_error_message(error), "csrf_token": csrf_service.generate_csrf_token()},
+            {"token": token, "error": _reset_error_message(error), "csrf_token": csrf_service.generate_csrf_token()},
         )
 
     @router.post("/reset-password", response_class=RedirectResponse)
@@ -530,8 +532,9 @@ def get_auth_router(templates):
             )
             return resp
         return templates.TemplateResponse(
+            request,
             "choose_issuer.html",
-            {"request": request, "memberships": memberships, "csrf_token": csrf_service.generate_csrf_token()},
+            {"memberships": memberships, "csrf_token": csrf_service.generate_csrf_token()},
         )
 
     @router.post("/choose-issuer", response_class=RedirectResponse)
@@ -761,18 +764,18 @@ def get_auth_router(templates):
 
     @router.get("/terms", response_class=HTMLResponse)
     def terms_page(request: Request):
-        return templates.TemplateResponse("terms.html", {"request": request})
+        return templates.TemplateResponse(request, "terms.html", {})
 
     @router.get("/privacy", response_class=HTMLResponse)
     def privacy_page(request: Request):
-        return templates.TemplateResponse("privacy.html", {"request": request})
+        return templates.TemplateResponse(request, "privacy.html", {})
 
     @router.get("/signup", response_class=HTMLResponse)
     def signup_page(request: Request, error: str | None = Query(None), email: str | None = Query(None), phone: str | None = Query(None), lt: str | None = Query(None)):
         return templates.TemplateResponse(
+            request,
             "signup.html",
             {
-                "request": request,
                 "error": _signup_error_message(error),
                 "csrf_token": csrf_service.generate_csrf_token(),
                 "google_login_url": _google_login_url(request) or "#",
@@ -866,8 +869,9 @@ def get_auth_router(templates):
         if memberships:
             return RedirectResponse(url="/portal/home", status_code=302)
         return templates.TemplateResponse(
+            request,
             "confirmar_perfil.html",
-            {"request": request, "user": user, "error": request.query_params.get("error"), "csrf_token": csrf_service.generate_csrf_token()},
+            {"user": user, "error": request.query_params.get("error"), "csrf_token": csrf_service.generate_csrf_token()},
         )
 
     @router.post("/confirmar-perfil", response_class=RedirectResponse)

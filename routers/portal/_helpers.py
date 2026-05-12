@@ -194,4 +194,4 @@ def render_portal(
     if template_vars:
         payload.update(template_vars)
     payload.setdefault("csrf_token", csrf_service.generate_csrf_token())
-    return templates.TemplateResponse(template_name, payload, status_code=status_code)
+    return templates.TemplateResponse(request, template_name, payload, status_code=status_code)
