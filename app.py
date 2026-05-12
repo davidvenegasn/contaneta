@@ -54,6 +54,7 @@ if _sentry_dsn:
             traces_sample_rate=float(os.environ.get("SENTRY_TRACES_RATE", "0.1")),
             integrations=[StarletteIntegration(), FastApiIntegration()],
             send_default_pii=False,
+            release=os.environ.get("APP_VERSION", "unknown"),
         )
         logging.getLogger(__name__).info("Sentry initialized (env=%s)", os.environ.get("ENV", "dev"))
     except ImportError:

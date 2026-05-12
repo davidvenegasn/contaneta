@@ -25,23 +25,39 @@
 
 ## Recommended Monitoring Stack
 
-### Option A: Sentry (Recommended for <500 Users)
+### Option A: Sentry (Recommended for <500 Users) — ACTIVE
 
-```bash
-pip install sentry-sdk[fastapi]
-```
+Sentry is already integrated in `app.py`. It activates when `SENTRY_DSN` is set.
 
-```python
-# app.py startup
-import sentry_sdk
-sentry_sdk.init(
-    dsn=os.getenv("SENTRY_DSN"),
-    traces_sample_rate=0.1,
-    environment=os.getenv("ENV", "dev"),
-)
-```
+#### How to activate in production
 
-Free tier covers 5K errors/month. Tracks: unhandled exceptions, slow transactions, release tracking.
+1. Create a free account at [sentry.io](https://sentry.io)
+2. Create a Python/FastAPI project
+3. Copy the DSN (looks like `https://abc123@o0.ingest.sentry.io/456`)
+4. Add to your production `.env`:
+   ```bash
+   SENTRY_DSN=https://abc123@o0.ingest.sentry.io/456
+   APP_VERSION=v0.1.0
+   SENTRY_TRACES_RATE=0.1
+   ```
+5. Restart: `sudo systemctl restart contaneta`
+6. Verify: check Sentry dashboard for a test event
+
+#### What it captures
+
+- Unhandled exceptions (automatic)
+- Performance traces (10% sampling by default)
+- Release tracking via `APP_VERSION`
+- **No PII** sent (`send_default_pii=False` per LFPDPPP)
+
+#### Free tier limits
+
+- 5K errors/month, 10K performance events/month
+- Sufficient for <500 users
+
+#### Without sentry-sdk installed
+
+If `sentry-sdk` is not installed but `SENTRY_DSN` is set, the app logs a warning and continues normally.
 
 ### Option B: CloudWatch (If on AWS)
 
