@@ -144,18 +144,32 @@ def update_user_name(user_id: int, name: Optional[str]) -> None:
 
 
 def update_user_password(user_id: int, password_hash: str) -> None:
+    """Update password hash and rotate session nonce to invalidate all existing sessions."""
     if not user_id or not password_hash:
         return
+    from database import has_column
+    from services.auth.session import generate_session_nonce
+
     conn = db()
     try:
-        from database import has_column
-        if has_column(conn, "users", "password_changed_at"):
-            conn.execute(
-                "UPDATE users SET password_hash = ?, password_changed_at = datetime('now') WHERE id = ?",
-                (password_hash, user_id),
-            )
-        else:
-            conn.execute("UPDATE users SET password_hash = ? WHERE id = ?", (password_hash, user_id))
+        has_changed_at = has_column(conn, "users", "password_changed_at")
+        has_nonce = has_column(conn, "users", "session_nonce")
+        new_nonce = generate_session_nonce()
+
+        # Build SET clause dynamically based on available columns
+        set_parts = ["password_hash = ?"]
+        params: list = [password_hash]
+        if has_changed_at:
+            set_parts.append("password_changed_at = datetime('now')")
+        if has_nonce:
+            set_parts.append("session_nonce = ?")
+            params.append(new_nonce)
+        params.append(user_id)
+
+        conn.execute(
+            f"UPDATE users SET {', '.join(set_parts)} WHERE id = ?",
+            tuple(params),
+        )
         conn.commit()
     finally:
         conn.close()

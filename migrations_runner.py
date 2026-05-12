@@ -560,6 +560,8 @@ def apply_migrations(
                         _apply_025_jobs_robust(conn)
                     elif version == "033":
                         _safe_add_column(conn, "users", "password_changed_at", "TEXT")
+                    elif version == "049":
+                        _safe_add_column(conn, "users", "session_nonce", "TEXT")
                     else:
                         with open(filepath, "r", encoding="utf-8") as f:
                             sql = f.read()
