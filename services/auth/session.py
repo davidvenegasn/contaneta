@@ -85,7 +85,7 @@ def verify_session(cookie_val: Optional[str], *, include_expiry: bool = False) -
     return None
 
 
-def session_cookie_params(request: Optional[Request] = None) -> dict:
+def session_cookie_params(request: Optional[Request] = None) -> dict[str, object]:
     """Cookie segura: HttpOnly, SameSite=Lax. Secure solo si la petición es HTTPS (o x-forwarded-proto=https). En HTTP (localhost) Secure=False para que el navegador guarde la cookie."""
     secure = COOKIE_SECURE
     if request is not None:

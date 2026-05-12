@@ -1,10 +1,12 @@
 """Suscripciones por usuario (Stripe) y trial por issuer (expires_at)."""
-from typing import Optional
+from __future__ import annotations
+
+from typing import Any, Optional
 
 from database import db, db_rows, has_column
 
 
-def get_subscription_by_user_id(user_id: int) -> Optional[dict]:
+def get_subscription_by_user_id(user_id: int) -> dict[str, Any] | None:
     """Devuelve la fila de subscriptions para el usuario o None."""
     if not user_id or user_id <= 0:
         return None

@@ -115,7 +115,7 @@ def set_issuer_plan(issuer_id: int, plan: str) -> None:
 
 # ---------- Usage tracking ----------
 
-def _ensure_usage_row(conn, issuer_id: int, ym: str) -> None:
+def _ensure_usage_row(conn: Any, issuer_id: int, ym: str) -> None:
     """Ensure a usage row exists for the issuer+month."""
     if not table_exists(conn, "plan_usage"):
         return

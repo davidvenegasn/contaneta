@@ -1,6 +1,8 @@
 """Usuarios y memberships."""
+from __future__ import annotations
+
 import re
-from typing import Optional
+from typing import Any, Optional
 
 import bcrypt
 
@@ -8,7 +10,7 @@ from config import FIRM_USER_EMAIL
 from database import db, db_rows
 
 
-def _user_from_row(row) -> dict:
+def _user_from_row(row: Any) -> dict[str, Any] | None:
     if not row:
         return None
     if isinstance(row, dict):
@@ -43,7 +45,7 @@ def verify_password(plain: str, hashed: str) -> bool:
         return False
 
 
-def get_user_by_email(email: str):
+def get_user_by_email(email: str) -> dict[str, Any] | None:
     if not (email and str(email).strip()):
         return None
     # Verificar si la columna active existe antes de usarla
@@ -61,7 +63,7 @@ def get_user_by_email(email: str):
         conn.close()
 
 
-def get_user_by_phone(phone: str):
+def get_user_by_phone(phone: str) -> dict[str, Any] | None:
     if not (phone and str(phone).strip()):
         return None
     normalized = re.sub(r"\D", "", str(phone).strip())
@@ -82,7 +84,7 @@ def get_user_by_phone(phone: str):
         conn.close()
 
 
-def get_user_by_email_or_phone(login: str):
+def get_user_by_email_or_phone(login: str) -> dict[str, Any] | None:
     if not (login and str(login).strip()):
         return None
     s = str(login).strip()
@@ -91,7 +93,7 @@ def get_user_by_email_or_phone(login: str):
     return get_user_by_phone(s)
 
 
-def get_user_by_id(user_id: int):
+def get_user_by_id(user_id: int) -> dict[str, Any] | None:
     if not user_id:
         return None
     rows = db_rows("SELECT id, email, phone, name FROM users WHERE id = ? LIMIT 1", (user_id,))
@@ -111,7 +113,7 @@ def create_user(
     password_hash: Optional[str] = None,
     oauth_provider: Optional[str] = None,
     oauth_id: Optional[str] = None,
-) -> dict:
+) -> dict[str, Any] | None:
     email = (email or "").strip().lower() or None
     phone = (phone or "").strip() or None
     name = (name or "").strip() or None
@@ -165,7 +167,7 @@ def get_or_create_user_by_oauth(
     email: Optional[str] = None,
     phone: Optional[str] = None,
     name: Optional[str] = None,
-) -> dict:
+) -> dict[str, Any] | None:
     rows = db_rows(
         "SELECT id, email, phone, name FROM users WHERE oauth_provider = ? AND oauth_id = ? LIMIT 1",
         (provider, oauth_id),
