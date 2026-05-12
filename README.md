@@ -66,3 +66,16 @@ scripts/                # Dev/ops utilities
 - [docs/ops/OPERATIONS.md](docs/ops/OPERATIONS.md) — Operations runbook
 - [docs/guides/](docs/guides/) — Admin, auth, billing, and SAT guides
 - [MIGRATIONS.md](MIGRATIONS.md) — Database migration system
+
+## Development workflow with Claude
+
+This project follows a strict workflow when using AI assistance for non-trivial changes:
+**Research → Plan → Implement → Review → QA**
+
+- Skills live in `.claude/skills/`
+- Artifacts saved to `context/`
+- Rules enforced in `CLAUDE.md`
+
+For trivial changes (typo, one-line fix), skip the workflow.
+
+See `.claude/skills/README.md` for details.
