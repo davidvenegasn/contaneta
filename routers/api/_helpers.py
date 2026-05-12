@@ -6,6 +6,7 @@ import os
 from fastapi import HTTPException, Request
 
 from config import BASE_DIR, DEV_FIXTURES
+from database import list_catalog
 from services.auth.rate_limit import is_rate_limited
 from services.sat.sat_sync import get_month_totals as _get_month_totals_raw
 
@@ -141,6 +142,45 @@ PRODSERV_FALLBACK = [
     ("50192100", "Servicios de mensajería"),
     ("50192101", "Mensajería y paquetería"),
 ]
+
+
+try:
+    from cfdi_pdf import FORMA_PAGO, REGIMEN_FISCAL, USO_CFDI
+except Exception:
+    USO_CFDI = {"G03": "Gastos en general", "G01": "Adquisición de mercancías", "CN01": "Nómina"}
+    REGIMEN_FISCAL = {"601": "General de Ley Personas Morales", "612": "Personas Físicas con Actividades Empresariales", "616": "Sin obligaciones fiscales", "626": "Régimen Simplificado de Confianza"}
+    FORMA_PAGO = {"03": "Transferencia electrónica", "01": "Efectivo", "99": "Por definir"}
+
+
+def _load_bootstrap_catalogs() -> dict:
+    """Load SAT catalogs for quick-invoice bootstrap. Shared by invoices.py and products.py."""
+    catalogs = {}
+    try:
+        catalogs["regimen_fiscal"] = list_catalog("cfdi_40_regimenes_fiscales")
+    except Exception:
+        reg = dict(REGIMEN_FISCAL)
+        reg.setdefault("616", "Sin obligaciones fiscales")
+        catalogs["regimen_fiscal"] = _catalog_list(reg)
+    try:
+        catalogs["uso_cfdi"] = list_catalog("cfdi_40_usos_cfdi")
+    except Exception:
+        catalogs["uso_cfdi"] = _catalog_list(USO_CFDI)
+    try:
+        catalogs["forma_pago"] = list_catalog("cfdi_40_formas_pago")
+    except Exception:
+        catalogs["forma_pago"] = _catalog_list(FORMA_PAGO)
+    try:
+        catalogs["metodo_pago"] = list_catalog("cfdi_40_metodos_pago")
+    except Exception:
+        catalogs["metodo_pago"] = [
+            {"key": "PUE", "label": "Pago en una sola exhibición"},
+            {"key": "PPD", "label": "Pago en parcialidades o diferido"},
+        ]
+    try:
+        catalogs["monedas"] = list_catalog("cfdi_40_monedas")
+    except Exception:
+        catalogs["monedas"] = _catalog_list(MONEDA_FALLBACK)
+    return catalogs
 
 
 def _get_month_totals_safe(issuer_id, ym, direction):

@@ -10,6 +10,7 @@ from routers.api._helpers import (
     MAX_LIST_OFFSET,
     MONEDA_FALLBACK,
     _catalog_list,
+    _load_bootstrap_catalogs,
     _load_fixture,
 )
 from routers.deps import get_portal_issuer
@@ -110,36 +111,5 @@ def register_products_routes(router):
             raise HTTPException(status_code=404, detail="Producto no encontrado o ya fue eliminado.")
         return ok()
 
-
-    # ----- Quick invoice (Home: cliente + producto → timbrar sin salir) -----
-    def _load_bootstrap_catalogs() -> dict:
-        """Load SAT catalogs for bootstrap. Returns dict with regimen_fiscal, uso_cfdi, forma_pago, metodo_pago, monedas."""
-        catalogs = {}
-        try:
-            catalogs["regimen_fiscal"] = list_catalog("cfdi_40_regimenes_fiscales")
-        except Exception:
-            reg = dict(REGIMEN_FISCAL)
-            reg.setdefault("616", "Sin obligaciones fiscales")
-            catalogs["regimen_fiscal"] = _catalog_list(reg)
-        try:
-            catalogs["uso_cfdi"] = list_catalog("cfdi_40_usos_cfdi")
-        except Exception:
-            catalogs["uso_cfdi"] = _catalog_list(USO_CFDI)
-        try:
-            catalogs["forma_pago"] = list_catalog("cfdi_40_formas_pago")
-        except Exception:
-            catalogs["forma_pago"] = _catalog_list(FORMA_PAGO)
-        try:
-            catalogs["metodo_pago"] = list_catalog("cfdi_40_metodos_pago")
-        except Exception:
-            catalogs["metodo_pago"] = [
-                {"key": "PUE", "label": "Pago en una sola exhibición"},
-                {"key": "PPD", "label": "Pago en parcialidades o diferido"},
-            ]
-        try:
-            catalogs["monedas"] = list_catalog("cfdi_40_monedas")
-        except Exception:
-            catalogs["monedas"] = _catalog_list(MONEDA_FALLBACK)
-        return catalogs
 
 

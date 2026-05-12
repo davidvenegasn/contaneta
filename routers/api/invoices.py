@@ -15,6 +15,7 @@ from routers.api._helpers import (
     DEFAULT_LIST_LIMIT,
     MAX_LIST_LIMIT,
     _api_rate_check,
+    _load_bootstrap_catalogs,
     _load_fixture,
 )
 from routers.deps import get_portal_issuer
