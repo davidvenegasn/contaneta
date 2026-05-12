@@ -101,3 +101,16 @@ Key variables (see `.env.example` for full list):
 ## Production Deployment
 
 Gunicorn behind Caddy/Nginx. Systemd service in `deploy/conta-invoicing.service`. Backups via `scripts/backup_storage.sh`. SAT sync via cron (`sat_sync/cron_sat_sync.sh`).
+
+## Refactor & Reorganization Rules
+
+Safe moves only — no behavior changes during reorganization:
+
+1. **Behavior must not change** — refactors are structural, not functional. If a response, query, or side-effect changes, it's not a refactor.
+2. **URLs stay identical** — every route must respond at the same path before and after. No redirects, no renames.
+3. **Tests before and after** — run `.venv/bin/pytest -q` before starting and after every move. Green → green or don't merge.
+4. **Move, don't rewrite** — copy the code as-is first, then update imports. Resist the urge to "improve" while moving.
+5. **Docs are archived, not deleted** — obsolete docs go to `_archive/`, never `rm`.
+6. **Use `git mv`** — preserves blame history. Never `cp` + `rm`.
+7. **One concern per commit** — each commit does exactly one thing: move a file, update imports, rename a symbol. Never mix.
+8. **Verify imports after every move** — run `python -c "import app"` to confirm nothing broke. Do this after each file move, not just at the end.
