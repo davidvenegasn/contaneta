@@ -16,6 +16,12 @@ except Exception:
     MONEDA = {"MXN": "Peso Mexicano", "USD": "Dólar Americano"}
     CLAVE_UNIDAD = {"E48": "Unidad de servicio", "EA": "Cada uno", "H87": "Pieza"}
 
+from routers.api._helpers import (
+    MONEDA_FALLBACK,
+    PRODSERV_FALLBACK,
+    UNIDAD_FALLBACK,
+    _catalog_list,
+)
 from services.http import ok
 
 
