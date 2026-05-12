@@ -459,6 +459,15 @@ body.sidebar-open .sidebar{
   gap: 10px;
 }
 
+/* Modal size variants */
+.modal__panel--sm{ max-width: min(400px, calc(100vw - 40px)); }
+.modal__panel--lg{ max-width: min(720px, calc(100vw - 40px)); }
+.modal__panel--full{ max-width: min(90vw, calc(100vw - 40px)); }
+
+/* Dismissible alert */
+.alert--dismissible{ display: flex; align-items: center; justify-content: space-between; gap: var(--space-2, 8px); }
+.alert__close{ flex-shrink: 0; }
+
 /* Separación entre barra superior y cuerpo (listados proveedores/clientes) */
 .portal-container > .page-section:first-child,
 .portal-container > section.page-section:first-child {

@@ -135,22 +135,8 @@
     </div>
   </div>
 
-  <div class="modal" id="editModal" role="dialog" aria-modal="true" aria-labelledby="editModalTitle" aria-label="Editar cliente" hidden aria-hidden="true">
-    <div class="modal__backdrop" data-close="true"></div>
-    <div class="modal__panel">
-      <div class="modal__head">
-        <div>
-          <div class="modal__title" id="editModalTitle">Editar cliente</div>
-          <div class="modal__subtitle">Campos opcionales para normalizar la información detectada.</div>
-        </div>
-        <button type="button" class="icon-btn" data-close="true" aria-label="Cerrar">
-          <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="M6 6l12 12" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
-            <path d="M18 6 6 18" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
-          </svg>
-        </button>
-      </div>
-      <div class="modal__body">
+  {% from 'portal/_ui_components.html' import portal_modal %}
+  {% call portal_modal('editModal', 'Editar cliente', subtitle='Campos opcionales para normalizar la información detectada.') %}
         <input type="hidden" id="cId" />
         <div class="field">
           <label class="label">Nombre</label>
@@ -184,9 +170,7 @@
       <div class="modal__foot">
         <button type="button" class="btn btn-ghost" data-close="true">Cancelar</button>
         <button type="button" class="btn btn-primary" id="saveBtn">Guardar</button>
-      </div>
-    </div>
-  </div>
+  {% endcall %}
 </section>
 
 <script>
