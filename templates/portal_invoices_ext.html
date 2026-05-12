@@ -8,12 +8,12 @@
 <div class="dashboard-metrics" style="margin-bottom:20px;">
   <div class="card metric-card metric-card--income">
     <div class="metric-label">Total ingresos (exportaciones)</div>
-    <div class="metric-value">${{ '{:,.2f}'.format(sum_ingresos|default(0)) }}</div>
+    <div class="metric-value">$<span data-count-to="{{ sum_ingresos|default(0) }}" data-count-decimals="2" data-count-duration="250">{{ '{:,.2f}'.format(sum_ingresos|default(0)) }}</span></div>
     <div class="metric-sub">{{ ym_label|default('') }}</div>
   </div>
   <div class="card metric-card metric-card--expense">
     <div class="metric-label">Total gastos (importaciones)</div>
-    <div class="metric-value">${{ '{:,.2f}'.format(sum_gastos|default(0)) }}</div>
+    <div class="metric-value">$<span data-count-to="{{ sum_gastos|default(0) }}" data-count-decimals="2" data-count-duration="250">{{ '{:,.2f}'.format(sum_gastos|default(0)) }}</span></div>
     <div class="metric-sub">{{ ym_label|default('') }}</div>
   </div>
 </div>

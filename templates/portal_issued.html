@@ -18,12 +18,12 @@
     <div class="ym-card__resumen dashboard-metrics">
       <div class="card metric-card">
         <div class="metric-label">Total ingresos</div>
-        <div class="metric-value">${{ '{:,.2f}'.format(mt.total_base|default(0)) }}</div>
+        <div class="metric-value">$<span data-count-to="{{ mt.total_base|default(0) }}" data-count-decimals="2" data-count-duration="250">{{ '{:,.2f}'.format(mt.total_base|default(0)) }}</span></div>
         <div class="metric-sub">{{ ym_label }} (subtotal)</div>
       </div>
       <div class="card metric-card">
         <div class="metric-label">IVA recibido (neto)</div>
-        <div class="metric-value">${{ '{:,.2f}'.format(mt.total_iva_neto|default(0)) }}</div>
+        <div class="metric-value">$<span data-count-to="{{ mt.total_iva_neto|default(0) }}" data-count-decimals="2" data-count-duration="250">{{ '{:,.2f}'.format(mt.total_iva_neto|default(0)) }}</span></div>
         <div class="metric-sub">{% if (mt.total_retenciones|default(0)) > 0 %}(– ${{ '{:,.2f}'.format(mt.total_retenciones|default(0)) }} retenciones){% else %}{{ ym_label }}{% endif %}</div>
       </div>
     </div>

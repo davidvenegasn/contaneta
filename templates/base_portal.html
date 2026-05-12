@@ -15,7 +15,7 @@
       return 'portal_selected_ym_' + (id || '0');
     }
     function validYm(s) {
-      return typeof s === 'string' && /^\d{4}-(0[1-9]|1[0-2])$/.test(s);
+      return typeof s === 'string' && (/^\d{4}-(0[1-9]|1[0-2])$/.test(s) || /^\d{4}$/.test(s));
     }
     var KEY = storageKey();
     var path = location.pathname;
@@ -45,6 +45,7 @@
     <script>if(localStorage.getItem('portal_nightmode')==='1')document.documentElement.classList.add('nightmode');</script>
     <!-- P35: cache GET catalogs/customers/products (TTL 10 min); debe cargar antes del content para prefetch en Home -->
     <script src="/static/js/catalog-cache.js"></script>
+    <script src="/static/js/count-up.js"></script>
     <link rel="stylesheet" href="/static/css/portal_tokens.css">
     <link rel="stylesheet" href="/static/css/components.css">
     <link rel="stylesheet" href="/static/css/portal_components.css">
@@ -56,12 +57,14 @@
     <link rel="stylesheet" href="/static/css/portal_rail.css">
     <link rel="stylesheet" href="/static/css/portal_sidebar_unified.css">
     <link rel="stylesheet" href="/static/css/portal.css">
+    <link rel="stylesheet" href="/static/css/portal_dashboard_v2.css">
+    <script defer src="/static/js/portal_dashboard_v2.js"></script>
     <link rel="stylesheet" href="/static/css/command-palette.css">
     <link rel="stylesheet" href="/static/css/form.css">
     <link rel="stylesheet" href="/static/css/movement-modal.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
     <!-- Guardrail: evitar CSS inline grande (mover a static/css/*.css) -->
   </head>
 
@@ -244,6 +247,7 @@
     <div class="month-picker__year-row">
       <button type="button" class="month-picker__year-nav" data-delta="-1" aria-label="Año anterior"><span class="month-picker__year-nav-arrow" aria-hidden="true">‹</span></button>
       <span class="month-picker__year"></span>
+      <button type="button" class="month-picker__year-btn" aria-label="Ver año completo">Año</button>
       <button type="button" class="month-picker__year-nav" data-delta="1" aria-label="Año siguiente"><span class="month-picker__year-nav-arrow" aria-hidden="true">›</span></button>
     </div>
     <div class="month-picker__grid"></div>
@@ -906,12 +910,17 @@
     const dropdown = picker.querySelector('.month-picker__dropdown');
     const yearEl = picker.querySelector('.month-picker__year');
     const gridEl = picker.querySelector('.month-picker__grid');
+    const yearBtn = picker.querySelector('.month-picker__year-btn');
     const baseUrl = picker.getAttribute('data-base-url') || '';
     const currentYm = picker.getAttribute('data-ym') || '';
 
+    function isAnnual(ym) { return /^\d{4}$/.test((ym || '').trim()); }
+
     function parseYm(ym) {
-      const parts = (ym || '').split('-');
-      return { year: parseInt(parts[0], 10) || new Date().getFullYear(), month: parseInt(parts[1], 10) || new Date().getMonth() + 1 };
+      var s = (ym || '').trim();
+      if (isAnnual(s)) return { year: parseInt(s, 10), month: 0, annual: true };
+      var parts = s.split('-');
+      return { year: parseInt(parts[0], 10) || new Date().getFullYear(), month: parseInt(parts[1], 10) || new Date().getMonth() + 1, annual: false };
     }
 
     function renderMonths(year) {
@@ -921,10 +930,15 @@
       for (var m = 1; m <= 12; m++) {
         var btn = document.createElement('button');
         btn.type = 'button';
-        btn.className = 'month-picker__month' + (year === cur.year && m === cur.month ? ' is-current' : '');
+        btn.className = 'month-picker__month' + (!cur.annual && year === cur.year && m === cur.month ? ' is-current' : '');
         btn.textContent = MESES_CORTOS[m - 1];
         btn.setAttribute('data-ym', year + '-' + (m < 10 ? '0' : '') + m);
         gridEl.appendChild(btn);
+      }
+      // Highlight year button when annual mode is active
+      if (yearBtn) {
+        if (cur.annual && year === cur.year) yearBtn.classList.add('is-current');
+        else yearBtn.classList.remove('is-current');
       }
     }
 
@@ -982,6 +996,20 @@
         renderMonths(picker._viewYear);
       });
     });
+
+    // "Año" button — navigate to annual view
+    if (yearBtn) {
+      yearBtn.addEventListener('click', function() {
+        var yr = String(picker._viewYear || parseYm(currentYm).year);
+        try {
+          var mk = document.querySelector('meta[name="portal-issuer-id"]');
+          var iid = mk && mk.getAttribute('content');
+          localStorage.setItem('portal_selected_ym_' + (iid || '0'), yr);
+        } catch (err) {}
+        var url = baseUrl + (baseUrl.indexOf('?') >= 0 ? '&' : '?') + 'ym=' + encodeURIComponent(yr);
+        window.location.href = url;
+      });
+    }
 
     gridEl.addEventListener('click', function(e) {
       var monthBtn = e.target && e.target.closest ? e.target.closest('.month-picker__month') : null;

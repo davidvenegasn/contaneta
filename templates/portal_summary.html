@@ -23,7 +23,7 @@
         <svg class="icon" viewBox="0 0 24 24" fill="none"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
         Ingresos (sin IVA)
       </div>
-      <div class="metric-value">${{ '{:,.2f}'.format(ingresos_sin_iva|default(0)) }}</div>
+      <div class="metric-value">$<span data-count-to="{{ ingresos_sin_iva|default(0) }}" data-count-decimals="2" data-count-duration="250">{{ '{:,.2f}'.format(ingresos_sin_iva|default(0)) }}</span></div>
       <div class="metric-sub">Del mes ({{ ym_label }})</div>
     </div>
 
@@ -32,7 +32,7 @@
         <svg class="icon" viewBox="0 0 24 24" fill="none"><path d="M12 22v-20M7 19h5a3.5 3.5 0 0 0 0-7H7M14 5H9.5a3.5 3.5 0 0 0 0 7H6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
         Gastos (sin IVA)
       </div>
-      <div class="metric-value">${{ '{:,.2f}'.format(gastos_sin_iva|default(0)) }}</div>
+      <div class="metric-value">$<span data-count-to="{{ gastos_sin_iva|default(0) }}" data-count-decimals="2" data-count-duration="250">{{ '{:,.2f}'.format(gastos_sin_iva|default(0)) }}</span></div>
       <div class="metric-sub">Del mes ({{ ym_label }})</div>
     </div>
 
@@ -41,7 +41,7 @@
         <svg class="icon" viewBox="0 0 24 24" fill="none"><path d="M21 12a9 9 0 1 1-9-9" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/><path d="M21 3v6h-6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
         IVA recibido (neto)
       </div>
-      <div class="metric-value">${{ '{:,.2f}'.format(iva_recibido_neto|default(0)) }}</div>
+      <div class="metric-value">$<span data-count-to="{{ iva_recibido_neto|default(0) }}" data-count-decimals="2" data-count-duration="250">{{ '{:,.2f}'.format(iva_recibido_neto|default(0)) }}</span></div>
       <div class="metric-sub">{% if iva_retenciones|default(0) > 0 %}(– ${{ '{:,.2f}'.format(iva_retenciones) }} retenciones){% else %}Del mes ({{ ym_label }}){% endif %}</div>
     </div>
 
@@ -50,7 +50,7 @@
         <svg class="icon" viewBox="0 0 24 24" fill="none"><path d="M22 12h-4l-3 9L9 3l-3 9H2" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
         IVA pagado
       </div>
-      <div class="metric-value">${{ '{:,.2f}'.format(iva_pagado|default(0)) }}</div>
+      <div class="metric-value">$<span data-count-to="{{ iva_pagado|default(0) }}" data-count-decimals="2" data-count-duration="250">{{ '{:,.2f}'.format(iva_pagado|default(0)) }}</span></div>
       <div class="metric-sub">Del mes ({{ ym_label }})</div>
     </div>
   </div>

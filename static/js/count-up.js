@@ -15,17 +15,20 @@
   function formatNumber(value, decimals, prefix, suffix) {
     var n = Number(value);
     if (isNaN(n)) return '';
+    var maxDec = decimals != null ? decimals : 2;
+    var minDec = decimals != null ? decimals : 0;
+    if (typeof Intl !== 'undefined' && Intl.NumberFormat) {
+      try {
+        var s = new Intl.NumberFormat(undefined, {
+          maximumFractionDigits: maxDec,
+          minimumFractionDigits: minDec
+        }).format(n);
+        return (prefix || '') + s + (suffix || '');
+      } catch (e) {}
+    }
     var s = decimals != null && decimals >= 0
       ? n.toFixed(decimals)
       : n % 1 === 0 ? String(Math.round(n)) : n.toFixed(2);
-    if (typeof Intl !== 'undefined' && Intl.NumberFormat && (decimals == null || decimals === 0)) {
-      try {
-        s = new Intl.NumberFormat(undefined, {
-          maximumFractionDigits: decimals != null ? decimals : 2,
-          minimumFractionDigits: decimals != null ? decimals : 0
-        }).format(n);
-      } catch (e) {}
-    }
     return (prefix || '') + s + (suffix || '');
   }
 
@@ -43,7 +46,7 @@
     var to = parseFloat(el.getAttribute('data-count-to'));
     if (isNaN(to)) return;
     var from = parseFloat(el.getAttribute('data-count-from')) || 0;
-    var duration = parseInt(el.getAttribute('data-count-duration'), 10) || 1800;
+    var duration = parseInt(el.getAttribute('data-count-duration'), 10) || 250;
     var decimals = el.hasAttribute('data-count-decimals')
       ? parseInt(el.getAttribute('data-count-decimals'), 10)
       : null;
@@ -79,7 +82,6 @@
 
     function run(el) {
       if (el._countUpDone) return;
-      el._countUpDone = true;
       countUp(el);
     }
 

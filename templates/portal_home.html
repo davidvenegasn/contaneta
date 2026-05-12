@@ -105,7 +105,8 @@
   </script>
 
   {% set _has_data = (ingresos_sin_iva|default(0)|float + gastos_sin_iva|default(0)|float + count_issued|default(0) + count_received|default(0)) != 0 %}
-  {% if not _has_data and not (onboarding.get('has_any_issued') if onboarding else false) %}
+  {% set _fiel_ok = onboarding.get('fiel_validated', false) if onboarding else false %}
+  {% if not _has_data and not _fiel_ok and not (onboarding.get('has_any_issued') if onboarding else false) %}
   <div class="ui-card ui-empty">
     <div class="ui-empty__icon" aria-hidden="true">
       <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9" stroke-linecap="round"/><path d="M21 3v6h-6" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -132,53 +133,7 @@
         </button>
       </div>
       <div class="ym-card__resumen">
-    <div class="ui-kpi-grid dashboard-metrics">
-      {% set trends = kpi_trends|default({}) %}
-      <a href="/portal/facturas?tab=issued" class="ui-kpi-card card metric-card metric-card--link" style="position:relative; text-decoration:none; color:inherit; cursor:pointer;">
-        <div class="ui-kpi-card__label metric-label">
-          <svg class="icon" viewBox="0 0 24 24" fill="none"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          Ingresos (sin IVA)
-        </div>
-        <div class="ui-kpi-card__value metric-value">
-          <span class="metric-value-full">${{ '{:,.2f}'.format(ingresos_sin_iva|default(0)) }}</span>
-        </div>
-        <div class="ui-kpi-card__sub metric-sub">Del mes ({{ ym_label }})</div>
-        <div class="metric-card__sparkline" data-sparkline="ingresos"></div>
-      </a>
-      <a href="/portal/facturas?tab=received" class="ui-kpi-card card metric-card metric-card--link" style="position:relative; text-decoration:none; color:inherit; cursor:pointer;">
-        <div class="ui-kpi-card__label metric-label">
-          <svg class="icon" viewBox="0 0 24 24" fill="none"><path d="M12 22v-20M7 19h5a3.5 3.5 0 0 0 0-7H7M14 5H9.5a3.5 3.5 0 0 0 0 7H6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          Gastos (sin IVA)
-        </div>
-        <div class="ui-kpi-card__value metric-value">
-          <span class="metric-value-full">${{ '{:,.2f}'.format(gastos_sin_iva|default(0)) }}</span>
-        </div>
-        <div class="ui-kpi-card__sub metric-sub">Del mes ({{ ym_label }})</div>
-        <div class="metric-card__sparkline" data-sparkline="gastos"></div>
-      </a>
-      <a href="/portal/facturas?tab=issued" class="ui-kpi-card card metric-card metric-card--link" style="position:relative; text-decoration:none; color:inherit; cursor:pointer;">
-        <div class="ui-kpi-card__label metric-label">
-          <svg class="icon" viewBox="0 0 24 24" fill="none"><path d="M21 12a9 9 0 1 1-9-9" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/><path d="M21 3v6h-6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          IVA recibido (neto)
-        </div>
-        <div class="ui-kpi-card__value metric-value">
-          <span class="metric-value-full">${{ '{:,.2f}'.format(iva_recibido_neto|default(0)) }}</span>
-        </div>
-        <div class="ui-kpi-card__sub metric-sub">{% if iva_retenciones|default(0) != 0 %}(– ${{ '{:,.2f}'.format((iva_retenciones|default(0))|float|abs) }} ret.){% else %}Del mes ({{ ym_label }}){% endif %}</div>
-        <div class="metric-card__sparkline" data-sparkline="iva_cobrado"></div>
-      </a>
-      <a href="/portal/facturas?tab=received" class="ui-kpi-card card metric-card metric-card--link" style="position:relative; text-decoration:none; color:inherit; cursor:pointer;">
-        <div class="ui-kpi-card__label metric-label">
-          <svg class="icon" viewBox="0 0 24 24" fill="none"><path d="M22 12h-4l-3 9L9 3l-3 9H2" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          IVA pagado
-        </div>
-        <div class="ui-kpi-card__value metric-value">
-          <span class="metric-value-full">${{ '{:,.2f}'.format(iva_pagado|default(0)) }}</span>
-        </div>
-        <div class="ui-kpi-card__sub metric-sub">Del mes ({{ ym_label }})</div>
-        <div class="metric-card__sparkline" data-sparkline="iva_pagado"></div>
-      </a>
-    </div>
+    {% include 'partials/_dashboard_balance_v2.html' %}
       </div>
     </div>
   </section>
@@ -207,9 +162,9 @@
           <span class="activity-feed__title">Actividad reciente</span>
           <button type="button" class="btn btn--sm btn--ghost" style="text-decoration:none;" onclick="if(window.openActivityModal)window.openActivityModal()">Ver todas</button>
         </div>
-        <ul class="activity-feed__list">
+        <ul class="activity-feed__list activity-feed__list--scroll">
           {% set acts = activities|default([]) %}
-          {% for a in acts[:5] %}
+          {% for a in acts[:20] %}
           <li class="activity-feed__item">
             <span class="activity-feed__dot activity-feed__dot--{{ a.direction }}" aria-hidden="true"></span>
             <span class="activity-feed__icon activity-feed__icon--{{ a.direction }}">
@@ -929,10 +884,74 @@
   })();
   </script>
   <!-- 6-month trend chart (SVG bar chart loaded via API) -->
+  <style>
+    .pv2-chart-tooltip {
+      position: fixed;
+      pointer-events: none;
+      background: var(--pv2-surface, #fff);
+      border: 1px solid var(--pv2-border-2, rgba(15,23,42,0.12));
+      border-radius: 10px;
+      padding: 8px 12px;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--pv2-text, #0a0a0a);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+      z-index: 1000;
+      opacity: 0;
+      transform: translateY(4px);
+      transition: opacity 0.15s ease, transform 0.15s ease;
+      white-space: nowrap;
+      line-height: 1.5;
+    }
+    .pv2-chart-tooltip.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .pv2-chart-tooltip .tt-label {
+      color: var(--pv2-text-3, #a1a1aa);
+      font-size: 11px;
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+    .pv2-chart-tooltip .tt-row {
+      display: flex; align-items: center; gap: 6px;
+    }
+    .pv2-chart-tooltip .tt-dot {
+      width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+    }
+    #trendChartContainer rect[data-type] {
+      cursor: pointer;
+      transition: opacity 0.15s ease;
+    }
+    #trendChartContainer rect[data-type]:hover {
+      opacity: 1 !important;
+    }
+  </style>
   <script>
   (function(){
     var container = document.getElementById('trendChartContainer');
     if (!container) return;
+
+    /* — Tooltip element — */
+    var tip = document.createElement('div');
+    tip.className = 'pv2-chart-tooltip';
+    document.body.appendChild(tip);
+
+    function showTip(e, html) {
+      tip.innerHTML = html;
+      tip.classList.add('visible');
+      positionTip(e);
+    }
+    function hideTip() { tip.classList.remove('visible'); }
+    function positionTip(e) {
+      var tw = tip.offsetWidth, th = tip.offsetHeight;
+      var x = e.clientX + 12, y = e.clientY - th - 8;
+      if (x + tw > window.innerWidth - 8) x = e.clientX - tw - 12;
+      if (y < 8) y = e.clientY + 16;
+      tip.style.left = x + 'px';
+      tip.style.top = y + 'px';
+    }
+
     fetch('/api/metrics/trend?months=6')
       .then(function(r) { return r.json(); })
       .then(function(res) {
@@ -959,11 +978,30 @@
           var hG = Math.max(2, (d.gastos / maxVal) * h);
           var parts = (d.ym || '').split('-');
           var label = parts.length === 2 ? MESES[parseInt(parts[1], 10) - 1] || parts[1] : d.ym;
-          bars += '<rect x="' + x + '" y="' + (h - hI) + '" width="' + barW + '" height="' + hI + '" rx="3" fill="#6366f1" opacity="0.85"><title>Ingresos ' + label + ': $' + Number(d.ingresos).toLocaleString('es-MX', {maximumFractionDigits:0}) + '</title></rect>';
-          bars += '<rect x="' + (x + barW + 2) + '" y="' + (h - hG) + '" width="' + barW + '" height="' + hG + '" rx="3" fill="#ef4444" opacity="0.75"><title>Gastos ' + label + ': $' + Number(d.gastos).toLocaleString('es-MX', {maximumFractionDigits:0}) + '</title></rect>';
+          var fmtI = '$' + Number(d.ingresos).toLocaleString('es-MX', {maximumFractionDigits:0});
+          var fmtG = '$' + Number(d.gastos).toLocaleString('es-MX', {maximumFractionDigits:0});
+          bars += '<rect x="' + x + '" y="' + (h - hI) + '" width="' + barW + '" height="' + hI + '" rx="3" fill="#6366f1" opacity="0.85" data-type="ingresos" data-label="' + label + '" data-val="' + fmtI + '" data-val2="' + fmtG + '"></rect>';
+          bars += '<rect x="' + (x + barW + 2) + '" y="' + (h - hG) + '" width="' + barW + '" height="' + hG + '" rx="3" fill="#ef4444" opacity="0.75" data-type="gastos" data-label="' + label + '" data-val="' + fmtG + '" data-val2="' + fmtI + '"></rect>';
           bars += '<text x="' + (x + groupW / 2) + '" y="' + (h + 14) + '" text-anchor="middle" font-size="11" fill="var(--text-muted, #94a3b8)">' + label + '</text>';
         });
         container.innerHTML = '<svg width="100%" height="' + (h + 20) + '" viewBox="0 0 ' + totalW + ' ' + (h + 20) + '" preserveAspectRatio="xMidYEnd meet">' + bars + '</svg>';
+
+        /* — Attach hover events — */
+        container.querySelectorAll('rect[data-type]').forEach(function(rect) {
+          rect.addEventListener('mouseenter', function(e) {
+            var lbl = rect.getAttribute('data-label');
+            var type = rect.getAttribute('data-type');
+            var valI = type === 'ingresos' ? rect.getAttribute('data-val') : rect.getAttribute('data-val2');
+            var valG = type === 'gastos' ? rect.getAttribute('data-val') : rect.getAttribute('data-val2');
+            var html = '<div class="tt-label">' + lbl + '</div>'
+              + '<div class="tt-row"><span class="tt-dot" style="background:#6366f1"></span> Ingresos: ' + valI + '</div>'
+              + '<div class="tt-row"><span class="tt-dot" style="background:#ef4444"></span> Gastos: ' + valG + '</div>';
+            showTip(e, html);
+          });
+          rect.addEventListener('mousemove', positionTip);
+          rect.addEventListener('mouseleave', hideTip);
+        });
+
         return data;
       })
       .then(function(data) {

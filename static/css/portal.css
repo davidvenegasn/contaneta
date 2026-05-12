@@ -2944,6 +2944,31 @@ body.month-picker-open .portal-shell {
   color: inherit;
 }
 
+.month-picker__year-btn {
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border, #e2e8f0);
+  background: transparent;
+  color: var(--muted, #64748b);
+  font-size: 0.75rem;
+  font-weight: var(--fw-semibold, 600);
+  cursor: pointer;
+  transition: background var(--motion-micro, 150ms) ease, color var(--motion-micro, 150ms) ease, border-color var(--motion-micro, 150ms) ease;
+  line-height: 1.2;
+}
+
+.month-picker__year-btn:hover {
+  background: var(--accent-soft, rgba(99,102,241,.08));
+  color: var(--accent, #6366f1);
+  border-color: var(--accent, #6366f1);
+}
+
+.month-picker__year-btn.is-current {
+  background: var(--accent, #6366f1);
+  color: #fff;
+  border-color: var(--accent, #6366f1);
+}
+
 .month-picker__grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -3871,6 +3896,23 @@ html.nightmode .month-picker__year-nav-arrow {
 
 html.nightmode .month-picker__year-nav:hover {
   background: rgba(255,255,255,.12);
+}
+
+html.nightmode .month-picker__year-btn {
+  border-color: var(--border);
+  color: var(--muted);
+}
+
+html.nightmode .month-picker__year-btn:hover {
+  background: rgba(255,255,255,.08);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+html.nightmode .month-picker__year-btn.is-current {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
 }
 
 html.nightmode .table th,

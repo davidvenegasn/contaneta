@@ -22,6 +22,12 @@
       resumen.hidden = collapsed;
       resumen.setAttribute('aria-hidden', collapsed ? 'true' : 'false');
 
+      /* Also hide/show the trend chart */
+      var chart = document.getElementById('trendChartCard');
+      if (chart) {
+        chart.closest('section').hidden = collapsed;
+      }
+
       var iconWrap = btn.querySelector('.ym-card__toggle-icon');
       var label = btn.querySelector('.ym-card__toggle-label');
       if (iconWrap) iconWrap.innerHTML = collapsed ? EYE_OFF : EYE_OPEN;

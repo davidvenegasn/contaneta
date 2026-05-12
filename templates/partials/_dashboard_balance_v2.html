@@ -1,0 +1,43 @@
+{# =========================================================
+   _dashboard_balance_v2.html
+   Partial Jinja: bloque "Tus ingresos del mes" estilo Revolut.
+   Layout horizontal: ingresos a la izquierda, 3 KPIs a la derecha.
+   Usa variables del backend YA existentes:
+     ingresos_sin_iva, gastos_sin_iva, iva_recibido_neto,
+     iva_pagado, ym_label, kpi_trends
+   ========================================================= #}
+{% set _trends = kpi_trends|default({}) %}
+{% set _delta_ing = _trends.get('ingresos', 0) if _trends else 0 %}
+{% set _ing = ingresos_sin_iva|default(0)|float %}
+{% set _ing_int = _ing|int %}
+{% set _ing_cents = ((_ing - _ing_int) * 100)|round(0, 'floor')|int %}
+<div class="pv2-balance pv2-balance--row">
+  {# --- Ingresos (columna principal) --- #}
+  <div class="pv2-balance-col pv2-balance-col--main">
+    <div class="pv2-balance-label">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+      Tus ingresos del mes{% if ym_label %} · {{ ym_label }}{% endif %}
+    </div>
+    <div class="pv2-balance-amount">
+      $<span data-count-to="{{ _ing }}" data-count-decimals="2" data-count-duration="250">{{ '{:,.2f}'.format(_ing) }}</span>
+    </div>
+  </div>
+
+  {# --- Gastos --- #}
+  <a class="pv2-balance-col pv2-balance-col--kpi" href="/portal/facturas?tab=received">
+    <div class="pv2-balance-btn-label">Gastos</div>
+    <div class="pv2-balance-btn-value">$<span data-count-to="{{ gastos_sin_iva|default(0) }}" data-count-decimals="2" data-count-duration="250">{{ '{:,.2f}'.format(gastos_sin_iva|default(0)) }}</span></div>
+  </a>
+
+  {# --- IVA cobrado --- #}
+  <a class="pv2-balance-col pv2-balance-col--kpi" href="/portal/facturas?tab=issued">
+    <div class="pv2-balance-btn-label">IVA cobrado</div>
+    <div class="pv2-balance-btn-value">$<span data-count-to="{{ iva_recibido_neto|default(0) }}" data-count-decimals="2" data-count-duration="250">{{ '{:,.2f}'.format(iva_recibido_neto|default(0)) }}</span></div>
+  </a>
+
+  {# --- IVA pagado --- #}
+  <a class="pv2-balance-col pv2-balance-col--kpi" href="/portal/facturas?tab=received">
+    <div class="pv2-balance-btn-label">IVA pagado</div>
+    <div class="pv2-balance-btn-value">$<span data-count-to="{{ iva_pagado|default(0) }}" data-count-decimals="2" data-count-duration="250">{{ '{:,.2f}'.format(iva_pagado|default(0)) }}</span></div>
+  </a>
+</div>

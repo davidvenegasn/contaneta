@@ -1,0 +1,339 @@
+/* =========================================================
+   portal_dashboard_v2.css
+   Rediseño visual del dashboard — Revolut × Sleek (ContaNeta)
+   Drop-in: se activa con class="pv2" en el <body>.
+   NO sustituye estilos existentes; añade una capa visual v2.
+   ========================================================= */
+
+/* ============ GLOBAL FONT: Inter everywhere ============ */
+.pv2,
+.pv2 *,
+.pv2 *::before,
+.pv2 *::after {
+  font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif !important;
+}
+.pv2 code,
+.pv2 pre,
+.pv2 kbd,
+.pv2 .uuid,
+.pv2 .mono,
+.pv2 [class*="uuid"],
+.pv2 [class*="folio"] {
+  font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif !important;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+/* ============ TOKENS (light + dark) ============ */
+.pv2 {
+  --pv2-bg: #f7f5f1;
+  --pv2-surface: #ffffff;
+  --pv2-surface-2: #faf9f6;
+  --pv2-surface-3: #f4f1ec;
+  --pv2-text: #0a0a0a;
+  --pv2-text-2: #52525b;
+  --pv2-text-3: #a1a1aa;
+  --pv2-border: rgba(15,23,42,0.07);
+  --pv2-border-2: rgba(15,23,42,0.12);
+  --pv2-primary: #0a0a0a;
+  --pv2-primary-contrast: #ffffff;
+  --pv2-indigo: #6366f1;
+  --pv2-indigo-soft: #eef2ff;
+  --pv2-red: #ef4444;
+  --pv2-red-soft: #fef2f2;
+  --pv2-green: #10b981;
+  --pv2-green-soft: #ecfdf5;
+  --pv2-amber: #f59e0b;
+  --pv2-amber-soft: #fffbeb;
+  --pv2-pos-text: #047857;
+  --pv2-neg-text: #b91c1c;
+  --pv2-hover: rgba(15,23,42,0.045);
+
+  background: var(--pv2-bg);
+  color: var(--pv2-text);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  letter-spacing: -0.012em;
+  -webkit-font-smoothing: antialiased;
+}
+
+.pv2.pv2-dark {
+  --pv2-bg: #0a0a0b;
+  --pv2-surface: #151518;
+  --pv2-surface-2: #1b1b1e;
+  --pv2-surface-3: #222226;
+  --pv2-text: #fafafa;
+  --pv2-text-2: rgba(255,255,255,0.62);
+  --pv2-text-3: rgba(255,255,255,0.4);
+  --pv2-border: rgba(255,255,255,0.08);
+  --pv2-border-2: rgba(255,255,255,0.16);
+  --pv2-primary: #ffffff;
+  --pv2-primary-contrast: #0a0a0b;
+  --pv2-indigo: #a78bfa;
+  --pv2-indigo-soft: rgba(167,139,250,0.14);
+  --pv2-red: #f87171;
+  --pv2-red-soft: rgba(248,113,113,0.12);
+  --pv2-green: #34d399;
+  --pv2-green-soft: rgba(52,211,153,0.12);
+  --pv2-amber: #fbbf24;
+  --pv2-amber-soft: rgba(251,191,36,0.12);
+  --pv2-pos-text: #34d399;
+  --pv2-neg-text: #f87171;
+  --pv2-hover: rgba(255,255,255,0.06);
+}
+
+/* ============ BALANCE CARD (4-column row) ============ */
+.pv2 .pv2-balance {
+  background: var(--pv2-surface);
+  border: 1px solid var(--pv2-border);
+  border-radius: 20px;
+  padding: 28px 32px;
+  margin: 0 0 20px 0;
+}
+.pv2 .pv2-balance--row {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr 1fr 1fr;
+  align-items: center;
+  gap: 24px;
+}
+.pv2 .pv2-balance-col--main {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.pv2 .pv2-balance-col--kpi {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+  padding: 18px 12px;
+  border-radius: 16px;
+  background: var(--pv2-surface-2);
+  border: 1px solid var(--pv2-border);
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.18s ease, transform 0.18s ease, background 0.18s ease;
+}
+.pv2 .pv2-balance-col--kpi:hover {
+  border-color: var(--pv2-border-2);
+  transform: translateY(-1px);
+  background: var(--pv2-surface);
+}
+
+.pv2 .pv2-balance-label {
+  font-size: 13.5px;
+  color: var(--pv2-text-2);
+  font-weight: 600;
+  margin-bottom: 8px;
+  letter-spacing: -0.012em;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.pv2 .pv2-balance-label svg { width: 16px; height: 16px; color: var(--pv2-indigo); }
+
+.pv2 .pv2-balance-amount {
+  font-size: 48px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  color: var(--pv2-text);
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 6px;
+}
+.pv2 .pv2-balance-amount .cents {
+  font-size: 22px;
+  color: var(--pv2-text-3);
+  font-weight: 700;
+  margin-left: 2px;
+}
+
+.pv2 .pv2-balance-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--pv2-text-3);
+  margin-bottom: 0;
+}
+.pv2 .pv2-balance-delta .chip {
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+.pv2 .pv2-balance-delta .chip.pos { background: var(--pv2-green-soft); color: var(--pv2-pos-text); }
+.pv2 .pv2-balance-delta .chip.neg { background: var(--pv2-red-soft); color: var(--pv2-neg-text); }
+.pv2 .pv2-balance-delta .chip.neu { background: var(--pv2-indigo-soft); color: var(--pv2-indigo); }
+
+/* Responsive: 2×2 on medium, stack on small */
+@media (max-width: 960px) {
+  .pv2 .pv2-balance--row {
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .pv2 .pv2-balance-col--main {
+    grid-column: 1 / -1;
+  }
+}
+@media (max-width: 540px) {
+  .pv2 .pv2-balance--row {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .pv2 .pv2-balance { padding: 22px 20px; }
+  .pv2 .pv2-balance-amount { font-size: 38px; }
+}
+/* Staggered fadeUp entry (same as metric-card in facturas) */
+@media (prefers-reduced-motion: no-preference) {
+  .pv2 .pv2-balance-col { animation: fadeUp var(--anim-duration-fast, 200ms) var(--ease-out, ease) both; }
+  .pv2 .pv2-balance-col:nth-child(1) { animation-delay: 0ms; }
+  .pv2 .pv2-balance-col:nth-child(2) { animation-delay: 80ms; }
+  .pv2 .pv2-balance-col:nth-child(3) { animation-delay: 160ms; }
+  .pv2 .pv2-balance-col:nth-child(4) { animation-delay: 240ms; }
+}
+
+.pv2 .pv2-balance-btn-label {
+  font-size: 14px;
+  color: var(--pv2-text-3);
+  font-weight: 600;
+  letter-spacing: -0.008em;
+}
+.pv2 .pv2-balance-btn-value {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--pv2-text);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ============ DARK MODE — re-estiliza lo existente ============ */
+/* Re-tiñe cards, KPIs y gráfica que ya tiene el portal
+   para que se sientan parte del dark. Sin tocar layout. */
+.pv2.pv2-dark .card,
+.pv2.pv2-dark .metric-card,
+.pv2.pv2-dark .ui-kpi-card {
+  background: var(--pv2-surface) !important;
+  border-color: var(--pv2-border) !important;
+  color: var(--pv2-text);
+}
+.pv2.pv2-dark .metric-label,
+.pv2.pv2-dark .ui-kpi-card__label { color: var(--pv2-text-2) !important; }
+.pv2.pv2-dark .metric-value,
+.pv2.pv2-dark .ui-kpi-card__value { color: var(--pv2-text) !important; }
+.pv2.pv2-dark .metric-sub,
+.pv2.pv2-dark .ui-kpi-card__sub { color: var(--pv2-text-3) !important; }
+
+/* ============ SIDEBAR + TOPBAR: seamless look ============ */
+.pv2 .portal-sidebar-unified {
+  border-right: none !important;
+  background: var(--pv2-bg) !important;
+}
+.pv2 .portal-rail {
+  background: var(--pv2-bg) !important;
+}
+.pv2 .portal-topbar {
+  background: var(--pv2-bg) !important;
+  border-bottom-color: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+.pv2 .portal-topbar.is-scrolled {
+  border-bottom-color: var(--pv2-border) !important;
+}
+
+/* Tighter layout: content closer to sidebar and topbar */
+.pv2 .portal {
+  --sidebar-content-gap: 0px !important;
+  --content-inset: 0px !important;
+}
+.pv2 .portal-container {
+  padding-left: 8px !important;
+  padding-right: 16px !important;
+}
+.pv2 .portal .main {
+  padding-top: 8px !important;
+}
+.pv2 .portal-topbar {
+  padding-left: 8px !important;
+}
+
+/* Sidebar icons: bigger + pushed down */
+.pv2 .rail-item .icon {
+  width: 24px !important;
+  height: 24px !important;
+}
+.pv2 .rail-item--movements .icon {
+  width: 28px !important;
+  height: 28px !important;
+}
+.pv2 .psb-nav-link__rail .icon {
+  width: 24px !important;
+  height: 24px !important;
+}
+.pv2 .psb-nav-link--movements .psb-nav-link__rail .icon {
+  width: 28px !important;
+  height: 28px !important;
+}
+.pv2 .rail-brand-toggle__logo {
+  width: 30px !important;
+  height: 30px !important;
+}
+.pv2 .portal-rail .rail-nav,
+.pv2 .portal-sidebar-unified .psb-nav {
+  padding-top: 24px !important;
+}
+
+/* ============ ACTIVITY FEED: scrollable + fade ============ */
+.pv2 .activity-feed {
+  background: var(--pv2-surface) !important;
+  border-color: var(--pv2-border) !important;
+  border-radius: 20px !important;
+}
+.pv2 .activity-feed__list--scroll {
+  max-height: 360px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--pv2-border-2) transparent;
+  -webkit-mask-image: linear-gradient(to bottom, #000 85%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 85%, transparent 100%);
+}
+.pv2 .activity-feed__list--scroll::-webkit-scrollbar {
+  width: 4px;
+}
+.pv2 .activity-feed__list--scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.pv2 .activity-feed__list--scroll::-webkit-scrollbar-thumb {
+  background: var(--pv2-border-2);
+  border-radius: 99px;
+}
+.pv2 .activity-feed__item {
+  transition: background 0.15s ease;
+}
+.pv2 .activity-feed__item:hover {
+  background: var(--pv2-hover);
+}
+
+/* ============ DARK TOGGLE BUTTON ============ */
+.pv2 .pv2-theme-toggle {
+  position: fixed;
+  bottom: 20px; right: 20px;
+  width: 48px; height: 48px; border-radius: 999px;
+  background: var(--pv2-surface);
+  border: 1px solid var(--pv2-border);
+  display: grid; place-items: center;
+  color: var(--pv2-text);
+  cursor: pointer;
+  z-index: 900;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+  transition: transform 0.15s ease;
+}
+.pv2 .pv2-theme-toggle:hover { transform: translateY(-2px); }
+.pv2 .pv2-theme-toggle svg { width: 20px; height: 20px; }
+.pv2 .pv2-theme-toggle .pv2-sun { display: none; }
+.pv2.pv2-dark .pv2-theme-toggle .pv2-sun { display: block; }
+.pv2.pv2-dark .pv2-theme-toggle .pv2-moon { display: none; }
