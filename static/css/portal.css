@@ -3123,11 +3123,13 @@ body.month-picker-open .portal-shell {
 .bank-movements-table th:nth-child(1) { width: 65px; }   /* Fecha */
 .bank-movements-table th:nth-child(2) { width: 28%; }    /* Concepto — % so it breathes */
 .bank-movements-table th:nth-child(3) { width: 72px; }   /* Tipo */
-.bank-movements-table th:nth-child(4) { width: 100px; }  /* Monto */
+.bank-movements-table th:nth-child(4),
+.bank-movements-table td:nth-child(4) { width: 100px; text-align: right; }  /* Monto */
 .bank-movements-table th:nth-child(5) { width: 80px; }   /* Banco */
 .bank-movements-table th:nth-child(6) { width: 100px; }  /* Categoría */
-.bank-movements-table th:nth-child(7) { width: 120px; }  /* Factura probable */
-.bank-movements-table th:nth-child(8) { width: 80px; }   /* Acciones */
+.bank-movements-table th:nth-child(7) { width: 120px; min-width: 140px; }  /* Factura probable */
+.bank-movements-table th:nth-child(8),
+.bank-movements-table td:nth-child(8) { width: 80px; text-align: right; }  /* Acciones */
 .bank-movements-table .concepto-cell {
   text-overflow: ellipsis;
   white-space: nowrap;
