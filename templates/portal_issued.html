@@ -9,9 +9,8 @@
       <div class="ym-selector">
         {{ month_picker('/portal/facturas?tab=issued', token, ym, ym_label) }}
       </div>
-      <button type="button" class="ym-card__toggle btn btn--sm btn--ghost" aria-label="Ocultar totales" title="Ocultar totales (proteger tu información)">
+      <button type="button" class="ym-card__toggle btn-icon-eye" aria-label="Ocultar totales" title="Ocultar/Mostrar totales">
         <span class="ym-card__toggle-icon" aria-hidden="true">−</span>
-        <span class="ym-card__toggle-label">Ocultar totales</span>
       </button>
     </div>
     {% set mt = month_totals|default({}) %}

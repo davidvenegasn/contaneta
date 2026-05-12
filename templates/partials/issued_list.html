@@ -7,9 +7,8 @@
       <h2 class="page-section-header__title section-title u-m0">{{ section_title|default('Facturas emitidas') }}</h2>
       {{ month_picker(_base_url, token, ym, ym_label) }}
     </div>
-    <button type="button" class="ym-card__toggle btn btn--sm btn--ghost" aria-label="Ocultar totales" title="Ocultar totales (proteger tu información)">
+    <button type="button" class="ym-card__toggle btn-icon-eye" aria-label="Ocultar totales" title="Ocultar/Mostrar totales">
       <span class="ym-card__toggle-icon" aria-hidden="true">−</span>
-      <span class="ym-card__toggle-label">Ocultar totales</span>
     </button>
   </div>
   {% set mt = month_totals|default({}) %}

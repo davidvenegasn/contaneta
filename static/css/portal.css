@@ -8088,3 +8088,21 @@ html.nightmode .bank-category-popover__item:hover {
 .page-section .hub-tabs { margin: 0 0 16px 0; }
 .page-section .hub-tabs + .card,
 .page-section .hub-tabs + .ym-card { margin-top: 0; }
+
+/* ── Eye icon toggle (ocultar/mostrar totales) ── */
+.btn-icon-eye {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--muted, #64748b);
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease;
+  flex-shrink: 0;
+}
+.btn-icon-eye:hover { background: rgba(99, 102, 241, 0.08); color: var(--accent, #6366f1); }
+.btn-icon-eye:focus-visible { outline: 2px solid var(--accent, #6366f1); outline-offset: 2px; }
+.ym-card--collapsed .btn-icon-eye { color: var(--accent, #6366f1); }
