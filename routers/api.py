@@ -51,6 +51,7 @@ from services import clients_service, products_service
 from services import jobs as jobs_service
 from services import invoices_engine
 from services.sat_sync import get_month_totals as _get_month_totals_raw
+from services.ym_helpers import ym_sql_filter, sanitize_ym, is_annual
 
 
 def _get_month_totals_safe(issuer_id, ym, direction):
@@ -1928,21 +1929,22 @@ def api_invoices_issued(
         return fixture
     issuer_id = issuer["id"]
     if not ym:
-        from datetime import datetime
         ym = datetime.now().strftime("%Y-%m")
-    
+    ym = sanitize_ym(ym, datetime.now().strftime("%Y-%m"))
+    _ym_filt = ym_sql_filter(ym)
+
     # Build WHERE clause
     where_parts = [
         "issuer_id = ?",
         "direction = 'issued'",
         "fecha_emision IS NOT NULL",
-        "substr(fecha_emision,1,7) = ?",
+        _ym_filt,
         "(total IS NULL OR total >= 0.01)",
     ]
     params = [issuer_id, ym]
 
     # Deduplicate subquery (same as portal route)
-    dedup_subquery = """
+    dedup_subquery = f"""
         id IN (
             SELECT id FROM (
                 SELECT id, ROW_NUMBER() OVER (
@@ -1951,7 +1953,7 @@ def api_invoices_issued(
                 ) AS rn
                 FROM sat_cfdi
                 WHERE issuer_id = ? AND direction = 'issued' AND fecha_emision IS NOT NULL
-                  AND substr(fecha_emision,1,7) = ? AND (total IS NULL OR total >= 0.01)
+                  AND {_ym_filt} AND (total IS NULL OR total >= 0.01)
             ) WHERE rn = 1
         )
     """
@@ -2059,22 +2061,23 @@ def api_invoices_received(
         return fixture
     issuer_id = issuer["id"]
     if not ym:
-        from datetime import datetime
         ym = datetime.now().strftime("%Y-%m")
-    
+    ym = sanitize_ym(ym, datetime.now().strftime("%Y-%m"))
+    _ym_filt = ym_sql_filter(ym)
+
     # Build WHERE clause
     where_parts = [
         "issuer_id = ?",
         "direction = 'received'",
         "fecha_emision IS NOT NULL",
-        "substr(fecha_emision,1,7) = ?",
+        _ym_filt,
         "total IS NOT NULL AND total >= 0.01",
         "(tipo_comprobante IS NULL OR UPPER(TRIM(tipo_comprobante)) != 'N')",
     ]
     params = [issuer_id, ym]
 
     # Deduplicate subquery
-    dedup_subquery = """
+    dedup_subquery = f"""
         id IN (
             SELECT id FROM (
                 SELECT id, ROW_NUMBER() OVER (
@@ -2083,7 +2086,7 @@ def api_invoices_received(
                 ) AS rn
                 FROM sat_cfdi
                 WHERE issuer_id = ? AND direction = 'received' AND fecha_emision IS NOT NULL
-                  AND substr(fecha_emision,1,7) = ? AND total IS NOT NULL AND total >= 0.01
+                  AND {_ym_filt} AND total IS NOT NULL AND total >= 0.01
                   AND (tipo_comprobante IS NULL OR UPPER(TRIM(tipo_comprobante)) != 'N')
             ) WHERE rn = 1
         )
@@ -3596,12 +3599,34 @@ def api_metrics_trend(
     issuer: dict = Depends(get_portal_issuer),
     months: int = Query(6, ge=1, le=12),
 ):
-    """Return monthly totals for issued/received over the last N months (for sparklines and charts)."""
+    """Return monthly totals for issued/received over the last N months (for sparklines and charts).
+    Smart: if user has less than N months of data, show only from first month with data."""
     issuer_id = int(issuer.get("id") or 0)
     if issuer_id <= 0:
         raise HTTPException(status_code=401, detail="Sesión inválida")
     from datetime import date
     today = date.today()
+
+    # Smart range: detect first month with data
+    try:
+        conn = db()
+        row = conn.execute(
+            "SELECT MIN(substr(fecha_emision,1,7)) AS first_ym FROM sat_cfdi WHERE issuer_id = ? AND fecha_emision IS NOT NULL",
+            (issuer_id,),
+        ).fetchone()
+        conn.close()
+        first_ym = (row["first_ym"] or "") if row else ""
+    except Exception:
+        first_ym = ""
+
+    if first_ym and len(first_ym) == 7:
+        try:
+            fy, fm = int(first_ym[:4]), int(first_ym[5:7])
+            months_with_data = (today.year - fy) * 12 + (today.month - fm) + 1
+            months = min(months, max(1, months_with_data))
+        except (ValueError, TypeError):
+            pass
+
     result = []
     y, m = today.year, today.month
     # Build list of last N months (inclusive of current)

@@ -33,6 +33,7 @@ from services.bank_own_accounts import detect_own_account_transfer, reclassify_o
 from services.bank_statement_ingest import ingest_bank_statement, extract_statement_metadata, validate_statement_ownership, commit_preview_to_db
 from services.bank_cfdi_matching import find_cfdi_candidates, save_suggested_matches, confirm_match as match_confirm, reject_match as match_reject
 from services.sat_sync import get_sat_sync_status, get_month_totals
+from services.ym_helpers import ym_sql_filter, ym_to_label, shift_ym, is_annual, sanitize_ym
 
 logger = logging.getLogger(__name__)
 
@@ -188,26 +189,7 @@ def _run_fiel_validation(issuer_id: int) -> tuple[bool, str]:
     return ok, message
 
 
-def ym_to_label(ym: str) -> str:
-    """Convert 2026-01 to 'Enero 2026'."""
-    try:
-        y, m = ym.split("-")
-        return f"{MESES_ES[int(m) - 1]} {y}"
-    except (ValueError, IndexError):
-        return ym
-
-
-def shift_ym(ym: str, delta_months: int) -> str:
-    y, m = ym.split("-")
-    y, m = int(y), int(m)
-    m += delta_months
-    while m <= 0:
-        m += 12
-        y -= 1
-    while m >= 13:
-        m -= 12
-        y += 1
-    return f"{y:04d}-{m:02d}"
+# ym_to_label and shift_ym imported from services.ym_helpers
 
 
 _get_month_totals = get_month_totals  # backward-compat alias
@@ -474,19 +456,21 @@ def get_portal_router(templates):
             issuer_id = issuer["id"]
             if not ym:
                 ym = ym_now()
+            ym = sanitize_ym(ym, ym_now())
+            _ym_filt = ym_sql_filter(ym)
             count_issued = db_rows(
-                """
+                f"""
                 SELECT COUNT(*) AS n FROM sat_cfdi
                 WHERE issuer_id = ? AND direction = 'issued' AND fecha_emision IS NOT NULL
-                  AND substr(fecha_emision,1,7) = ? AND (total IS NULL OR total >= 0.01)
+                  AND {_ym_filt} AND (total IS NULL OR total >= 0.01)
                 """,
                 (issuer_id, ym),
             )
             count_received = db_rows(
-                """
+                f"""
                 SELECT COUNT(*) AS n FROM sat_cfdi
                 WHERE issuer_id = ? AND direction = 'received' AND fecha_emision IS NOT NULL
-                  AND substr(fecha_emision,1,7) = ? AND total IS NOT NULL AND total >= 0.01
+                  AND {_ym_filt} AND total IS NOT NULL AND total >= 0.01
                   AND (tipo_comprobante IS NULL OR UPPER(TRIM(tipo_comprobante)) != 'N')
                 """,
                 (issuer_id, ym),
@@ -706,19 +690,20 @@ def get_portal_router(templates):
         try:
             issuer_id = issuer["id"]
             ym = ym_now()
+            _ym_filt = ym_sql_filter(ym)
             count_issued = db_rows(
-                """
+                f"""
                 SELECT COUNT(*) AS n FROM sat_cfdi
                 WHERE issuer_id = ? AND direction = 'issued' AND fecha_emision IS NOT NULL
-                  AND substr(fecha_emision,1,7) = ? AND (total IS NULL OR total >= 0.01)
+                  AND {_ym_filt} AND (total IS NULL OR total >= 0.01)
                 """,
                 (issuer_id, ym),
             )
             count_received = db_rows(
-                """
+                f"""
                 SELECT COUNT(*) AS n FROM sat_cfdi
                 WHERE issuer_id = ? AND direction = 'received' AND fecha_emision IS NOT NULL
-                  AND substr(fecha_emision,1,7) = ? AND total IS NOT NULL AND total >= 0.01
+                  AND {_ym_filt} AND total IS NOT NULL AND total >= 0.01
                   AND (tipo_comprobante IS NULL OR UPPER(TRIM(tipo_comprobante)) != 'N')
                 """,
                 (issuer_id, ym),
@@ -998,6 +983,9 @@ def get_portal_router(templates):
             issuer_id = issuer["id"]
             if not ym:
                 ym = ym_now()
+            ym = sanitize_ym(ym, ym_now())
+            _ym_filt = ym_sql_filter(ym)
+            _row_limit = 3000 if is_annual(ym) else 300
             month_picker_base_url = f"/portal/facturas?tab={tab}"
             sat_sync_status = _get_sat_sync_status(issuer_id)
             has_fiel_validated = bool(db_rows("SELECT 1 FROM sat_credentials WHERE issuer_id = ? AND validation_ok = 1 LIMIT 1", (issuer_id,)))
@@ -1011,13 +999,13 @@ def get_portal_router(templates):
                 "month_picker_base_url": month_picker_base_url,
             }
             if tab == "issued":
-                rows = db_rows("""
+                rows = db_rows(f"""
                     SELECT uuid, fecha_emision, rfc_receptor, nombre_receptor, concepto, total, moneda,
                            COALESCE(impuestos, 0) AS impuestos, COALESCE(retenciones, 0) AS retenciones,
                            metodo_pago, status, xml_path
                     FROM sat_cfdi
                     WHERE issuer_id = ? AND direction = 'issued' AND fecha_emision IS NOT NULL
-                      AND substr(fecha_emision,1,7) = ? AND (total IS NULL OR total >= 0.01)
+                      AND {_ym_filt} AND (total IS NULL OR total >= 0.01)
                       AND id IN (
                         SELECT id FROM (
                           SELECT id, ROW_NUMBER() OVER (
@@ -1025,10 +1013,10 @@ def get_portal_router(templates):
                             ORDER BY (CASE WHEN COALESCE(total,0) >= 0.01 THEN 0 ELSE 1 END), id
                           ) AS rn
                           FROM sat_cfdi
-                          WHERE issuer_id = ? AND direction = 'issued' AND fecha_emision IS NOT NULL AND substr(fecha_emision,1,7) = ? AND (total IS NULL OR total >= 0.01)
+                          WHERE issuer_id = ? AND direction = 'issued' AND fecha_emision IS NOT NULL AND {_ym_filt} AND (total IS NULL OR total >= 0.01)
                         ) WHERE rn = 1
                       )
-                    ORDER BY fecha_emision DESC LIMIT 300;
+                    ORDER BY fecha_emision DESC LIMIT {_row_limit};
                 """, (issuer_id, ym, issuer_id, ym))
                 months = db_rows("""
                     SELECT substr(fecha_emision,1,7) AS ym, count(*) AS n
@@ -1047,13 +1035,13 @@ def get_portal_router(templates):
                 })
             else:
                 # received y ppd usan los mismos datos (recibidas); PPD se filtra en front con metodo_pago
-                rows = db_rows("""
+                rows = db_rows(f"""
                     SELECT uuid, fecha_emision, rfc_emisor, nombre_emisor, concepto, total, moneda,
                            COALESCE(impuestos, 0) AS impuestos, COALESCE(retenciones, 0) AS retenciones,
                            metodo_pago, status, xml_path
                     FROM sat_cfdi
                     WHERE issuer_id = ? AND direction = 'received' AND fecha_emision IS NOT NULL
-                      AND substr(fecha_emision,1,7) = ? AND total IS NOT NULL AND total >= 0.01
+                      AND {_ym_filt} AND total IS NOT NULL AND total >= 0.01
                       AND (tipo_comprobante IS NULL OR UPPER(TRIM(tipo_comprobante)) != 'N')
                       AND id IN (
                         SELECT id FROM (
@@ -1062,10 +1050,10 @@ def get_portal_router(templates):
                             ORDER BY id
                           ) AS rn
                           FROM sat_cfdi
-                          WHERE issuer_id = ? AND direction = 'received' AND fecha_emision IS NOT NULL AND substr(fecha_emision,1,7) = ? AND total IS NOT NULL AND total >= 0.01 AND (tipo_comprobante IS NULL OR UPPER(TRIM(tipo_comprobante)) != 'N')
+                          WHERE issuer_id = ? AND direction = 'received' AND fecha_emision IS NOT NULL AND {_ym_filt} AND total IS NOT NULL AND total >= 0.01 AND (tipo_comprobante IS NULL OR UPPER(TRIM(tipo_comprobante)) != 'N')
                         ) WHERE rn = 1
                       )
-                    ORDER BY fecha_emision DESC LIMIT 300;
+                    ORDER BY fecha_emision DESC LIMIT {_row_limit};
                 """, (issuer_id, ym, issuer_id, ym))
                 months = db_rows("""
                     SELECT substr(fecha_emision,1,7) AS ym, count(*) AS n
@@ -1277,15 +1265,18 @@ def get_portal_router(templates):
             issuer_id = issuer["id"]
             if not ym:
                 ym = ym_now()
-            rows = db_rows("""
+            ym = sanitize_ym(ym, ym_now())
+            _ym_filt = ym_sql_filter(ym)
+            _row_limit = 3000 if is_annual(ym) else 300
+            rows = db_rows(f"""
                 SELECT uuid, fecha_emision, rfc_emisor, nombre_emisor, total, moneda, status, xml_path,
                        serie, folio, concepto, forma_pago, metodo_pago, uso_cfdi, subtotal, descuento, impuestos,
                        tipo_comprobante, xml_status
                 FROM sat_cfdi
                 WHERE issuer_id = ? AND direction = 'received'
                   AND UPPER(TRIM(COALESCE(tipo_comprobante,''))) = 'N'
-                  AND fecha_emision IS NOT NULL AND substr(fecha_emision,1,7) = ?
-                ORDER BY fecha_emision DESC LIMIT 300;
+                  AND fecha_emision IS NOT NULL AND {_ym_filt}
+                ORDER BY fecha_emision DESC LIMIT {_row_limit};
             """, (issuer_id, ym))
             months = db_rows("""
                 SELECT substr(fecha_emision,1,7) AS ym, count(*) AS n
@@ -1875,25 +1866,29 @@ def get_portal_router(templates):
         issuer_id = int(issuer.get("id") or 0)
         if issuer_id <= 0:
             raise HTTPException(status_code=401, detail="Sesión inválida")
-        ym_val = (ym or ym_now()).strip()[:7] or ym_now()
+        ym_val = sanitize_ym(ym or "", ym_now())
+        # Month-close is inherently monthly — redirect annual to current month
+        if is_annual(ym_val):
+            return RedirectResponse(url=f"/portal/month-close?ym={ym_now()}", status_code=302)
         from services import month_close as month_close_service
 
         status = month_close_service.get_status(issuer_id, ym_val)
         ov = status.get("overrides") if isinstance(status.get("overrides"), dict) else {}
 
+        _ym_filt = ym_sql_filter(ym_val)
         issued_count = db_rows(
-            """
+            f"""
             SELECT COUNT(*) AS n FROM sat_cfdi
             WHERE issuer_id = ? AND direction = 'issued' AND fecha_emision IS NOT NULL
-              AND substr(fecha_emision,1,7) = ? AND (total IS NULL OR total >= 0.01)
+              AND {_ym_filt} AND (total IS NULL OR total >= 0.01)
             """,
             (issuer_id, ym_val),
         )
         received_count = db_rows(
-            """
+            f"""
             SELECT COUNT(*) AS n FROM sat_cfdi
             WHERE issuer_id = ? AND direction = 'received' AND fecha_emision IS NOT NULL
-              AND substr(fecha_emision,1,7) = ? AND total IS NOT NULL AND total >= 0.01
+              AND {_ym_filt} AND total IS NOT NULL AND total >= 0.01
               AND (tipo_comprobante IS NULL OR UPPER(TRIM(tipo_comprobante)) != 'N')
             """,
             (issuer_id, ym_val),
@@ -3464,7 +3459,7 @@ def get_portal_router(templates):
         if issuer_id <= 0:
             raise HTTPException(status_code=401, detail="Sesión inválida")
         # Mes: prioridad ym (selector) > period_month (legacy) > mes actual
-        explicit_ym = (ym or period_month or "").strip()[:7]
+        explicit_ym = sanitize_ym(ym or period_month or "", "")
         period_month = explicit_ym or ym_now()
         movements: list = []
         total_count = 0
@@ -3809,7 +3804,7 @@ def get_portal_router(templates):
                 except Exception:
                     pass
 
-        ym_safe = (period_month or ym_now()).strip()[:7] or ym_now()
+        ym_safe = sanitize_ym(period_month or "", ym_now())
 
         # Auto-run matching on page load (lightweight — skips if already done)
         if total_count > 0:
@@ -3877,7 +3872,7 @@ def get_portal_router(templates):
         issuer_id = int(issuer.get("id") or 0)
         if issuer_id <= 0:
             raise HTTPException(status_code=401, detail="Sesión inválida")
-        period_month = (ym or "").strip()[:7] or ym_now()
+        period_month = sanitize_ym(ym or "", ym_now())
         conn = db()
         conn.row_factory = lambda cursor, row: dict(zip([c[0] for c in cursor.description], row))
         try:
@@ -3976,16 +3971,17 @@ def get_portal_router(templates):
             raise HTTPException(status_code=401, detail="Sesión inválida")
         if tab not in ("issued", "received"):
             tab = "issued"
-        period = (ym or "").strip()[:7] or ym_now()
+        period = sanitize_ym(ym or "", ym_now())
+        _ym_filt = ym_sql_filter(period)
 
         if tab == "issued":
-            rows = db_rows("""
+            rows = db_rows(f"""
                 SELECT uuid, fecha_emision, rfc_receptor, nombre_receptor, concepto,
                        COALESCE(total - COALESCE(impuestos,0), total) AS subtotal,
                        COALESCE(impuestos, 0) AS iva, total, status
                 FROM sat_cfdi
                 WHERE issuer_id = ? AND direction = 'issued' AND fecha_emision IS NOT NULL
-                  AND substr(fecha_emision,1,7) = ? AND (total IS NULL OR total >= 0.01)
+                  AND {_ym_filt} AND (total IS NULL OR total >= 0.01)
                 ORDER BY fecha_emision DESC
             """, (issuer_id, period)) or []
             headers = ["Fecha", "Receptor", "RFC", "Concepto", "Subtotal", "IVA", "Total", "UUID", "Estado"]
@@ -4003,13 +3999,13 @@ def get_portal_router(templates):
                 ]
             fname = f"facturas_emitidas_{period}.csv"
         else:
-            rows = db_rows("""
+            rows = db_rows(f"""
                 SELECT uuid, fecha_emision, rfc_emisor, nombre_emisor, concepto,
                        COALESCE(total - COALESCE(impuestos,0), total) AS subtotal,
                        COALESCE(impuestos, 0) AS iva, total
                 FROM sat_cfdi
                 WHERE issuer_id = ? AND direction = 'received' AND fecha_emision IS NOT NULL
-                  AND substr(fecha_emision,1,7) = ? AND total IS NOT NULL AND total >= 0.01
+                  AND {_ym_filt} AND total IS NOT NULL AND total >= 0.01
                   AND (tipo_comprobante IS NULL OR UPPER(TRIM(tipo_comprobante)) != 'N')
                 ORDER BY fecha_emision DESC
             """, (issuer_id, period)) or []

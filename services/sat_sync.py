@@ -2,6 +2,7 @@
 import logging
 
 from database import db, has_column
+from services.ym_helpers import ym_sql_filter
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +62,7 @@ def get_month_totals(issuer_id: int, ym: str, direction: str) -> dict:
     conn = db()
     try:
         base_where = (
-            "issuer_id = ? AND direction = ? AND fecha_emision IS NOT NULL AND substr(fecha_emision,1,7) = ?"
+            f"issuer_id = ? AND direction = ? AND fecha_emision IS NOT NULL AND {ym_sql_filter(ym)}"
         )
         if direction == "issued":
             base_where += " AND (total IS NULL OR total >= 0.01)"
