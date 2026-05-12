@@ -102,6 +102,10 @@
         <span class="psb-nav-link__rail">{{ icon_quotations() }}<span class="rail-tooltip">Cotizaciones</span></span>
         <span class="psb-nav-link__txt">Cotizaciones</span>
       </a>
+      <a class="psb-nav-link {{ 'is-active' if (active_page == 'fiscal' or (nav_is_active is defined and nav_is_active('/portal/fiscal'))) else '' }}" href="/portal/fiscal">
+        <span class="psb-nav-link__rail">{{ icon_summary() }}<span class="rail-tooltip">Fiscal</span></span>
+        <span class="psb-nav-link__txt">Resumen Fiscal</span>
+      </a>
 
       <div class="psb-section">
         <div class="psb-section__rail"><div class="psb-section__rule" aria-hidden="true"></div></div>

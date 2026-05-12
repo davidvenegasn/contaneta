@@ -9,6 +9,7 @@ def get_portal_router(templates):
     from routers.portal.bank import register_bank_routes
     from routers.portal.catalogs import register_catalogs_routes
     from routers.portal.dashboard import register_dashboard_routes
+    from routers.portal.fiscal import register_fiscal_routes
     from routers.portal.invoices import register_invoices_routes
     from routers.portal.misc import register_misc_routes
     from routers.portal.month_close import register_month_close_routes
@@ -22,6 +23,7 @@ def get_portal_router(templates):
     register_bank_routes(router, templates)
     register_month_close_routes(router, templates)
     register_sat_config_routes(router, templates)
+    register_fiscal_routes(router, templates)
     register_misc_routes(router, templates)
 
     return router
