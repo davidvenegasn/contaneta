@@ -70,6 +70,11 @@ def create(issuer_id: int, tipo: str, fecha: str, invoice_number: str,
     tipo = tipo.strip().upper()
     if tipo not in ("INGRESO", "GASTO"):
         raise ValueError("tipo must be INGRESO or GASTO")
+    if not tipo_cambio or tipo_cambio <= 0:
+        from services.invoices.banxico_client import get_rate
+        auto_rate = get_rate(fecha, moneda)
+        if auto_rate:
+            tipo_cambio = auto_rate
     monto_mxn = round(monto_original * tipo_cambio, 2)
     period_month = fecha[:7] if fecha and len(fecha) >= 7 else None
     conn = db()
