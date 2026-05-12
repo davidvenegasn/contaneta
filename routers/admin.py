@@ -1321,4 +1321,11 @@ a {{ color: #0369a1; text-decoration: none; }}
         )
         return response
 
+    @router.get("/sentry-test")
+    def admin_sentry_test(
+        _admin: tuple = Depends(require_admin),
+    ):
+        """Intentional exception to verify Sentry integration. Admin only."""
+        raise RuntimeError("Sentry test: intentional error from /admin/sentry-test")
+
     return router
