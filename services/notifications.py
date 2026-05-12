@@ -368,44 +368,46 @@ def refresh_for_issuer(issuer_id: int) -> None:
     except Exception:
         pass
 
-    # 3) Gastos bancarios sin CFDI (requiere_cfdi=1 y sin match probable)
+    # 3) CFDIs recibidos en las últimas 24h — una notificación por UUID
     try:
-        conn = db()
-        if table_exists(conn, "bank_movements") and has_column(conn, "bank_movements", "period_month"):
-            has_req = has_column(conn, "bank_movements", "requires_cfdi")
-            has_bim = table_exists(conn, "bank_invoice_matches")
-            where = ["issuer_id = ?", "period_month = ?", "COALESCE(retiro,0) >= 0.01", "COALESCE(categoria,'') != 'CUENTA_PROPIA'"]
-            params = [issuer_id, ym]
-            if has_req:
-                where.append("COALESCE(requires_cfdi,0) = 1")
-            if has_bim:
-                where.append(
-                    """NOT EXISTS (
-                         SELECT 1 FROM bank_invoice_matches bim
-                         WHERE bim.issuer_id = bank_movements.issuer_id
-                           AND bim.bank_movement_id = bank_movements.id
-                           AND bim.status IN ('suggested','confirmed')
-                           AND COALESCE(bim.score,0) >= 80
-                       )"""
-                )
-            row = conn.execute(f"SELECT COUNT(*) AS c FROM bank_movements WHERE {' AND '.join(where)}", tuple(params)).fetchone()
-            n = int(row["c"]) if row else 0
-            if n > 0:
-                create_notification_if_missing(
-                    issuer_id=issuer_id,
-                    type="bank_expense_without_cfdi",
-                    title="Gastos en banco sin factura",
-                    body=f"Hay {n} movimiento(s) de gasto sin match probable a CFDI este mes.",
-                    severity=SEVERITY_WARNING,
-                    action_url=f"/portal/bank/movements?ym={ym}&tipo=GASTO&match_filter=none",
-                    dedupe_parts=["bank_expense_without_cfdi", ym, str(n)],
-                )
+        rows = db_rows(
+            """
+            SELECT uuid, nombre_emisor, rfc_emisor, total, moneda, fecha_emision, serie, folio
+            FROM sat_cfdi
+            WHERE issuer_id = ?
+              AND direction = 'received'
+              AND uuid IS NOT NULL
+              AND fecha_emision IS NOT NULL
+              AND datetime(substr(fecha_emision, 1, 19)) >= datetime('now', '-1 day')
+              AND (
+                    status IS NULL
+                    OR (UPPER(TRIM(status)) NOT IN ('C','CANCELADO','CANCELADA','0')
+                        AND UPPER(TRIM(status)) NOT LIKE 'CANCEL%')
+                  )
+            ORDER BY datetime(substr(fecha_emision, 1, 19)) DESC
+            LIMIT 50
+            """,
+            (issuer_id,),
+        )
+        for r in rows or []:
+            emisor = (r.get("nombre_emisor") or r.get("rfc_emisor") or "Proveedor").strip()
+            total = float(r.get("total") or 0)
+            moneda = (r.get("moneda") or "MXN").strip()
+            folio_part = ""
+            if r.get("folio"):
+                serie = (r.get("serie") or "").strip()
+                folio_part = f" · {serie}{r.get('folio')}" if serie else f" · {r.get('folio')}"
+            body = f"{emisor} — ${total:,.2f} {moneda}{folio_part}"
+            create_notification_if_missing(
+                issuer_id=issuer_id,
+                type="cfdi_received",
+                title="Nueva factura recibida",
+                body=body[:280],
+                severity=SEVERITY_INFO,
+                action_url="/portal/facturas?tab=received",
+                dedupe_parts=["cfdi_received", r.get("uuid") or ""],
+            )
     except Exception:
         pass
-    finally:
-        try:
-            conn.close()
-        except Exception:
-            pass
 
 

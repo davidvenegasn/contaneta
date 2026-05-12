@@ -52,8 +52,9 @@ def _setup_db():
             "VALUES (?, ?, 'owner', datetime('now'))",
             (USER_ID, ISSUER_ID),
         )
-        # Clean notifications from previous test runs
+        # Clean notifications and sat_cfdi from previous test runs
         conn.execute("DELETE FROM notifications WHERE issuer_id = ?", (ISSUER_ID,))
+        conn.execute("DELETE FROM sat_cfdi WHERE issuer_id = ?", (ISSUER_ID,))
         conn.commit()
     finally:
         conn.close()
@@ -293,3 +294,105 @@ class TestReadAllAPI:
     def test_should_require_csrf(self, client, cookies):
         r = client.post("/api/notifications/read-all", cookies=cookies)
         assert r.status_code == 403
+
+
+class TestCfdiReceivedNotification:
+    """Tests for the cfdi_received notification rule in refresh_for_issuer."""
+
+    def test_should_create_cfdi_received_notification_for_recent_invoice(self):
+        """When a CFDI direction='received' has fecha_emision within 24h,
+        refresh_for_issuer must create one notification of type='cfdi_received'."""
+        import uuid as uuid_mod
+
+        test_uuid = str(uuid_mod.uuid4())
+        conn = db()
+        try:
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO sat_cfdi
+                  (issuer_id, uuid, direction, fecha_emision, rfc_emisor, nombre_emisor,
+                   total, moneda, tipo_comprobante, serie, folio)
+                VALUES (?, ?, 'received', datetime('now'), 'XAXX010101000', 'Proveedor Test SA',
+                        5800.00, 'MXN', 'I', 'A', '123')
+                """,
+                (ISSUER_ID, test_uuid),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        notif_svc.refresh_for_issuer(ISSUER_ID)
+
+        notifs = notif_svc.get_notifications(ISSUER_ID, limit=50)
+        cfdi_notifs = [n for n in notifs if n["type"] == "cfdi_received"]
+        assert len(cfdi_notifs) >= 1, "Should create at least one cfdi_received notification"
+        found = [n for n in cfdi_notifs if "Proveedor Test SA" in n["body"]]
+        assert len(found) == 1, "Should find notification with the emisor name"
+        n = found[0]
+        assert n["title"] == "Nueva factura recibida"
+        assert "$5,800.00" in n["body"]
+        assert "MXN" in n["body"]
+        assert "A123" in n["body"]
+        assert n["severity"] == "info"
+
+    def test_should_be_idempotent(self):
+        """Calling refresh_for_issuer twice should not duplicate cfdi_received notifications."""
+        import uuid as uuid_mod
+
+        test_uuid = str(uuid_mod.uuid4())
+        conn = db()
+        try:
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO sat_cfdi
+                  (issuer_id, uuid, direction, fecha_emision, rfc_emisor, nombre_emisor,
+                   total, moneda, tipo_comprobante)
+                VALUES (?, ?, 'received', datetime('now'), 'XAXX010101000', 'Dedupe Corp',
+                        1000.00, 'USD', 'I')
+                """,
+                (ISSUER_ID, test_uuid),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        notif_svc.refresh_for_issuer(ISSUER_ID)
+        notif_svc.refresh_for_issuer(ISSUER_ID)
+
+        notifs = notif_svc.get_notifications(ISSUER_ID, limit=50)
+        dedupe_matches = [n for n in notifs if n["type"] == "cfdi_received" and "Dedupe Corp" in n["body"]]
+        assert len(dedupe_matches) == 1, "Should not duplicate on second refresh"
+
+    def test_should_not_notify_cancelled_cfdi(self):
+        """Cancelled CFDIs should not generate notifications."""
+        import uuid as uuid_mod
+
+        test_uuid = str(uuid_mod.uuid4())
+        conn = db()
+        try:
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO sat_cfdi
+                  (issuer_id, uuid, direction, fecha_emision, rfc_emisor, nombre_emisor,
+                   total, moneda, tipo_comprobante, status)
+                VALUES (?, ?, 'received', datetime('now'), 'XAXX010101000', 'Cancelled Inc',
+                        9999.00, 'MXN', 'I', 'CANCELADO')
+                """,
+                (ISSUER_ID, test_uuid),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        notif_svc.refresh_for_issuer(ISSUER_ID)
+
+        notifs = notif_svc.get_notifications(ISSUER_ID, limit=50)
+        cancelled_notifs = [n for n in notifs if n["type"] == "cfdi_received" and "Cancelled Inc" in n["body"]]
+        assert len(cancelled_notifs) == 0, "Should not create notification for cancelled CFDI"
+
+    def test_should_not_notify_bank_expense_without_cfdi(self):
+        """The bank_expense_without_cfdi type must no longer be generated."""
+        notif_svc.refresh_for_issuer(ISSUER_ID)
+        notifs = notif_svc.get_notifications(ISSUER_ID, limit=50)
+        bank_notifs = [n for n in notifs if n["type"] == "bank_expense_without_cfdi"]
+        assert len(bank_notifs) == 0, "bank_expense_without_cfdi should no longer be generated"
