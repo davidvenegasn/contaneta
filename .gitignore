@@ -21,6 +21,10 @@ invoicing.db.*
 *.sqlite3
 sqlite_aux_backup/
 
+# Old DB recovery artifacts — do not commit
+dump_recover.sql
+fixed.db
+
 # --- Storage local (NO versionar) ---
 storage/**
 !storage/
