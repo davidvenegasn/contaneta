@@ -1,8 +1,9 @@
 {% extends "base_portal.html" %}
 {% block content %}
 
-<!-- Month picker -->
-{{ month_picker('/portal/invoices-ext', token|default(''), ym|default(''), ym_label|default('')) }}
+{% set section_title = "Invoices extranjeros" %}
+{% set month_picker_url = "/portal/invoices-ext" %}
+{% include "partials/_page_section_header.html" %}
 
 <!-- Metric cards -->
 <div class="dashboard-metrics" style="margin-bottom:20px;">

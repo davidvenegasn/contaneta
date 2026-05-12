@@ -1,0 +1,12 @@
+{# Cabecera estándar de sección con título + selector de fecha (Option B: justify-between).
+   Params vía variables del contexto:
+   - section_title (str, requerido): título visible. Ej: "Movimientos bancarios"
+   - month_picker_url (str, requerido): URL base. Ej: "/portal/movimientos"
+   - token, ym, ym_label: pasan al macro month_picker
+#}
+<header class="page-section-header">
+  <h2 class="page-section-header__title section-title u-m0">{{ section_title }}</h2>
+  <div class="ym-selector page-section-header__picker">
+    {{ month_picker(month_picker_url, token|default(''), ym|default(''), ym_label|default('')) }}
+  </div>
+</header>

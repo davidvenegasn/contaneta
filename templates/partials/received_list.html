@@ -3,9 +3,6 @@
 {% set _list_title = list_title|default('Facturas recibidas') %}
 <div class="card ym-card ym-card--collapsible" data-resumen-key="portal_resumen_collapsed">
   <div class="ym-card__head">
-    <div class="ym-selector">
-      {{ month_picker(_base_url, token, ym, ym_label) }}
-    </div>
     <button type="button" class="ym-card__toggle btn btn--sm btn--ghost" aria-label="Ocultar totales" title="Ocultar totales (proteger tu información)">
       <span class="ym-card__toggle-icon" aria-hidden="true">−</span>
       <span class="ym-card__toggle-label">Ocultar totales</span>

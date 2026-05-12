@@ -2,10 +2,10 @@
 {% set title = title|default('Movimientos') %}
 
 {% block content %}
+  {% set section_title = "Movimientos bancarios" %}
+  {% set month_picker_url = "/portal/movimientos" %}
+  {% include "partials/_page_section_header.html" %}
   <div class="card ym-card">
-    <div class="ym-selector">
-      {{ month_picker('/portal/movimientos', token|default(''), ym|default(period_month|default('')), ym_label|default('')) }}
-    </div>
     <div class="dashboard-metrics">
       <div class="card metric-card metric-card--income">
         <div class="metric-label">Total ingresos</div>
