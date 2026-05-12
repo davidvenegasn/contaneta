@@ -72,6 +72,12 @@ def _register_builtin_parsers() -> None:
         register_parser("BANBAJIO", parse_banbajio, experimental=bajio_exp)
     except ImportError:
         pass
+    try:
+        from services.bank.parsers.banregio import EXPERIMENTAL as banregio_exp
+        from services.bank.parsers.banregio import parse_banregio
+        register_parser("BANREGIO", parse_banregio, experimental=banregio_exp)
+    except ImportError:
+        pass
 
 
 _register_builtin_parsers()
