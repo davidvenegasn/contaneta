@@ -1,0 +1,315 @@
+/**
+ * animations.css — Micro-interactions & transitions layer
+ *
+ * Enhances perceived quality with subtle animations on top of the
+ * existing design system.  Every animation uses CSS custom properties
+ * from portal_tokens.css / _tokens.css for timing and honours
+ * prefers-reduced-motion by zeroing durations (tokens are set to 0ms
+ * in the reduce-motion media query in portal_tokens.css).
+ *
+ * Performance: only transform and opacity are animated (composited
+ * properties).  No width/height/margin/top/left changes.
+ */
+
+/* ==========================================================
+   a) PAGE CONTENT FADE-IN
+   .page-section gets a subtle fade + slide-up on load
+   ========================================================== */
+@keyframes pageFadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.page-section {
+  animation: pageFadeUp var(--motion-page, 180ms) var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1)) both;
+}
+
+/* Stagger successive sections within .portal-container */
+.portal-container > .page-section:nth-child(2) {
+  animation-delay: 40ms;
+}
+.portal-container > .page-section:nth-child(3) {
+  animation-delay: 80ms;
+}
+.portal-container > .page-section:nth-child(4) {
+  animation-delay: 120ms;
+}
+
+/* ==========================================================
+   b) CARD HOVER — subtle lift + shadow
+   The base shadow transition is already on .card/.ui-card in
+   components.css; we add a translateY lift for non-interactive
+   cards so they feel responsive without being distracting.
+   ========================================================== */
+.ui-card:hover,
+.card:hover {
+  transform: translateY(-2px);
+}
+
+/* Interactive cards already have their own hover/active in
+   components.css — do not double-stack the lift. */
+.card--interactive:hover,
+.ui-card--interactive:hover {
+  /* Handled by components.css (translateY(-2px)) — no change */
+}
+
+/* Flat cards: no lift, only border change (keep existing behavior) */
+.card--flat:hover,
+.ui-card--flat:hover {
+  transform: none;
+}
+
+/* ==========================================================
+   c) BUTTON CLICK FEEDBACK
+   Strengthen the :active press from 0.99 → 0.97 for a more
+   tactile feel.  The transition property is already declared
+   in components.css on .btn/.ui-btn.
+   ========================================================== */
+.ui-btn:active,
+.btn:active,
+button.btn:active {
+  transform: scale(0.97);
+}
+
+/* Primary button: press down instead of lift (override hover lift) */
+.ui-btn--primary:active,
+.btn--primary:active,
+.btn-primary:active {
+  transform: translateY(0) scale(0.97);
+}
+
+/* Disabled buttons: never animate */
+.ui-btn:disabled:active,
+.btn:disabled:active {
+  transform: none;
+}
+
+/* ==========================================================
+   d) FORM FOCUS — smooth border-color transition
+   The transition is already declared in components.css; here
+   we ensure the accent border and ring animate smoothly by
+   adding opacity to the transition list.
+   ========================================================== */
+.ui-input:focus,
+.ui-select:focus,
+.ui-textarea:focus,
+.input:focus,
+.select:focus,
+.textarea:focus,
+.portal input:focus,
+.portal select:focus,
+.portal textarea:focus {
+  transition: border-color var(--motion-fast, 100ms) var(--ease-smooth, ease),
+              box-shadow var(--motion-fast, 100ms) var(--ease-smooth, ease);
+}
+
+/* ==========================================================
+   e) TABLE ROW HOVER — background transition
+   components.css sets the hover color but has no transition on
+   td.  We add one here.
+   ========================================================== */
+.ui-table tbody td,
+.table tbody td {
+  transition: background-color var(--motion-fast, 100ms) var(--ease-smooth, ease);
+}
+
+/* ==========================================================
+   f) MODAL OPEN / CLOSE — fade + scale on backdrop and panel
+   The modal uses hidden/not-hidden toggling.  We animate the
+   backdrop opacity and panel scale via a CSS animation that
+   fires when the element becomes visible.
+   ========================================================== */
+@keyframes modalBackdropIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes modalPanelIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.modal:not([hidden]) .modal__backdrop {
+  animation: modalBackdropIn var(--motion-modal, 250ms) var(--ease-out, ease) both;
+}
+
+.modal:not([hidden]) .modal__panel {
+  animation: modalPanelIn var(--motion-modal, 250ms) var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)) both;
+}
+
+/* ==========================================================
+   g) SIDEBAR LINK HOVER — smooth bg/color transition
+   Already handled in portal_shell.css via --motion-micro on
+   .nav-item.  This selector strengthens the color transition
+   on the icon to match.
+   ========================================================== */
+.nav-item .nav-icon {
+  transition: color var(--motion-micro, 100ms) var(--ease-smooth, ease);
+}
+
+/* ==========================================================
+   h) BADGE PULSE — .badge--new gets a subtle pulse ring
+   for drawing attention to new/unread items.
+   ========================================================== */
+@keyframes badgePulse {
+  0%   { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.35); }
+  70%  { box-shadow: 0 0 0 6px rgba(99, 102, 241, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0); }
+}
+
+.badge--new {
+  animation: badgePulse var(--anim-duration-slow, 600ms) var(--ease-out, ease) 3;
+}
+
+/* ==========================================================
+   i) SKELETON SHIMMER — .skeleton-line, .skeleton-card
+   Generic skeleton placeholders that inherit the shimmer
+   animation already defined in portal.css on .skeleton.
+   ========================================================== */
+.skeleton-line {
+  height: 14px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.05);
+  position: relative;
+  overflow: hidden;
+}
+
+.skeleton-line::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+  animation: shimmer 1.1s infinite;
+}
+
+/* Width variants */
+.skeleton-line--xs  { width: 40%; }
+.skeleton-line--sm  { width: 60%; }
+.skeleton-line--md  { width: 80%; }
+.skeleton-line--lg  { width: 100%; }
+
+.skeleton-card {
+  height: 120px;
+  border-radius: var(--radius-md, 12px);
+  background: rgba(0, 0, 0, 0.05);
+  position: relative;
+  overflow: hidden;
+}
+
+.skeleton-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+  animation: shimmer 1.1s infinite;
+}
+
+/* shimmer keyframes already defined in portal.css — no
+   redefinition needed here; browsers share @keyframes names
+   across stylesheets. */
+
+/* ==========================================================
+   j) TOAST SLIDE-IN — enhancement
+   Toast animations already exist in components.css.  We add
+   an alternative slide-from-right entrance for use when the
+   toast stack is in the top-right corner (desktop).
+   ========================================================== */
+@keyframes toastSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@media (min-width: 769px) and (prefers-reduced-motion: no-preference) {
+  .toast {
+    animation: toastSlideIn var(--motion-modal, 250ms) var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)) both;
+  }
+}
+
+/* ==========================================================
+   REDUCED MOTION — disable all animations added above
+   The token-based durations are already zeroed in
+   portal_tokens.css, but we also explicitly cancel
+   animations and transitions for safety.
+   ========================================================== */
+@media (prefers-reduced-motion: reduce) {
+  .page-section {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+
+  .ui-card:hover,
+  .card:hover {
+    transform: none;
+  }
+
+  .ui-btn:active,
+  .btn:active,
+  button.btn:active {
+    transform: none;
+  }
+
+  .ui-btn--primary:active,
+  .btn--primary:active,
+  .btn-primary:active {
+    transform: none;
+  }
+
+  .modal:not([hidden]) .modal__backdrop,
+  .modal:not([hidden]) .modal__panel {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+
+  .badge--new {
+    animation: none;
+  }
+
+  .skeleton-line::after,
+  .skeleton-card::after {
+    animation: none;
+    opacity: 0.4;
+  }
+
+  .ui-table tbody td,
+  .table tbody td {
+    transition: none;
+  }
+
+  .nav-item .nav-icon {
+    transition: none;
+  }
+
+  .ui-input:focus,
+  .ui-select:focus,
+  .ui-textarea:focus,
+  .input:focus,
+  .select:focus,
+  .textarea:focus,
+  .portal input:focus,
+  .portal select:focus,
+  .portal textarea:focus {
+    transition: none;
+  }
+}
