@@ -80,20 +80,36 @@ def detect_bank_from_text(text: str) -> dict[str, Any]:
     if "BANORTE" in head or "CUENTA ENLACE PERSONAL" in head:
         return {"bank_name": "BANORTE", "profile": "banorte_v1", "confidence": 95}
     if "BBVA" in head and ("ESTADO DE CUENTA" in head or "CUENTA" in head):
-        return {"bank_name": "BBVA", "profile": "generic_v1", "confidence": 70}
+        return {"bank_name": "BBVA", "profile": "not_implemented", "confidence": 70}
     if "SANTANDER" in head and ("ESTADO DE CUENTA" in head or "MOVIMIENTOS" in head):
-        return {"bank_name": "SANTANDER", "profile": "generic_v1", "confidence": 70}
+        return {"bank_name": "SANTANDER", "profile": "not_implemented", "confidence": 70}
     if "BANAMEX" in head or "CITIBANAMEX" in head:
-        return {"bank_name": "BANAMEX", "profile": "generic_v1", "confidence": 70}
+        return {"bank_name": "CITIBANAMEX", "profile": "not_implemented", "confidence": 70}
+    if "HSBC" in head and ("ESTADO DE CUENTA" in head or "MOVIMIENTOS" in head or "ACCOUNT" in head):
+        return {"bank_name": "HSBC", "profile": "not_implemented", "confidence": 70}
+    if "SCOTIABANK" in head:
+        return {"bank_name": "SCOTIABANK", "profile": "not_implemented", "confidence": 70}
+    if "BANBAJIO" in head or "BAJIO" in head:
+        return {"bank_name": "BANBAJIO", "profile": "not_implemented", "confidence": 65}
+    if "BANREGIO" in head:
+        return {"bank_name": "BANREGIO", "profile": "not_implemented", "confidence": 70}
+    if "BANCO AZTECA" in head or "AZTECA" in head:
+        return {"bank_name": "AZTECA", "profile": "not_implemented", "confidence": 60}
+    if "INBURSA" in head:
+        return {"bank_name": "INBURSA", "profile": "not_implemented", "confidence": 70}
+    if "MIFEL" in head:
+        return {"bank_name": "MIFEL", "profile": "not_implemented", "confidence": 65}
     # Repetir búsqueda en todo el texto por si el encabezado está más abajo
     if "BANORTE" in t or "CUENTA ENLACE PERSONAL" in t:
         return {"bank_name": "BANORTE", "profile": "banorte_v1", "confidence": 90}
     if "BBVA" in t:
-        return {"bank_name": "BBVA", "profile": "generic_v1", "confidence": 60}
+        return {"bank_name": "BBVA", "profile": "not_implemented", "confidence": 60}
     if "SANTANDER" in t:
-        return {"bank_name": "SANTANDER", "profile": "generic_v1", "confidence": 60}
+        return {"bank_name": "SANTANDER", "profile": "not_implemented", "confidence": 60}
     if "BANAMEX" in t or "CITIBANAMEX" in t:
-        return {"bank_name": "BANAMEX", "profile": "generic_v1", "confidence": 60}
+        return {"bank_name": "CITIBANAMEX", "profile": "not_implemented", "confidence": 60}
+    if "HSBC" in t:
+        return {"bank_name": "HSBC", "profile": "not_implemented", "confidence": 55}
     return {"bank_name": "DESCONOCIDO", "profile": "generic_v1", "confidence": 0}
 
 
