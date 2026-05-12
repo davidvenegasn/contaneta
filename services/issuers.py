@@ -134,6 +134,43 @@ def get_demo_issuer():
     return None
 
 
+def update_issuer_profile(
+    issuer_id: int,
+    razon_social: str | None = None,
+    regimen_fiscal: str | None = None,
+) -> None:
+    """Update the issuer's razon_social and/or regimen_fiscal.
+
+    Args:
+        issuer_id: Tenant ID.
+        razon_social: New legal name (or None to skip).
+        regimen_fiscal: New tax regime code (or None to skip).
+    """
+    set_parts: list[str] = []
+    params: list = []
+    if razon_social is not None:
+        razon_social = razon_social.strip()
+        set_parts.append("razon_social = ?")
+        params.append(razon_social)
+    if regimen_fiscal is not None:
+        regimen_fiscal = regimen_fiscal.strip().upper() or None
+        set_parts.append("regimen_fiscal = ?")
+        params.append(regimen_fiscal)
+    if not set_parts:
+        return
+    set_parts.append("updated_at = datetime('now')")
+    params.append(issuer_id)
+    conn = db()
+    try:
+        conn.execute(
+            f"UPDATE issuers SET {', '.join(set_parts)} WHERE id = ?",
+            tuple(params),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def create_issuer_with_token(
     rfc: str,
     razon_social: str,

@@ -143,6 +143,25 @@ def update_user_name(user_id: int, name: Optional[str]) -> None:
         conn.close()
 
 
+def update_user_email(user_id: int, email: str) -> None:
+    """Update the email for a user. Raises ValueError if email is already taken by another user."""
+    email = (email or "").strip().lower()
+    if not email:
+        raise ValueError("El correo electrónico es obligatorio.")
+    conn = db()
+    try:
+        existing = conn.execute(
+            "SELECT id FROM users WHERE email = ? AND id != ? LIMIT 1",
+            (email, user_id),
+        ).fetchone()
+        if existing:
+            raise ValueError("Este correo ya está registrado por otro usuario.")
+        conn.execute("UPDATE users SET email = ? WHERE id = ?", (email, user_id))
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def update_user_password(user_id: int, password_hash: str) -> None:
     """Update password hash and rotate session nonce to invalidate all existing sessions."""
     if not user_id or not password_hash:

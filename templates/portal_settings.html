@@ -1,0 +1,167 @@
+{% extends "base_portal.html" %}
+{% set title = 'Configuración' %}
+
+{% block content %}
+<header class="app-header app-header--with-back">
+  <div class="app-header__left">
+    <a href="/portal/home" class="btn btn--ghost btn--sm app-header__back" style="text-decoration:none;">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" width="18" height="18"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+      Inicio
+    </a>
+    <div>
+      <h1 class="app-title">Configuración</h1>
+      <p class="app-subtitle muted">Administra tu perfil, contraseña y datos fiscales.</p>
+    </div>
+  </div>
+</header>
+
+{% if success_msg %}
+<div class="card u-mb-14 card--success-bg" style="border-left:4px solid var(--success, #22c55e); padding:12px 16px;">
+  <p class="u-m0">{{ success_msg }}</p>
+</div>
+{% endif %}
+{% if error_msg %}
+<div class="card u-mb-14 card--warn-bg" style="border-left:4px solid var(--warn, #f59e0b); padding:12px 16px;">
+  <p class="u-m0">{{ error_msg }}</p>
+</div>
+{% endif %}
+
+{# ── Tab navigation ── #}
+<div class="settings-tabs u-mb-14" style="display:flex; gap:8px; border-bottom:1px solid var(--border, #e5e7eb); padding-bottom:0;">
+  <button type="button" class="settings-tab is-active" data-tab="profile" style="padding:8px 16px; background:none; border:none; border-bottom:2px solid transparent; cursor:pointer; font-size:14px; font-weight:500; color:var(--muted, #6b7280);">Perfil</button>
+  <button type="button" class="settings-tab" data-tab="password" style="padding:8px 16px; background:none; border:none; border-bottom:2px solid transparent; cursor:pointer; font-size:14px; font-weight:500; color:var(--muted, #6b7280);">Contraseña</button>
+  <button type="button" class="settings-tab" data-tab="fiscal" style="padding:8px 16px; background:none; border:none; border-bottom:2px solid transparent; cursor:pointer; font-size:14px; font-weight:500; color:var(--muted, #6b7280);">Datos fiscales</button>
+</div>
+
+{# ── Profile section ── #}
+<div class="settings-panel" id="panel-profile">
+  <div class="card p-20">
+    <h2 class="u-m0 u-mb-3 u-text-base">Perfil de usuario</h2>
+    <p class="muted u-text-sm" style="margin:0 0 16px;">Actualiza tu nombre y correo electrónico.</p>
+    <form method="post" action="/portal/settings/profile" autocomplete="off">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token or '' }}" />
+      <div style="display:flex; flex-direction:column; gap:14px; max-width:400px;">
+        <div>
+          <label for="settings-name" style="display:block; font-size:13px; font-weight:500; margin-bottom:4px;">Nombre</label>
+          <input type="text" id="settings-name" name="name" value="{{ user.name or '' if user else '' }}" placeholder="Tu nombre" class="form-input" style="width:100%;" />
+        </div>
+        <div>
+          <label for="settings-email" style="display:block; font-size:13px; font-weight:500; margin-bottom:4px;">Correo electrónico</label>
+          <input type="email" id="settings-email" name="email" value="{{ user.email or '' if user else '' }}" placeholder="tu@correo.com" required class="form-input" style="width:100%;" />
+        </div>
+        <div>
+          <button type="submit" class="btn btn--primary btn--sm">Guardar perfil</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# ── Password section ── #}
+<div class="settings-panel" id="panel-password" hidden>
+  <div class="card p-20">
+    <h2 class="u-m0 u-mb-3 u-text-base">Cambiar contraseña</h2>
+    <p class="muted u-text-sm" style="margin:0 0 16px;">Ingresa tu contraseña actual y la nueva contraseña.</p>
+    <form method="post" action="/portal/settings/password" autocomplete="off">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token or '' }}" />
+      <div style="display:flex; flex-direction:column; gap:14px; max-width:400px;">
+        <div>
+          <label for="settings-current-pw" style="display:block; font-size:13px; font-weight:500; margin-bottom:4px;">Contraseña actual</label>
+          <input type="password" id="settings-current-pw" name="current_password" required class="form-input" style="width:100%;" autocomplete="current-password" />
+        </div>
+        <div>
+          <label for="settings-new-pw" style="display:block; font-size:13px; font-weight:500; margin-bottom:4px;">Nueva contraseña</label>
+          <input type="password" id="settings-new-pw" name="new_password" required minlength="8" class="form-input" style="width:100%;" autocomplete="new-password" />
+        </div>
+        <div>
+          <label for="settings-confirm-pw" style="display:block; font-size:13px; font-weight:500; margin-bottom:4px;">Confirmar nueva contraseña</label>
+          <input type="password" id="settings-confirm-pw" name="confirm_password" required minlength="8" class="form-input" style="width:100%;" autocomplete="new-password" />
+        </div>
+        <div>
+          <button type="submit" class="btn btn--primary btn--sm">Cambiar contraseña</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# ── Fiscal data section ── #}
+<div class="settings-panel" id="panel-fiscal" hidden>
+  <div class="card p-20">
+    <h2 class="u-m0 u-mb-3 u-text-base">Datos fiscales del emisor</h2>
+    <p class="muted u-text-sm" style="margin:0 0 16px;">Información fiscal asociada a tu cuenta de facturación.</p>
+
+    <dl class="datos-fiscales-list" style="margin-bottom:16px;">
+      <div class="datos-fiscales-row" style="display:flex; gap:8px; padding:6px 0;">
+        <dt style="font-size:13px; font-weight:500; min-width:120px; color:var(--muted, #6b7280);">RFC</dt>
+        <dd style="margin:0; font-size:14px;">{{ issuer_rfc or '—' }}</dd>
+      </div>
+    </dl>
+
+    {% if membership_role in ('owner', 'admin') %}
+    <form method="post" action="/portal/settings/issuer" autocomplete="off">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token or '' }}" />
+      <div style="display:flex; flex-direction:column; gap:14px; max-width:400px;">
+        <div>
+          <label for="settings-razon" style="display:block; font-size:13px; font-weight:500; margin-bottom:4px;">Razón social</label>
+          <input type="text" id="settings-razon" name="razon_social" value="{{ issuer_alias or '' }}" class="form-input" style="width:100%;" />
+        </div>
+        <div>
+          <label for="settings-regimen" style="display:block; font-size:13px; font-weight:500; margin-bottom:4px;">Régimen fiscal</label>
+          <select id="settings-regimen" name="regimen_fiscal" class="form-input" style="width:100%;">
+            <option value="">— Seleccionar —</option>
+            {% for code, desc in regimen_options.items() %}
+            <option value="{{ code }}" {{ 'selected' if issuer_tax_system == code else '' }}>{{ code }} — {{ desc }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <button type="submit" class="btn btn--primary btn--sm">Guardar datos fiscales</button>
+        </div>
+      </div>
+    </form>
+    {% else %}
+    <dl class="datos-fiscales-list">
+      <div class="datos-fiscales-row" style="display:flex; gap:8px; padding:6px 0;">
+        <dt style="font-size:13px; font-weight:500; min-width:120px; color:var(--muted, #6b7280);">Razón social</dt>
+        <dd style="margin:0; font-size:14px;">{{ issuer_alias or '—' }}</dd>
+      </div>
+      <div class="datos-fiscales-row" style="display:flex; gap:8px; padding:6px 0;">
+        <dt style="font-size:13px; font-weight:500; min-width:120px; color:var(--muted, #6b7280);">Régimen fiscal</dt>
+        <dd style="margin:0; font-size:14px;">{{ issuer_regimen_label or '—' }}</dd>
+      </div>
+    </dl>
+    <p class="muted u-text-sm">Solo el dueño o administrador puede editar estos datos.</p>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+(function() {
+  var tabs = document.querySelectorAll('.settings-tab');
+  var panels = document.querySelectorAll('.settings-panel');
+  tabs.forEach(function(tab) {
+    tab.addEventListener('click', function() {
+      var target = tab.getAttribute('data-tab');
+      tabs.forEach(function(t) {
+        t.classList.remove('is-active');
+        t.style.borderBottomColor = 'transparent';
+        t.style.color = 'var(--muted, #6b7280)';
+      });
+      tab.classList.add('is-active');
+      tab.style.borderBottomColor = 'var(--accent, #6366f1)';
+      tab.style.color = 'var(--text, #111827)';
+      panels.forEach(function(p) { p.hidden = true; });
+      var panel = document.getElementById('panel-' + target);
+      if (panel) panel.hidden = false;
+    });
+  });
+  // Activate first tab styling
+  var first = document.querySelector('.settings-tab.is-active');
+  if (first) {
+    first.style.borderBottomColor = 'var(--accent, #6366f1)';
+    first.style.color = 'var(--text, #111827)';
+  }
+})();
+</script>
+{% endblock %}
