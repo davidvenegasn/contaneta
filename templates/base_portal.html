@@ -25,7 +25,7 @@
       try { localStorage.setItem(KEY, ymUrl); } catch (e) {}
       return;
     }
-    var monthPaths = ['/portal/home', '/portal/facturas', '/portal/movimientos', '/portal/bank/movements', '/portal/invoices-ext', '/portal/invoices/nomina', '/portal/month-close'];
+    var monthPaths = ['/portal/home', '/portal/facturas', '/portal/movimientos', '/portal/bank/movements', '/portal/invoices-ext', '/portal/invoices/nomina', '/portal/month-close', '/portal/estados-financieros'];
     if (monthPaths.indexOf(path) < 0) return;
     if ((path === '/portal/movimientos' || path === '/portal/bank/movements') && validYm((params.get('period_month') || '').trim())) return;
     var stored = '';
