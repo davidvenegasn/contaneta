@@ -228,8 +228,8 @@ button.rail-item {
 /* Drawer section label — compact to reduce gap */
 .drawer-section-label {
   display: block;
-  font-size: 10px;
-  font-weight: 700;
+  font-size: var(--text-micro);
+  font-weight: var(--fw-bold);
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: #52525b;
@@ -244,7 +244,7 @@ button.rail-item {
   transform: translateY(-50%);
   background: rgba(0, 0, 0, 0.92);
   color: #fff;
-  font-size: 12px;
+  font-size: var(--text-2xs);
   padding: 9px 10px;
   border-radius: 12px;
   white-space: nowrap;
@@ -324,8 +324,8 @@ button.rail-item {
 }
 
 .portal-drawer__brand {
-  font-size: 16px;
-  font-weight: 800;
+  font-size: var(--fs-base);
+  font-weight: var(--fw-bold);
   letter-spacing: -0.03em;
   color: var(--text, #0f172a);
   font-family: var(--font-family);
@@ -364,15 +364,15 @@ button.rail-item {
 .drawer-link {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   min-height: 40px;
   margin-left: calc(-1 * var(--rail-w));
   padding: 0 4px 0 calc(var(--rail-w) + 4px);
   border-radius: 8px;
   text-decoration: none;
   color: #0f172a;
-  font-size: 15px;
-  font-weight: 600;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
   letter-spacing: -0.02em;
   line-height: 1.2;
   white-space: nowrap;
@@ -396,7 +396,7 @@ button.rail-item {
 .drawer-link--active {
   background: var(--accent-soft, #eef2ff);
   border-radius: 8px;
-  font-weight: 700;
+  font-weight: var(--fw-bold);
   color: var(--primary);
 }
 .drawer-link--active .drawer-link__icon { color: var(--primary); }
@@ -499,8 +499,8 @@ button.rail-item {
 .rail-invoice-flyout__text {
   display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1;
 }
-.rail-invoice-flyout__text strong { font-size: 13px; font-weight: 600; }
-.rail-invoice-flyout__text small { font-size: 11px; color: var(--text-muted, #6b7280); }
+.rail-invoice-flyout__text strong { font-size: var(--fs-xs); font-weight: var(--fw-semibold); }
+.rail-invoice-flyout__text small { font-size: var(--text-micro); color: var(--text-muted, #6b7280); }
 
 .rail-invoice-flyout__chevron {
   width: 16px; height: 16px; flex-shrink: 0;
@@ -511,7 +511,7 @@ button.rail-item {
 .rail-invoice-flyout__subheader {
   display: flex; align-items: center; gap: 6px;
   padding: 8px 8px 4px;
-  font-size: 13px;
+  font-size: var(--fs-xs);
 }
 .rail-invoice-flyout__back {
   display: flex; align-items: center; justify-content: center;
@@ -534,14 +534,14 @@ button.rail-item {
   position: relative;
 }
 .rail-invoice-flyout__label {
-  display: block; font-size: 11px; font-weight: 600;
+  display: block; font-size: var(--text-micro); font-weight: var(--fw-semibold);
   color: var(--text-muted, #6b7280);
   margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.04em;
 }
 .rail-invoice-flyout__input {
   width: 100%; padding: 7px 10px;
   border: 1px solid var(--border, rgba(0,0,0,0.12));
-  border-radius: 8px; font-size: 13px;
+  border-radius: 8px; font-size: var(--fs-xs);
   font-family: inherit; background: var(--surface, #fff);
   color: var(--text, #1e293b);
   transition: border-color 120ms ease;
@@ -563,12 +563,12 @@ button.rail-item {
 .rail-invoice-flyout__result-item {
   display: flex; flex-direction: column; gap: 1px;
   padding: 7px 10px; cursor: pointer;
-  border-radius: 6px; font-size: 13px;
+  border-radius: 6px; font-size: var(--fs-xs);
   transition: background 100ms ease;
 }
 .rail-invoice-flyout__result-item:hover { background: var(--accent-soft, #eef2ff); }
 .rail-invoice-flyout__result-item small {
-  font-size: 11px; color: var(--text-muted, #6b7280);
+  font-size: var(--text-micro); color: var(--text-muted, #6b7280);
 }
 
 /* ── Selected chip ── */
@@ -576,14 +576,14 @@ button.rail-item {
   display: flex; align-items: center; gap: 6px;
   margin-top: 4px; padding: 5px 8px;
   background: var(--accent-soft, #eef2ff);
-  border-radius: 8px; font-size: 12px; font-weight: 500;
+  border-radius: 8px; font-size: var(--text-2xs); font-weight: var(--fw-medium);
   color: var(--accent, #6366f1);
 }
 .rail-invoice-flyout__selected[hidden] { display: none; }
 .rail-invoice-flyout__selected-remove {
   margin-left: auto; border: none; background: transparent;
   cursor: pointer; color: var(--text-muted, #94a3b8);
-  padding: 0; line-height: 1; font-size: 16px;
+  padding: 0; line-height: 1; font-size: var(--fs-base);
 }
 .rail-invoice-flyout__selected-remove:hover { color: var(--text, #1e293b); }
 
@@ -594,7 +594,7 @@ button.rail-item {
   padding: 9px 12px;
   border: none; border-radius: 10px;
   background: var(--accent, #6366f1); color: #fff;
-  font-size: 13px; font-weight: 600; font-family: inherit;
+  font-size: var(--fs-xs); font-weight: var(--fw-semibold); font-family: inherit;
   cursor: pointer; transition: opacity 150ms ease;
 }
 .rail-invoice-flyout__submit:disabled { opacity: 0.45; cursor: default; }
@@ -617,7 +617,7 @@ button.rail-item {
   justify-content: center;
   min-width: 48px;
   min-height: 48px;
-  padding: 12px;
+  padding: var(--space-3);
   margin: -4px;
   border: none;
   background: transparent;
@@ -708,7 +708,7 @@ body.mobile-menu-open .topbar-hamburger__icon {
   }
   body.mobile-menu-open .portal-drawer__inner {
     width: 100%;
-    padding: 16px;
+    padding: var(--space-4);
   }
   /* Reset drawer link offsets (no rail to extend behind) */
   body.mobile-menu-open .drawer-link {
@@ -718,7 +718,7 @@ body.mobile-menu-open .topbar-hamburger__icon {
   }
   body.mobile-menu-open .drawer-section-label {
     padding-left: 14px;
-    margin-top: 8px;
+    margin-top: var(--space-2);
   }
   /* Show icons in mobile drawer */
   body.mobile-menu-open .drawer-link__icon {
@@ -837,8 +837,8 @@ html.nightmode .rail-invoice-flyout__sep { background: var(--border, rgba(255,25
   text-decoration: none;
   color: var(--text, #1e293b);
   font-family: inherit;
-  font-size: 13px;
-  font-weight: 400;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-regular);
   text-align: left;
   width: 100%;
   transition: background 150ms ease;
@@ -849,7 +849,7 @@ html.nightmode .rail-invoice-flyout__sep { background: var(--border, rgba(255,25
 /* ── Drawer quick invoice panel ── */
 .drawer-quick__header {
   display: flex; align-items: center; gap: 6px;
-  padding: 4px 0 8px; font-size: 13px;
+  padding: 4px 0 8px; font-size: var(--fs-xs);
 }
 .drawer-quick__back {
   display: flex; align-items: center; justify-content: center;
@@ -861,14 +861,14 @@ html.nightmode .rail-invoice-flyout__sep { background: var(--border, rgba(255,25
 .drawer-quick__back svg { width: 16px; height: 16px; }
 .drawer-quick__field { padding: 4px 0; position: relative; }
 .drawer-quick__label {
-  display: block; font-size: 11px; font-weight: 600;
+  display: block; font-size: var(--text-micro); font-weight: var(--fw-semibold);
   color: var(--text-muted, #6b7280);
   margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.04em;
 }
 .drawer-quick__input {
   width: 100%; padding: 8px 10px;
   border: 1px solid var(--border, rgba(0,0,0,0.12));
-  border-radius: 8px; font-size: 14px;
+  border-radius: 8px; font-size: var(--fs-sm);
   font-family: inherit; background: var(--surface, #fff);
   color: var(--text, #1e293b); outline: none;
   box-sizing: border-box;
@@ -886,22 +886,22 @@ html.nightmode .rail-invoice-flyout__sep { background: var(--border, rgba(255,25
 .drawer-quick__result-item {
   display: flex; flex-direction: column; gap: 1px;
   padding: 8px 10px; cursor: pointer;
-  border-radius: 6px; font-size: 13px; transition: background 100ms ease;
+  border-radius: 6px; font-size: var(--fs-xs); transition: background 100ms ease;
 }
 .drawer-quick__result-item:hover { background: var(--accent-soft, #eef2ff); }
-.drawer-quick__result-item small { font-size: 11px; color: var(--text-muted, #6b7280); }
+.drawer-quick__result-item small { font-size: var(--text-micro); color: var(--text-muted, #6b7280); }
 .drawer-quick__selected {
   display: flex; align-items: center; gap: 6px;
   margin-top: 4px; padding: 6px 8px;
   background: var(--accent-soft, #eef2ff);
-  border-radius: 8px; font-size: 12px; font-weight: 500;
+  border-radius: 8px; font-size: var(--text-2xs); font-weight: var(--fw-medium);
   color: var(--accent, #6366f1);
 }
 .drawer-quick__selected[hidden] { display: none; }
 .drawer-quick__selected-remove {
   margin-left: auto; border: none; background: transparent;
   cursor: pointer; color: var(--text-muted, #94a3b8);
-  padding: 0; line-height: 1; font-size: 16px;
+  padding: 0; line-height: 1; font-size: var(--fs-base);
 }
 .drawer-quick__selected-remove:hover { color: var(--text, #1e293b); }
 .drawer-quick__submit {
@@ -909,7 +909,7 @@ html.nightmode .rail-invoice-flyout__sep { background: var(--border, rgba(255,25
   width: 100%; margin-top: 10px; padding: 10px 12px;
   border: none; border-radius: 10px;
   background: var(--accent, #6366f1); color: #fff;
-  font-size: 14px; font-weight: 600; font-family: inherit;
+  font-size: var(--fs-sm); font-weight: var(--fw-semibold); font-family: inherit;
   cursor: pointer; transition: opacity 150ms ease;
 }
 .drawer-quick__submit:disabled { opacity: 0.45; cursor: default; }

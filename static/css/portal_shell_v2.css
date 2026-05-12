@@ -78,8 +78,8 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
 }
 
 .portal-rail--expanded .portal-rail__top {
@@ -129,8 +129,8 @@
   padding: 6px 10px;
   background: var(--gray-9, #1e293b);
   color: #fff;
-  font-size: 12px;
-  font-weight: 500;
+  font-size: var(--text-2xs);
+  font-weight: var(--fw-medium);
   white-space: nowrap;
   border-radius: 8px;
   opacity: 0;
@@ -153,7 +153,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: var(--space-2);
   padding: 0 10px;
   transition: transform 0.15s ease, box-shadow 0.15s ease, width 0.2s ease;
 }
@@ -179,8 +179,8 @@
 
 .portal-rail__brand-name {
   display: none;
-  font-size: 14px;
-  font-weight: 600;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
   color: #fff;
   white-space: nowrap;
   overflow: hidden;
@@ -250,8 +250,8 @@
 /* Label visible solo cuando rail expandido */
 .portal-rail__label {
   display: none;
-  font-size: 14px;
-  font-weight: 500;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -270,8 +270,8 @@
   padding: 6px 10px;
   background: var(--gray-9, #1e293b);
   color: #fff;
-  font-size: 12px;
-  font-weight: 500;
+  font-size: var(--text-2xs);
+  font-weight: var(--fw-medium);
   white-space: nowrap;
   border-radius: 8px;
   opacity: 0;
@@ -350,8 +350,8 @@
   padding: 6px 10px;
   background: var(--gray-9, #1e293b);
   color: #fff;
-  font-size: 12px;
-  font-weight: 500;
+  font-size: var(--text-2xs);
+  font-weight: var(--fw-medium);
   white-space: nowrap;
   border-radius: 8px;
   opacity: 0;
@@ -424,7 +424,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 20px;
+  padding: var(--space-4) var(--space-5);
   border-bottom: 1px solid var(--border, #e2e8f0);
   min-height: 56px;
 }
@@ -443,7 +443,7 @@
 }
 
 .portal-drawer__brand-name {
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
   font-size: 1.1rem;
   color: var(--text, #1e293b);
 }
@@ -483,8 +483,8 @@
 }
 
 .portal-drawer__section-title {
-  font-size: 11px;
-  font-weight: 600;
+  font-size: var(--text-micro);
+  font-weight: var(--fw-semibold);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--text-muted, #64748b);
@@ -494,13 +494,13 @@
 .portal-drawer__item {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
   padding: 10px 12px;
   border-radius: 10px;
   text-decoration: none;
   color: var(--text, #1e293b);
-  font-size: 14px;
-  font-weight: 500;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
   transition: background 0.15s ease;
 }
 
@@ -533,18 +533,18 @@
 }
 
 .portal-drawer__label {
-  font-weight: 500;
+  font-weight: var(--fw-medium);
   color: inherit;
 }
 
 .portal-drawer__sublabel {
-  font-size: 12px;
-  font-weight: 400;
+  font-size: var(--text-2xs);
+  font-weight: var(--fw-regular);
   color: var(--text-muted, #64748b);
 }
 
 .portal-drawer__section--legacy {
-  margin-top: 8px;
+  margin-top: var(--space-2);
   padding-top: 8px;
   border-top: 1px solid var(--border, #e2e8f0);
 }
@@ -554,9 +554,9 @@
 }
 
 .portal-drawer__details-summary {
-  padding: 8px 12px;
-  font-size: 12px;
-  font-weight: 600;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-2xs);
+  font-weight: var(--fw-semibold);
   color: var(--text-muted, #64748b);
   cursor: pointer;
   user-select: none;
@@ -568,7 +568,7 @@
 
 .portal-drawer__footer {
   padding: 12px 20px;
-  font-size: 11px;
+  font-size: var(--text-micro);
   border-top: 1px solid var(--border, #e2e8f0);
 }
 

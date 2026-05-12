@@ -22,7 +22,7 @@ nav.psb {
   width: 100%;
   box-sizing: border-box;
   padding: 28px 0 12px;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .psb-scroll {
@@ -35,7 +35,7 @@ nav.psb {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   /* Aire entre la marca (ContaNeta) y el bloque de navegación (Nueva factura en adelante) */
-  margin-top: 32px;
+  margin-top: var(--space-8);
 }
 
 /* ── Brand (misma rejilla que el resto) ── */
@@ -86,8 +86,8 @@ nav.psb {
   box-sizing: border-box;
   text-decoration: none;
   color: #0f172a;
-  font-size: 15px;
-  font-weight: 600;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
   letter-spacing: -0.02em;
   border-radius: 12px;
   transition: background 0.2s ease, color 0.2s ease;
@@ -246,8 +246,8 @@ nav.psb {
   padding: 6px 4px !important;
   border-radius: 0;
   background: transparent !important;
-  font-size: 15px;
-  font-weight: 600;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
   letter-spacing: -0.02em;
   line-height: 1.25;
   white-space: nowrap;
@@ -259,7 +259,7 @@ nav.psb {
 
 .psb-dual .drawer-link.drawer-link--active {
   color: var(--primary);
-  font-weight: 700;
+  font-weight: var(--fw-bold);
 }
 
 .psb-dual .drawer-submenu {

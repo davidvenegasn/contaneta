@@ -93,7 +93,7 @@
   display: grid;
   grid-template-columns: 1.6fr 1fr 1fr 1fr;
   align-items: center;
-  gap: 24px;
+  gap: var(--space-6);
 }
 .pv2 .pv2-balance-col--main {
   display: flex;
@@ -105,7 +105,7 @@
   flex-direction: column;
   align-items: center;
   text-align: center;
-  gap: 8px;
+  gap: var(--space-2);
   padding: 18px 12px;
   border-radius: 16px;
   background: var(--pv2-surface-2);
@@ -123,12 +123,12 @@
 .pv2 .pv2-balance-label {
   font-size: 13.5px;
   color: var(--pv2-text-2);
-  font-weight: 600;
-  margin-bottom: 8px;
+  font-weight: var(--fw-semibold);
+  margin-bottom: var(--space-2);
   letter-spacing: -0.012em;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
 }
 .pv2 .pv2-balance-label svg { width: 16px; height: 16px; color: var(--pv2-indigo); }
 
@@ -144,7 +144,7 @@
 .pv2 .pv2-balance-amount .cents {
   font-size: 22px;
   color: var(--pv2-text-3);
-  font-weight: 700;
+  font-weight: var(--fw-bold);
   margin-left: 2px;
 }
 
@@ -152,8 +152,8 @@
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
   color: var(--pv2-text-3);
   margin-bottom: 0;
 }
@@ -161,7 +161,7 @@
   padding: 3px 10px;
   border-radius: 999px;
   font-size: 11.5px;
-  font-weight: 700;
+  font-weight: var(--fw-bold);
   letter-spacing: 0.01em;
 }
 .pv2 .pv2-balance-delta .chip.pos { background: var(--pv2-green-soft); color: var(--pv2-pos-text); }
@@ -172,7 +172,7 @@
 @media (max-width: 960px) {
   .pv2 .pv2-balance--row {
     grid-template-columns: 1fr 1fr;
-    gap: 16px;
+    gap: var(--space-4);
   }
   .pv2 .pv2-balance-col--main {
     grid-column: 1 / -1;
@@ -181,7 +181,7 @@
 @media (max-width: 540px) {
   .pv2 .pv2-balance--row {
     grid-template-columns: 1fr;
-    gap: 12px;
+    gap: var(--space-3);
   }
   .pv2 .pv2-balance { padding: 22px 20px; }
   .pv2 .pv2-balance-amount { font-size: 38px; }
@@ -196,14 +196,14 @@
 }
 
 .pv2 .pv2-balance-btn-label {
-  font-size: 14px;
+  font-size: var(--fs-sm);
   color: var(--pv2-text-3);
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
   letter-spacing: -0.008em;
 }
 .pv2 .pv2-balance-btn-value {
   font-size: 24px;
-  font-weight: 700;
+  font-weight: var(--fw-bold);
   letter-spacing: -0.02em;
   color: var(--pv2-text);
   font-variant-numeric: tabular-nums;

@@ -95,9 +95,9 @@ body.sidebar-open .sidebar{
 
 .userbox{
   display: flex;
-  gap: 12px;
+  gap: var(--space-3);
   align-items: center;
-  padding: 12px;
+  padding: var(--space-3);
   border: 1px solid var(--border);
   border-radius: 14px;
   transition: background var(--motion-micro, 150ms) ease, border-color var(--motion-micro, 150ms) ease;
@@ -228,7 +228,7 @@ body.sidebar-open .sidebar{
   border: 1px solid transparent;
   color: var(--text);
   text-decoration: none;
-  font-weight: 500;
+  font-weight: var(--fw-medium);
   min-width: 0;
   position: relative;
   transition: background var(--motion-micro, 150ms) ease, border-color var(--motion-micro, 150ms) ease, transform var(--motion-micro, 150ms) ease;
@@ -299,7 +299,7 @@ body.sidebar-open .sidebar{
 .nav-item:hover .nav-icon{ color: var(--text); }
 .nav-item.active .nav-icon{ color:var(--accent); }
 
-.sidebar-bottom{ margin-top:auto; font-size:12px; padding:10px; }
+.sidebar-bottom{ margin-top:auto; font-size:var(--text-2xs); padding:10px; }
 
 .main{
   min-width: 0;
@@ -428,20 +428,20 @@ body.sidebar-open .sidebar{
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-3);
   padding: 18px 20px;
   border-bottom: 1px solid var(--border, #e2e8f0);
 }
 .modal__panel .modal__title{
   margin: 0;
   font-size: 1.2rem;
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
   letter-spacing: -0.02em;
   color: var(--text, #1e293b);
 }
 .modal__panel .modal__subtitle{
   margin: 4px 0 0;
-  font-size: 13px;
+  font-size: var(--fs-xs);
   color: var(--text-muted, #64748b);
 }
 .modal__panel .modal__body{
@@ -452,7 +452,7 @@ body.sidebar-open .sidebar{
   padding: 20px;
 }
 .modal__panel .modal__foot{
-  padding: 16px 20px;
+  padding: var(--space-4) var(--space-5);
   border-top: 1px solid var(--border, #e2e8f0);
   display: flex;
   justify-content: flex-end;
