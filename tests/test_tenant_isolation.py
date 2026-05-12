@@ -39,6 +39,12 @@ QID_A = 11001
 QID_B = 12001
 JOB_A = 15001
 JOB_B = 16001
+CLIENT_A = 13001
+CLIENT_B = 14001
+PRODUCT_A = 17001
+PRODUCT_B = 18001
+UUID_A = "cccccccc-dddd-4eee-f000-000000000001"
+UUID_B = "dddddddd-eeee-4fff-a000-000000000002"
 
 
 def _seed_two_tenants():
@@ -49,6 +55,9 @@ def _seed_two_tenants():
         conn.execute("DELETE FROM quotation_items WHERE quotation_id IN (?, ?)", (QID_A, QID_B))
         conn.execute("DELETE FROM quotations WHERE id IN (?, ?)", (QID_A, QID_B))
         conn.execute("DELETE FROM jobs WHERE id IN (?, ?)", (JOB_A, JOB_B))
+        conn.execute("DELETE FROM customer_profiles WHERE id IN (?, ?)", (CLIENT_A, CLIENT_B))
+        conn.execute("DELETE FROM issuer_products WHERE id IN (?, ?)", (PRODUCT_A, PRODUCT_B))
+        conn.execute("DELETE FROM sat_cfdi WHERE issuer_id IN (?, ?)", (ISSUER_A, ISSUER_B))
         conn.execute("DELETE FROM memberships WHERE user_id IN (?, ?) OR issuer_id IN (?, ?)", (USER_A, USER_B, ISSUER_A, ISSUER_B))
 
         conn.execute(
@@ -107,6 +116,41 @@ def _seed_two_tenants():
             """,
             (JOB_B, ISSUER_B),
         )
+
+        # Customer profiles
+        conn.execute(
+            "INSERT OR IGNORE INTO customer_profiles (id, issuer_id, rfc, legal_name, created_at) VALUES (?, ?, 'XAXX010101000', 'Cliente A', datetime('now'))",
+            (CLIENT_A, ISSUER_A),
+        )
+        conn.execute(
+            "INSERT OR IGNORE INTO customer_profiles (id, issuer_id, rfc, legal_name, created_at) VALUES (?, ?, 'XEXX010101000', 'Cliente B', datetime('now'))",
+            (CLIENT_B, ISSUER_B),
+        )
+
+        # Products
+        conn.execute(
+            "INSERT OR IGNORE INTO issuer_products (id, issuer_id, description, product_key, unit_key, unit_price, created_at) VALUES (?, ?, 'Producto A', '01010101', 'E48', 100.00, datetime('now'))",
+            (PRODUCT_A, ISSUER_A),
+        )
+        conn.execute(
+            "INSERT OR IGNORE INTO issuer_products (id, issuer_id, description, product_key, unit_key, unit_price, created_at) VALUES (?, ?, 'Producto B', '01010101', 'E48', 200.00, datetime('now'))",
+            (PRODUCT_B, ISSUER_B),
+        )
+
+        # SAT CFDI (for issued/received cross-tenant tests)
+        conn.execute(
+            """INSERT INTO sat_cfdi (issuer_id, direction, uuid, rfc_emisor, nombre_emisor, rfc_receptor, nombre_receptor,
+               total, status, fecha_emision, created_at, updated_at)
+            VALUES (?, 'issued', ?, 'TENANTA101', 'A', 'XAXX010101000', 'ClienteA', 1000.00, 'Vigente', '2026-05-01', datetime('now'), datetime('now'))""",
+            (ISSUER_A, UUID_A),
+        )
+        conn.execute(
+            """INSERT INTO sat_cfdi (issuer_id, direction, uuid, rfc_emisor, nombre_emisor, rfc_receptor, nombre_receptor,
+               total, status, fecha_emision, created_at, updated_at)
+            VALUES (?, 'issued', ?, 'TENANTB102', 'B', 'XEXX010101000', 'ClienteB', 2000.00, 'Vigente', '2026-05-01', datetime('now'), datetime('now'))""",
+            (ISSUER_B, UUID_B),
+        )
+
         conn.commit()
     finally:
         conn.close()
@@ -140,4 +184,64 @@ def test_tenant_b_cannot_get_job_of_a(client):
     cookie_b = make_session_cookie(issuer_id=ISSUER_B, user_id=USER_B)
     r = client.get(f"/api/jobs/{JOB_A}", cookies=cookie_b)
     assert r.status_code == 404, f"Esperado 404, obtuvo {r.status_code}"
+
+
+# ---------- CFDI issued/received cross-tenant ----------
+
+def test_tenant_a_issued_list_excludes_b(client):
+    """A's issued invoices list must not contain B's UUIDs."""
+    cookie_a = make_session_cookie(issuer_id=ISSUER_A, user_id=USER_A)
+    r = client.get("/api/invoices/issued?ym=2026-05", cookies=cookie_a)
+    assert r.status_code == 200
+    data = r.json()
+    uuids = [d.get("uuid") for d in (data.get("data", []))]
+    assert UUID_B not in uuids, "Tenant A sees tenant B's issued invoice"
+
+
+def test_tenant_b_issued_list_excludes_a(client):
+    """B's issued invoices list must not contain A's UUIDs."""
+    cookie_b = make_session_cookie(issuer_id=ISSUER_B, user_id=USER_B)
+    r = client.get("/api/invoices/issued?ym=2026-05", cookies=cookie_b)
+    assert r.status_code == 200
+    data = r.json()
+    uuids = [d.get("uuid") for d in (data.get("data", []))]
+    assert UUID_A not in uuids, "Tenant B sees tenant A's issued invoice"
+
+
+def test_tenant_a_cfdi_detail_b_returns_404(client):
+    """A cannot access CFDI detail page for B's UUID."""
+    cookie_a = make_session_cookie(issuer_id=ISSUER_A, user_id=USER_A)
+    r = client.get(f"/portal/cfdi/issued/{UUID_B}", cookies=cookie_a, follow_redirects=False)
+    assert r.status_code in (302, 404), f"Expected 302/404, got {r.status_code}"
+
+
+def test_tenant_b_cfdi_detail_a_returns_404(client):
+    """B cannot access CFDI detail page for A's UUID."""
+    cookie_b = make_session_cookie(issuer_id=ISSUER_B, user_id=USER_B)
+    r = client.get(f"/portal/cfdi/issued/{UUID_A}", cookies=cookie_b, follow_redirects=False)
+    assert r.status_code in (302, 404), f"Expected 302/404, got {r.status_code}"
+
+
+# ---------- Client/Product cross-tenant ----------
+
+def test_tenant_a_customers_excludes_b(client):
+    """A's customer list must not contain B's clients."""
+    cookie_a = make_session_cookie(issuer_id=ISSUER_A, user_id=USER_A)
+    r = client.get("/api/customers", cookies=cookie_a)
+    assert r.status_code == 200
+    data = r.json()
+    items = data.get("items", [])
+    ids = [d.get("id") for d in items if isinstance(d, dict)]
+    assert CLIENT_B not in ids, "Tenant A sees tenant B's client"
+
+
+def test_tenant_a_products_excludes_b(client):
+    """A's product list must not contain B's products."""
+    cookie_a = make_session_cookie(issuer_id=ISSUER_A, user_id=USER_A)
+    r = client.get("/api/products", cookies=cookie_a)
+    assert r.status_code == 200
+    data = r.json()
+    items = data.get("items", [])
+    ids = [d.get("id") for d in items if isinstance(d, dict)]
+    assert PRODUCT_B not in ids, "Tenant A sees tenant B's product"
 
