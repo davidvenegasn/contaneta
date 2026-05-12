@@ -14,7 +14,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from services import invoices_service
+from services.invoices import invoices_service
 from services.errors import ValidationError
 from database import safe_update
 

@@ -2,7 +2,7 @@
 Plan guard — middleware/dependency for checking plan limits before actions.
 
 Usage in routers:
-    from services.plan_guard import require_plan_action
+    from services.billing.plan_guard import require_plan_action
 
     # In a route:
     check = require_plan_action(issuer_id, "invoice")
@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from services.plans import check_limit, increment_usage
+from services.billing.plans import check_limit, increment_usage
 
 
 def require_plan_action(issuer_id: int, action: str) -> dict[str, Any]:

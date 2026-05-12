@@ -38,7 +38,7 @@ def main(argv: list[str] | None = None) -> int:
 
     directions = [d.strip() for d in args.directions.split(",") if d.strip()]
 
-    from services.sat_autosync import get_eligible_issuers, enqueue_sat_sync
+    from services.sat.sat_autosync import get_eligible_issuers, enqueue_sat_sync
 
     eligible = get_eligible_issuers(
         cooldown_hours=args.cooldown_hours,

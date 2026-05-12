@@ -254,7 +254,7 @@ def get_plan_summary(issuer_id: int) -> dict[str, Any]:
     # Show "Trial" instead of "Gratis" when trial is active (consistent with header badge)
     label = config["label"]
     if plan_name == "free":
-        from services.subscription import is_issuer_trial_active
+        from services.billing.subscription import is_issuer_trial_active
         if is_issuer_trial_active(issuer_id):
             label = "Trial"
 

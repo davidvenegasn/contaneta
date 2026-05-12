@@ -11,7 +11,7 @@ import logging
 from typing import Any, Optional
 
 from database import db, db_rows, table_exists, has_column
-from services.bank_cfdi_matching import score_movement_cfdi, refresh_suggestions_for_month
+from services.bank.bank_cfdi_matching import score_movement_cfdi, refresh_suggestions_for_month
 
 logger = logging.getLogger(__name__)
 

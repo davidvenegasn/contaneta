@@ -22,10 +22,10 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(levelna
 logger = logging.getLogger("sat_worker")
 
 from services.errors import ExternalServiceError  # noqa: E402
-from services.subprocess_utils import run_php  # noqa: E402
-from services.sat_credentials_secure import decrypted_fiel_env  # noqa: E402
-from services.sat_autosync import update_sync_state_after_job  # noqa: E402
-from services.catalog_from_cfdi import backfill_catalog_from_existing_cfdi  # noqa: E402
+from services.sat.subprocess_utils import run_php  # noqa: E402
+from services.sat.sat_credentials_secure import decrypted_fiel_env  # noqa: E402
+from services.sat.sat_autosync import update_sync_state_after_job  # noqa: E402
+from services.invoices.catalog_from_cfdi import backfill_catalog_from_existing_cfdi  # noqa: E402
 
 DB_PATH = os.environ.get("APP_DB_PATH") or os.path.join(BASE_DIR, "invoicing.db")
 SAT_SYNC_DIR = os.path.join(BASE_DIR, "sat_sync")

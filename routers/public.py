@@ -6,7 +6,7 @@ from fastapi.responses import HTMLResponse, Response, RedirectResponse
 
 from database import db
 from services import quotations
-from services.plans import PLANS
+from services.billing.plans import PLANS
 
 def get_public_router(templates):
     router = APIRouter()

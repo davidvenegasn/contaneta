@@ -31,7 +31,8 @@ from config import (
     BASE_DIR,
     SESSION_SECRET_FROM_ENV,
 )
-from services import issuers, session
+from services import issuers
+from services.auth import session
 from services.errors import AppError
 from routers.deps import get_portal_issuer
 from routers.auth import get_auth_router
@@ -70,7 +71,7 @@ def _startup_impl() -> None:
     _startup_config_check()
     # Limpiar entradas viejas de rate limiting al arrancar
     try:
-        from services import rate_limit as _rl
+        from services.auth import rate_limit as _rl
         _rl.cleanup_old_entries(max_age_seconds=86400)
     except Exception:
         logging.warning("rate_limit cleanup on startup failed", exc_info=True)
@@ -683,7 +684,7 @@ async def redirect_token_middleware(request: Request, call_next):
 
     if token_query and is_portal_html and ALLOW_LEGACY_TOKEN_LOGIN:
         # Rate limit token login: max 5 attempts per IP per 60s
-        from services.rate_limit import is_rate_limited, get_client_ip
+        from services.auth.rate_limit import is_rate_limited, get_client_ip
         if is_rate_limited(request, "token_login", window_seconds=60, max_attempts=5):
             client_ip = get_client_ip(request)
             logging.getLogger(__name__).warning(

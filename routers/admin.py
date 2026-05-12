@@ -13,7 +13,8 @@ from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from config import DB_PATH, ENV, IS_PROD, DEV_MODE, SESSION_SECRET_FROM_ENV, AT_REST_MASTER_KEY_SET, COOKIE_SECURE, SITE_URL, STRIPE_SECRET_KEY
 from database import db, db_rows, has_column
 from migrations_runner import apply_migrations
-from services import session, issuers, users, audit, csrf as csrf_service, error_events as error_events_service
+from services.auth import session, users, csrf as csrf_service
+from services import issuers, audit, error_events as error_events_service
 from services.action_log import log_action
 from services import admin_issuer as admin_issuer_service
 
@@ -672,7 +673,7 @@ def get_admin_router(templates):
         _admin: tuple[int, int, int | None] = Depends(require_admin),
     ):
         csrf_service.validate_csrf_token(request)
-        from services.sat_autosync import enqueue_sat_sync
+        from services.sat.sat_autosync import enqueue_sat_sync
         enqueued = []
         for direction in ("issued", "received"):
             jid = enqueue_sat_sync(issuer_id, direction)

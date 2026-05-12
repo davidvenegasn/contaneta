@@ -6,9 +6,9 @@ from fastapi import APIRouter, Request, HTTPException, Header, Depends
 from fastapi.responses import JSONResponse, RedirectResponse
 
 from config import STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_PRICE_ID, SITE_URL
-from services import session as session_service
-from services import subscription as subscription_service
-from services import users as users_service
+from services.auth import session as session_service
+from services.billing import subscription as subscription_service
+from services.auth import users as users_service
 from services import audit
 from services.action_log import log_action
 

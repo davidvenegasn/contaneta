@@ -15,7 +15,7 @@ from fastapi.responses import JSONResponse
 
 logger = logging.getLogger(__name__)
 
-from services.rate_limit import is_rate_limited
+from services.auth.rate_limit import is_rate_limited
 
 
 def _api_rate_check(request: Request, key: str, *, max_attempts: int = 10, window: float = 60.0):
@@ -43,14 +43,15 @@ except Exception:
     FORMA_PAGO = {"03": "Transferencia electrónica", "01": "Efectivo", "99": "Por definir"}
     MONEDA = {"MXN": "Peso Mexicano", "USD": "Dólar Americano"}
     CLAVE_UNIDAD = {"E48": "Unidad de servicio", "EA": "Cada uno", "H87": "Pieza"}
-from services import subscription as subscription_service, csrf as csrf_service
+from services.billing import subscription as subscription_service
+from services.auth import csrf as csrf_service
 from services.action_log import log_action
 from services.http import ok, ok_list
 from services.schemas import ClientCreate, ProductCreate
 from services import clients_service, products_service
 from services import jobs as jobs_service
-from services import invoices_engine
-from services.sat_sync import get_month_totals as _get_month_totals_raw
+from services.invoices import invoices_engine
+from services.sat.sat_sync import get_month_totals as _get_month_totals_raw
 from services.ym_helpers import ym_sql_filter, sanitize_ym, is_annual
 
 
@@ -145,14 +146,14 @@ def api_account_status(request: Request, issuer: dict = Depends(get_portal_issue
         prod = db_rows("SELECT COUNT(*) AS n FROM issuer_products WHERE issuer_id = ?", (issuer_id,))
         has_product = (prod[0]["n"] if prod else 0) >= 1
 
-        # P36: sync status (shared logic from services.sat_sync)
-        from services.sat_sync import get_sat_sync_status
+        # P36: sync status (shared logic from services.sat.sat_sync)
+        from services.sat.sat_sync import get_sat_sync_status
         _sync = get_sat_sync_status(issuer_id)
         last_sync_at = _sync["last_sync_at"]
         sync_status = _sync["status"]
 
         # P36: plan_label — use canonical plan from plans service for consistency
-        from services.plans import get_issuer_plan, get_plan_config
+        from services.billing.plans import get_issuer_plan, get_plan_config
         _plan_name = get_issuer_plan(issuer_id)
         _plan_cfg = get_plan_config(_plan_name)
         trial_days_left = None
@@ -2554,7 +2555,7 @@ def api_matching_preview(
     issuer: dict = Depends(get_portal_issuer),
     ym: str = Query(..., min_length=7, max_length=7),
 ):
-    from services.matching import preview_month
+    from services.invoices.matching import preview_month
     issuer_id = int(issuer.get("id") or 0)
     if issuer_id <= 0:
         raise HTTPException(status_code=401, detail="Sesión inválida")
@@ -2727,7 +2728,7 @@ def api_manual_movement_create(
     issuer_id = int(issuer.get("id") or 0)
     if issuer_id <= 0:
         raise HTTPException(status_code=401, detail="Sesión inválida")
-    from services import manual_movements as mm
+    from services.invoices import manual_movements as mm
     mm.ensure_table()
     fecha = (body.get("fecha") or "").strip()
     descripcion = (body.get("descripcion") or "").strip()
@@ -2764,7 +2765,7 @@ def api_manual_movements_list(
     issuer_id = int(issuer.get("id") or 0)
     if issuer_id <= 0:
         raise HTTPException(status_code=401, detail="Sesión inválida")
-    from services import manual_movements as mm
+    from services.invoices import manual_movements as mm
     mm.ensure_table()
     items = mm.list_movements(issuer_id, period_month=ym, tipo=tipo, limit=limit, offset=offset)
     total = mm.count_movements(issuer_id, period_month=ym)
@@ -2778,7 +2779,7 @@ def api_manual_movement_delete(movement_id: int, request: Request, issuer: dict 
     issuer_id = int(issuer.get("id") or 0)
     if issuer_id <= 0:
         raise HTTPException(status_code=401, detail="Sesión inválida")
-    from services import manual_movements as mm
+    from services.invoices import manual_movements as mm
     mm.ensure_table()
     deleted = mm.delete(issuer_id, movement_id)
     if not deleted:
@@ -2798,7 +2799,7 @@ def api_foreign_invoice_create(
     issuer_id = int(issuer.get("id") or 0)
     if issuer_id <= 0:
         raise HTTPException(status_code=401, detail="Sesión inválida")
-    from services import foreign_invoices as fi
+    from services.invoices import foreign_invoices as fi
     fi.ensure_table()
     tipo = (body.get("tipo") or "").strip().upper()
     fecha = (body.get("fecha") or "").strip()
@@ -2843,7 +2844,7 @@ def api_foreign_invoices_list(
     issuer_id = int(issuer.get("id") or 0)
     if issuer_id <= 0:
         raise HTTPException(status_code=401, detail="Sesión inválida")
-    from services import foreign_invoices as fi
+    from services.invoices import foreign_invoices as fi
     fi.ensure_table()
     items = fi.list_invoices(issuer_id, period_month=ym, tipo=tipo, limit=limit, offset=offset)
     total = fi.count_invoices(issuer_id, period_month=ym)
@@ -2857,7 +2858,7 @@ def api_foreign_invoice_delete(invoice_id: int, request: Request, issuer: dict =
     issuer_id = int(issuer.get("id") or 0)
     if issuer_id <= 0:
         raise HTTPException(status_code=401, detail="Sesión inválida")
-    from services import foreign_invoices as fi
+    from services.invoices import foreign_invoices as fi
     fi.ensure_table()
     conn = db()
     try:
@@ -2909,7 +2910,7 @@ def api_exchange_rate(
     period: str = Query(None),
 ):
     """Get exchange rate for a currency+month."""
-    from services.exchange_rates import get_rate
+    from services.invoices.exchange_rates import get_rate
     if not period:
         period = datetime.now().strftime("%Y-%m")
     rate = get_rate(moneda, period)
@@ -2923,7 +2924,7 @@ def api_exchange_rates_list(
     moneda: str = Query(None),
 ):
     """List exchange rates."""
-    from services.exchange_rates import list_rates
+    from services.invoices.exchange_rates import list_rates
     rates = list_rates(moneda=moneda)
     return ok_list(rates, len(rates))
 
@@ -2936,7 +2937,7 @@ def api_exchange_rate_set(
 ):
     """Set an exchange rate for a currency+month."""
     csrf_service.verify_api_csrf(request)
-    from services.exchange_rates import set_rate, get_rate
+    from services.invoices.exchange_rates import set_rate, get_rate
     moneda = (body.get("moneda") or "").strip().upper()
     period = (body.get("period") or "").strip()
     rate = body.get("rate")
@@ -3010,10 +3011,10 @@ def api_invoice_extract_pdf(
             issuer_id = int(issuer.get("id") or 0)
             if issuer_id <= 0:
                 raise HTTPException(status_code=401, detail="Sesión inválida")
-            from services import foreign_invoices as fi
+            from services.invoices import foreign_invoices as fi
             fi.ensure_table()
             # Fill defaults for auto-save
-            from services.exchange_rates import get_rate
+            from services.invoices.exchange_rates import get_rate
             moneda = data.get("moneda") or "USD"
             tipo = data.get("tipo") or "GASTO"
             fecha = data.get("fecha") or datetime.now().strftime("%Y-%m-%d")

@@ -238,7 +238,7 @@ def summarize(description_raw: str, method: str, counterparty: Optional[str]) ->
 
 def _classify(m: MovementPreview, desc_norm: str, preset: Optional[dict[str, Any]] = None) -> None:
     """Clasifica en método, categoría, bucket, deductible_hint, needs_review, confidence. Registra rule_hits y confidence_breakdown."""
-    from services.bank_classifier_presets import (
+    from services.bank.bank_classifier_presets import (
         get_preset,
         KEYWORDS_TARJETA,
         KEYWORDS_IMPUESTO,
@@ -444,7 +444,7 @@ def parse_bank_pdf_to_movements_preview(pdf_path: str, preset: str = "conservati
     Parsea PDF Banorte y devuelve movements + summary + raw_debug (si DEV).
     preset: "conservative" | "aggressive". No guarda en DB.
     """
-    from services.bank_classifier_presets import get_preset
+    from services.bank.bank_classifier_presets import get_preset
     preset_dict = get_preset(preset)
     try:
         import pdfplumber
@@ -460,7 +460,7 @@ def parse_bank_pdf_to_movements_preview(pdf_path: str, preset: str = "conservati
             "summary": {"total_deposit": 0, "total_withdraw": 0, "count_in": 0, "count_out": 0, "count_info": 0, "error": "file_not_found"},
             "raw_debug": None,
         }
-    from services.bank_statement_parser import (
+    from services.bank.bank_statement_parser import (
         locate_sections,
         build_transactions,
         norm_text,
@@ -476,7 +476,7 @@ def parse_bank_pdf_to_movements_preview(pdf_path: str, preset: str = "conservati
                 if ln:
                     raw_rows.append({"Page": page_idx, "Line": li, "Text": ln})
     # Detectar banco desde el texto del inicio del PDF (nombre del banco suele estar arriba)
-    from services.bank_detection import detect_bank_from_text
+    from services.bank.bank_detection import detect_bank_from_text
     first_page_text = " ".join((r.get("Text") or "") for r in raw_rows if r.get("Page") == 1).strip()
     if not first_page_text and raw_rows:
         first_page_text = " ".join((r.get("Text") or "") for r in raw_rows[:60]).strip()
@@ -602,7 +602,7 @@ def reclassify_movements(movements: list[dict[str, Any]], preset: str = "conserv
     Preserva concept, notes y demás campos editados; actualiza category, bucket,
     deductible_hint, needs_review, confidence, rule_hits, warnings, confidence_breakdown.
     """
-    from services.bank_classifier_presets import get_preset
+    from services.bank.bank_classifier_presets import get_preset
     preset_dict = get_preset(preset)
     result: list[dict[str, Any]] = []
     for d in movements:

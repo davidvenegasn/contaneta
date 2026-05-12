@@ -103,7 +103,7 @@ def classify_movements_batch(
     Classify a batch of movements for an issuer.
     Returns movements with 'suggested_categoria' field added.
     """
-    from services.bank_accounts import list_active_accounts_raw as list_active_accounts
+    from services.bank.bank_accounts import list_active_accounts_raw as list_active_accounts
 
     accounts = list_active_accounts(issuer_id)
     own_clabes = {(a.get("clabe") or "").strip() for a in accounts if a.get("clabe")}
@@ -125,7 +125,7 @@ def auto_classify_unclassified(issuer_id: int, ym: str) -> int:
     Auto-classify movements without a category for a given month.
     Returns count of movements updated.
     """
-    from services.bank_accounts import list_active_accounts_raw as list_active_accounts
+    from services.bank.bank_accounts import list_active_accounts_raw as list_active_accounts
 
     conn = db()
     try:

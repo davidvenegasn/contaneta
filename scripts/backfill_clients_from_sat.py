@@ -31,7 +31,7 @@ def main() -> None:
     args = parser.parse_args()
 
     import sqlite3
-    from services.catalog_from_cfdi import backfill_catalog_from_existing_cfdi
+    from services.invoices.catalog_from_cfdi import backfill_catalog_from_existing_cfdi
 
     db_path = os.environ.get("APP_DB_PATH") or os.path.join(BASE_DIR, "invoicing.db")
     if not os.path.isfile(db_path):

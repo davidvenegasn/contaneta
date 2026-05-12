@@ -615,7 +615,7 @@ def convert_pdf_to_xlsx(
 
     # -------- pipeline robusta (Banorte o similares) --------
     from config import DEV_MODE
-    from services.bank_statement_parser import parse_bank_statement, write_debug_json
+    from services.bank.bank_statement_parser import parse_bank_statement, write_debug_json
 
     debug_on = bool(DEV_MODE) and (os.environ.get("BANK_PARSER_DEBUG", "0").strip() == "1")
     parsed = parse_bank_statement(raw_rows, debug=debug_on)
@@ -729,7 +729,7 @@ def convert_pdf_to_xlsx(
     # Persistir movimientos en DB con dedupe (solo INGRESO/GASTO)
     if statement_id and issuer_id and txs:
         try:
-            from services.bank_statement_parser import upsert_bank_movements
+            from services.bank.bank_statement_parser import upsert_bank_movements
             upsert_bank_movements(int(issuer_id), int(statement_id), txs)
         except Exception:
             logger.exception("bank_parser: no se pudieron guardar movimientos en DB")

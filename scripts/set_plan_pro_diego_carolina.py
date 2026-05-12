@@ -30,7 +30,7 @@ def main():
         sys.exit(1)
 
     from database import db
-    from services.subscription import upsert_subscription
+    from services.billing.subscription import upsert_subscription
 
     conn = db()
     try:

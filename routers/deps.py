@@ -6,8 +6,9 @@ from fastapi import Request, HTTPException
 
 from config import ALLOW_DEMO_PORTAL, ALLOW_LEGACY_TOKEN_LOGIN, DEV_MODE, DEV_TOKEN, SESSION_TTL_DAYS
 from database import db_rows, has_column, db
-from services import issuers, session, users
-from services import rate_limit as rate_limit_service
+from services import issuers
+from services.auth import session, users
+from services.auth import rate_limit as rate_limit_service
 
 logger = logging.getLogger(__name__)
 

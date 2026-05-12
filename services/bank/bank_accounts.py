@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 def _encrypt_clabe(issuer_id: int, clabe_plain: str) -> str:
     """Encrypt CLABE for storage. Falls back to plain text if crypto unavailable."""
     try:
-        from services.crypto_at_rest import encrypt_text
+        from services.sat.crypto_at_rest import encrypt_text
         return encrypt_text(issuer_id=issuer_id, plaintext=clabe_plain)
     except Exception:
         return clabe_plain
@@ -32,7 +32,7 @@ def decrypt_clabe(issuer_id: int, clabe_stored: str) -> str:
     if not clabe_stored.startswith("enc:"):
         return clabe_stored
     try:
-        from services.crypto_at_rest import decrypt_text
+        from services.sat.crypto_at_rest import decrypt_text
         return decrypt_text(issuer_id=issuer_id, token=clabe_stored)
     except Exception:
         logger.warning("Failed to decrypt CLABE for issuer %s, returning masked", issuer_id)

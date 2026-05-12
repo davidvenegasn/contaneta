@@ -10,8 +10,8 @@ BASE_DIR = os.path.dirname(SCRIPT_DIR)
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
-from services.subprocess_utils import run_php  # noqa: E402
-from services.sat_credentials_secure import decrypted_fiel_env  # noqa: E402
+from services.sat.subprocess_utils import run_php  # noqa: E402
+from services.sat.sat_credentials_secure import decrypted_fiel_env  # noqa: E402
 
 
 def main(argv: list[str]) -> int:

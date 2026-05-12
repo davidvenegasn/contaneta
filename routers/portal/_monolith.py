@@ -8,7 +8,7 @@ import re
 import secrets
 import stat
 from services.errors import ExternalServiceError
-from services.subprocess_utils import run_php
+from services.sat.subprocess_utils import run_php
 from datetime import datetime, date, timezone
 from typing import Optional, Any
 
@@ -18,21 +18,23 @@ from fastapi.responses import HTMLResponse, Response, RedirectResponse, JSONResp
 from config import BASE_DIR, REGIMEN_LABEL_TO_CODE, REGIMEN_CODE_DESCRIPTIONS, COOKIE_DEMO_VIEW, DB_PATH, DEV_MODE, PORTAL_SHELL_V2
 from database import db, db_rows, has_column, table_exists
 from routers.deps import get_portal_issuer
-from services import quotations as quotations_service, rate_limit as rate_limit_service, session as session_service, audit, subscription as subscription_service, csrf as csrf_service
+from services import quotations as quotations_service, audit
+from services.auth import rate_limit as rate_limit_service, session as session_service, csrf as csrf_service
+from services.billing import subscription as subscription_service
 from services import file_access_log
 from services.action_log import log_action
 from services.redirects import safe_next_url
 from services.portal_errors import portal_error_type
 from services.pdf_to_excel import convert_pdf_to_xlsx, get_storage_root, safe_join, ensure_parent_dir
-from services.bank_parse_preview import parse_bank_pdf_to_movements_preview, reclassify_movements
-from services.bank_preview_pipeline import parse_bank_statement_preview
-from services.bank_preview_models import compute_dedupe_fingerprint
-from services.catalog_from_cfdi import backfill_catalog_from_existing_cfdi
-from services.bank_accounts import list_active_accounts as bank_list_accounts, list_active_accounts_raw as bank_list_accounts_raw, list_all_accounts as bank_list_all_accounts, get_account as bank_get_account, create_account as bank_create_account, update_account as bank_update_account, delete_account as bank_delete_account
-from services.bank_own_accounts import detect_own_account_transfer, reclassify_own_transfers_by_rfc
-from services.bank_statement_ingest import ingest_bank_statement, extract_statement_metadata, validate_statement_ownership, commit_preview_to_db
-from services.bank_cfdi_matching import find_cfdi_candidates, save_suggested_matches, confirm_match as match_confirm, reject_match as match_reject
-from services.sat_sync import get_sat_sync_status, get_month_totals
+from services.bank.bank_parse_preview import parse_bank_pdf_to_movements_preview, reclassify_movements
+from services.bank.bank_preview_pipeline import parse_bank_statement_preview
+from services.bank.bank_preview_models import compute_dedupe_fingerprint
+from services.invoices.catalog_from_cfdi import backfill_catalog_from_existing_cfdi
+from services.bank.bank_accounts import list_active_accounts as bank_list_accounts, list_active_accounts_raw as bank_list_accounts_raw, list_all_accounts as bank_list_all_accounts, get_account as bank_get_account, create_account as bank_create_account, update_account as bank_update_account, delete_account as bank_delete_account
+from services.bank.bank_own_accounts import detect_own_account_transfer, reclassify_own_transfers_by_rfc
+from services.bank.bank_statement_ingest import ingest_bank_statement, extract_statement_metadata, validate_statement_ownership, commit_preview_to_db
+from services.bank.bank_cfdi_matching import find_cfdi_candidates, save_suggested_matches, confirm_match as match_confirm, reject_match as match_reject
+from services.sat.sat_sync import get_sat_sync_status, get_month_totals
 from services.ym_helpers import ym_sql_filter, ym_to_label, shift_ym, is_annual, sanitize_ym
 
 logger = logging.getLogger(__name__)
@@ -121,7 +123,7 @@ def _run_fiel_validation(issuer_id: int) -> tuple[bool, str]:
     stdout = ""
     try:
         # Cifrado at-rest: pasar credenciales desencriptadas vía env (solo al proceso PHP)
-        from services.sat_credentials_secure import decrypted_fiel_env
+        from services.sat.sat_credentials_secure import decrypted_fiel_env
 
         with decrypted_fiel_env(int(issuer_id)) as fiel_env:
             env.update(fiel_env)
@@ -925,7 +927,7 @@ def get_portal_router(templates):
                 raise HTTPException(status_code=401, detail="Sesión inválida")
             if not ym:
                 ym = ym_now()
-            from services import foreign_invoices as fi
+            from services.invoices import foreign_invoices as fi
             fi.ensure_table()
             items = fi.list_invoices(issuer_id, period_month=ym, limit=200)
             total = fi.count_invoices(issuer_id, period_month=ym)
@@ -2065,7 +2067,7 @@ def get_portal_router(templates):
         issuer_id = int(issuer.get("id") or 0)
         subscription = subscription_service.get_subscription_by_user_id(user_id) if user_id else None
         is_active = subscription_service.is_subscription_active(user_id)
-        from services import plans as plans_service
+        from services.billing import plans as plans_service
         plan_summary = plans_service.get_plan_summary(issuer_id) if issuer_id > 0 else {
             "plan": "free", "plan_label": "Gratis", "price_mxn": 0,
             "limits": {"invoices": {"used": 0, "limit": 5}, "sat_syncs": {"used": 0, "limit": 0}, "bank_imports": {"used": 0, "limit": 2}, "bank_accounts": {"limit": 1}, "month_close": False, "matching": False},
@@ -2527,7 +2529,7 @@ def get_portal_router(templates):
         auto_save_result = {"saved": False}
         if all_movements and issuer_id > 0:
             try:
-                from services.bank_statement_parser import upsert_bank_movements
+                from services.bank.bank_statement_parser import upsert_bank_movements
                 from database import db as _db
                 _conn = _db()
                 try:
@@ -3034,7 +3036,7 @@ def get_portal_router(templates):
                         ):
                             new_cat = "FINANCIERO_PAGO_TARJETA"
                     if new_cat and mov_has_hash:
-                        from services.bank_statement_parser import _movement_hash
+                        from services.bank.bank_statement_parser import _movement_hash
                         h = _movement_hash(issuer_id, t)
                         conn.execute(
                             "UPDATE bank_movements SET categoria = ? WHERE issuer_id = ? AND movement_hash = ?",
@@ -3809,7 +3811,7 @@ def get_portal_router(templates):
         # Auto-run matching on page load (lightweight — skips if already done)
         if total_count > 0:
             try:
-                from services import bank_cfdi_matching as _bcm
+                from services.bank import bank_cfdi_matching as _bcm
                 _bcm.refresh_suggestions_for_month(issuer_id, ym_safe)
             except Exception as _me:
                 logger.debug("auto-matching on movimientos page: %s", _me)
@@ -4049,7 +4051,7 @@ def get_portal_router(templates):
         if rate_limit_service.is_rate_limited(request, "bank_reconcile"):
             raise HTTPException(status_code=429, detail="Demasiados intentos. Espera un minuto.")
         issuer_id = int(issuer.get("id") or 0)
-        from services import bank_cfdi_matching as bank_cfdi_matching_service
+        from services.bank import bank_cfdi_matching as bank_cfdi_matching_service
 
         bank_cfdi_matching_service.refresh_suggestions_for_month(issuer_id, ym)
         audit.log(
@@ -4149,7 +4151,7 @@ def get_portal_router(templates):
         key_enc_path = os.path.join(cred_dir, "fiel.key.enc")
         rel_cer = f"storage/credentials/{issuer_id}/fiel.cer.enc"
         rel_key = f"storage/credentials/{issuer_id}/fiel.key.enc"
-        from services.crypto_at_rest import encrypt_bytes, encrypt_text
+        from services.sat.crypto_at_rest import encrypt_bytes, encrypt_text
 
         cer_blob = encrypt_bytes(issuer_id=int(issuer_id), plaintext=cer_body, aad=b"fiel.cer")
         key_blob = encrypt_bytes(issuer_id=int(issuer_id), plaintext=key_body, aad=b"fiel.key")
@@ -4191,7 +4193,7 @@ def get_portal_router(templates):
         # Auto-enqueue initial SAT sync on successful credential validation
         if valid_ok:
             try:
-                from services.sat_autosync import enqueue_onboarding_sync
+                from services.sat.sat_autosync import enqueue_onboarding_sync
                 enqueue_onboarding_sync(issuer_id)
                 logger.info("Onboarding SAT sync enqueued for issuer %s", issuer_id)
             except Exception:

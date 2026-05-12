@@ -40,7 +40,7 @@ from fastapi.testclient import TestClient
 from config import BASE_DIR, DB_PATH
 from app import app
 from database import db
-from services import session as session_service
+from services.auth import session as session_service
 
 # Aplicar migraciones a la DB de test
 apply_migrations(DB_PATH)

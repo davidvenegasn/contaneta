@@ -7,7 +7,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from services.bank_preview_models import compute_dedupe_fingerprint
+from services.bank.bank_preview_models import compute_dedupe_fingerprint
 
 
 def normalize_description(raw: str) -> str:

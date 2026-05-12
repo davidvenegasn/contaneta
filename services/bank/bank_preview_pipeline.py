@@ -9,9 +9,9 @@ import re
 from datetime import datetime, timezone
 from typing import Any, Optional
 
-from services.bank_detection import detect_bank_from_pdf_text_pages, extract_account_holder_from_pdf_text
-from services.bank_preview_models import make_preview_movement, normalize_preview_movement
-from services.bank_classifier import classify_bank_preview_movement, extract_spei_counterparty_for_display
+from services.bank.bank_detection import detect_bank_from_pdf_text_pages, extract_account_holder_from_pdf_text
+from services.bank.bank_preview_models import make_preview_movement, normalize_preview_movement
+from services.bank.bank_classifier import classify_bank_preview_movement, extract_spei_counterparty_for_display
 from services.pdf_to_excel import detect_statement_period_from_text
 
 logger = logging.getLogger(__name__)
@@ -86,15 +86,15 @@ def _parse_banorte(raw_rows: list[dict], pages_text: list[str], file_name: str, 
     Returns (movements_preview_format, file_summary, error).
     """
     try:
-        from services.bank_statement_parser import (
+        from services.bank.bank_statement_parser import (
             locate_sections,
             build_transactions,
             norm_text,
             extract_money_candidates,
             _parse_banorte_date_from_start,
         )
-        from services.bank_parse_preview import _build_movement
-        from services.bank_classifier_presets import get_preset, PRESET_CONSERVATIVE
+        from services.bank.bank_parse_preview import _build_movement
+        from services.bank.bank_classifier_presets import get_preset, PRESET_CONSERVATIVE
     except ImportError as e:
         return [], {}, f"Error importando módulos: {e}"
     sections = locate_sections(raw_rows)

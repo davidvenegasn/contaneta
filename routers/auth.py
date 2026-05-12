@@ -11,11 +11,12 @@ import httpx
 
 from config import _env_path, DEV_MODE
 from database import db
-from services import issuers, session, users, audit, csrf as csrf_service, action_log
+from services import issuers, audit, action_log
+from services.auth import session, users, csrf as csrf_service
 from services.action_log import log_action
-from services import rate_limit as rate_limit_service
+from services.auth import rate_limit as rate_limit_service
 from services import sanitize as sanitize_service
-from services import verification as verification_service
+from services.auth import verification as verification_service
 from services import email_sender
 
 logger = logging.getLogger(__name__)

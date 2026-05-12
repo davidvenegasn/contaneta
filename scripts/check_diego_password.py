@@ -12,7 +12,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from database import db_rows
-from services.users import get_user_password_hash, verify_password
+from services.auth.users import get_user_password_hash, verify_password
 
 
 def main():

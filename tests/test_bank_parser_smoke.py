@@ -17,7 +17,7 @@ if not _test_db:
 if not os.environ.get("SESSION_SECRET"):
     os.environ["SESSION_SECRET"] = "test-secret-bank-parser"
 
-from services.bank_parse_preview import parse_bank_pdf_to_movements_preview  # noqa: E402
+from services.bank.bank_parse_preview import parse_bank_pdf_to_movements_preview  # noqa: E402
 
 
 def test_bank_parser_preview_handles_missing_file():
