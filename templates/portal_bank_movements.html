@@ -284,10 +284,6 @@
                     <span class="concil-icon concil-icon--ok" title="Conciliado">
                       <svg viewBox="0 0 16 16" fill="none" width="14" height="14"><circle cx="8" cy="8" r="7" stroke="#22c55e" stroke-width="1.5"/><path d="M5 8.5l2 2 4-4" stroke="#22c55e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
                     </span>
-                  {% elif es_gasto %}
-                    <span class="concil-icon concil-icon--pending" title="Sin factura">
-                      <svg viewBox="0 0 16 16" fill="none" width="14" height="14"><circle cx="8" cy="8" r="7" stroke="#f59e0b" stroke-width="1.5"/><path d="M8 5v3" stroke="#f59e0b" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="11" r="0.75" fill="#f59e0b"/></svg>
-                    </span>
                   {% endif %}
                 {% endif %}
               </td>
@@ -317,18 +313,8 @@
                 <dl class="bank-detail-dl">
                   <dt>Descripción completa</dt>
                   <dd class="u-break-word">{{ (m.descripcion or '—')|e }}</dd>
-                  <dt>Método</dt>
-                  <dd>{{ m.metodo_hint or '—' }}</dd>
-                  <dt>Contraparte</dt>
-                  <dd>{{ m.contraparte_hint or '—' }}</dd>
                   <dt>RFC</dt>
                   <dd><code>{{ m.rfc_encontrado or '—' }}</code></dd>
-                  <dt>Confianza</dt>
-                  <dd>{{ (m.confidence_score ~ '%') if m.confidence_score is not none else '—' }}</dd>
-                  {% if m.cfdi_match_status %}
-                  <dt>Match CFDI</dt>
-                  <dd><span class="badge badge--{{ 'success' if m.cfdi_match_status == 'confirmed' else ('warning' if m.cfdi_match_status == 'suggested' else ('danger' if m.cfdi_match_status == 'rejected' else 'secondary') ) }}">{{ m.cfdi_match_status }}</span></dd>
-                  {% endif %}
                   {% if m.probable_cfdi_uuid %}
                   <dt>Factura probable</dt>
                   <dd>
@@ -338,11 +324,12 @@
                     {% endif %}
                   </dd>
                   {% endif %}
-                  <dt>Archivo / Estado de cuenta</dt>
-                  <dd>{{ m.statement_file_id or '—' }}</dd>
                 </dl>
                 <p class="u-mt-2 u-mb-0">
-                  <button type="button" class="btn btn--sm btn--secondary bank-movement-editar-en-modal" data-id="{{ m.id }}" data-descripcion="{{ (m.descripcion or '')|e }}" data-categoria="{{ (m.categoria or '')|e }}">Editar concepto y categoría</button>
+                  <button type="button" class="btn btn--sm btn--ghost bank-movement-editar-en-modal" data-id="{{ m.id }}" data-descripcion="{{ (m.descripcion or '')|e }}" data-categoria="{{ (m.categoria or '')|e }}">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                    <span>Editar</span>
+                  </button>
                 </p>
               </td>
             </tr>

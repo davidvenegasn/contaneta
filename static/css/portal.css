@@ -7975,3 +7975,5 @@ label[for]{ cursor: pointer; }
 }
 html.nightmode .kb-help-panel { background: var(--surface, #1e293b); border-color: var(--border-strong, #334155); }
 html.nightmode .kb-help-row kbd { background: rgba(255,255,255,.06); border-color: var(--border-strong, #334155); color: var(--text, #f1f5f9); }
+
+.bank-movement-editar-en-modal { display: inline-flex; align-items: center; gap: 6px; font-weight: 500; }
