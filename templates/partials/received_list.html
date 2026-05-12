@@ -104,16 +104,17 @@
             <th>IVA pagado</th>
             <th>Pago</th>
             <th>Estatus</th>
+            <th>% Deducible</th>
             <th>Movimiento probable</th>
             <th>Acciones</th>
           </tr>
         </thead>
         <tbody id="tableBody" class="row-stagger">
-          <tr><td colspan="10"><div class="skeleton skeleton--row-46"></div></td></tr>
-          <tr><td colspan="10"><div class="skeleton skeleton--row-46"></div></td></tr>
-          <tr><td colspan="10"><div class="skeleton skeleton--row-46"></div></td></tr>
-          <tr><td colspan="10"><div class="skeleton skeleton--row-46"></div></td></tr>
-          <tr><td colspan="10"><div class="skeleton skeleton--row-46"></div></td></tr>
+          <tr><td colspan="11"><div class="skeleton skeleton--row-46"></div></td></tr>
+          <tr><td colspan="11"><div class="skeleton skeleton--row-46"></div></td></tr>
+          <tr><td colspan="11"><div class="skeleton skeleton--row-46"></div></td></tr>
+          <tr><td colspan="11"><div class="skeleton skeleton--row-46"></div></td></tr>
+          <tr><td colspan="11"><div class="skeleton skeleton--row-46"></div></td></tr>
         </tbody>
       </table>
     </div>
@@ -252,7 +253,7 @@
     const tableWrap = document.getElementById('tableWrap');
     const emptyState = document.getElementById('emptyState');
     const pagination = document.getElementById('pagination');
-    tableBody.innerHTML = (window.uiSkeletonTableRows && window.uiSkeletonTableRows(10, 5)) || '<tr><td colspan="10"><div class="skeleton skeleton-line"></div></td></tr>'.repeat(5);
+    tableBody.innerHTML = (window.uiSkeletonTableRows && window.uiSkeletonTableRows(10, 5)) || '<tr><td colspan="11"><div class="skeleton skeleton-line"></div></td></tr>'.repeat(5);
     tableWrap.style.display = '';
     var mobileList = document.getElementById('invoiceListMobile');
     if (mobileList) mobileList.innerHTML = (window.uiSkeletonCards && window.uiSkeletonCards(3)) || '<div class="invoice-card-mobile"><div class="skeleton skeleton-card"></div></div>'.repeat(3);
@@ -385,6 +386,16 @@
       const iva = formatMoney(row.impuestos || 0, row.moneda);
       const metodoPago = row.metodo_pago ? `<span class="badge badge--neutral badge--xs">${escapeHtml(row.metodo_pago)}</span>` : '<span class="muted">—</span>';
       const status = renderStatus(row.status);
+      const deductPct = row.deductibility_pct != null ? row.deductibility_pct : 100;
+      const deductSrc = row.deductibility_source || 'default';
+      const deductOpts = [100, 50, 8.5, 0];
+      const deductOptMatch = deductOpts.includes(deductPct);
+      const deductOptions = deductOpts.map(v => '<option value="' + v + '"' + (v === deductPct ? ' selected' : '') + '>' + v + '%</option>').join('')
+        + (deductOptMatch ? '' : '<option value="' + deductPct + '" selected>' + deductPct + '%</option>')
+        + '<option value="custom">Otro…</option>';
+      const deductBadge = deductSrc === 'auto' ? '<span class="deductibility-badge deductibility-badge--auto">auto</span>'
+        : deductSrc === 'manual' ? '<span class="deductibility-badge deductibility-badge--manual">manual</span>' : '';
+      const deductCell = '<select class="deductibility-select" data-uuid="' + escapeHtml(row.uuid || '') + '">' + deductOptions + '</select>' + deductBadge;
       const showMovProb = (row.probable_movement_id && ((row.probable_movement_status === 'confirmed') || (parseInt(row.probable_movement_score, 10) >= 80)));
       const movProb = showMovProb ? (function(){
         const f = row.probable_movement_fecha ? formatDate(row.probable_movement_fecha) : '—';
@@ -409,6 +420,7 @@
         <td class="muted">${iva}</td>
         <td>${metodoPago}</td>
         <td>${status}</td>
+        <td>${deductCell}</td>
         <td>${movProb}</td>
         <td class="text-right"><div class="u-flex u-gap-1 u-justify-end u-flex-wrap">
           <a href="${detailUrl}" class="btn btn--sm btn--ghost cfdi-detail-link link-none">Detalle</a>
@@ -610,6 +622,42 @@
     observer.observe(monthPicker, { attributes: true, attributeFilter: ['data-ym'] });
   }
 
+  // Deductibility dropdown handler
+  document.addEventListener('change', function(e) {
+    var sel = e.target.closest('.deductibility-select');
+    if (!sel) return;
+    var uuid = sel.getAttribute('data-uuid');
+    var val = sel.value;
+    if (val === 'custom') {
+      var input = prompt('Porcentaje deducible (0-100):');
+      if (input == null || input.trim() === '') { sel.value = sel.getAttribute('data-prev') || '100'; return; }
+      var num = parseFloat(input);
+      if (isNaN(num) || num < 0 || num > 100) { alert('Valor inválido (0-100)'); sel.value = sel.getAttribute('data-prev') || '100'; return; }
+      val = num;
+      // Add custom option if needed
+      var opt = document.createElement('option');
+      opt.value = num; opt.textContent = num + '%'; opt.selected = true;
+      sel.insertBefore(opt, sel.querySelector('option[value="custom"]'));
+    }
+    sel.setAttribute('data-prev', val);
+    fetch('/api/cfdi/' + encodeURIComponent(uuid) + '/deductibility', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ percentage: parseFloat(val) })
+    }).then(function(r) {
+      if (r.ok) {
+        sel.style.borderColor = 'var(--success, #22c55e)';
+        setTimeout(function() { sel.style.borderColor = ''; }, 1500);
+      } else {
+        sel.style.borderColor = 'var(--danger, #ef4444)';
+        setTimeout(function() { sel.style.borderColor = ''; }, 2000);
+      }
+    }).catch(function() {
+      sel.style.borderColor = 'var(--danger, #ef4444)';
+      setTimeout(function() { sel.style.borderColor = ''; }, 2000);
+    });
+  });
+
   parseURLParams();
   syncFormInputs();
   updateFiltersBadge();
@@ -647,4 +695,8 @@
   .filters-panel__row .select--compact, .filters-panel__row .input--compact { width: 100%; min-width: 0; }
   .filters-panel__actions { margin-left: 0; justify-content: flex-end; }
 }
+.deductibility-select { padding: 4px 8px; border-radius: 4px; font-size: 12px; border: 1px solid var(--border); background: var(--surface, #fff); transition: border-color 0.3s; }
+.deductibility-badge { font-size: 10px; color: var(--muted); margin-left: 4px; }
+.deductibility-badge--auto { color: var(--accent, #0d9488); }
+.deductibility-badge--manual { color: var(--success, #22c55e); }
 </style>

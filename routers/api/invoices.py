@@ -1221,6 +1221,22 @@ def register_invoices_routes(router):
             logger.exception("Error fetching invoices")
             raise HTTPException(status_code=500, detail="Error al obtener facturas")
 
+        # Enrich with deductibility data
+        try:
+            from services.fiscal.deductibility import get_deductibility_map
+            uuids = [r["uuid"] for r in rows if r.get("uuid")]
+            deduct_map = get_deductibility_map(issuer_id, uuids) if uuids else {}
+            enriched = []
+            for r in rows:
+                d = dict(r)
+                dd = deduct_map.get(d.get("uuid"), {"percentage": 100.0, "source": "default", "auto_reason": ""})
+                d["deductibility_pct"] = dd["percentage"]
+                d["deductibility_source"] = dd["source"]
+                enriched.append(d)
+            rows = enriched
+        except Exception:
+            logger.debug("Could not enrich deductibility", exc_info=True)
+
         return {
             "data": rows,
             "pagination": {
