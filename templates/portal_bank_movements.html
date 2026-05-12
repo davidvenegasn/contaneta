@@ -293,13 +293,8 @@
               <td class="muted u-text-xs">{{ m.bank_name|default(m.statement_bank_name|default('—')) }}</td>
               <td class="bank-movements-category-editable bank-category-editable bank-category-dropdown" title="Clic para abrir menú y elegir otra categoría"><span class="badge badge--neutral">{{ (m.categoria or '')|humanize_category }}</span><span class="bank-category-chevron" aria-hidden="true"> ▼</span></td>
               <td>
-                {% if m.probable_cfdi_uuid and ((m.probable_cfdi_status == 'confirmed') or (m.probable_cfdi_score is not none and m.probable_cfdi_score >= 80)) %}
-                  <div class="u-text-xs">
-                    <a href="/portal/cfdi/received/{{ m.probable_cfdi_uuid }}" class="link-none cfdi-match-link" title="Ver CFDI">{{ m.probable_cfdi_uuid[:8] }}…{{ m.probable_cfdi_uuid[-4:] }}<svg class="icon-external" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>
-                    {% if m.probable_cfdi_score is not none %}
-                      <span class="badge badge--{{ 'success' if m.probable_cfdi_score >= 90 else ('warning' if m.probable_cfdi_score >= 80 else 'neutral') }} badge--xs" title="Score">{{ m.probable_cfdi_score }}</span>
-                    {% endif %}
-                  </div>
+                {% if m.probable_cfdi_uuid and m.probable_cfdi_score is not none and m.probable_cfdi_score >= 50 %}
+                  <a href="/portal/cfdi/received/{{ m.probable_cfdi_uuid }}" class="link-none cfdi-match-link u-text-xs" title="Ver CFDI">{{ m.probable_cfdi_uuid[:8] }}…{{ m.probable_cfdi_uuid[-4:] }}<svg class="icon-external" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>
                 {% else %}
                   <span class="muted">—</span>
                 {% endif %}
