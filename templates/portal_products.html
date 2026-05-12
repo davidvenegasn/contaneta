@@ -41,7 +41,7 @@
     <div class="card-list-sep">
       {% if not rows or rows|length == 0 %}
         {% from 'portal/_ui_components.html' import portal_empty_state %}
-        {% call portal_empty_state('Aún no tienes productos confirmados', 'Crea uno manualmente o conviértelo desde “Productos sugeridos”.') %}
+        {% call portal_empty_state('Aún no tienes productos confirmados', 'Agrega productos para facturar más rápido. Crea uno manualmente o conviértelo desde “Productos sugeridos”.', icon_type='products') %}
           <button type="button" class="btn btn-primary" id="newBtnEmpty">Crear producto</button>
           <a class="btn btn--secondary" href="/portal/products/suggestions">Ver productos sugeridos</a>
         {% endcall %}

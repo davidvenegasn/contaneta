@@ -35,11 +35,10 @@
 
     <div class="card-list-sep">
       {% if not rows or rows|length == 0 %}
-        <div class="empty-state empty-state--empty">
-          <div class="empty-state__title">Aún no hay productos sugeridos</div>
-          <div class="empty-state__desc">Haz clic en “Actualizar desde mis facturas emitidas” para generar sugerencias desde tus CFDI.</div>
-          <button type="button" class="btn btn-primary" id="backfillBtnEmpty">Actualizar ahora</button>
-        </div>
+        {% from 'portal/_ui_components.html' import portal_empty_state %}
+        {% call portal_empty_state('Aún no hay productos sugeridos', 'Haz clic en “Actualizar desde mis facturas emitidas” para generar sugerencias automáticas desde tus CFDI.', icon_type='products') %}
+          <button type=”button” class=”btn btn-primary” id=”backfillBtnEmpty”>Actualizar ahora</button>
+        {% endcall %}
       {% else %}
       <div class="table-wrap">
         <table class="table ui-table ui-table--zebra">

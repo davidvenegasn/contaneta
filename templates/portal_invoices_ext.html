@@ -106,12 +106,10 @@
     </table>
   </div>
   {% else %}
-  <div class="invoices-empty" id="invoicesEmpty">
-    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10A15.3 15.3 0 0 1 12 2"/></svg>
-    <p>No tienes invoices registrados en <strong>{{ ym_label|default('este mes') }}</strong>.</p>
-    <p style="font-size:13px;">Arrastra un PDF arriba o agrega uno manualmente.</p>
-    <button type="button" class="btn btn-primary" id="emptyAddInvoiceBtn" style="margin-top:12px;">Agregar mi primer invoice</button>
-  </div>
+  {% from 'portal/_ui_components.html' import portal_empty_state %}
+  {% call portal_empty_state('Sin invoices extranjeros', 'No tienes invoices registrados en ' ~ ym_label|default('este mes') ~ '. Arrastra un PDF arriba o agrega uno manualmente.', icon_type='document') %}
+    <button type="button" class="btn btn-primary" id="emptyAddInvoiceBtn">Agregar mi primer invoice</button>
+  {% endcall %}
   {% endif %}
 </div>
 

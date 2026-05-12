@@ -65,11 +65,10 @@
         </table>
       </div>
       {% else %}
-      <div class="empty-state">
-        <h4>Sin cuentas registradas</h4>
-        <p class="muted">Agrega al menos una cuenta para poder detectar traspasos propios.</p>
+      {% from 'portal/_ui_components.html' import portal_empty_state %}
+      {% call portal_empty_state('Sin cuentas registradas', 'Agrega al menos una cuenta bancaria para detectar traspasos propios y evitar confundirlos como ingreso o gasto.', icon_type='bank') %}
         <button type="button" class="btn btn-primary" id="bankAccAddBtnEmpty">Agregar cuenta</button>
-      </div>
+      {% endcall %}
       {% endif %}
     </div>
   </div>

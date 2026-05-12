@@ -49,7 +49,7 @@
     <div class=”card-list-sep”>
       {% if not rows or rows|length == 0 %}
         {% from 'portal/_ui_components.html' import portal_empty_state %}
-        {% call portal_empty_state('Aún no hay clientes detectados', 'Haz clic en “Añadir cliente” para crear tu lista automáticamente desde tus facturas emitidas.') %}
+        {% call portal_empty_state('Aún no hay clientes detectados', 'Haz clic en “Añadir cliente” para crear tu lista automáticamente desde tus facturas emitidas.', icon_type='clients') %}
           <button type=”button” class=”btn btn-primary” id=”backfillBtnEmpty”>Actualizar ahora</button>
         {% endcall %}
       {% else %}

@@ -127,21 +127,10 @@
           {% else %}
             <tr>
               <td colspan="10" style="padding: 0; vertical-align: middle;">
-                <div class="empty-state" style="padding: var(--space-8) var(--space-5);">
-                  <div class="empty-state__icon" aria-hidden="true">
-                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/>
-                      <path d="M14 2v5a1 1 0 0 0 1 1h5"/>
-                      <path d="M12 18v-6"/>
-                      <path d="m9 15 3 3 3-3"/>
-                    </svg>
-                  </div>
-                  <p class="empty-state__title" style="margin: 0;">Aún no hay recibos de nómina este mes</p>
-                  <p class="empty-state__desc" style="margin: 0;">No hay CFDI de nómina recibidos para {{ ym_label }}. Revisa facturas recibidas.</p>
-                  <div class="empty-state__actions">
-                    <a href="/portal/facturas?tab=received" class="btn btn--primary" style="text-decoration: none;">Ver facturas recibidas</a>
-                  </div>
-                </div>
+                {% from 'portal/_ui_components.html' import portal_empty_state %}
+                {% call portal_empty_state('Aún no hay recibos de nómina este mes', 'No hay CFDI de nómina recibidos para ' ~ ym_label ~ '. Sincroniza con el SAT o revisa facturas recibidas.', icon_type='invoice') %}
+                  <a href="/portal/facturas?tab=received" class="btn btn-primary">Ver facturas recibidas</a>
+                {% endcall %}
               </td>
             </tr>
           {% endif %}

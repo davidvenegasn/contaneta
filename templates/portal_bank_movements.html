@@ -254,11 +254,10 @@
 
     <div class="card__body ui-card__body">
       {% if not movements or movements|length == 0 %}
-        <div class="empty-state empty-state--empty">
-          <div class="empty-state__title">No hay movimientos en {{ ym_label|default(period_month|default('')) }}</div>
-          <div class="empty-state__desc">Cambia de mes con el selector arriba o sube un estado de cuenta en <a href="/portal/bank/pdf-to-excel">Convertir Edo. de Cuenta</a>. Los movimientos se muestran según el mes de su estado de cuenta.</div>
-          <a href="/portal/bank/pdf-to-excel" class="btn btn--primary">Subir estado de cuenta</a>
-        </div>
+        {% from 'portal/_ui_components.html' import portal_empty_state %}
+        {% call portal_empty_state('Sin movimientos bancarios', 'No hay movimientos en ' ~ ym_label|default(period_month|default('este mes')) ~ '. Sube un estado de cuenta para conciliar tus ingresos y gastos.', icon_type='bank') %}
+          <a href="/portal/bank/pdf-to-excel" class="btn btn-primary">Subir estado de cuenta</a>
+        {% endcall %}
       {% else %}
       <p class="muted u-m0 u-mb-8">Mostrando {{ offset + 1 }}–{{ offset + movements|length }} de {{ total_count|default(0) }} en {{ ym_label|default('') }}</p>
       <div class="table-wrap table-wrap--overflow">
@@ -611,7 +610,9 @@
             <tr><th>Fecha</th><th>Descripción</th><th>Tipo</th><th>Monto</th><th>Categoría</th><th></th></tr>
           </thead>
           <tbody id="manualMovTableBody">
-            <tr><td colspan="6" class="muted" style="text-align:center;padding:24px;">Cargando...</td></tr>
+            <tr><td colspan="6"><div class="skeleton skeleton-line"></div></td></tr>
+            <tr><td colspan="6"><div class="skeleton skeleton-line"></div></td></tr>
+            <tr><td colspan="6"><div class="skeleton skeleton-line"></div></td></tr>
           </tbody>
         </table>
       </div>
