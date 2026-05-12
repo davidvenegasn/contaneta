@@ -924,6 +924,11 @@ def ready():
     )
 
 
+# K8s-convention aliases
+app.get("/healthz")(health)
+app.get("/readyz")(ready)
+
+
 @app.get("/status", response_class=HTMLResponse)
 def status_page():
     """Página HTML legible con estado y Support Snapshot (diagnóstico sin secretos)."""
