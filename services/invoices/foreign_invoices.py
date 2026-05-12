@@ -1,6 +1,7 @@
 """Foreign invoices — invoices/gastos de servicios internacionales."""
 
 from database import db, db_rows, table_exists
+from services.ym_helpers import is_annual
 
 
 def ensure_table():
@@ -100,7 +101,10 @@ def list_invoices(issuer_id: int, period_month: str = None, tipo: str = None,
     where = ["issuer_id = ?"]
     params: list = [issuer_id]
     if period_month:
-        where.append("period_month = ?")
+        if is_annual(period_month):
+            where.append("substr(period_month, 1, 4) = ?")
+        else:
+            where.append("period_month = ?")
         params.append(period_month)
     if tipo:
         where.append("tipo = ?")
@@ -118,7 +122,10 @@ def count_invoices(issuer_id: int, period_month: str = None) -> int:
     where = ["issuer_id = ?"]
     params: list = [issuer_id]
     if period_month:
-        where.append("period_month = ?")
+        if is_annual(period_month):
+            where.append("substr(period_month, 1, 4) = ?")
+        else:
+            where.append("period_month = ?")
         params.append(period_month)
     where_sql = " AND ".join(where)
     rows = db_rows(f"SELECT COUNT(*) AS n FROM foreign_invoices WHERE {where_sql}", tuple(params))

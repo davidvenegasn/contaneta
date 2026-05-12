@@ -231,9 +231,10 @@ def register_invoices_routes(router, templates):
                 raise HTTPException(status_code=401, detail="Sesión inválida")
             if not ym:
                 ym = ym_now()
+            ym = sanitize_ym(ym, ym_now())
             from services.invoices import foreign_invoices as fi
             fi.ensure_table()
-            items = fi.list_invoices(issuer_id, period_month=ym, limit=200)
+            items = fi.list_invoices(issuer_id, period_month=ym, limit=2000 if is_annual(ym) else 200)
             total = fi.count_invoices(issuer_id, period_month=ym)
             sum_ingresos = sum(r.get("monto_mxn", 0) for r in items if r.get("tipo") == "INGRESO")
             sum_gastos = sum(r.get("monto_mxn", 0) for r in items if r.get("tipo") == "GASTO")
