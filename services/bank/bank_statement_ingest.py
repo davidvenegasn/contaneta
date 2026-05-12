@@ -217,6 +217,7 @@ def _movement_to_row(
         "is_possible_duplicate": 1 if m.get("posible_duplicado") else 0,
         "requires_cfdi": 1 if _movement_requires_cfdi(m) else 0,
         "cfdi_match_status": "pending",
+        "impacta_contabilidad": 0 if m.get("impacta_contabilidad") is False or m.get("impacta_contabilidad") == 0 else 1,
     }
 
 
@@ -336,6 +337,7 @@ def ingest_bank_statement(
         has_dup_col = has_column(conn, "bank_movements", "duplicate_hash") and has_column(
             conn, "bank_movements", "bank_account_id"
         )
+        has_impacta = has_column(conn, "bank_movements", "impacta_contabilidad")
         has_movement_hash = has_column(conn, "bank_movements", "movement_hash")
         inserted_count = 0
         duplicate_movements_count = 0
@@ -377,7 +379,9 @@ def ingest_bank_statement(
                         amount, direction, tipo, categoria, metodo_hint, contraparte_hint, rfc_encontrado,
                         counterparty_name_detected, counterparty_rfc_detected, confidence_score,
                         duplicate_hash, is_possible_duplicate, requires_cfdi, cfdi_match_status, movement_hash, created_at, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?)
+                        {', impacta_contabilidad' if has_impacta else ''}
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?
+                        {', ?' if has_impacta else ''})
                     """,
                     (
                         row["issuer_id"],
@@ -409,18 +413,21 @@ def ingest_bank_statement(
                         row["cfdi_match_status"],
                         row.get("movement_hash"),
                         now,
+                        *([row["impacta_contabilidad"]] if has_impacta else []),
                     ),
                 )
             elif mov_cols_021:
                 conn.execute(
-                    """
+                    f"""
                     INSERT INTO bank_movements (
                         issuer_id, statement_file_id, bank_statement_id, bank_account_id, period_month, movement_index,
                         fecha, descripcion, raw_description, normalized_description, deposito, retiro, saldo,
                         amount, direction, tipo, categoria, metodo_hint, contraparte_hint, rfc_encontrado,
                         counterparty_name_detected, counterparty_rfc_detected, confidence_score,
                         duplicate_hash, is_possible_duplicate, requires_cfdi, cfdi_match_status, created_at, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?)
+                        {', impacta_contabilidad' if has_impacta else ''}
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?
+                        {', ?' if has_impacta else ''})
                     """,
                     (
                         row["issuer_id"],
@@ -451,6 +458,7 @@ def ingest_bank_statement(
                         row["requires_cfdi"],
                         row["cfdi_match_status"],
                         now,
+                        *([row["impacta_contabilidad"]] if has_impacta else []),
                     ),
                 )
             else:
@@ -628,6 +636,7 @@ def commit_preview_to_db(
 
         if table_exists(conn, "bank_movements"):
             mov_cols_021 = has_column(conn, "bank_movements", "bank_statement_id")
+            has_impacta = has_column(conn, "bank_movements", "impacta_contabilidad")
             for i, m in enumerate(movements_list):
                 row_data = _movement_to_row(m, issuer_id, statement_id, bank_account_id, period_month, i + 1)
                 if has_movement_hash:
@@ -658,14 +667,16 @@ def commit_preview_to_db(
                 if mov_cols_021:
                     if has_movement_hash:
                         conn.execute(
-                            """
+                            f"""
                             INSERT INTO bank_movements (
                                 issuer_id, statement_file_id, bank_statement_id, bank_account_id, period_month, movement_index,
                                 fecha, descripcion, raw_description, normalized_description, deposito, retiro, saldo,
                                 amount, direction, tipo, categoria, metodo_hint, contraparte_hint, rfc_encontrado,
                                 counterparty_name_detected, counterparty_rfc_detected, confidence_score,
                                 duplicate_hash, is_possible_duplicate, requires_cfdi, cfdi_match_status, movement_hash, created_at, updated_at
-                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?)
+                                {', impacta_contabilidad' if has_impacta else ''}
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?
+                                {', ?' if has_impacta else ''})
                             """,
                             (
                                 row_data["issuer_id"],
@@ -697,18 +708,21 @@ def commit_preview_to_db(
                                 row_data["cfdi_match_status"],
                                 row_data.get("movement_hash"),
                                 now,
+                                *([row_data["impacta_contabilidad"]] if has_impacta else []),
                             ),
                         )
                     else:
                         conn.execute(
-                            """
+                            f"""
                             INSERT INTO bank_movements (
                                 issuer_id, statement_file_id, bank_statement_id, bank_account_id, period_month, movement_index,
                                 fecha, descripcion, raw_description, normalized_description, deposito, retiro, saldo,
                                 amount, direction, tipo, categoria, metodo_hint, contraparte_hint, rfc_encontrado,
                                 counterparty_name_detected, counterparty_rfc_detected, confidence_score,
                                 duplicate_hash, is_possible_duplicate, requires_cfdi, cfdi_match_status, created_at, updated_at
-                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?)
+                                {', impacta_contabilidad' if has_impacta else ''}
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?
+                                {', ?' if has_impacta else ''})
                             """,
                             (
                                 row_data["issuer_id"],
@@ -739,6 +753,7 @@ def commit_preview_to_db(
                                 row_data["requires_cfdi"],
                                 row_data["cfdi_match_status"],
                                 now,
+                                *([row_data["impacta_contabilidad"]] if has_impacta else []),
                             ),
                         )
                 else:

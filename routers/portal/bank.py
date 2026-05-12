@@ -1439,8 +1439,9 @@ def register_bank_routes(router, templates):
             ).fetchone()
             total_count = int(_db_row_to_dict(total_count_row).get("c", 0) or 0)
 
+            _impacta_filter = " AND COALESCE(impacta_contabilidad, 1) = 1" if has_column(conn, "bank_movements", "impacta_contabilidad") else " AND COALESCE(categoria,'') != 'CUENTA_PROPIA'"
             sum_row = conn.execute(
-                f"SELECT COALESCE(SUM(deposito), 0) AS ing, COALESCE(SUM(retiro), 0) AS gas FROM bank_movements WHERE {where_sql} AND COALESCE(categoria,'') != 'CUENTA_PROPIA'",
+                f"SELECT COALESCE(SUM(deposito), 0) AS ing, COALESCE(SUM(retiro), 0) AS gas FROM bank_movements WHERE {where_sql}{_impacta_filter}",
                 params,
             ).fetchone()
             sum_row_d = _db_row_to_dict(sum_row)
@@ -1450,7 +1451,7 @@ def register_bank_routes(router, templates):
             # Conciliation stats (always for full period, ignoring user filters)
             concil_stats = {"matched": 0, "unmatched": 0, "total_real": 0}
             try:
-                _concil_base = "issuer_id = ? AND COALESCE(categoria,'') != 'CUENTA_PROPIA'"
+                _concil_base = "issuer_id = ? AND COALESCE(impacta_contabilidad, 1) = 1" if has_column(conn, "bank_movements", "impacta_contabilidad") else "issuer_id = ? AND COALESCE(categoria,'') != 'CUENTA_PROPIA'"
                 _concil_params: list = [issuer_id]
                 if has_column(conn, "bank_movements", "period_month"):
                     _concil_base += " AND period_month = ?"
