@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Página no encontrada — ContaNeta</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#f1f5f9;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:1.5rem;color:#334155}
+    .error-page{max-width:440px;width:100%;text-align:center}
+    .error-code{font-size:6rem;font-weight:800;color:#e2e8f0;line-height:1;margin-bottom:.5rem;letter-spacing:-.04em}
+    .error-title{font-size:1.5rem;font-weight:700;color:#1e293b;margin-bottom:.75rem}
+    .error-msg{color:#64748b;line-height:1.6;margin-bottom:2rem}
+    .error-actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+    .btn{display:inline-flex;align-items:center;gap:6px;padding:10px 20px;border-radius:8px;font-weight:600;font-size:.9rem;text-decoration:none;transition:all .15s ease}
+    .btn-primary{background:#6366f1;color:#fff;border:none}
+    .btn-primary:hover{background:#4f46e5}
+    .btn-outline{background:#fff;color:#475569;border:1px solid #e2e8f0}
+    .btn-outline:hover{background:#f8fafc;border-color:#cbd5e1}
+    .brand{margin-top:2.5rem;font-size:.8rem;color:#94a3b8}
+    .brand a{color:#94a3b8;text-decoration:none}
+    .brand a:hover{color:#64748b}
+  </style>
+</head>
+<body>
+  <div class="error-page">
+    <div class="error-code">404</div>
+    <h1 class="error-title">Página no encontrada</h1>
+    <p class="error-msg">La ruta que buscas no existe o ha sido movida.<br>Verifica la dirección o regresa al inicio.</p>
+    <div class="error-actions">
+      <a href="/portal/home" class="btn btn-primary">Ir al portal</a>
+      <a href="/" class="btn btn-outline">Página principal</a>
+    </div>
+    <p class="brand"><a href="/">ContaNeta</a></p>
+  </div>
+</body>
+</html>

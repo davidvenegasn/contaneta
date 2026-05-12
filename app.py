@@ -173,32 +173,13 @@ def _humanize_category(value):
 templates.env.filters["humanize_category"] = _humanize_category
 
 
-def _html_404() -> str:
-    return """<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>No encontrado — ContaNeta</title>
-  <style>
-    body { font-family: system-ui, -apple-system, sans-serif; margin: 0; padding: 2rem; background: #f1f5f9; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
-    .card { max-width: 420px; width: 100%; background: #fff; padding: 28px; border-radius: 16px; box-shadow: 0 4px 6px -1px rgba(0,0,0,.08), 0 2px 4px -2px rgba(0,0,0,.06); }
-    h1 { margin: 0 0 8px; font-size: 1.35rem; font-weight: 600; color: #1e293b; }
-    .code { font-size: 13px; color: #94a3b8; margin-bottom: 16px; }
-    p { margin: 0 0 20px; color: #64748b; line-height: 1.5; }
-    a { display: inline-block; color: #0ea5e9; text-decoration: none; font-weight: 500; }
-    a:hover { text-decoration: underline; }
-  </style>
-</head>
-<body>
-  <div class="card">
-    <h1>Página no encontrada</h1>
-    <p class="code">404</p>
-    <p>La ruta que buscas no existe o ha sido movida.</p>
-    <p><a href="/">Ir al inicio</a></p>
-  </div>
-</body>
-</html>"""
+def _render_error_template(template_name: str, context: dict | None = None) -> str | None:
+    """Try to render an error template. Returns None on failure (fallback to inline HTML)."""
+    try:
+        tmpl = templates.get_template(template_name)
+        return tmpl.render(context or {})
+    except Exception:
+        return None
 
 
 def _html_error(status: int, detail: str) -> str:
@@ -276,7 +257,8 @@ def _api_app_error_body(exc: AppError) -> dict:
 async def not_found_handler(request: Request, _exc):
     accept = (request.headers.get("accept") or "").lower()
     if "text/html" in accept:
-        return HTMLResponse(_html_404(), status_code=404)
+        html = _render_error_template("errors/404.html")
+        return HTMLResponse(html or _html_error(404, "La ruta que buscas no existe o ha sido movida."), status_code=404)
     from fastapi.responses import JSONResponse
     path = (request.url.path or "")
     if path.startswith("/api/"):
@@ -303,7 +285,8 @@ async def server_error_handler(request: Request, exc: Exception):
     accept = (request.headers.get("accept") or "").lower()
     if "text/html" in accept:
         rid = getattr(request.state, "request_id", request_id_ctx.get())
-        return HTMLResponse(_html_error(500, f"Ha ocurrido un error en el servidor. Intenta de nuevo. (ID: {rid}) Si el problema persiste, contacta a soporte."), status_code=500)
+        html = _render_error_template("errors/500.html", {"request_id": rid})
+        return HTMLResponse(html or _html_error(500, f"Ha ocurrido un error en el servidor. Intenta de nuevo. (ID: {rid})"), status_code=500)
     from fastapi.responses import JSONResponse
     path = (request.url.path or "")
     if path.startswith("/api/"):
@@ -469,7 +452,11 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
     if is_api:
         return JSONResponse(_api_error_body(exc.status_code, exc.detail), status_code=exc.status_code)
     if "text/html" in accept:
-        return HTMLResponse(_html_http_error(exc.status_code, exc.detail), status_code=exc.status_code)
+        # Try branded template first (403, etc.), fall back to inline HTML
+        tmpl_map = {403: "errors/403.html", 404: "errors/404.html"}
+        tmpl_name = tmpl_map.get(exc.status_code)
+        html = _render_error_template(tmpl_name) if tmpl_name else None
+        return HTMLResponse(html or _html_http_error(exc.status_code, exc.detail), status_code=exc.status_code)
     return JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
 
 
