@@ -58,6 +58,8 @@
     <link rel="stylesheet" href="/static/css/portal_rail.css">
     <link rel="stylesheet" href="/static/css/portal_sidebar_unified.css">
     <link rel="stylesheet" href="/static/css/portal.css">
+    <link rel="stylesheet" href="/static/css/toast.css">
+    <link rel="stylesheet" href="/static/css/tooltips.css">
     <link rel="stylesheet" href="/static/css/portal_dashboard_v2.css">
     <script defer src="/static/js/portal_dashboard_v2.js"></script>
     <link rel="stylesheet" href="/static/css/command-palette.css">
@@ -434,6 +436,8 @@
           </div>
           {% endif %}
 
+          <!-- Cargar toast.js antes de ui.js para que portalToast esté definido cuando ui.js lo use -->
+          <script src="/static/js/toast.js"></script>
           <!-- Cargar ui.js antes del content para que las listas (productos, clientes, emitidas, etc.) tengan uiFetchJSON en la primera carga -->
           <script src="/static/js/ui.js"></script>
           <script src="/static/js/command-palette.js" defer></script>
@@ -703,52 +707,8 @@
     });
   };
 
-  // ============ Toast unificado P25: contenedor único, máx 3, animación in/out ============
-  const toastStack = document.getElementById('toastStack');
-  const TOAST_MAX_VISIBLE = 3;
-  window.portalToast = (opts) => {
-    if (!toastStack) return;
-    const o = opts || {};
-    let type = o.type || 'success'; // success | danger | warning | info (error → danger)
-    if (type === 'error') type = 'danger';
-    const title = o.title || 'Listo';
-    let msg = o.message || '';
-    if (type === 'danger' && msg) msg = sanitizeErrorMessage(msg);
-    const defaultTtl = (type === 'danger' ? 5000 : (type === 'info' ? 4000 : 3200));
-    const ttl = Number.isFinite(o.ttl) ? o.ttl : defaultTtl;
-
-    while (toastStack.children.length >= TOAST_MAX_VISIBLE) {
-      toastStack.removeChild(toastStack.firstChild);
-    }
-
-    const el = document.createElement('div');
-    el.className = `toast toast--${type}`;
-    const isAssertive = type === 'danger';
-    el.setAttribute('role', isAssertive ? 'alert' : 'status');
-    el.setAttribute('aria-live', isAssertive ? 'assertive' : 'polite');
-    el.style.opacity = '0';
-    el.style.transform = 'translateY(8px)';
-    el.style.transition = 'opacity 200ms ease, transform 200ms ease';
-
-    const escape = (s) => { const d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; };
-    el.innerHTML = `
-      <div>
-        <p class="toast__title">${escape(title)}</p>
-        ${msg ? `<p class="toast__msg">${escape(msg)}</p>` : ''}
-      </div>
-    `;
-
-    toastStack.appendChild(el);
-    requestAnimationFrame(function() {
-      el.style.opacity = '1';
-      el.style.transform = 'translateY(0)';
-    });
-    window.setTimeout(() => {
-      el.style.opacity = '0';
-      el.style.transform = 'translateY(-6px) scale(0.98)';
-      window.setTimeout(() => { if (el.parentNode) el.remove(); }, 220);
-    }, ttl);
-  };
+  // ============ Toast unificado: movido a /static/js/toast.js (carga antes de ui.js) ============
+  // window.portalToast, window.showToast, window.toastFromResponse ahora viven en toast.js
 
   // ============ Banners persistentes (éxito / aviso / error) — un solo sistema con toasts ============
   // Toasts = feedback inmediato que se oculta solo. Banners = avisos importantes que permanecen hasta cerrar o navegar.
