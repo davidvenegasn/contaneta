@@ -1,0 +1,137 @@
+/**
+ * Design System Foundation — CSS Custom Properties (tokens.css)
+ *
+ * Canonical design tokens using a consistent --color-*, --font-size-*,
+ * --font-weight-*, --line-height-*, --transition-* naming convention.
+ *
+ * Values are derived from the existing portal_tokens.css and _tokens.css
+ * system so that all layers stay in sync. Tokens that already exist with the
+ * requested name (--space-*, --radius-*, --shadow-*, --font-family) are NOT
+ * redeclared here to avoid circular references; they are documented in
+ * comments for discoverability.
+ *
+ * Load order in base_portal.html:
+ *   _tokens.css → portal_tokens.css → tokens.css → components.css → ...
+ *
+ * This file adds alias tokens only. Existing CSS continues to work unchanged.
+ * Migration of existing styles to use these aliases is a separate task.
+ */
+
+:root {
+  /* ==========================================================================
+     COLORS
+     ========================================================================== */
+
+  /* Primary */
+  --color-primary:        var(--primary, #6366f1);
+  --color-primary-hover:  var(--primary-hover, #4f46e5);
+  --color-primary-light:  var(--primary-light, #eef2ff);
+
+  /* Semantic */
+  --color-success:        var(--success, #059669);
+  --color-warning:        var(--warn, #d97706);
+  --color-danger:         var(--danger, #ef4444);
+  --color-info:           var(--info, #3b82f6);
+
+  /* Backgrounds */
+  --color-bg:             var(--bg, #fafafa);
+  --color-bg-secondary:   var(--bg-subtle, #f5f5f7);
+  --color-bg-card:        var(--card-bg, #ffffff);
+
+  /* Text */
+  --color-text:           var(--text, #0f172a);
+  --color-text-secondary: var(--text-secondary, #475569);
+  --color-text-muted:     var(--text-muted, #64748b);
+
+  /* Borders */
+  --color-border:         var(--border, rgba(0, 0, 0, 0.06));
+  --color-border-light:   var(--border, rgba(0, 0, 0, 0.06));
+
+  /* Sidebar */
+  --color-sidebar-bg:     var(--surface, #ffffff);
+  --color-sidebar-text:   var(--text, #0f172a);
+  --color-sidebar-active: var(--primary, #6366f1);
+
+  /* ==========================================================================
+     TYPOGRAPHY
+     ========================================================================== */
+
+  /*
+   * --font-family is already defined in portal_tokens.css:
+   *   "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+   *   "Helvetica Neue", sans-serif
+   * Do NOT redeclare here (circular var reference).
+   */
+
+  /* Font sizes (aliases from --text-* to --font-size-*) */
+  --font-size-xs:         var(--text-xs, 0.8125rem);     /* 13px */
+  --font-size-sm:         var(--text-sm, 0.875rem);       /* 14px */
+  --font-size-base:       var(--text-base, 1rem);          /* 16px */
+  --font-size-lg:         var(--text-lg, 1.25rem);         /* 20px */
+  --font-size-xl:         var(--text-xl, 1.375rem);        /* 22px */
+  --font-size-2xl:        var(--text-2xl, 1.5rem);         /* 24px */
+
+  /* Font weights (aliases from --fw-* to --font-weight-*) */
+  --font-weight-normal:   var(--fw-normal, 400);
+  --font-weight-medium:   var(--fw-medium, 500);
+  --font-weight-semibold: var(--fw-semibold, 600);
+  --font-weight-bold:     var(--fw-bold, 700);
+
+  /* Line heights (aliases from --leading-* to --line-height-*) */
+  --line-height-tight:    var(--leading-tight, 1.25);
+  --line-height-base:     var(--leading-normal, 1.5);
+  --line-height-relaxed:  var(--leading-relaxed, 1.6);
+
+  /* ==========================================================================
+     SPACING (4px base scale)
+     ==========================================================================
+
+     Already defined in portal_tokens.css — do NOT redeclare (circular ref):
+       --space-0:  0
+       --space-1:  0.25rem    (  4px )
+       --space-2:  0.5rem     (  8px )
+       --space-3:  0.75rem    ( 12px )
+       --space-4:  1rem       ( 16px )
+       --space-5:  1.25rem    ( 20px )
+       --space-6:  1.5rem     ( 24px )
+       --space-8:  2rem       ( 32px )
+       --space-10: 2.5rem     ( 40px )
+       --space-12: 3rem       ( 48px )
+
+     Gap-fills from _tokens.css:
+       --space-7:  1.75rem    ( 28px )
+       --space-9:  2.25rem    ( 36px )
+       --space-11: 2.75rem    ( 44px )
+     ========================================================================== */
+
+  /* ==========================================================================
+     SHADOWS
+     ==========================================================================
+
+     Already defined in portal_tokens.css — do NOT redeclare:
+       --shadow-sm:  alias of --shadow-1  ( 0 6px 18px rgba(0,0,0,0.05) )
+       --shadow-md:  alias of --shadow-3  ( 0 22px 70px rgba(0,0,0,0.14) )
+
+     Already defined in _tokens.css:
+       --shadow-lg:  alias of --shadow-2  ( 0 12px 34px rgba(0,0,0,0.08) )
+     ========================================================================== */
+
+  /* ==========================================================================
+     BORDER RADIUS
+     ==========================================================================
+
+     Already defined in portal_tokens.css — do NOT redeclare:
+       --radius-sm:    10px
+       --radius-md:    12px
+       --radius-lg:    20px
+       --radius-full:  9999px
+     ========================================================================== */
+
+  /* ==========================================================================
+     TRANSITIONS
+     ========================================================================== */
+
+  --transition-fast: var(--motion-fast, 100ms) ease;
+  --transition-base: var(--motion-normal, 160ms) ease;
+  --transition-slow: var(--motion-slow, 300ms) ease;
+}
