@@ -330,6 +330,7 @@
                   </dd>
                   {% endif %}
                 </dl>
+                <div class="bank-edit-history u-mt-2" id="editHistory-{{ m.id }}" data-loaded="0"></div>
                 <p class="u-mt-2 u-mb-0">
                   <button type="button" class="btn btn--sm btn--ghost bank-movement-editar-en-modal" data-id="{{ m.id }}" data-descripcion="{{ (m.descripcion or '')|e }}" data-categoria="{{ (m.categoria or '')|e }}">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
@@ -507,6 +508,7 @@
             var detailRow = document.querySelector('.bank-movements-detail-row[data-detail-for="' + id + '"]');
             if (detailRow) {
               detailRow.hidden = !detailRow.hidden;
+              if (!detailRow.hidden) { loadEditHistory(id); }
             }
           });
         });
@@ -558,8 +560,28 @@
               }
             }
             closeModal();
+            loadEditHistory(id);
           }).catch(function () { if (window.uiToast) window.uiToast({ type: 'danger', title: 'Error', message: 'No se pudo guardar el movimiento.' }); });
         });
+        function loadEditHistory(movId) {
+          var container = document.getElementById('editHistory-' + movId);
+          if (!container) return;
+          fetch('/portal/bank/movements/' + movId + '/edits')
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+              var edits = (data && data.edits) || [];
+              if (edits.length === 0) { container.innerHTML = ''; return; }
+              var html = '<p class="u-text-xs muted u-mb-1"><strong>Historial de cambios</strong></p><ul class="u-text-xs" style="margin:0; padding-left:16px;">';
+              edits.forEach(function (e) {
+                var field = e.field_name === 'descripcion' ? 'Concepto' : e.field_name === 'categoria' ? 'Categoría' : e.field_name;
+                var date = (e.created_at || '').replace('T', ' ').substring(0, 16);
+                html += '<li style="margin-bottom:2px;"><span class="muted">' + date + '</span> ' + field + ': <del>' + (e.old_value || '—') + '</del> &rarr; ' + (e.new_value || '—') + '</li>';
+              });
+              html += '</ul>';
+              container.innerHTML = html;
+            })
+            .catch(function () {});
+        }
       })();
       </script>
       {% set next_offset = offset + limit %}

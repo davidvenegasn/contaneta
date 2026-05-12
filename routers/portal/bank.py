@@ -651,11 +651,12 @@ def register_bank_routes(router, templates):
         conn = db()
         try:
             row = conn.execute(
-                "SELECT id FROM bank_movements WHERE id = ? AND issuer_id = ?",
+                "SELECT id, descripcion, categoria FROM bank_movements WHERE id = ? AND issuer_id = ?",
                 (movement_id, issuer_id),
             ).fetchone()
             if not row:
                 raise HTTPException(status_code=404, detail="Movimiento no encontrado")
+            old_row = _db_row_to_dict(row)
             updates = []
             params: list = []
             if descripcion is not None:
@@ -671,6 +672,19 @@ def register_bank_routes(router, templates):
                 "UPDATE bank_movements SET " + ", ".join(updates) + " WHERE id = ? AND issuer_id = ?",
                 params,
             )
+            # Audit trail
+            user_id = getattr(request.state, "user_id", None)
+            if table_exists(conn, "bank_movement_edits"):
+                if descripcion is not None and str(descripcion).strip() != (old_row.get("descripcion") or ""):
+                    conn.execute(
+                        "INSERT INTO bank_movement_edits (issuer_id, movement_id, field_name, old_value, new_value, edited_by) VALUES (?, ?, 'descripcion', ?, ?, ?)",
+                        (issuer_id, movement_id, old_row.get("descripcion") or "", str(descripcion).strip(), user_id),
+                    )
+                if categoria is not None and str(categoria).strip() != (old_row.get("categoria") or ""):
+                    conn.execute(
+                        "INSERT INTO bank_movement_edits (issuer_id, movement_id, field_name, old_value, new_value, edited_by) VALUES (?, ?, 'categoria', ?, ?, ?)",
+                        (issuer_id, movement_id, old_row.get("categoria") or "", str(categoria).strip(), user_id),
+                    )
             conn.commit()
             return JSONResponse({"ok": True, "updated": True})
         finally:
@@ -679,6 +693,28 @@ def register_bank_routes(router, templates):
                     conn.close()
                 except Exception:
                     pass
+
+    @router.get("/bank/movements/{movement_id}/edits", response_class=JSONResponse)
+    def portal_bank_movement_edits(movement_id: int, issuer: dict = Depends(get_portal_issuer)):
+        """Returns edit history for a movement."""
+        issuer_id = int(issuer.get("id") or 0)
+        if issuer_id <= 0:
+            raise HTTPException(status_code=401, detail="Sesión inválida")
+        conn = db()
+        try:
+            if not table_exists(conn, "bank_movement_edits"):
+                return JSONResponse({"ok": True, "edits": []})
+            rows = conn.execute(
+                "SELECT field_name, old_value, new_value, created_at FROM bank_movement_edits WHERE movement_id = ? AND issuer_id = ? ORDER BY created_at DESC LIMIT 50",
+                (movement_id, issuer_id),
+            ).fetchall()
+            edits = [_db_row_to_dict(r) for r in rows]
+            return JSONResponse({"ok": True, "edits": edits})
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
     @router.post("/bank/movements/delete-all", response_class=JSONResponse)
     def portal_bank_movements_delete_all(issuer: dict = Depends(get_portal_issuer)):
