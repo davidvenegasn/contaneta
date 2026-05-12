@@ -12,7 +12,6 @@ from datetime import datetime, timezone
 from typing import Any
 
 from database import db, db_rows, db_execute, has_column, table_exists
-from services.month_close import pdf_exists
 
 SEVERITY_INFO = "info"
 SEVERITY_WARNING = "warning"
@@ -342,33 +341,7 @@ def refresh_for_issuer(issuer_id: int) -> None:
         except Exception:
             pass
 
-    # 2) SAT sync falló (últimas 24h)
-    try:
-        r = db_rows(
-            """
-            SELECT finished_at, last_error FROM sat_jobs
-            WHERE issuer_id = ? AND status = 'error' AND finished_at IS NOT NULL
-              AND datetime(finished_at) >= datetime('now','-1 day')
-            ORDER BY datetime(finished_at) DESC
-            LIMIT 1
-            """,
-            (issuer_id,),
-        )
-        if r:
-            last = r[0]
-            create_notification_if_missing(
-                issuer_id=issuer_id,
-                type="sat_sync_failed",
-                title="Falló la sincronización SAT",
-                body=(last.get("last_error") or "Hubo un error al sincronizar con el SAT. Intenta de nuevo más tarde.")[:280],
-                severity=SEVERITY_DANGER,
-                action_url="/portal/home",
-                dedupe_parts=["sat_sync_failed", (last.get("finished_at") or "")[:16]],
-            )
-    except Exception:
-        pass
-
-    # 3) CFDI cancelado recientemente (proxy por fecha_emision)
+    # 2) CFDI cancelado recientemente (proxy por fecha_emision)
     try:
         r = db_rows(
             """
@@ -395,7 +368,7 @@ def refresh_for_issuer(issuer_id: int) -> None:
     except Exception:
         pass
 
-    # 4) Gastos bancarios sin CFDI (requiere_cfdi=1 y sin match probable)
+    # 3) Gastos bancarios sin CFDI (requiere_cfdi=1 y sin match probable)
     try:
         conn = db()
         if table_exists(conn, "bank_movements") and has_column(conn, "bank_movements", "period_month"):
@@ -435,31 +408,4 @@ def refresh_for_issuer(issuer_id: int) -> None:
         except Exception:
             pass
 
-    # 5) Mes sin acuse/opinión (mes anterior)
-    try:
-        from datetime import timedelta
-
-        prev = (now.replace(day=1) - timedelta(days=1)).strftime("%Y-%m")
-        if not pdf_exists(issuer_id=issuer_id, ym=prev, kind="acuse"):
-            create_notification_if_missing(
-                issuer_id=issuer_id,
-                type="month_close_missing_acuse",
-                title=f"Falta acuse de {prev}",
-                body="Sube el acuse de declaración para cerrar el mes.",
-                severity=SEVERITY_INFO,
-                action_url=f"/portal/month-close?ym={prev}",
-                dedupe_parts=["month_close_missing_acuse", prev],
-            )
-        if not pdf_exists(issuer_id=issuer_id, ym=prev, kind="opinion"):
-            create_notification_if_missing(
-                issuer_id=issuer_id,
-                type="month_close_missing_opinion",
-                title=f"Falta opinión de {prev}",
-                body="Sube la opinión de cumplimiento para cerrar el mes.",
-                severity=SEVERITY_INFO,
-                action_url=f"/portal/month-close?ym={prev}",
-                dedupe_parts=["month_close_missing_opinion", prev],
-            )
-    except Exception:
-        pass
 
