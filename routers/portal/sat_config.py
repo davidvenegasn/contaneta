@@ -25,7 +25,8 @@ from services.sat.subprocess_utils import run_php
 
 logger = logging.getLogger(__name__)
 
-MAX_FIEL_SIZE = 2 * 1024 * 1024  # 2 MB
+MAX_FIEL_CER_SIZE = 50 * 1024  # 50 KB — SAT .cer certificates are typically 1-3 KB
+MAX_FIEL_KEY_SIZE = 50 * 1024  # 50 KB — SAT .key files are typically 1-3 KB
 ALLOWED_CER = (".cer",)
 ALLOWED_KEY = (".key",)
 
@@ -279,8 +280,10 @@ def register_sat_config_routes(router, templates):
             raise HTTPException(status_code=400, detail="La contraseña FIEL es obligatoria")
         cer_body = await fiel_cer.read()
         key_body = await fiel_key.read()
-        if len(cer_body) > MAX_FIEL_SIZE or len(key_body) > MAX_FIEL_SIZE:
-            raise HTTPException(status_code=400, detail="Cada archivo debe medir como máximo 2 MB")
+        if len(cer_body) > MAX_FIEL_CER_SIZE:
+            raise HTTPException(status_code=400, detail="El archivo .cer excede el tamaño máximo de 50 KB")
+        if len(key_body) > MAX_FIEL_KEY_SIZE:
+            raise HTTPException(status_code=400, detail="El archivo .key excede el tamaño máximo de 50 KB")
         # Validate FIEL cert/key format before encrypting and storing
         from services.sat.sat_credentials_secure import validate_fiel_cer, validate_fiel_key
         try:
