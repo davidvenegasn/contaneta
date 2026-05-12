@@ -169,6 +169,16 @@ def _month_from_fecha(fecha: Optional[str]) -> Optional[str]:
     return None
 
 
+def _normalize_rfc(rfc: str | None) -> str:
+    """Normalize RFC: strip, uppercase, treat 'ND' and similar as empty."""
+    if not rfc:
+        return ""
+    r = rfc.strip().upper()[:20]
+    if r in ("ND", "N/D", "NA", "N/A", "NO DISPONIBLE", "SIN RFC", ""):
+        return ""
+    return r
+
+
 def _movement_to_row(
     m: dict,
     issuer_id: int,
@@ -208,9 +218,9 @@ def _movement_to_row(
         "categoria": (m.get("categoria_sugerida") or "OTROS")[:200],
         "metodo_hint": (m.get("canal") or "")[:64],
         "contraparte_hint": (m.get("contraparte_nombre") or "")[:200],
-        "rfc_encontrado": (m.get("rfc_detectado") or "")[:20],
+        "rfc_encontrado": _normalize_rfc(m.get("rfc_detectado")),
         "counterparty_name_detected": (m.get("contraparte_nombre") or "")[:200],
-        "counterparty_rfc_detected": (m.get("rfc_detectado") or "")[:20],
+        "counterparty_rfc_detected": _normalize_rfc(m.get("rfc_detectado")),
         "confidence_score": int(m.get("confianza_clasificacion") or 0),
         "source_page_first": None,
         "duplicate_hash": fp[:64] if fp else None,
@@ -218,6 +228,7 @@ def _movement_to_row(
         "requires_cfdi": 1 if _movement_requires_cfdi(m) else 0,
         "cfdi_match_status": "pending",
         "impacta_contabilidad": 0 if m.get("impacta_contabilidad") is False or m.get("impacta_contabilidad") == 0 else 1,
+        "own_account_alias": (m.get("own_account_alias") or "")[:200] or None,
     }
 
 
@@ -341,6 +352,7 @@ def ingest_bank_statement(
         has_movement_hash = has_column(conn, "bank_movements", "movement_hash")
         inserted_count = 0
         duplicate_movements_count = 0
+        duplicate_samples: list[dict] = []
         for i, m in enumerate(movements):
             row = _movement_to_row(m, issuer_id, statement_id, bank_account_id, period_month, i + 1)
             # Dedup by movement_hash (issuer+fecha+desc+montos) — works cross-file
@@ -358,6 +370,8 @@ def ingest_bank_statement(
                 ).fetchone()
                 if existing:
                     duplicate_movements_count += 1
+                    if len(duplicate_samples) < 5:
+                        duplicate_samples.append({"fecha": row["fecha"], "descripcion": (row["descripcion"] or "")[:80], "deposito": row.get("deposito"), "retiro": row.get("retiro")})
                     continue
                 row["movement_hash"] = global_hash
             # Fallback: dedup by duplicate_hash (fingerprint within same account)
@@ -369,6 +383,8 @@ def ingest_bank_statement(
                 ).fetchone()
                 if existing:
                     duplicate_movements_count += 1
+                    if len(duplicate_samples) < 5:
+                        duplicate_samples.append({"fecha": row["fecha"], "descripcion": (row["descripcion"] or "")[:80], "deposito": row.get("deposito"), "retiro": row.get("retiro")})
                     continue
             if mov_cols_021 and has_movement_hash:
                 conn.execute(
@@ -494,6 +510,7 @@ def ingest_bank_statement(
             "movements_count": inserted_count,
             "inserted_count": inserted_count,
             "duplicate_movements_count": duplicate_movements_count,
+            "duplicate_samples": duplicate_samples[:5],
         }
     except Exception as e:
         logger.exception("ingest_bank_statement: error issuer=%s", issuer_id)

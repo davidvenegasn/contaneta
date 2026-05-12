@@ -120,6 +120,7 @@ def detect_own_account_transfer(
                     mov["impacta_contabilidad"] = False
                     mov["categoria_sugerida"] = "CUENTA_PROPIA"
                     mov["subcategoria_sugerida"] = "TRASPASO_INTERNO"
+                    mov["own_account_alias"] = (acc.get("alias") or acc.get("holder_name") or f"*{ac_norm[-4:]}")[:200]
                     reasons.append("Coincide CLABE con cuenta propia registrada")
                     if "confianza_clasificacion" in mov:
                         mov["confianza_clasificacion"] = max(mov.get("confianza_clasificacion", 0), 90)
@@ -141,6 +142,7 @@ def detect_own_account_transfer(
                 mov["impacta_contabilidad"] = False
                 mov["categoria_sugerida"] = "CUENTA_PROPIA"
                 mov["subcategoria_sugerida"] = "TRASPASO_INTERNO"
+                mov["own_account_alias"] = (acc.get("alias") or acc.get("holder_name") or f"*{a4}")[:200]
                 reasons.append("Cuenta coincide con últimos 4 dígitos registrados")
                 w = mov.get("warnings") or []
                 if "Cuenta propia (últimos 4 dígitos)" not in w:
@@ -154,6 +156,7 @@ def detect_own_account_transfer(
         mov["impacta_contabilidad"] = False
         mov["categoria_sugerida"] = "CUENTA_PROPIA"
         mov["subcategoria_sugerida"] = "TRASPASO_INTERNO"
+        mov["own_account_alias"] = statement_owner_name[:200]
         reasons.append("Beneficiario coincide con titular del estado de cuenta")
         w = mov.get("warnings") or []
         if "Cuenta propia (titular)" not in w:
@@ -169,6 +172,7 @@ def detect_own_account_transfer(
                 mov["impacta_contabilidad"] = False
                 mov["categoria_sugerida"] = "CUENTA_PROPIA"
                 mov["subcategoria_sugerida"] = "TRASPASO_INTERNO"
+                mov["own_account_alias"] = (acc.get("alias") or holder)[:200]
                 reasons.append("Beneficiario coincide con cuenta propia registrada")
                 w = mov.get("warnings") or []
                 if "Cuenta propia (registrada)" not in w:
