@@ -25,6 +25,10 @@ from services.sat.subprocess_utils import run_php
 
 logger = logging.getLogger(__name__)
 
+MAX_FIEL_SIZE = 2 * 1024 * 1024  # 2 MB
+ALLOWED_CER = (".cer",)
+ALLOWED_KEY = (".key",)
+
 _get_month_totals = get_month_totals
 _get_sat_sync_status = get_sat_sync_status
 
