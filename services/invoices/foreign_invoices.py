@@ -122,6 +122,42 @@ def list_invoices(issuer_id: int, period_month: str = None, tipo: str = None,
     )
 
 
+def compute_totals(issuer_id: int, period_month: str = None) -> dict:
+    """Compute aggregated totals from SQL (normalizes tipo casing, handles NULLs).
+
+    Args:
+        issuer_id: Tenant ID.
+        period_month: YYYY-MM (monthly) or YYYY (annual) or None for all.
+
+    Returns:
+        dict with sum_ingresos, sum_gastos (both floats in MXN).
+    """
+    where = ["issuer_id = ?"]
+    params: list = [issuer_id]
+    if period_month:
+        if is_annual(period_month):
+            where.append("substr(period_month, 1, 4) = ?")
+        else:
+            where.append("period_month = ?")
+        params.append(period_month)
+    where_sql = " AND ".join(where)
+    rows = db_rows(
+        f"""
+        SELECT
+          COALESCE(SUM(CASE WHEN UPPER(TRIM(COALESCE(tipo,''))) = 'INGRESO' THEN COALESCE(monto_mxn, 0) ELSE 0 END), 0) AS sum_ingresos,
+          COALESCE(SUM(CASE WHEN UPPER(TRIM(COALESCE(tipo,''))) = 'GASTO'   THEN COALESCE(monto_mxn, 0) ELSE 0 END), 0) AS sum_gastos
+        FROM foreign_invoices
+        WHERE {where_sql}
+        """,
+        tuple(params),
+    )
+    row = rows[0] if rows else {}
+    return {
+        "sum_ingresos": float(row.get("sum_ingresos") or 0),
+        "sum_gastos": float(row.get("sum_gastos") or 0),
+    }
+
+
 def count_invoices(issuer_id: int, period_month: str = None) -> int:
     """Count foreign invoices for an issuer."""
     where = ["issuer_id = ?"]

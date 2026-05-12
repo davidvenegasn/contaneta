@@ -236,8 +236,10 @@ def register_invoices_routes(router, templates):
             fi.ensure_table()
             items = fi.list_invoices(issuer_id, period_month=ym, limit=2000 if is_annual(ym) else 200)
             total = fi.count_invoices(issuer_id, period_month=ym)
-            sum_ingresos = sum(r.get("monto_mxn", 0) for r in items if r.get("tipo") == "INGRESO")
-            sum_gastos = sum(r.get("monto_mxn", 0) for r in items if r.get("tipo") == "GASTO")
+            # Totals come from SQL aggregate (independent of Python list), normalizes tipo casing and NULLs
+            totals = fi.compute_totals(issuer_id, period_month=ym)
+            sum_ingresos = totals["sum_ingresos"]
+            sum_gastos = totals["sum_gastos"]
             prev_ym = shift_ym(ym, -1)
             next_ym = shift_ym(ym, 1)
             return _render_portal(
