@@ -48,6 +48,18 @@ def _register_builtin_parsers() -> None:
         register_parser("BBVA", parse_bbva, experimental=bbva_exp)
     except ImportError:
         pass
+    try:
+        from services.bank.parsers.santander import EXPERIMENTAL as santander_exp
+        from services.bank.parsers.santander import parse_santander
+        register_parser("SANTANDER", parse_santander, experimental=santander_exp)
+    except ImportError:
+        pass
+    try:
+        from services.bank.parsers.citibanamex import EXPERIMENTAL as citi_exp
+        from services.bank.parsers.citibanamex import parse_citibanamex
+        register_parser("CITIBANAMEX", parse_citibanamex, experimental=citi_exp)
+    except ImportError:
+        pass
 
 
 _register_builtin_parsers()
