@@ -104,6 +104,38 @@
   })();
   </script>
 
+  {# ── Actionable Alerts ── #}
+  {% set _alerts = dashboard_alerts|default([]) %}
+  {% if _alerts|length > 0 %}
+  <div class="dashboard-alerts fade-in fade-in--1" style="display:flex; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
+    {% for alert in _alerts %}
+    <a href="{{ alert.href }}" class="dashboard-alert-card dashboard-alert-card--{{ alert.severity }}" style="text-decoration:none;">
+      <div class="dashboard-alert-card__icon">
+        {% if alert.severity == 'warning' %}
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        {% else %}
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        {% endif %}
+      </div>
+      <div class="dashboard-alert-card__body">
+        <div class="dashboard-alert-card__title">{{ alert.title }}</div>
+        <div class="dashboard-alert-card__subtitle">{{ alert.subtitle }}</div>
+      </div>
+      <svg class="dashboard-alert-card__arrow" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M7 4l6 6-6 6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  {% if dashboard_alerts is defined and (ingresos_sin_iva|default(0)|float + gastos_sin_iva|default(0)|float + count_issued|default(0) + count_received|default(0)) != 0 %}
+  <div class="dashboard-all-clear fade-in fade-in--1" style="margin-bottom:16px;">
+    <div class="dashboard-all-clear__inner">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+      <span>Todo en orden &mdash; no hay alertas pendientes este mes</span>
+    </div>
+  </div>
+  {% endif %}
+  {% endif %}
+
   {% set _has_data = (ingresos_sin_iva|default(0)|float + gastos_sin_iva|default(0)|float + count_issued|default(0) + count_received|default(0)) != 0 %}
   {% set _fiel_ok = onboarding.get('fiel_validated', false) if onboarding else false %}
   {% if not _has_data and not _fiel_ok and not (onboarding.get('has_any_issued') if onboarding else false) %}
@@ -137,21 +169,118 @@
     </div>
   </section>
 
-  <!-- 6-month trend chart -->
+  <!-- 12-month trend chart -->
   <section class="fade-in fade-in--3">
     <div class="dashboard-chart-card" id="trendChartCard">
       <div class="dashboard-chart-card__head">
-        <span class="dashboard-chart-card__title">Tendencia de 6 meses</span>
+        <span class="dashboard-chart-card__title">Tendencia de 12 meses</span>
         <div class="dashboard-chart-card__legend">
           <span><span class="dashboard-chart-card__legend-dot" style="background:#6366f1;"></span> Ingresos</span>
           <span><span class="dashboard-chart-card__legend-dot" style="background:#ef4444;"></span> Gastos</span>
         </div>
       </div>
-      <div id="trendChartContainer" style="height:180px; display:flex; align-items:flex-end; gap:4px; padding:0 4px;">
+      <div id="trendChartContainer" style="height:200px; display:flex; align-items:flex-end; gap:4px; padding:0 4px;">
         <p class="muted u-text-xs" style="margin:auto;">Cargando tendencia...</p>
       </div>
     </div>
   </section>
+
+  {# ── 12-month trend table (server-rendered) ── #}
+  {% set _trend = monthly_trend|default([]) %}
+  {% if _trend|length > 0 %}
+  <section class="fade-in fade-in--3" style="margin-top:16px;">
+    <details class="dashboard-trend-details">
+      <summary class="dashboard-trend-summary">
+        <span class="dashboard-trend-summary__title">Detalle mensual (12 meses)</span>
+        <svg class="dashboard-trend-summary__chevron" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M6 8l4 4 4-4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </summary>
+      <div class="dashboard-trend-table-wrap">
+        <table class="dashboard-trend-table">
+          <thead>
+            <tr>
+              <th>Mes</th>
+              <th style="text-align:right;">Ingresos</th>
+              <th style="text-align:right;">Gastos</th>
+              <th style="text-align:right;">Diferencia</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for m in _trend %}
+            <tr>
+              <td>{{ m.label }}</td>
+              <td style="text-align:right; color:#6366f1; font-weight:600;">${{ '{:,.0f}'.format(m.ingresos) }}</td>
+              <td style="text-align:right; color:#ef4444; font-weight:600;">${{ '{:,.0f}'.format(m.gastos) }}</td>
+              {% set diff = m.ingresos - m.gastos %}
+              <td style="text-align:right; font-weight:600; color:{{ '#059669' if diff >= 0 else '#ef4444' }};">
+                {{ '+' if diff >= 0 else '' }}${{ '{:,.0f}'.format(diff) }}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            {% set total_ingresos = _trend|sum(attribute='ingresos') %}
+            {% set total_gastos = _trend|sum(attribute='gastos') %}
+            {% set total_diff = total_ingresos - total_gastos %}
+            <tr style="font-weight:700; border-top:2px solid var(--pv2-border-2, rgba(15,23,42,0.12));">
+              <td>Total</td>
+              <td style="text-align:right; color:#6366f1;">${{ '{:,.0f}'.format(total_ingresos) }}</td>
+              <td style="text-align:right; color:#ef4444;">${{ '{:,.0f}'.format(total_gastos) }}</td>
+              <td style="text-align:right; color:{{ '#059669' if total_diff >= 0 else '#ef4444' }};">
+                {{ '+' if total_diff >= 0 else '' }}${{ '{:,.0f}'.format(total_diff) }}
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </details>
+  </section>
+  {% endif %}
+
+  {# ── Top Clients & Providers (Quarter) ── #}
+  {% set _top_clients = top_clients|default([]) %}
+  {% set _top_providers = top_providers|default([]) %}
+  {% if _top_clients|length > 0 or _top_providers|length > 0 %}
+  <section class="fade-in fade-in--3" style="margin-top:16px;">
+    <div class="dashboard-rankings">
+      {% if _top_clients|length > 0 %}
+      <div class="dashboard-ranking-card">
+        <div class="dashboard-ranking-card__head">
+          <span class="dashboard-ranking-card__title">Top clientes del trimestre</span>
+          <a href="/portal/facturas?tab=issued" class="btn btn--sm btn--ghost">Ver todos</a>
+        </div>
+        <ol class="dashboard-ranking-list">
+          {% for c in _top_clients %}
+          <li class="dashboard-ranking-item">
+            <span class="dashboard-ranking-item__rank">{{ loop.index }}</span>
+            <span class="dashboard-ranking-item__name" title="{{ c.rfc }}">{{ c.nombre }}</span>
+            <span class="dashboard-ranking-item__meta">{{ c.count }} factura{{ 's' if c.count != 1 }}</span>
+            <span class="dashboard-ranking-item__amount">${{ '{:,.0f}'.format(c.total) }}</span>
+          </li>
+          {% endfor %}
+        </ol>
+      </div>
+      {% endif %}
+      {% if _top_providers|length > 0 %}
+      <div class="dashboard-ranking-card">
+        <div class="dashboard-ranking-card__head">
+          <span class="dashboard-ranking-card__title">Top proveedores del trimestre</span>
+          <a href="/portal/facturas?tab=received" class="btn btn--sm btn--ghost">Ver todos</a>
+        </div>
+        <ol class="dashboard-ranking-list">
+          {% for p in _top_providers %}
+          <li class="dashboard-ranking-item">
+            <span class="dashboard-ranking-item__rank">{{ loop.index }}</span>
+            <span class="dashboard-ranking-item__name" title="{{ p.rfc }}">{{ p.nombre }}</span>
+            <span class="dashboard-ranking-item__meta">{{ p.count }} factura{{ 's' if p.count != 1 }}</span>
+            <span class="dashboard-ranking-item__amount">${{ '{:,.0f}'.format(p.total) }}</span>
+          </li>
+          {% endfor %}
+        </ol>
+      </div>
+      {% endif %}
+    </div>
+  </section>
+  {% endif %}
 
   <!-- Dashboard bottom: Activity (60%) + Actions (40%) -->
   <div class="dashboard-bottom fade-in fade-in--4">
@@ -182,8 +311,33 @@
       </div>
     </div>
     <div class="dashboard-bottom__actions">
+      {# ── Next Actions Checklist ── #}
+      {% set _next_actions = next_actions|default([]) %}
+      {% if _next_actions|length > 0 %}
+      <div class="actions-card" style="margin-bottom:12px;">
+        <div class="actions-card__title">Siguiente paso</div>
+        <ul class="next-actions-list">
+          {% for action in _next_actions %}
+          <li class="next-actions-item {{ 'next-actions-item--done' if action.done }}">
+            <a href="{{ action.href }}" class="next-actions-item__link">
+              <span class="next-actions-item__check">
+                {% if action.done %}
+                <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                {% else %}
+                <span class="next-actions-item__bullet"></span>
+                {% endif %}
+              </span>
+              <span class="next-actions-item__label">{{ action.label }}</span>
+              <svg class="next-actions-item__arrow" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M7 4l6 6-6 6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </a>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+
       <div class="actions-card">
-        <div class="actions-card__title">Acciones rápidas</div>
+        <div class="actions-card__title">Acciones rapidas</div>
         <div class="actions-card__grid">
           <a class="actions-card__grid-item" href="/portal/create">
             <span class="actions-card__grid-icon">
@@ -925,6 +1079,152 @@
     #trendChartContainer rect[data-type]:hover {
       opacity: 1 !important;
     }
+    /* Trend detail table */
+    .dashboard-trend-details {
+      background: var(--pv2-surface, #fff);
+      border: 1px solid var(--pv2-border-2, rgba(15,23,42,0.08));
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .dashboard-trend-summary {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      cursor: pointer;
+      user-select: none;
+      font-size: 13.5px;
+      font-weight: 600;
+      color: var(--pv2-text-2, #64748b);
+    }
+    .dashboard-trend-summary::-webkit-details-marker { display: none; }
+    .dashboard-trend-summary__title { flex: 1; }
+    .dashboard-trend-summary__chevron {
+      transition: transform 0.2s ease;
+      flex-shrink: 0;
+    }
+    details[open] > .dashboard-trend-summary .dashboard-trend-summary__chevron {
+      transform: rotate(180deg);
+    }
+    .dashboard-trend-table-wrap {
+      padding: 0 16px 16px;
+      overflow-x: auto;
+    }
+    .dashboard-trend-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .dashboard-trend-table th {
+      font-weight: 600;
+      color: var(--pv2-text-3, #94a3b8);
+      font-size: 11.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding: 8px 6px;
+      border-bottom: 1px solid var(--pv2-border-2, rgba(15,23,42,0.08));
+    }
+    .dashboard-trend-table td {
+      padding: 7px 6px;
+      border-bottom: 1px solid var(--pv2-border-2, rgba(15,23,42,0.04));
+    }
+    .dashboard-trend-table tbody tr:hover {
+      background: var(--pv2-surface-hover, rgba(99,102,241,0.04));
+    }
+    .dashboard-trend-table tfoot td {
+      padding-top: 10px;
+    }
+
+    /* ── Dashboard Alert Cards ── */
+    .dashboard-alert-card {
+      display: flex; align-items: center; gap: 12px;
+      padding: 14px 18px; border-radius: 14px;
+      border: 1px solid var(--pv2-border, rgba(15,23,42,0.07));
+      background: var(--pv2-surface, #fff);
+      flex: 1 1 280px; min-width: 260px;
+      transition: border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+      color: inherit;
+    }
+    .dashboard-alert-card:hover {
+      border-color: var(--pv2-border-2, rgba(15,23,42,0.12));
+      transform: translateY(-1px);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+    }
+    .dashboard-alert-card--warning { border-left: 3px solid var(--pv2-amber, #f59e0b); }
+    .dashboard-alert-card--warning .dashboard-alert-card__icon { color: var(--pv2-amber, #f59e0b); }
+    .dashboard-alert-card--info { border-left: 3px solid var(--pv2-indigo, #6366f1); }
+    .dashboard-alert-card--info .dashboard-alert-card__icon { color: var(--pv2-indigo, #6366f1); }
+    .dashboard-alert-card__icon { flex-shrink: 0; display: flex; align-items: center; }
+    .dashboard-alert-card__body { flex: 1; min-width: 0; }
+    .dashboard-alert-card__title { font-size: 13.5px; font-weight: 650; color: var(--pv2-text, #0a0a0a); line-height: 1.35; }
+    .dashboard-alert-card__subtitle { font-size: 12px; color: var(--pv2-text-3, #a1a1aa); line-height: 1.4; margin-top: 2px; }
+    .dashboard-alert-card__arrow { flex-shrink: 0; color: var(--pv2-text-3, #a1a1aa); opacity: 0; transition: opacity 0.15s ease; }
+    .dashboard-alert-card:hover .dashboard-alert-card__arrow { opacity: 1; }
+
+    /* ── All Clear Message ── */
+    .dashboard-all-clear { text-align: center; }
+    .dashboard-all-clear__inner {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 10px 20px; border-radius: 12px;
+      background: var(--pv2-green-soft, #ecfdf5);
+      color: var(--pv2-pos-text, #047857);
+      font-size: 13.5px; font-weight: 600;
+    }
+    .dashboard-all-clear__inner svg { flex-shrink: 0; color: var(--pv2-green, #10b981); }
+
+    /* ── Rankings (Top Clients/Providers) ── */
+    .dashboard-rankings { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    @media (max-width: 768px) { .dashboard-rankings { grid-template-columns: 1fr; } }
+    .dashboard-ranking-card {
+      background: var(--pv2-surface, #fff);
+      border: 1px solid var(--pv2-border, rgba(15,23,42,0.07));
+      border-radius: 16px; padding: 20px;
+    }
+    .dashboard-ranking-card__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    .dashboard-ranking-card__title { font-size: 14px; font-weight: 650; color: var(--pv2-text, #0a0a0a); letter-spacing: -0.01em; }
+    .dashboard-ranking-list { list-style: none; margin: 0; padding: 0; }
+    .dashboard-ranking-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 0; border-bottom: 1px solid var(--pv2-border, rgba(15,23,42,0.07));
+    }
+    .dashboard-ranking-item:last-child { border-bottom: none; }
+    .dashboard-ranking-item__rank {
+      width: 22px; height: 22px; border-radius: 6px;
+      background: var(--pv2-surface-3, #f4f1ec);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 700; color: var(--pv2-text-2, #52525b); flex-shrink: 0;
+    }
+    .dashboard-ranking-item__name {
+      flex: 1; font-size: 13px; font-weight: 500; color: var(--pv2-text, #0a0a0a);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .dashboard-ranking-item__meta { font-size: 11.5px; color: var(--pv2-text-3, #a1a1aa); white-space: nowrap; }
+    .dashboard-ranking-item__amount {
+      font-size: 13px; font-weight: 650; color: var(--pv2-text, #0a0a0a);
+      font-variant-numeric: tabular-nums; white-space: nowrap;
+    }
+
+    /* ── Next Actions Checklist ── */
+    .next-actions-list { list-style: none; margin: 0; padding: 0; }
+    .next-actions-item { border-bottom: 1px solid var(--pv2-border, rgba(15,23,42,0.07)); }
+    .next-actions-item:last-child { border-bottom: none; }
+    .next-actions-item__link {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 4px; text-decoration: none; color: inherit;
+      transition: background 0.15s ease; border-radius: 8px;
+    }
+    .next-actions-item__link:hover { background: var(--pv2-hover, rgba(15,23,42,0.045)); }
+    .next-actions-item__check {
+      width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .next-actions-item__bullet {
+      width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--pv2-text-3, #a1a1aa);
+    }
+    .next-actions-item--done .next-actions-item__check { color: var(--pv2-green, #10b981); }
+    .next-actions-item--done .next-actions-item__label { text-decoration: line-through; color: var(--pv2-text-3, #a1a1aa); }
+    .next-actions-item__label { flex: 1; font-size: 13px; font-weight: 500; color: var(--pv2-text, #0a0a0a); }
+    .next-actions-item__arrow { flex-shrink: 0; color: var(--pv2-text-3, #a1a1aa); opacity: 0; transition: opacity 0.15s ease; }
+    .next-actions-item__link:hover .next-actions-item__arrow { opacity: 1; }
   </style>
   <script>
   (function(){
@@ -951,7 +1251,7 @@
       tip.style.top = y + 'px';
     }
 
-    fetch('/api/metrics/trend?months=6')
+    fetch('/api/metrics/trend?months=12')
       .then(function(r) { return r.json(); })
       .then(function(res) {
         if (!res.ok || !res.data || !res.data.length) {

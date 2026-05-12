@@ -17,6 +17,7 @@ from routers.portal._helpers import (
     ym_now,
 )
 from services.auth import csrf as csrf_service
+from services.dashboard import get_alerts, get_monthly_trend, get_next_actions, get_top_clients, get_top_providers
 from services.sat.sat_sync import get_month_totals, get_sat_sync_status
 from services.ym_helpers import sanitize_ym, shift_ym, ym_sql_filter, ym_to_label
 
@@ -279,6 +280,11 @@ def register_dashboard_routes(router, templates):
                     ),
                     "notifications": notifications,
                     "csrf_token": csrf_service.generate_csrf_token(),
+                    "dashboard_alerts": get_alerts(issuer_id, ym),
+                    "next_actions": get_next_actions(issuer_id, ym),
+                    "top_clients": get_top_clients(issuer_id, limit=5),
+                    "top_providers": get_top_providers(issuer_id, limit=5),
+                    "monthly_trend": get_monthly_trend(issuer_id, months=12),
                 },
             )
         except Exception:

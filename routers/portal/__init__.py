@@ -15,6 +15,7 @@ def get_portal_router(templates):
     from routers.portal.month_close import register_month_close_routes
     from routers.portal.quotations import register_quotations_routes
     from routers.portal.sat_config import register_sat_config_routes
+    from routers.portal.statements import register_statements_routes
 
     register_dashboard_routes(router, templates)
     register_quotations_routes(router, templates)
@@ -24,6 +25,7 @@ def get_portal_router(templates):
     register_month_close_routes(router, templates)
     register_sat_config_routes(router, templates)
     register_fiscal_routes(router, templates)
+    register_statements_routes(router, templates)
     register_misc_routes(router, templates)
 
     return router
