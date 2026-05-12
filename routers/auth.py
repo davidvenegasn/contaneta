@@ -10,7 +10,7 @@ from fastapi import APIRouter, Form, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from config import DEV_MODE, _env_path
-from database import db
+from database import db, db_rows
 from services import audit, email_sender, issuers
 from services import sanitize as sanitize_service
 from services.action_log import log_action
@@ -909,8 +909,62 @@ def get_auth_router(templates):
 
     @router.get("/onboarding", response_class=HTMLResponse)
     def onboarding_page(request: Request):
-        """Legacy onboarding page — now redirects to SAT config (FIEL upload)."""
-        return RedirectResponse(url="/portal/config/sat", status_code=302)
+        """Multi-step onboarding wizard: fiscal data -> SAT setup -> first invoice."""
+        cookie_val = request.cookies.get(cookie_name)
+        session_data = session.verify_session(cookie_val)
+        if not session_data or session_data[0] == 0:
+            return RedirectResponse(url="/login", status_code=302)
+        user_id, issuer_id = session_data[0], session_data[1]
+        error = request.query_params.get("error")
+
+        # Determine which step the user is on based on their data
+        issuer = None
+        step = 1  # default: fiscal data
+        has_customers = False
+        has_products = False
+        if issuer_id and issuer_id > 0:
+            rows = db_rows("SELECT * FROM issuers WHERE id = ?", (issuer_id,))
+            issuer = rows[0] if rows else None
+        rfc_ok = bool(issuer and issuer.get("rfc") and issuer["rfc"] != "PENDIENTE")
+        if rfc_ok:
+            # Check if FIEL is configured
+            has_fiel = bool(db_rows(
+                "SELECT 1 FROM sat_credentials WHERE issuer_id = ? LIMIT 1",
+                (issuer_id,),
+            ))
+            if has_fiel:
+                # Check customers/products for step 3
+                cust = db_rows(
+                    "SELECT COUNT(*) AS n FROM customer_profiles WHERE issuer_id = ?",
+                    (issuer_id,),
+                )
+                prod = db_rows(
+                    "SELECT COUNT(*) AS n FROM products WHERE issuer_id = ?",
+                    (issuer_id,),
+                )
+                has_customers = bool(cust and cust[0]["n"] > 0)
+                has_products = bool(prod and prod[0]["n"] > 0)
+                step = 3
+            else:
+                step = 2
+
+        # Allow explicit step override via query param (within valid range)
+        forced = request.query_params.get("step")
+        if forced and forced.isdigit() and 1 <= int(forced) <= 3:
+            step = int(forced)
+
+        return templates.TemplateResponse(
+            "onboarding.html",
+            {
+                "request": request,
+                "step": step,
+                "issuer": issuer,
+                "error": error,
+                "csrf_token": csrf_service.generate_csrf_token(),
+                "has_customers": has_customers,
+                "has_products": has_products,
+            },
+        )
 
     @router.post("/onboarding", response_class=RedirectResponse)
     def onboarding_submit(
@@ -957,7 +1011,8 @@ def get_auth_router(templates):
             conn.commit()
         finally:
             conn.close()
-        resp = RedirectResponse(url="/portal/home", status_code=302)
+        # Redirect to step 2 (SAT setup) after saving fiscal data
+        resp = RedirectResponse(url="/onboarding?step=2", status_code=302)
         resp.set_cookie(
             cookie_name,
             session.sign_session(user_id, issuer_id),

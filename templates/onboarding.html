@@ -3,57 +3,204 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Completa tu perfil fiscal · ContaNeta</title>
+  <title>Configuración inicial · ContaNeta</title>
   <link rel="stylesheet" href="/static/css/form.css">
-  <style>
-    body { max-width: 480px; margin: 2rem auto; padding: 0 1rem; }
-    .auth-card { padding: 1.5rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card-bg); box-shadow: var(--shadow); }
-    .auth-card h1 { margin: 0 0 0.5rem; font-size: 1.25rem; }
-    .auth-card .muted { margin-bottom: 1rem; }
-    .auth-card .danger { color: #c00; margin-bottom: 1rem; font-size: 14px; }
-    .auth-card label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 0.25rem; }
-    .auth-card input, .auth-card select { width: 100%; padding: 0.5rem 0.75rem; margin-bottom: 1rem; border-radius: 12px; border: 1px solid var(--border-strong); }
-    .auth-card button[type="submit"] { width: 100%; padding: 0.6rem; }
-    .checkbox-group { margin: 1rem 0; font-size: 13px; }
-    .checkbox-group label { display: flex; align-items: flex-start; gap: 0.5rem; cursor: pointer; }
-    .checkbox-group input { width: auto; margin: 0.2rem 0 0; }
-  </style>
+  <link rel="stylesheet" href="/static/css/auth.css">
+  <link rel="stylesheet" href="/static/css/onboarding.css">
 </head>
 <body>
-  <div class="auth-card">
-    <h1>Completa tu perfil fiscal</h1>
-    <p class="muted">Datos del emisor (RFC) para facturación y descarga de CFDI.</p>
-    {% if error %}
-      <p class="danger">
-        {% if error == 'required' %}RFC y razón social son obligatorios.{% else %}{{ error }}{% endif %}
-      </p>
-    {% endif %}
-    <form method="post" action="/onboarding">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token or '' }}" />
-      <label for="rfc">RFC *</label>
-      <input type="text" name="rfc" id="rfc" placeholder="XAXX010101000" maxlength="13" value="{{ (issuer or {}).get('rfc') or '' }}" required />
-      <label for="razon_social">Razón social *</label>
-      <input type="text" name="razon_social" id="razon_social" placeholder="Nombre o razón social del contribuyente" value="{{ (issuer or {}).get('alias') or '' }}" required />
-      <label for="regimen_fiscal">Régimen fiscal</label>
-      <select name="regimen_fiscal" id="regimen_fiscal">
-        <option value="616" {% if ((issuer or {}).get('regimen_fiscal') or '') == '616' %}selected{% endif %}>616 - Sin obligaciones fiscales</option>
-        <option value="601" {% if ((issuer or {}).get('regimen_fiscal') or '') == '601' %}selected{% endif %}>601 - General de Ley Personas Morales</option>
-        <option value="603" {% if ((issuer or {}).get('regimen_fiscal') or '') == '603' %}selected{% endif %}>603 - Personas Morales con Fines no Lucrativos</option>
-        <option value="612" {% if ((issuer or {}).get('regimen_fiscal') or '') == '612' %}selected{% endif %}>612 - Personas Físicas con Actividades Empresariales y Profesionales</option>
-        <option value="620" {% if ((issuer or {}).get('regimen_fiscal') or '') == '620' %}selected{% endif %}>620 - Sociedad Cooperativa de Producción</option>
-        <option value="622" {% if ((issuer or {}).get('regimen_fiscal') or '') == '622' %}selected{% endif %}>622 - Régimen de Actividades Agrícolas, Ganaderas, Silvícolas y Pesqueras</option>
-        <option value="626" {% if ((issuer or {}).get('regimen_fiscal') or '') == '626' %}selected{% endif %}>626 - Régimen Simplificado de Confianza</option>
-      </select>
-      <label for="cp">Código postal (opcional)</label>
-      <input type="text" name="cp" id="cp" placeholder="00000" maxlength="5" />
-      <div class="checkbox-group">
-        <label>
-          <input type="checkbox" name="authorize_firm" />
-          <span>Autorizo a V&G Fiscal a acceder como despacho para prestar el servicio (contabilidad, facturación, revisión).</span>
-        </label>
+  <div class="onboarding-wizard">
+    <div class="onboarding-wizard__brand">
+      <span class="onboarding-wizard__logo">ContaNeta</span>
+    </div>
+
+    <div class="onboarding-wizard__card">
+      {# ── Step indicator ── #}
+      {% set current_step = step|default(1) %}
+      <nav class="onboarding-steps" aria-label="Progreso de configuración">
+        {% set steps_meta = [
+          {"num": 1, "label": "Datos fiscales"},
+          {"num": 2, "label": "Configurar SAT"},
+          {"num": 3, "label": "Primer factura"}
+        ] %}
+        {% for s in steps_meta %}
+        <div class="onboarding-steps__item {{ 'onboarding-steps__item--done' if s.num < current_step else ('onboarding-steps__item--active' if s.num == current_step else 'onboarding-steps__item--pending') }}"
+             aria-current="{{ 'step' if s.num == current_step else 'false' }}">
+          <span class="onboarding-steps__circle">
+            {% if s.num < current_step %}
+            <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+            {% else %}
+            {{ s.num }}
+            {% endif %}
+          </span>
+          <span class="onboarding-steps__label">{{ s.label }}</span>
+        </div>
+        {% endfor %}
+      </nav>
+
+      {# ── Progress bar ── #}
+      {% set progress_pct = ((current_step - 1) * 100 / 3)|int %}
+      <div class="onboarding-progress" role="progressbar" aria-valuenow="{{ progress_pct }}" aria-valuemin="0" aria-valuemax="100">
+        <div class="onboarding-progress__bar" style="width: {{ progress_pct }}%"></div>
       </div>
-      <button type="submit" class="btn btn-primary">Continuar al portal</button>
-    </form>
+
+      {# ── Error message ── #}
+      {% if error %}
+        <p class="onboarding-wizard__error">
+          {% if error == 'required' %}RFC y razón social son obligatorios.
+          {% elif error == 'invalid' %}Token inválido. Intenta de nuevo.
+          {% else %}{{ error }}{% endif %}
+        </p>
+      {% endif %}
+
+      {# ══════════════════════════════════════════════ #}
+      {# STEP 1: Datos fiscales                        #}
+      {# ══════════════════════════════════════════════ #}
+      {% if current_step == 1 %}
+      <h1 class="onboarding-wizard__title">Completa tu perfil fiscal</h1>
+      <p class="onboarding-wizard__subtitle">
+        Estos datos identifican a tu empresa o persona física ante el SAT.
+        Los usaremos para emitir tus facturas CFDI.
+      </p>
+
+      <div class="onboarding-hint">
+        <svg class="onboarding-hint__icon" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+        </svg>
+        <span>Tu RFC y razón social deben coincidir exactamente con tu Constancia de Situación Fiscal.</span>
+      </div>
+
+      <form method="post" action="/onboarding" id="onboarding-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token or '' }}" />
+        <label for="rfc">RFC *</label>
+        <input type="text" name="rfc" id="rfc" placeholder="XAXX010101000" maxlength="13"
+               value="{{ (issuer or {}).get('rfc') or '' }}" required
+               pattern="[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}" title="RFC válido: 12 o 13 caracteres" />
+
+        <label for="razon_social">Razón social *</label>
+        <input type="text" name="razon_social" id="razon_social"
+               placeholder="Nombre o razón social del contribuyente"
+               value="{{ (issuer or {}).get('alias') or (issuer or {}).get('razon_social') or '' }}" required />
+
+        <label for="regimen_fiscal">Régimen fiscal</label>
+        <select name="regimen_fiscal" id="regimen_fiscal">
+          {% set rf = (issuer or {}).get('regimen_fiscal') or '' %}
+          <option value="616" {{ 'selected' if rf == '616' }}>616 - Sin obligaciones fiscales</option>
+          <option value="601" {{ 'selected' if rf == '601' }}>601 - General de Ley Personas Morales</option>
+          <option value="603" {{ 'selected' if rf == '603' }}>603 - Personas Morales con Fines no Lucrativos</option>
+          <option value="612" {{ 'selected' if rf == '612' }}>612 - Personas Físicas con Actividades Empresariales y Profesionales</option>
+          <option value="620" {{ 'selected' if rf == '620' }}>620 - Sociedad Cooperativa de Producción</option>
+          <option value="622" {{ 'selected' if rf == '622' }}>622 - Régimen de Actividades Agrícolas, Ganaderas, Silvícolas y Pesqueras</option>
+          <option value="626" {{ 'selected' if rf == '626' }}>626 - Régimen Simplificado de Confianza</option>
+        </select>
+
+        <label for="cp">Código postal (domicilio fiscal)</label>
+        <input type="text" name="cp" id="cp" placeholder="00000" maxlength="5"
+               value="{{ (issuer or {}).get('cp') or '' }}"
+               pattern="\d{5}" title="5 dígitos" />
+
+        <div class="checkbox-group">
+          <label>
+            <input type="checkbox" name="authorize_firm" />
+            <span>Autorizo a V&amp;G Fiscal a acceder como despacho para prestar el servicio (contabilidad, facturación, revisión).</span>
+          </label>
+        </div>
+
+        <div class="onboarding-wizard__actions">
+          <button type="submit" class="btn btn-primary">Guardar y continuar</button>
+        </div>
+      </form>
+
+      {# ══════════════════════════════════════════════ #}
+      {# STEP 2: Configurar SAT (FIEL)                #}
+      {# ══════════════════════════════════════════════ #}
+      {% elif current_step == 2 %}
+      <h1 class="onboarding-wizard__title">Conecta tu cuenta con el SAT</h1>
+      <p class="onboarding-wizard__subtitle">
+        Sube tu FIEL (e.firma) para que ContaNeta descargue automáticamente
+        tus facturas emitidas y recibidas directo del SAT.
+      </p>
+
+      <div class="onboarding-hint">
+        <svg class="onboarding-hint__icon" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/>
+        </svg>
+        <span>Tu e.firma se almacena cifrada con AES-256. Nunca se comparte con terceros. Solo se usa para consultar tus CFDI en el portal del SAT.</span>
+      </div>
+
+      <ul class="onboarding-checklist-summary">
+        <li>
+          <svg class="onboarding-checklist-summary__icon onboarding-checklist-summary__icon--pending" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="10" cy="10" r="7"/></svg>
+          Sube tu archivo <strong>.cer</strong> (certificado)
+        </li>
+        <li>
+          <svg class="onboarding-checklist-summary__icon onboarding-checklist-summary__icon--pending" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="10" cy="10" r="7"/></svg>
+          Sube tu archivo <strong>.key</strong> (llave privada)
+        </li>
+        <li>
+          <svg class="onboarding-checklist-summary__icon onboarding-checklist-summary__icon--pending" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="10" cy="10" r="7"/></svg>
+          Ingresa tu <strong>contraseña de la e.firma</strong>
+        </li>
+      </ul>
+
+      <div class="onboarding-wizard__actions">
+        <a href="/portal/config/sat" class="btn btn-primary">Ir a configurar SAT</a>
+      </div>
+      <div class="onboarding-wizard__footer">
+        <a href="/portal/home">Omitir por ahora y entrar al portal</a>
+      </div>
+
+      {# ══════════════════════════════════════════════ #}
+      {# STEP 3: Primera factura                       #}
+      {# ══════════════════════════════════════════════ #}
+      {% elif current_step == 3 %}
+      <h1 class="onboarding-wizard__title">Emite tu primera factura</h1>
+      <p class="onboarding-wizard__subtitle">
+        Ya tienes todo configurado. Crea tu primer cliente y producto
+        para generar una factura CFDI en segundos.
+      </p>
+
+      <div class="onboarding-hint">
+        <svg class="onboarding-hint__icon" viewBox="0 0 20 20" fill="currentColor">
+          <path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.464 5.05l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1z"/>
+          <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm0-2a6 6 0 100-12 6 6 0 000 12z" clip-rule="evenodd"/>
+        </svg>
+        <span>Puedes crear una factura rápida desde el inicio, o ir a la sección de facturas para opciones avanzadas.</span>
+      </div>
+
+      <ul class="onboarding-checklist-summary">
+        <li>
+          <svg class="onboarding-checklist-summary__icon {{ 'onboarding-checklist-summary__icon--done' if has_customers else 'onboarding-checklist-summary__icon--pending' }}" viewBox="0 0 20 20" fill="{% if has_customers %}currentColor{% else %}none{% endif %}" stroke="currentColor" stroke-width="{% if has_customers %}0{% else %}2{% endif %}">
+            {% if has_customers %}
+            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+            {% else %}
+            <circle cx="10" cy="10" r="7"/>
+            {% endif %}
+          </svg>
+          Agregar un cliente (receptor)
+        </li>
+        <li>
+          <svg class="onboarding-checklist-summary__icon {{ 'onboarding-checklist-summary__icon--done' if has_products else 'onboarding-checklist-summary__icon--pending' }}" viewBox="0 0 20 20" fill="{% if has_products %}currentColor{% else %}none{% endif %}" stroke="currentColor" stroke-width="{% if has_products %}0{% else %}2{% endif %}">
+            {% if has_products %}
+            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+            {% else %}
+            <circle cx="10" cy="10" r="7"/>
+            {% endif %}
+          </svg>
+          Agregar un producto o servicio
+        </li>
+        <li>
+          <svg class="onboarding-checklist-summary__icon onboarding-checklist-summary__icon--pending" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="10" cy="10" r="7"/></svg>
+          Emitir tu primer CFDI
+        </li>
+      </ul>
+
+      <div class="onboarding-wizard__actions">
+        <a href="/portal/home" class="btn btn-primary">Ir al portal</a>
+      </div>
+
+      {% endif %}
+    </div>
   </div>
 </body>
 </html>
