@@ -53,4 +53,16 @@
 
 ## Implementation
 
-See `migrations/0XX_add_performance_indexes.sql.example` for ready-to-use migration.
+See `migrations/041_performance_indexes.sql` (applied).
+
+## Result Post-Application (2026-05-12)
+
+All 5 recommended indexes applied via migration 041. Total indexes: 106 → 111.
+
+### Query Plan Improvements
+
+| Query | Before | After |
+|-------|--------|-------|
+| `sat_cfdi WHERE issuer_id+direction+status` | INDEX idx_sat_cfdi_issuer_direction_fecha (partial match) | **COVERING INDEX** idx_sat_cfdi_issuer_direction_status (exact match) |
+| `jobs WHERE issuer_id+name+payload_hash+status` | INDEX idx_jobs_issuer_status (partial) | **COVERING INDEX** idx_jobs_issuer_name_hash_status (exact match) |
+| `customer_profiles WHERE issuer_id+rfc` | sqlite_autoindex (already covered) | Same — auto index sufficient |
