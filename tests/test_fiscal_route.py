@@ -119,6 +119,16 @@ def fiscal_db(tmp_path):
             regimen TEXT NOT NULL DEFAULT 'RESICO_PF',
             updated_at TEXT NOT NULL DEFAULT (datetime('now'))
         );
+        CREATE TABLE IF NOT EXISTS cfdi_deductibility (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            cfdi_uuid TEXT NOT NULL,
+            issuer_id INTEGER NOT NULL,
+            percentage REAL NOT NULL DEFAULT 100,
+            source TEXT NOT NULL DEFAULT 'default',
+            auto_reason TEXT,
+            updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+            UNIQUE(cfdi_uuid, issuer_id)
+        );
 
         INSERT INTO issuers (id, rfc, alias) VALUES (1, 'TEST010101AAA', 'Test Co');
         INSERT INTO users (id, email) VALUES (1, 'test@test.com');

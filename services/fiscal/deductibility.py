@@ -126,6 +126,83 @@ def set_deductibility(
     )
 
 
+def compute_deductible_totals(issuer_id: int, ym: str) -> dict:
+    """Compute weighted deductible totals for received CFDIs in a period.
+
+    For each received CFDI, multiplies subtotal and IVA by its deductibility %.
+    CFDIs without a stored deductibility record default to 100%.
+
+    Args:
+        issuer_id: Tenant ID.
+        ym: Year-month (YYYY-MM) or year (YYYY).
+
+    Returns:
+        dict with gastos_deducibles, iva_acreditable, gastos_brutos, iva_bruto,
+        and detail list (per-invoice breakdown).
+    """
+    from services.ym_helpers import is_annual, ym_sql_filter
+
+    ym_filt = ym_sql_filter(ym)
+    base_where = (
+        f"issuer_id = ? AND direction = 'received' AND fecha_emision IS NOT NULL AND {ym_filt}"
+        " AND total IS NOT NULL AND total >= 0.01"
+        " AND (tipo_comprobante IS NULL OR UPPER(TRIM(tipo_comprobante)) != 'N')"
+    )
+    rows = db_rows(
+        f"""SELECT uuid, COALESCE(subtotal, total) AS subtotal, COALESCE(impuestos, 0) AS impuestos,
+                   fecha_emision, rfc_emisor, nombre_emisor, concepto
+            FROM sat_cfdi WHERE {base_where}""",
+        (issuer_id, ym),
+    )
+    if not rows:
+        return {
+            "gastos_deducibles": 0.0, "iva_acreditable": 0.0,
+            "gastos_brutos": 0.0, "iva_bruto": 0.0, "detail": [],
+        }
+
+    uuids = [r["uuid"] for r in rows if r.get("uuid")]
+    deduct_map = get_deductibility_map(issuer_id, uuids) if uuids else {}
+
+    gastos_brutos = 0.0
+    iva_bruto = 0.0
+    gastos_deducibles = 0.0
+    iva_acreditable = 0.0
+    detail = []
+
+    for r in rows:
+        subtotal = float(r.get("subtotal") or 0)
+        iva = float(r.get("impuestos") or 0)
+        dd = deduct_map.get(r["uuid"], {"percentage": 100.0, "source": "default"})
+        pct = dd["percentage"] / 100.0
+
+        gastos_brutos += subtotal
+        iva_bruto += iva
+        gastos_deducibles += subtotal * pct
+        iva_acreditable += iva * pct
+
+        detail.append({
+            "uuid": r["uuid"],
+            "fecha": r.get("fecha_emision"),
+            "rfc_emisor": r.get("rfc_emisor"),
+            "nombre_emisor": r.get("nombre_emisor"),
+            "concepto": r.get("concepto"),
+            "total": subtotal,
+            "impuestos": iva,
+            "deductibility_pct": dd["percentage"],
+            "deductibility_source": dd.get("source", "default"),
+            "deducible": round(subtotal * pct, 2),
+            "iva_acreditable": round(iva * pct, 2),
+        })
+
+    return {
+        "gastos_deducibles": round(gastos_deducibles, 2),
+        "iva_acreditable": round(iva_acreditable, 2),
+        "gastos_brutos": round(gastos_brutos, 2),
+        "iva_bruto": round(iva_bruto, 2),
+        "detail": detail,
+    }
+
+
 def get_deductibility_map(issuer_id: int, uuids: list[str]) -> dict[str, dict]:
     """Bulk fetch deductibility for many UUIDs at once.
 

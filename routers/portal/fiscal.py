@@ -85,19 +85,25 @@ def register_fiscal_routes(router, templates):
             received = get_month_totals(issuer_id, ym, "received")
 
             ingresos = issued["total_base"]
-            gastos = received["total_base"]
+            gastos_brutos = received["total_base"]
             iva_cobrado = issued["total_iva"]
-            iva_pagado = received["total_iva"]
+            iva_pagado_bruto = received["total_iva"]
             isr_retenido = issued.get("total_retenciones", 0.0)
-            iva_retenido = 0.0  # IVA retenido comes from received retenciones
             # For IVA: retenido = retenciones on issued (clients withhold your IVA)
             iva_retenido = issued.get("total_retenciones", 0.0)
 
-            # Foreign invoices (gastos extranjeros)
+            # Deductibility-adjusted totals (LISR Art. 28, LIVA Art. 5-V)
+            from services.fiscal.deductibility import compute_deductible_totals
+            deduct = compute_deductible_totals(issuer_id, ym)
+            gastos = deduct["gastos_deducibles"]
+            iva_pagado = deduct["iva_acreditable"]
+            deducible_invoices = deduct["detail"]
+
+            # Foreign invoices (gastos extranjeros — always 100% for now)
             fi.ensure_table()
-            fi_items = fi.list_invoices(issuer_id, period_month=ym, limit=500)
-            fi_gastos = sum(r.get("monto_mxn", 0) for r in fi_items if r.get("tipo") == "GASTO")
-            fi_ingresos = sum(r.get("monto_mxn", 0) for r in fi_items if r.get("tipo") == "INGRESO")
+            fi_totals = fi.compute_totals(issuer_id, period_month=ym)
+            fi_gastos = fi_totals["sum_gastos"]
+            fi_ingresos = fi_totals["sum_ingresos"]
 
             total_ingresos = ingresos + fi_ingresos
             total_gastos = gastos + fi_gastos
@@ -112,7 +118,7 @@ def register_fiscal_routes(router, templates):
                     retenciones_isr=isr_retenido,
                 )
 
-            # IVA estimation
+            # IVA estimation (uses deductibility-adjusted IVA)
             iva_result = calc_iva(
                 iva_causado=iva_cobrado,
                 iva_acreditable=iva_pagado,
@@ -137,8 +143,11 @@ def register_fiscal_routes(router, templates):
                     "total_ingresos": round(total_ingresos, 2),
                     "total_gastos": round(total_gastos, 2),
                     "utilidad": round(utilidad, 2),
+                    "gastos_brutos": round(gastos_brutos, 2),
                     "fi_gastos": round(fi_gastos, 2),
                     "fi_ingresos": round(fi_ingresos, 2),
+                    "deducible_invoices": deducible_invoices,
+                    "total_deducible": round(gastos, 2),
                     "iva_cobrado": round(iva_cobrado, 2),
                     "iva_pagado": round(iva_pagado, 2),
                     "iva_retenido": round(iva_retenido, 2),
