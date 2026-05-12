@@ -1,12 +1,14 @@
 {% extends "base_portal.html" %}
 {% block content %}
 
-{% set section_title = "Invoices extranjeros" %}
-{% set month_picker_url = "/portal/invoices-ext" %}
-{% include "partials/_page_section_header.html" %}
-
-<!-- Metric cards -->
-<div class="dashboard-metrics" style="margin-bottom:20px;">
+<div class="card ym-card">
+  <div class="ym-card__head">
+    <div class="page-section-header">
+      <h2 class="page-section-header__title section-title u-m0">Invoices extranjeros</h2>
+      {{ month_picker('/portal/invoices-ext', token|default(''), ym|default(''), ym_label|default('')) }}
+    </div>
+  </div>
+  <div class="dashboard-metrics">
   <div class="card metric-card metric-card--income">
     <div class="metric-label">Total ingresos (exportaciones)</div>
     <div class="metric-value">$<span data-count-to="{{ sum_ingresos|default(0) }}" data-count-decimals="2" data-count-duration="250">{{ '{:,.2f}'.format(sum_ingresos|default(0)) }}</span></div>
@@ -16,6 +18,7 @@
     <div class="metric-label">Total gastos (importaciones)</div>
     <div class="metric-value">$<span data-count-to="{{ sum_gastos|default(0) }}" data-count-decimals="2" data-count-duration="250">{{ '{:,.2f}'.format(sum_gastos|default(0)) }}</span></div>
     <div class="metric-sub">{{ ym_label|default('') }}</div>
+  </div>
   </div>
 </div>
 

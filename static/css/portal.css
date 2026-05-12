@@ -8051,14 +8051,14 @@ html.nightmode .bank-category-popover__item:hover {
   background: rgba(99, 102, 241, 0.18);
 }
 
-/* ── Page section header (unified across portal pages — Option B: justify-between) ── */
+/* ── Page section header (title + month picker inside ym-card__head) ── */
 .page-section-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
+  gap: var(--space-3, 12px);
   flex-wrap: wrap;
-  margin: 0 0 16px 0;
+  flex: 1;
+  min-width: 0;
 }
 .page-section-header__title {
   font-size: 1.25rem;
@@ -8066,15 +8066,13 @@ html.nightmode .bank-category-popover__item:hover {
   color: var(--text);
   letter-spacing: -0.01em;
 }
-.page-section-header__picker {
+/* When ym-card is not collapsible, head needs flex layout too */
+.ym-card .ym-card__head {
   display: flex;
   align-items: center;
-}
-@media (max-width: 640px) {
-  .page-section-header {
-    flex-direction: column;
-    align-items: flex-start;
-  }
+  justify-content: space-between;
+  gap: var(--space-3, 12px);
+  margin-bottom: var(--space-3, 12px);
 }
 
 /* ── Home: compact greeting ── */

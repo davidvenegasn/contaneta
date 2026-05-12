@@ -11,8 +11,6 @@
     </nav>
 
     {% set section_title = ("Facturas emitidas" if active_tab == "issued" else ("Facturas recibidas" if active_tab == "received" else "Facturas PPD")) %}
-    {% set month_picker_url = "/portal/facturas?tab=" ~ active_tab %}
-    {% include "partials/_page_section_header.html" %}
 
     {% if active_tab == 'issued' %}
       {% include "partials/issued_list.html" with context %}
