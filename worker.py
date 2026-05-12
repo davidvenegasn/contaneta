@@ -35,11 +35,11 @@ def _handler_not_implemented(job: dict, _ctx: JobContext) -> dict:
 def _load_handlers() -> dict[str, JobHandler]:
     """Handler registry.  Maps job name → handler function."""
     from services.sat.sat_job_handlers import (
-        handle_sat_sync_month,
         handle_sat_refresh_light,
+        handle_sat_sync_month,
         handle_sat_verify_credentials,
-        handle_sat_xml_backfill,
         handle_sat_verify_pending,
+        handle_sat_xml_backfill,
     )
     return {
         "sat_sync_month": handle_sat_sync_month,

@@ -1,11 +1,12 @@
 """Token CSRF firmado para POSTs sensibles (login, register, submit) y mutaciones /api/*."""
-import hmac
-import hashlib
-import time
-import secrets
 import base64
+import hashlib
+import hmac
+import secrets
+import time
 
 from fastapi import Request
+
 from config import SESSION_SECRET
 
 CSRF_MAX_AGE_SECONDS = 3600  # 1 hora

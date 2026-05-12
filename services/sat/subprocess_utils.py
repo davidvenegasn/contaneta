@@ -6,7 +6,6 @@ from typing import Optional
 
 from services.errors import ExternalServiceError
 
-
 logger = logging.getLogger(__name__)
 
 

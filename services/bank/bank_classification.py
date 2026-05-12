@@ -12,8 +12,7 @@ from __future__ import annotations
 import re
 from typing import Any, Optional
 
-from database import db, table_exists, has_column
-
+from database import db, has_column, table_exists
 
 # Regex patterns for classification
 _CARD_PAYMENT_RE = re.compile(

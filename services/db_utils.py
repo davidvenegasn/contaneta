@@ -8,9 +8,8 @@ Objetivo:
 
 from __future__ import annotations
 
-from typing import Any, Iterable, Sequence
-
 import sqlite3
+from typing import Any, Iterable, Sequence
 
 
 def fetch_one(conn: sqlite3.Connection, sql: str, params: Sequence[Any] = ()) -> dict | None:

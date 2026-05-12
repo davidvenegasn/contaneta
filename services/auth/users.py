@@ -47,7 +47,7 @@ def get_user_by_email(email: str):
     if not (email and str(email).strip()):
         return None
     # Verificar si la columna active existe antes de usarla
-    from database import has_column, db
+    from database import db, has_column
     conn = db()
     try:
         has_active = has_column(conn, "users", "active")
@@ -68,7 +68,7 @@ def get_user_by_phone(phone: str):
     if not normalized:
         return None
     # Verificar si la columna active existe antes de usarla
-    from database import has_column, db
+    from database import db, has_column
     conn = db()
     try:
         has_active = has_column(conn, "users", "active")

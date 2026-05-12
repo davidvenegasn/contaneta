@@ -1,31 +1,36 @@
 """Catalogs API routes."""
-import os
+import hashlib
 import json
 import logging
+import os
 import re
 import secrets
 import time
-import hashlib
-from typing import Optional
 from datetime import datetime
 from io import BytesIO
+from typing import Optional
 
-from fastapi import Request, Body, Depends, Query, HTTPException, File, UploadFile
+from fastapi import Body, Depends, File, HTTPException, Query, Request, UploadFile
 from fastapi.responses import JSONResponse
 
-from database import db, db_rows, table_exists, has_column, list_catalog, search_catalog
-from validators import validate_customer, validate_product
-from routers.deps import get_portal_issuer
 from config import BASE_DIR, DEV_FIXTURES
+from database import db, db_rows, has_column, list_catalog, search_catalog, table_exists
 from routers.api._helpers import (
-    _api_rate_check, _load_fixture, _get_month_totals_safe,
-    DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT, MAX_LIST_OFFSET, QUOTATION_STATUSES,
+    DEFAULT_LIST_LIMIT,
+    MAX_LIST_LIMIT,
+    MAX_LIST_OFFSET,
+    QUOTATION_STATUSES,
+    _api_rate_check,
+    _get_month_totals_safe,
+    _load_fixture,
 )
+from routers.deps import get_portal_issuer
+from validators import validate_customer, validate_product
 
 logger = logging.getLogger(__name__)
 
 try:
-    from cfdi_pdf import USO_CFDI, REGIMEN_FISCAL, FORMA_PAGO, MONEDA, CLAVE_UNIDAD
+    from cfdi_pdf import CLAVE_UNIDAD, FORMA_PAGO, MONEDA, REGIMEN_FISCAL, USO_CFDI
 except Exception:
     USO_CFDI = {"G03": "Gastos en general", "G01": "Adquisición de mercancías", "CN01": "Nómina"}
     REGIMEN_FISCAL = {"601": "General de Ley Personas Morales", "612": "Personas Físicas con Actividades Empresariales", "616": "Sin obligaciones fiscales", "626": "Régimen Simplificado de Confianza"}
@@ -33,17 +38,18 @@ except Exception:
     MONEDA = {"MXN": "Peso Mexicano", "USD": "Dólar Americano"}
     CLAVE_UNIDAD = {"E48": "Unidad de servicio", "EA": "Cada uno", "H87": "Pieza"}
 
-from services.billing import subscription as subscription_service
-from services.auth import csrf as csrf_service
-from services.action_log import log_action
-from services.http import ok, ok_list
-from services.schemas import ClientCreate, ProductCreate
+from facturapi_client import FacturapiError, create_invoice, download_invoice
+from facturapi_client import cancel_invoice as facturapi_cancel
 from services import clients_service, products_service
 from services import jobs as jobs_service
+from services.action_log import log_action
+from services.auth import csrf as csrf_service
+from services.billing import subscription as subscription_service
+from services.http import ok, ok_list
 from services.invoices import invoices_engine
 from services.sat.sat_sync import get_month_totals as _get_month_totals_raw
-from services.ym_helpers import ym_sql_filter, sanitize_ym, is_annual
-from facturapi_client import create_invoice, download_invoice, cancel_invoice as facturapi_cancel, FacturapiError
+from services.schemas import ClientCreate, ProductCreate
+from services.ym_helpers import is_annual, sanitize_ym, ym_sql_filter
 
 
 def register_catalogs_routes(router):

@@ -16,6 +16,7 @@ from config import (
     SESSION_SECRET,
     SESSION_TTL_DAYS,
 )
+
 # Cookie: HttpOnly siempre; SameSite=Lax (protege CSRF); Secure en prod o cuando X-Forwarded-Proto=https
 
 logger = logging.getLogger(__name__)

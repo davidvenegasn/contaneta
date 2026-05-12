@@ -5,19 +5,19 @@ import time
 from collections import defaultdict
 from urllib.parse import quote
 
-from fastapi import APIRouter, Request, Form, Query, HTTPException
-from fastapi.responses import HTMLResponse, RedirectResponse
 import httpx
+from fastapi import APIRouter, Form, HTTPException, Query, Request
+from fastapi.responses import HTMLResponse, RedirectResponse
 
-from config import _env_path, DEV_MODE
+from config import DEV_MODE, _env_path
 from database import db
-from services import issuers, audit, action_log
-from services.auth import session, users, csrf as csrf_service
-from services.action_log import log_action
-from services.auth import rate_limit as rate_limit_service
+from services import action_log, audit, email_sender, issuers
 from services import sanitize as sanitize_service
+from services.action_log import log_action
+from services.auth import csrf as csrf_service
+from services.auth import rate_limit as rate_limit_service
+from services.auth import session, users
 from services.auth import verification as verification_service
-from services import email_sender
 
 logger = logging.getLogger(__name__)
 
@@ -813,7 +813,7 @@ def get_auth_router(templates):
             phone = None
 
         # Build redirect base with preserved fields
-        from urllib.parse import urlencode, quote
+        from urllib.parse import quote, urlencode
         _keep = {}
         if email:
             _keep["email"] = email

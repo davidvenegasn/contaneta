@@ -11,7 +11,6 @@ from typing import Any
 
 from database import db, db_rows, has_column, table_exists
 
-
 # ---------- Plan definitions ----------
 
 PLANS = {

@@ -24,13 +24,12 @@ if not os.environ.get("SESSION_SECRET"):
 
 from fastapi.testclient import TestClient
 
+# Importar app después de fijar ENV/DB
+from app import app
 from config import BASE_DIR, DB_PATH
 from database import db
 from migrations_runner import apply_migrations
 from tests.helpers import make_session_cookie
-
-# Importar app después de fijar ENV/DB
-from app import app
 
 UUID_A = "aaaaaaaa-bbbb-4ccc-d000-000000000001"
 UUID_B = "bbbbbbbb-cccc-4ddd-d000-000000000002"

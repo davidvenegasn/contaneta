@@ -25,13 +25,11 @@ if not os.environ.get("SESSION_SECRET"):
 
 from fastapi.testclient import TestClient  # noqa: E402
 
+from app import app  # noqa: E402
 from config import DB_PATH  # noqa: E402
 from database import db  # noqa: E402
 from migrations_runner import apply_migrations  # noqa: E402
 from tests.helpers import make_session_cookie  # noqa: E402
-
-from app import app  # noqa: E402
-
 
 ISSUER_A = 101
 ISSUER_B = 102

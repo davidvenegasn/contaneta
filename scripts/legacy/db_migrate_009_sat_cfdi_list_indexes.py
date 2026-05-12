@@ -8,8 +8,8 @@ Migración 009: índices en sat_cfdi para listados y búsqueda por UUID.
 - (issuer_id, direction, fecha_emision): listados por mes y orden por fecha.
 - (issuer_id, uuid): búsqueda de detalle por UUID.
 """
-import sqlite3
 import os
+import sqlite3
 
 DB_PATH = os.getenv("APP_DB_PATH", "invoicing.db")
 

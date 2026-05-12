@@ -8,9 +8,9 @@ from dataclasses import dataclass
 from config import SESSION_SECRET
 
 try:
+    from cryptography.hazmat.primitives import hashes
     from cryptography.hazmat.primitives.ciphers.aead import AESGCM
     from cryptography.hazmat.primitives.kdf.hkdf import HKDF
-    from cryptography.hazmat.primitives import hashes
 except Exception as e:  # pragma: no cover
     # El módulo existe para prod; en entornos sin dependencia instalada, fallará al usarlo.
     AESGCM = None  # type: ignore

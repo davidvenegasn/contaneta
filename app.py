@@ -1,47 +1,47 @@
 import json
 import logging
 import os
-import uuid
 import sqlite3
 import subprocess
+import uuid
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
 from urllib.parse import parse_qs, quote, urlencode, urlparse, urlunparse
 
 request_id_ctx: ContextVar[str] = ContextVar("request_id", default="-")
 
-from migrations_runner import apply_migrations
-from fastapi import FastAPI, Request, Query, Depends
-from fastapi.responses import HTMLResponse, RedirectResponse, Response
+from fastapi import Depends, FastAPI, Query, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.templating import Jinja2Templates
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from config import (
-    STATIC_DIR,
-    TEMPLATES_DIR,
+    ALLOW_LEGACY_TOKEN_LOGIN,
+    BASE_DIR,
     DB_PATH,
-    SESSION_COOKIE_NAME,
-    SITE_URL,
     DEV_MODE,
     DEV_TOKEN,
     IS_PROD,
-    ALLOW_LEGACY_TOKEN_LOGIN,
-    BASE_DIR,
+    SESSION_COOKIE_NAME,
     SESSION_SECRET_FROM_ENV,
+    SITE_URL,
+    STATIC_DIR,
+    TEMPLATES_DIR,
 )
+from migrations_runner import apply_migrations
+from routers.admin import get_admin_router
+from routers.api import router as api_router
+from routers.auth import get_auth_router
+from routers.billing import router as billing_router
+from routers.deps import get_portal_issuer
+from routers.invoicing import get_invoicing_router
+from routers.portal import get_portal_router
+from routers.public import get_public_router
 from services import issuers
 from services.auth import session
 from services.errors import AppError
-from routers.deps import get_portal_issuer
-from routers.auth import get_auth_router
-from routers.api import router as api_router
-from routers.public import get_public_router
-from routers.portal import get_portal_router
-from routers.invoicing import get_invoicing_router
-from routers.admin import get_admin_router
-from routers.billing import router as billing_router
 
 # Optional Sentry integration
 _sentry_dsn = os.environ.get("SENTRY_DSN", "").strip()
@@ -684,7 +684,7 @@ async def redirect_token_middleware(request: Request, call_next):
 
     if token_query and is_portal_html and ALLOW_LEGACY_TOKEN_LOGIN:
         # Rate limit token login: max 5 attempts per IP per 60s
-        from services.auth.rate_limit import is_rate_limited, get_client_ip
+        from services.auth.rate_limit import get_client_ip, is_rate_limited
         if is_rate_limited(request, "token_login", window_seconds=60, max_attempts=5):
             client_ip = get_client_ip(request)
             logging.getLogger(__name__).warning(
@@ -774,7 +774,7 @@ def _health_checks():
     y campos para Support Snapshot (diagnóstico sin secretos)."""
     import os
 
-    from config import BASE_DIR, ENV, DEV_MODE
+    from config import BASE_DIR, DEV_MODE, ENV
     from database import db, db_rows
 
     out = {

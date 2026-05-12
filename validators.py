@@ -5,7 +5,6 @@ Validación de datos para clientes (RFC, CP, régimen, email) y productos (Clave
 import re
 from typing import Optional
 
-
 # RFC: 12 caracteres (persona moral) o 13 (persona física). Alfanumérico.
 # Casos especiales: XAXX010101000, XEXX010101000 (público en general / extranjero).
 _RFC_PATTERN = re.compile(r"^[A-Z&Ñ][0-9A-Z&Ñ]{11,12}$")

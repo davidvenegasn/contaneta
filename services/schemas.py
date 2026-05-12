@@ -14,7 +14,6 @@ from typing import Optional
 
 from pydantic import BaseModel, Field, validator
 
-
 _RFC_RE = re.compile(r"^[A-ZÑ&]{3,4}[0-9]{6}[A-Z0-9]{2,3}$")
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 

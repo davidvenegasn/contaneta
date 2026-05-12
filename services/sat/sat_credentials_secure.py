@@ -8,7 +8,6 @@ from typing import Iterator
 
 from config import BASE_DIR
 from database import db
-
 from services.sat.crypto_at_rest import decrypt_bytes, decrypt_text, encrypt_bytes, encrypt_text
 
 

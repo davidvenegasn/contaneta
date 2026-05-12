@@ -1,8 +1,8 @@
 """Emisores (issuers) y tokens legacy."""
 import secrets
 
+from config import DEMO_ISSUER_ID, DEV_MODE, DEV_TOKEN
 from database import db, db_rows, has_column
-from config import DEV_MODE, DEV_TOKEN, DEMO_ISSUER_ID
 
 # Días de trial al registrar (sin Stripe aún). Configurable por env si se desea.
 TRIAL_DAYS_DEFAULT = 14

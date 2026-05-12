@@ -1,27 +1,24 @@
 # Rutas de facturación: submit del formulario y descargas (XML/PDF desde sat_cfdi o Facturapi)
 import logging
 import os
-from typing import Optional, List
+from typing import List, Optional
 
 logger = logging.getLogger(__name__)
 
-from fastapi import APIRouter, Request, Form, Depends, HTTPException
-from fastapi.responses import HTMLResponse, Response, RedirectResponse
-
-from fastapi import Request
+from fastapi import APIRouter, Depends, Form, HTTPException, Request
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 
 from config import BASE_DIR
 from database import db, table_exists
-from facturapi_client import create_invoice, download_invoice, FacturapiError
-from validators import validate_customer
-from services.form_parse import parse_items_from_form, parse_payments_from_form
-from services.auth import csrf as csrf_service
-from services import audit
-from services.billing import subscription as subscription_service
-from services.action_log import log_action
-from services.invoices import invoices_engine
-from services import file_access_log
+from facturapi_client import FacturapiError, create_invoice, download_invoice
 from routers.deps import get_portal_issuer
+from services import audit, file_access_log
+from services.action_log import log_action
+from services.auth import csrf as csrf_service
+from services.billing import subscription as subscription_service
+from services.form_parse import parse_items_from_form, parse_payments_from_form
+from services.invoices import invoices_engine
+from validators import validate_customer
 
 
 def _safe_abs_path(path_like: str) -> str:
@@ -176,7 +173,7 @@ def get_invoicing_router(templates):
                 entity="cfdi",
                 entity_id=uuid_clean[:36],
             )
-            from cfdi_pdf import parse_cfdi_xml, build_pdf
+            from cfdi_pdf import build_pdf, parse_cfdi_xml
             data = parse_cfdi_xml(abs_path)
             pdf_bytes = build_pdf(data)
             if not pdf_bytes:

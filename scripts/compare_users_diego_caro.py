@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Compara la cuenta de Diego con la de Caro para ver qué difiere."""
-import sys
 import os
+import sys
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from database import db_rows

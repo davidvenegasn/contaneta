@@ -10,8 +10,8 @@ from __future__ import annotations
 import logging
 from typing import Any, Optional
 
-from database import db, db_rows, table_exists, has_column
-from services.bank.bank_cfdi_matching import score_movement_cfdi, refresh_suggestions_for_month
+from database import db, db_rows, has_column, table_exists
+from services.bank.bank_cfdi_matching import refresh_suggestions_for_month, score_movement_cfdi
 
 logger = logging.getLogger(__name__)
 

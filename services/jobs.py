@@ -9,7 +9,6 @@ from typing import Any
 from database import db
 from services.db_utils import execute, fetch_all, fetch_one, scalar
 
-
 ALLOWED_STATUSES = {"queued", "running", "success", "failed"}
 
 

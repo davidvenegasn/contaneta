@@ -2,13 +2,13 @@
 import logging
 import time
 
-from fastapi import Request, HTTPException
+from fastapi import HTTPException, Request
 
 from config import ALLOW_DEMO_PORTAL, ALLOW_LEGACY_TOKEN_LOGIN, DEV_MODE, DEV_TOKEN, SESSION_TTL_DAYS
-from database import db_rows, has_column, db
+from database import db, db_rows, has_column
 from services import issuers
-from services.auth import session, users
 from services.auth import rate_limit as rate_limit_service
+from services.auth import session, users
 
 logger = logging.getLogger(__name__)
 

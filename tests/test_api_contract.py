@@ -3,7 +3,6 @@ import sys
 import tempfile
 from pathlib import Path
 
-
 # Fijar DB de test antes de importar app/config
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
@@ -18,13 +17,12 @@ if not os.environ.get("SESSION_SECRET"):
 
 from fastapi.testclient import TestClient  # noqa: E402
 
+from app import app  # noqa: E402
 from config import DB_PATH  # noqa: E402
 from database import db  # noqa: E402
 from migrations_runner import apply_migrations  # noqa: E402
 from services import jobs as jobs_service  # noqa: E402
 from tests.helpers import make_session_cookie  # noqa: E402
-from app import app  # noqa: E402
-
 
 ISSUER_ID = 9101
 USER_ID = 9101

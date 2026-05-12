@@ -3,9 +3,9 @@ import logging
 import os
 import sqlite3
 import time
+from contextlib import contextmanager
 
 from config import CATALOGS_DB, DB_PATH
-from contextlib import contextmanager
 
 logger = logging.getLogger(__name__)
 

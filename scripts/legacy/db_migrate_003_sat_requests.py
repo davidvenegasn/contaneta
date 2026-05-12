@@ -3,7 +3,8 @@
 # Ver MIGRATION_LEGACY_MAP.md en la raíz del proyecto. No ejecutar.
 # ---
 
-import sqlite3, os
+import os
+import sqlite3
 
 DB_PATH = os.getenv("APP_DB_PATH", "invoicing.db")
 

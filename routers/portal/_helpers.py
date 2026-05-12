@@ -4,13 +4,17 @@ import logging
 import os
 import re
 from datetime import datetime
-from typing import Optional, Any
+from typing import Any, Optional
 
 from fastapi import Request
 
 from config import (
-    BASE_DIR, DB_PATH, DEV_MODE, PORTAL_SHELL_V2,
-    REGIMEN_LABEL_TO_CODE, REGIMEN_CODE_DESCRIPTIONS,
+    BASE_DIR,
+    DB_PATH,
+    DEV_MODE,
+    PORTAL_SHELL_V2,
+    REGIMEN_CODE_DESCRIPTIONS,
+    REGIMEN_LABEL_TO_CODE,
 )
 from database import db, db_rows, has_column
 from services.auth import csrf as csrf_service

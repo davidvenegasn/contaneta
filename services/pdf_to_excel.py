@@ -1,11 +1,11 @@
 import hashlib
+import logging
 import os
 import re
 import unicodedata
-import logging
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
-from typing import Optional, Iterable, Any
+from typing import Any, Iterable, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -504,7 +504,7 @@ def convert_pdf_to_xlsx(
     except ModuleNotFoundError:
         pdfplumber = None
     from openpyxl import Workbook
-    from openpyxl.styles import Font, Alignment
+    from openpyxl.styles import Alignment, Font
     from openpyxl.utils import get_column_letter
 
     if not os.path.isfile(pdf_path_abs):

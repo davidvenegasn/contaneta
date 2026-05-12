@@ -14,12 +14,11 @@ from reportlab.lib.units import inch
 from reportlab.platypus import (
     Image,
     Paragraph,
+    SimpleDocTemplate,
     Spacer,
     Table,
     TableStyle,
-    SimpleDocTemplate,
 )
-
 
 # Catálogos SAT (subset común)
 FORMA_PAGO = {

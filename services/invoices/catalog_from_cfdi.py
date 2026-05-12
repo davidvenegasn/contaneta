@@ -6,7 +6,7 @@ import sqlite3
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional, Any
+from typing import Any, Optional
 
 from config import BASE_DIR
 from database import db

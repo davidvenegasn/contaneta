@@ -1,0 +1,32 @@
+# Ruff configuration for ContaNeta
+# https://docs.astral.sh/ruff/
+
+target-version = "py311"
+line-length = 120
+
+[lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "SIM",  # flake8-simplify
+    "S",    # flake8-bandit (security)
+]
+ignore = [
+    "E501",   # line too long (handled by formatter)
+    "S101",   # assert usage (ok in tests)
+    "S603",   # subprocess without shell=True (we use PHP subprocess intentionally)
+    "S607",   # partial path in subprocess (PHP scripts)
+    "B008",   # function call in default arg (FastAPI Depends/Query pattern)
+    "UP007",  # use X | Y for union types (keep Optional for py311 compat)
+]
+
+[lint.per-file-ignores]
+"tests/**" = ["S101", "S106"]
+"migrations/**" = ["E501"]
+
+[lint.isort]
+known-first-party = ["services", "routers", "database", "config", "validators"]

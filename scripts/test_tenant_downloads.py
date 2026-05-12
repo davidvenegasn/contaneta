@@ -34,12 +34,12 @@ else:
 if not os.environ.get("SESSION_SECRET"):
     os.environ["SESSION_SECRET"] = "test-secret-tenant-downloads"
 
-from migrations_runner import apply_migrations
 from fastapi.testclient import TestClient
 
-from config import BASE_DIR, DB_PATH
 from app import app
+from config import BASE_DIR, DB_PATH
 from database import db
+from migrations_runner import apply_migrations
 from services.auth import session as session_service
 
 # Aplicar migraciones a la DB de test

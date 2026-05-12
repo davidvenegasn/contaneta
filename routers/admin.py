@@ -6,17 +6,29 @@ import subprocess
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import APIRouter, Request, Depends, HTTPException, Form, Query
-from fastapi.responses import RedirectResponse, HTMLResponse
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 
-from config import DB_PATH, ENV, IS_PROD, DEV_MODE, SESSION_SECRET_FROM_ENV, AT_REST_MASTER_KEY_SET, COOKIE_SECURE, SITE_URL, STRIPE_SECRET_KEY
+from config import (
+    AT_REST_MASTER_KEY_SET,
+    COOKIE_SECURE,
+    DB_PATH,
+    DEV_MODE,
+    ENV,
+    IS_PROD,
+    SESSION_SECRET_FROM_ENV,
+    SITE_URL,
+    STRIPE_SECRET_KEY,
+)
 from database import db, db_rows, has_column
 from migrations_runner import apply_migrations
-from services.auth import session, users, csrf as csrf_service
-from services import issuers, audit, error_events as error_events_service
-from services.action_log import log_action
 from services import admin_issuer as admin_issuer_service
+from services import audit, issuers
+from services import error_events as error_events_service
+from services.action_log import log_action
+from services.auth import csrf as csrf_service
+from services.auth import session, users
 
 basic_auth = HTTPBasic(auto_error=False)
 

@@ -9,8 +9,8 @@ Uso: python3 scripts/seed_demo_data.py
 Idempotente: si ya hay datos del demo, no duplica (comprueba por issuer_id=2).
 """
 import os
-import sqlite3
 import secrets
+import sqlite3
 from datetime import datetime, timedelta
 from random import choice, randint, uniform
 

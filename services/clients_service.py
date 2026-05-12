@@ -7,7 +7,7 @@ from __future__ import annotations
 from typing import Tuple
 
 from database import db
-from services.db_utils import fetch_all, scalar, execute
+from services.db_utils import execute, fetch_all, scalar
 from services.schemas import ClientCreate
 
 

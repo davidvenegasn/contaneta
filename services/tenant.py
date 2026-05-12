@@ -22,6 +22,7 @@ def require_issuer_id(issuer: dict[str, Any]) -> int:
 
 
 import re
+
 from services.errors import ForbiddenError, NotFoundError
 
 

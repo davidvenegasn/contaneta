@@ -3,7 +3,7 @@ import json
 import logging
 import os
 
-from fastapi import Request, HTTPException
+from fastapi import HTTPException, Request
 
 from config import BASE_DIR, DEV_FIXTURES
 from services.auth.rate_limit import is_rate_limited

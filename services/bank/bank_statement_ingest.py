@@ -10,7 +10,7 @@ import re
 from datetime import datetime, timezone
 from typing import Any, Optional
 
-from database import db, table_exists, has_column
+from database import db, has_column, table_exists
 from services.bank.bank_accounts import get_account_raw as bank_get_account
 from services.bank.bank_preview_models import compute_dedupe_fingerprint
 

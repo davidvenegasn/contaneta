@@ -1,12 +1,13 @@
 """Rutas públicas: cotización por link (/q/{token}, /public/cotizacion), /pricing."""
 from datetime import datetime
 
-from fastapi import APIRouter, Request, Form, Query
-from fastapi.responses import HTMLResponse, Response, RedirectResponse
+from fastapi import APIRouter, Form, Query, Request
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 
 from database import db
 from services import quotations
 from services.billing.plans import PLANS
+
 
 def get_public_router(templates):
     router = APIRouter()

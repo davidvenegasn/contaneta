@@ -15,8 +15,8 @@ from datetime import datetime, timezone
 
 from database import db
 from services.errors import ExternalServiceError
-from services.sat.subprocess_utils import run_php
 from services.sat.sat_credentials_secure import decrypted_fiel_env
+from services.sat.subprocess_utils import run_php
 
 logger = logging.getLogger(__name__)
 

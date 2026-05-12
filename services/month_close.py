@@ -7,8 +7,7 @@ from typing import Any
 
 from config import BASE_DIR
 from database import db
-from services.pdf_to_excel import get_storage_root, safe_join, ensure_parent_dir
-
+from services.pdf_to_excel import ensure_parent_dir, get_storage_root, safe_join
 
 _YM_RE = re.compile(r"^\d{4}-\d{2}$")
 

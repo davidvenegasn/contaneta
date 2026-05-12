@@ -9,6 +9,7 @@ Crea la tabla issuer_products para guardar productos/servicios del emisor
 """
 import os
 import sqlite3
+
 from dotenv import load_dotenv
 
 load_dotenv()

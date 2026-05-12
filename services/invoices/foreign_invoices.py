@@ -1,6 +1,6 @@
 """Foreign invoices — invoices/gastos de servicios internacionales."""
 
-from database import db, db_rows, db_execute, table_exists
+from database import db, db_execute, db_rows, table_exists
 
 
 def ensure_table():

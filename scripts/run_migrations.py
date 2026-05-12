@@ -4,9 +4,9 @@ Ejecuta apply_migrations(DB_PATH) manualmente sin levantar uvicorn.
 Útil para aplicar migraciones en producción o antes de arrancar la app.
 Uso: APP_DB_PATH=invoicing.db python scripts/run_migrations.py
 """
+import logging
 import os
 import sys
-import logging
 from pathlib import Path
 
 # Agregar raíz del proyecto al path para importar migrations_runner

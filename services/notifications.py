@@ -8,7 +8,6 @@ from typing import Any, Optional
 from database import db, db_rows, has_column, table_exists
 from services.month_close import pdf_exists
 
-
 SEVERITY_INFO = "info"
 SEVERITY_WARNING = "warning"
 SEVERITY_DANGER = "danger"

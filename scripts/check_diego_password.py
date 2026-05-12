@@ -5,8 +5,8 @@ Uso (desde la raíz del proyecto):
   python scripts/check_diego_password.py
   python scripts/check_diego_password.py "diegoesgay?"
 """
-import sys
 import os
+import sys
 
 # Asegurar que el proyecto está en el path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

@@ -9,7 +9,7 @@ import logging
 import os
 import re
 from dataclasses import dataclass, field
-from typing import Any, Optional, List
+from typing import Any, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -239,11 +239,11 @@ def summarize(description_raw: str, method: str, counterparty: Optional[str]) ->
 def _classify(m: MovementPreview, desc_norm: str, preset: Optional[dict[str, Any]] = None) -> None:
     """Clasifica en método, categoría, bucket, deductible_hint, needs_review, confidence. Registra rule_hits y confidence_breakdown."""
     from services.bank.bank_classifier_presets import (
-        get_preset,
-        KEYWORDS_TARJETA,
         KEYWORDS_IMPUESTO,
+        KEYWORDS_TARJETA,
         MERCHANT_MAP,
         PRESET_CONSERVATIVE,
+        get_preset,
     )
     preset = preset or get_preset(PRESET_CONSERVATIVE)
     default_bucket = preset.get("default_bucket_unknown") or "DESCONOCIDO"
@@ -461,11 +461,11 @@ def parse_bank_pdf_to_movements_preview(pdf_path: str, preset: str = "conservati
             "raw_debug": None,
         }
     from services.bank.bank_statement_parser import (
-        locate_sections,
-        build_transactions,
-        norm_text,
-        extract_money_candidates,
         _parse_banorte_date_from_start,
+        build_transactions,
+        extract_money_candidates,
+        locate_sections,
+        norm_text,
     )
     raw_rows: list[dict[str, Any]] = []
     with pdfplumber.open(pdf_path) as pdf:

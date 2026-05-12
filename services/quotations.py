@@ -95,9 +95,9 @@ def build_quotation_pdf(quote: dict) -> bytes:
     """Genera PDF formal de cotización: encabezado, emisor, cliente, tabla conceptos, totales, vigencia, notas."""
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import letter
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
     from reportlab.lib.units import inch
-    from reportlab.platypus import Paragraph, Spacer, Table, TableStyle, SimpleDocTemplate
+    from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
     buf = BytesIO()
     margin = 0.65 * inch
