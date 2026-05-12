@@ -12,6 +12,7 @@ def _register_all():
     from routers.api.operations import register_operations_routes
     from routers.api.products import register_products_routes
     from routers.api.providers import register_providers_routes
+    from routers.api.fiscal import register_fiscal_routes
     from routers.api.quotations import register_quotations_routes
 
     register_account_routes(router)
@@ -22,6 +23,7 @@ def _register_all():
     register_providers_routes(router)
     register_catalogs_routes(router)
     register_operations_routes(router)
+    register_fiscal_routes(router)
 
 
 _register_all()
