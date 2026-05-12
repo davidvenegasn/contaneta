@@ -21,11 +21,6 @@
         <div class="metric-sub">{{ ym_label|default('') }}</div>
       </div>
       <div class="card metric-card">
-        <div class="metric-label">Movimientos</div>
-        <div class="metric-value">{{ total_count|default(0) }}</div>
-        <div class="metric-sub">{{ ym_label|default('') }}</div>
-      </div>
-      <div class="card metric-card">
         <div class="metric-label">Cuenta propia</div>
         <div class="metric-value metric-value--compact">
           <div>Entradas: ${{ '{:,.2f}'.format(cuenta_propia_entradas|default(0)) }}</div>
@@ -71,10 +66,6 @@
         <button type="button" class="btn btn--sm btn--ghost" id="addMovBtn" title="Agregar movimiento">
           <svg class="icon" viewBox="0 0 24 24" fill="none" width="16" height="16"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
           Agregar movimiento
-        </button>
-        <button type="button" class="btn btn--sm btn--ghost" id="addInvoiceBtn" title="Agregar invoice extranjero">
-          <svg class="icon" viewBox="0 0 24 24" fill="none" width="16" height="16"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.75"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10A15.3 15.3 0 0 1 12 2" stroke="currentColor" stroke-width="1.75"/></svg>
-          Agregar Invoice
         </button>
         <button type="button" class="btn btn--sm btn--ghost filters-toggle" id="filtersToggleBtn" aria-expanded="false" aria-controls="movementsFiltersPanel">
           <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true" width="18" height="18"><path d="M4 6h16M4 12h10M4 18h6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
@@ -716,12 +707,6 @@
     if (addMovBtn) {
       addMovBtn.addEventListener('click', function() {
         if (window.openAddMovementModal) window.openAddMovementModal();
-      });
-    }
-    var addInvBtn = document.getElementById('addInvoiceBtn');
-    if (addInvBtn) {
-      addInvBtn.addEventListener('click', function() {
-        if (window.openAddInvoiceModal) window.openAddInvoiceModal();
       });
     }
   })();
