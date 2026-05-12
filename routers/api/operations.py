@@ -266,16 +266,29 @@ def register_operations_routes(router):
     def api_notifications_list(
         request: Request,
         issuer: dict = Depends(get_portal_issuer),
-        unread_only: bool = Query(True),
-        limit: int = Query(10, ge=1, le=50),
+        unread_only: bool = Query(False),
+        limit: int = Query(20, ge=1, le=50),
     ):
+        """List notifications for the current tenant. Includes unread_count in meta."""
         from services import notifications as notif_service
         issuer_id = int(issuer.get("id") or 0)
         if issuer_id <= 0:
             raise HTTPException(status_code=401, detail="Sesión inválida")
-        items = notif_service.list_notifications(issuer_id, unread_only=unread_only, limit=limit)
-        return ok_list(items, len(items))
+        items = notif_service.get_notifications(issuer_id, limit=limit, unread_only=unread_only)
+        unread = notif_service.count_unread(issuer_id)
+        return ok_list(items, len(items), unread_count=unread)
 
+    @router.get("/notifications/unread-count")
+    def api_notifications_unread_count(
+        request: Request,
+        issuer: dict = Depends(get_portal_issuer),
+    ):
+        """Return the count of unread notifications for the current tenant."""
+        from services import notifications as notif_service
+        issuer_id = int(issuer.get("id") or 0)
+        if issuer_id <= 0:
+            raise HTTPException(status_code=401, detail="Sesión inválida")
+        return ok({"unread_count": notif_service.count_unread(issuer_id)})
 
     @router.post("/notifications/{notification_id}/read")
     def api_notification_mark_read(
@@ -283,6 +296,7 @@ def register_operations_routes(router):
         notification_id: int,
         issuer: dict = Depends(get_portal_issuer),
     ):
+        """Mark a single notification as read."""
         csrf_service.verify_api_csrf(request)
         from services import notifications as notif_service
         issuer_id = int(issuer.get("id") or 0)
@@ -291,22 +305,32 @@ def register_operations_routes(router):
         success = notif_service.mark_read(issuer_id, notification_id)
         return ok({"marked": success})
 
+    @router.post("/notifications/read-all")
+    def api_notifications_read_all(
+        request: Request,
+        issuer: dict = Depends(get_portal_issuer),
+    ):
+        """Mark all unread notifications as read (single UPDATE, no loop)."""
+        csrf_service.verify_api_csrf(request)
+        from services import notifications as notif_service
+        issuer_id = int(issuer.get("id") or 0)
+        if issuer_id <= 0:
+            raise HTTPException(status_code=401, detail="Sesión inválida")
+        count = notif_service.mark_all_read(issuer_id)
+        return ok({"marked": count})
 
     @router.post("/notifications/mark-all-read")
     def api_notifications_mark_all_read(
         request: Request,
         issuer: dict = Depends(get_portal_issuer),
     ):
+        """Legacy alias kept for backward compat — prefer /notifications/read-all."""
         csrf_service.verify_api_csrf(request)
         from services import notifications as notif_service
         issuer_id = int(issuer.get("id") or 0)
         if issuer_id <= 0:
             raise HTTPException(status_code=401, detail="Sesión inválida")
-        items = notif_service.list_notifications(issuer_id, unread_only=True, limit=200)
-        count = 0
-        for n in items:
-            if notif_service.mark_read(issuer_id, n["id"]):
-                count += 1
+        count = notif_service.mark_all_read(issuer_id)
         return ok({"marked": count})
 
 

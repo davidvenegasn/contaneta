@@ -7195,6 +7195,8 @@ html.nightmode .upload-zone.is-dragover { background: rgba(129,140,248,.08); }
   text-decoration: none;
 }
 .notif-item__action:hover { text-decoration: underline; }
+.notif-item--unread { background: var(--accent-soft, #eef2ff); }
+.notif-item--unread .notif-item__title { font-weight: var(--fw-bold); }
 .notif-item--warning { border-left: 3px solid #f59e0b; }
 .notif-item--danger { border-left: 3px solid #ef4444; }
 

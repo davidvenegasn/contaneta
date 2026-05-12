@@ -1059,7 +1059,7 @@
   }
 
   // ============ Notification Drawer ============
-  // Deferred: drawer HTML is rendered after this script block
+  // Uses server-side unread count and /api/notifications endpoints
   document.addEventListener('DOMContentLoaded', function() {
   (function() {
     var bellBtn = document.getElementById('notifBellBtn');
@@ -1072,37 +1072,34 @@
     var emptyEl = document.getElementById('notifDrawerEmpty');
     if (!bellBtn || !drawer) return;
 
-    var NOTIF_LS_KEY = 'notif_last_seen';
+    function getCsrfToken() {
+      var meta = document.querySelector('meta[name="csrf-token"]');
+      return meta ? meta.content : '';
+    }
+
+    function setBadge(count) {
+      if (count > 0) {
+        badge.textContent = count > 99 ? '99+' : String(count);
+        badge.hidden = false;
+      } else {
+        badge.hidden = true;
+      }
+    }
 
     function updateBadge() {
-      fetch('/api/activity?limit=20', { credentials: 'same-origin' })
+      fetch('/api/notifications/unread-count', { credentials: 'same-origin' })
         .then(function(r) { return r.json(); })
         .then(function(res) {
-          var items = res.items || (res.data && res.data.items) || [];
-          var lastSeen = parseInt(localStorage.getItem(NOTIF_LS_KEY) || '0', 10);
-          if (!lastSeen) {
-            localStorage.setItem(NOTIF_LS_KEY, String(Date.now()));
-            badge.hidden = true;
-            return;
-          }
-          var count = 0;
-          items.forEach(function(a) {
-            try {
-              var ts = new Date(a.fecha_emision + (a.fecha_emision.indexOf('Z') === -1 ? 'Z' : '')).getTime();
-              if (ts > lastSeen) count++;
-            } catch(e) {}
-          });
-          if (count > 0) {
-            badge.textContent = count > 9 ? '9+' : String(count);
-            badge.hidden = false;
-          } else {
-            badge.hidden = true;
-          }
+          var count = (res.data && res.data.unread_count != null) ? res.data.unread_count : 0;
+          setBadge(count);
+          if (markAllBtn) markAllBtn.hidden = (count === 0);
         })
         .catch(function() {});
     }
 
+    // Poll badge every 60 seconds + initial load
     updateBadge();
+    setInterval(updateBadge, 60000);
 
     var _notifOpen = false;
     function openNotifDrawer() {
@@ -1110,14 +1107,11 @@
       drawer.hidden = false;
       if (backdrop) backdrop.hidden = false;
       bellBtn.setAttribute('aria-expanded', 'true');
-      // Force layout recalc so transition works after hidden removal
       void drawer.offsetHeight;
       drawer.classList.add('notif-drawer--open');
       if (backdrop) backdrop.classList.add('notif-backdrop--visible');
       if (window.uiLockScroll) window.uiLockScroll();
       loadNotifications();
-      localStorage.setItem(NOTIF_LS_KEY, String(Date.now()));
-      badge.hidden = true;
     }
     function closeNotifDrawer() {
       _notifOpen = false;
@@ -1128,7 +1122,6 @@
       setTimeout(function() { drawer.hidden = true; if (backdrop) backdrop.hidden = true; }, 300);
     }
 
-    // Expose close globally for "Ver todo" button
     window.closeNotifDrawerGlobal = closeNotifDrawer;
 
     bellBtn.addEventListener('click', function() { _notifOpen ? closeNotifDrawer() : openNotifDrawer(); });
@@ -1136,11 +1129,37 @@
     if (backdrop) backdrop.addEventListener('click', closeNotifDrawer);
     document.addEventListener('keydown', function(e) { if (e.key === 'Escape' && _notifOpen) closeNotifDrawer(); });
 
+    // Mark all read
+    if (markAllBtn) {
+      markAllBtn.addEventListener('click', function() {
+        fetch('/api/notifications/read-all', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'X-CSRF-Token': getCsrfToken() }
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(res) {
+          if (res.ok) {
+            setBadge(0);
+            markAllBtn.hidden = true;
+            // Update items in-place to show read state
+            var items = listEl.querySelectorAll('.notif-item--unread');
+            for (var i = 0; i < items.length; i++) {
+              items[i].classList.remove('notif-item--unread');
+              items[i].classList.add('notif-item--read');
+            }
+          }
+        })
+        .catch(function() {});
+      });
+    }
+
     var sevIcons = {
       danger: '<svg class="notif-sev-icon" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="#ef4444" stroke-width="1.5"/><path d="M8 5v3.5" stroke="#ef4444" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="11.5" r="0.75" fill="#ef4444"/></svg>',
       warning: '<svg class="notif-sev-icon" viewBox="0 0 16 16" fill="none"><path d="M8 2 1.5 14h13L8 2z" stroke="#f59e0b" stroke-width="1.3" stroke-linejoin="round"/><path d="M8 7v3" stroke="#f59e0b" stroke-width="1.3" stroke-linecap="round"/><circle cx="8" cy="12" r="0.6" fill="#f59e0b"/></svg>',
       info: '<svg class="notif-sev-icon" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="#6366f1" stroke-width="1.5"/><path d="M8 7v4" stroke="#6366f1" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="4.75" r="0.75" fill="#6366f1"/></svg>'
     };
+
     function relativeTime(dateStr) {
       if (!dateStr) return '';
       try {
@@ -1153,60 +1172,77 @@
         return dateStr.slice(0, 10);
       } catch(e) { return dateStr ? dateStr.slice(0, 10) : ''; }
     }
-    function formatMoney(n) {
-      if (n == null) return '';
-      return '$' + Number(n).toLocaleString('es-MX', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+
+    function markSingleRead(notifId, liEl) {
+      fetch('/api/notifications/' + notifId + '/read', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'X-CSRF-Token': getCsrfToken() }
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(res) {
+        if (res.ok) {
+          liEl.classList.remove('notif-item--unread');
+          liEl.classList.add('notif-item--read');
+          updateBadge();
+        }
+      })
+      .catch(function() {});
     }
 
     function loadNotifications() {
       listEl.innerHTML = '<li class="notif-item" style="justify-content:center;color:var(--text-muted);padding:24px;">Cargando...</li>';
       emptyEl.hidden = true;
-      var prevLastSeen = parseInt(localStorage.getItem(NOTIF_LS_KEY) || '0', 10);
-      fetch('/api/activity?limit=20')
+      fetch('/api/notifications?limit=20&unread_only=false', { credentials: 'same-origin' })
         .then(function(r) { return r.json(); })
         .then(function(res) {
           var items = res.items || (res.data && res.data.items) || [];
+          var unreadCount = (res.meta && res.meta.unread_count != null) ? res.meta.unread_count : 0;
+          setBadge(unreadCount);
+          if (markAllBtn) markAllBtn.hidden = (unreadCount === 0);
           if (!items.length) { emptyEl.hidden = false; listEl.innerHTML = ''; return; }
           emptyEl.hidden = true;
-          listEl.innerHTML = items.map(function(a) {
-            var isIssued = a.direction === 'issued';
-            var icon = isIssued
-              ? '<span class="notif-activity-icon notif-activity-icon--issued" aria-hidden="true">↑</span>'
-              : '<span class="notif-activity-icon notif-activity-icon--received" aria-hidden="true">↓</span>';
-            var label = isIssued ? 'Emitida' : 'Recibida';
-            var name = a.nombre || 'Sin nombre';
-            var detailUrl = '/portal/cfdi/' + (isIssued ? 'issued' : 'received') + '/' + (a.uuid || '');
-            // Determine if unread
-            var isUnread = false;
-            if (prevLastSeen) {
-              try {
-                var ts = new Date(a.fecha_emision + (a.fecha_emision.indexOf('Z') === -1 ? 'Z' : '')).getTime();
-                if (ts > prevLastSeen) isUnread = true;
-              } catch(e) {}
-            }
-            var unreadClass = isUnread ? ' notif-item--unread' : '';
-            return '<li class="notif-item notif-item--activity' + unreadClass + '">' +
+          listEl.innerHTML = items.map(function(n) {
+            var sev = n.severity || 'info';
+            var icon = sevIcons[sev] || sevIcons.info;
+            var isUnread = !n.read_at;
+            var sevClass = (sev === 'warning' || sev === 'danger') ? ' notif-item--' + sev : '';
+            var readClass = isUnread ? ' notif-item--unread' : ' notif-item--read';
+            var actionHtml = n.action_url
+              ? '<a href="' + n.action_url + '" class="notif-item__action" title="Ir" data-notif-id="' + n.id + '">Ver</a>'
+              : '';
+            return '<li class="notif-item' + sevClass + readClass + '" data-notif-id="' + n.id + '">' +
               '<div class="notif-item__icon">' + icon + '</div>' +
               '<div class="notif-item__content">' +
-                '<div class="notif-item__title">' +
-                  '<span class="notif-activity-badge notif-activity-badge--' + a.direction + '">' + label + '</span> ' +
-                  '<span class="notif-activity-name">' + (name.length > 30 ? name.substring(0, 30) + '…' : name) + '</span>' +
-                '</div>' +
+                '<div class="notif-item__title">' + (n.title || '') + '</div>' +
+                (n.body ? '<div class="notif-item__body">' + n.body + '</div>' : '') +
                 '<div class="notif-item__meta">' +
-                  '<span class="notif-item__time">' + (a.time_ago || '') + '</span>' +
-                  (a.total ? '<span class="notif-activity-amount">' + formatMoney(a.total) + '</span>' : '') +
+                  '<span class="notif-item__time">' + relativeTime(n.created_at) + '</span>' +
                 '</div>' +
               '</div>' +
-              '<a href="' + detailUrl + '" class="notif-item__action" title="Ver detalle" ' +
-                'onclick="this.closest(\'.notif-item\').classList.remove(\'notif-item--unread\')">→</a>' +
+              actionHtml +
             '</li>';
           }).join('');
-        })
-        .catch(function() {});
-    }
 
-    // Hide mark-all button (not applicable for activity feed)
-    if (markAllBtn) markAllBtn.hidden = true;
+          // Click handler: mark as read when clicking a notification row or its action link
+          listEl.querySelectorAll('.notif-item[data-notif-id]').forEach(function(li) {
+            li.addEventListener('click', function(e) {
+              var nid = li.getAttribute('data-notif-id');
+              if (li.classList.contains('notif-item--unread') && nid) {
+                markSingleRead(nid, li);
+              }
+              // If clicked action link, navigate
+              var link = li.querySelector('.notif-item__action[href]');
+              if (link && e.target === link) {
+                closeNotifDrawer();
+              }
+            });
+          });
+        })
+        .catch(function() {
+          listEl.innerHTML = '<li class="notif-item" style="justify-content:center;color:var(--text-muted);padding:24px;">Error al cargar</li>';
+        });
+    }
   })();
 
   // ============ Creation Panel ("+" button) ============
@@ -2184,12 +2220,12 @@
     fetchStatus();
   })();
 </script>
-<!-- ── Notification Drawer (right side, 320px) ── -->
+<!-- ── Notification Drawer (right side, 340px) ── -->
 <div class="notif-backdrop" id="notifBackdrop" hidden></div>
 <aside class="notif-drawer" id="notifDrawer" aria-label="Notificaciones" hidden>
   <div class="notif-drawer__head">
     <h2 class="notif-drawer__title">Notificaciones</h2>
-    <button type="button" class="btn btn-ghost btn-small" onclick="if(window.closeNotifDrawerGlobal)window.closeNotifDrawerGlobal();if(window.openActivityModal)window.openActivityModal();">Ver todo</button>
+    <button type="button" class="btn btn-ghost btn-small" id="notifMarkAllBtn" hidden>Marcar todo leído</button>
     <button type="button" class="icon-btn notif-drawer__close" id="notifDrawerClose" aria-label="Cerrar">
       <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
     </button>

@@ -1,3 +1,9 @@
+"""In-app notification service — create, list, mark-read, count unread.
+
+The notifications table is created by migration 027 and extended by 030 (meta_json)
+and 050 (user_id). The ensure_notifications_table() fallback guarantees the table
+exists even if migrations have not run yet (e.g. fresh dev environments).
+"""
 from __future__ import annotations
 
 import hashlib
@@ -5,7 +11,7 @@ import json
 from datetime import datetime, timezone
 from typing import Any
 
-from database import db, db_rows, has_column, table_exists
+from database import db, db_rows, db_execute, has_column, table_exists
 from services.month_close import pdf_exists
 
 SEVERITY_INFO = "info"
@@ -14,11 +20,13 @@ SEVERITY_DANGER = "danger"
 
 
 def _dedupe_key(*parts: str) -> str:
+    """Build a SHA-256 dedupe key from arbitrary string parts."""
     raw = "|".join([p or "" for p in parts])[:5000]
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
 def ensure_notifications_table() -> None:
+    """Create the notifications table and indexes if they do not exist."""
     conn = db()
     try:
         conn.execute(
@@ -26,6 +34,7 @@ def ensure_notifications_table() -> None:
             CREATE TABLE IF NOT EXISTS notifications (
               id INTEGER PRIMARY KEY AUTOINCREMENT,
               issuer_id INTEGER NOT NULL,
+              user_id INTEGER,
               type TEXT NOT NULL,
               title TEXT NOT NULL,
               body TEXT NOT NULL,
@@ -39,7 +48,69 @@ def ensure_notifications_table() -> None:
         )
         conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_notifications_dedupe ON notifications(issuer_id, dedupe_key);")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_notifications_issuer_read ON notifications(issuer_id, read_at, created_at);")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_notif_user ON notifications(issuer_id, user_id, read_at);")
         conn.commit()
+    finally:
+        conn.close()
+
+
+# ── Public API ────────────────────────────────────────────────────────────────
+
+
+def create_notification(
+    issuer_id: int,
+    title: str,
+    message: str = "",
+    type: str = "info",
+    link: str | None = None,
+    user_id: int | None = None,
+) -> int | None:
+    """Create a new notification and return its id.  No deduplication.
+
+    Args:
+        issuer_id: Tenant ID (required).
+        title: Short notification title.
+        message: Longer body text (optional).
+        type: Notification type/category, also used as severity. Defaults to 'info'.
+        link: Optional URL the notification should navigate to.
+        user_id: Optional — target a specific user within the tenant.
+
+    Returns:
+        The new notification id, or None on failure.
+    """
+    ensure_notifications_table()
+    issuer_id = int(issuer_id)
+    title = (title or "").strip()
+    message = (message or "").strip()
+    type = (type or SEVERITY_INFO).strip()
+    if not title:
+        return None
+
+    # Map type to a valid severity for display
+    severity = type if type in (SEVERITY_INFO, SEVERITY_WARNING, SEVERITY_DANGER) else SEVERITY_INFO
+
+    conn = db()
+    try:
+        cur = conn.execute(
+            """
+            INSERT INTO notifications (issuer_id, user_id, type, title, body, severity, action_url, dedupe_key, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+            """,
+            (
+                issuer_id,
+                int(user_id) if user_id else None,
+                type,
+                title,
+                message,
+                severity,
+                (link or "").strip() or None,
+                _dedupe_key(str(issuer_id), str(user_id or ""), type, title, message, str(datetime.now(timezone.utc).isoformat())),
+            ),
+        )
+        conn.commit()
+        return cur.lastrowid
+    except Exception:
+        return None
     finally:
         conn.close()
 
@@ -55,6 +126,10 @@ def create_notification_if_missing(
     dedupe_parts: list[str] | None = None,
     meta: dict | None = None,
 ) -> bool:
+    """Create a notification only if a matching dedupe_key does not exist yet.
+
+    Returns True if a new notification was created, False if it was a duplicate.
+    """
     ensure_notifications_table()
     issuer_id = int(issuer_id)
     type = (type or "").strip()
@@ -96,7 +171,17 @@ def create_notification_if_missing(
         conn.close()
 
 
-def list_notifications(issuer_id: int, *, unread_only: bool = True, limit: int = 10) -> list[dict[str, Any]]:
+def get_notifications(issuer_id: int, limit: int = 20, unread_only: bool = False) -> list[dict[str, Any]]:
+    """Return recent notifications for a tenant, newest first.
+
+    Args:
+        issuer_id: Tenant ID.
+        limit: Maximum number of notifications to return (1-50).
+        unread_only: If True, only return unread notifications.
+
+    Returns:
+        List of notification dicts.
+    """
     ensure_notifications_table()
     issuer_id = int(issuer_id)
     limit = max(1, min(int(limit), 50))
@@ -115,12 +200,26 @@ def list_notifications(issuer_id: int, *, unread_only: bool = True, limit: int =
     return rows or []
 
 
+def list_notifications(issuer_id: int, *, unread_only: bool = True, limit: int = 10) -> list[dict[str, Any]]:
+    """Legacy wrapper kept for backward compatibility with dashboard and operations router."""
+    return get_notifications(issuer_id, limit=limit, unread_only=unread_only)
+
+
 def mark_read(issuer_id: int, notification_id: int) -> bool:
+    """Mark a single notification as read. Returns True if it existed and was updated.
+
+    Args:
+        issuer_id: Tenant ID (ensures tenant isolation).
+        notification_id: The notification row id.
+
+    Returns:
+        True if the notification was found and marked, False otherwise.
+    """
     ensure_notifications_table()
     conn = db()
     try:
         row = conn.execute(
-            "SELECT id FROM notifications WHERE id = ? AND issuer_id = ? LIMIT 1",
+            "SELECT id FROM notifications WHERE id = ? AND issuer_id = ? AND read_at IS NULL LIMIT 1",
             (int(notification_id), int(issuer_id)),
         ).fetchone()
         if not row:
@@ -133,6 +232,45 @@ def mark_read(issuer_id: int, notification_id: int) -> bool:
         return True
     finally:
         conn.close()
+
+
+def mark_all_read(issuer_id: int) -> int:
+    """Mark all unread notifications for a tenant as read. Returns count of updated rows.
+
+    Args:
+        issuer_id: Tenant ID.
+
+    Returns:
+        Number of notifications that were marked as read.
+    """
+    ensure_notifications_table()
+    conn = db()
+    try:
+        cur = conn.execute(
+            "UPDATE notifications SET read_at = datetime('now') WHERE issuer_id = ? AND read_at IS NULL",
+            (int(issuer_id),),
+        )
+        conn.commit()
+        return cur.rowcount
+    finally:
+        conn.close()
+
+
+def count_unread(issuer_id: int) -> int:
+    """Return the number of unread notifications for a tenant.
+
+    Args:
+        issuer_id: Tenant ID.
+
+    Returns:
+        Integer count of unread notifications.
+    """
+    ensure_notifications_table()
+    rows = db_rows(
+        "SELECT COUNT(*) AS n FROM notifications WHERE issuer_id = ? AND read_at IS NULL",
+        (int(issuer_id),),
+    )
+    return int(rows[0]["n"]) if rows else 0
 
 
 def refresh_for_issuer(issuer_id: int) -> None:
