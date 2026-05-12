@@ -3,7 +3,7 @@ import logging
 
 from fastapi import Depends, HTTPException, Query, Request
 
-from database import db_rows
+from database import db_execute, db_rows
 from routers.deps import get_portal_issuer
 
 logger = logging.getLogger(__name__)
@@ -167,3 +167,73 @@ def register_account_routes(router):
         }
         return ok(payload)
 
+
+    # ----- LFPDPPP: Data export (Derecho de Acceso) -----
+    @router.get("/account/my-data")
+    def api_my_data_export(request: Request, issuer: dict = Depends(get_portal_issuer)):
+        """Export all personal data for the authenticated user (LFPDPPP Art. 23)."""
+        from routers.api._helpers import _api_rate_check
+        _api_rate_check(request, f"my-data-export:{issuer['user_id']}", max_attempts=3, window=86400.0)
+
+        user_id = issuer["user_id"]
+        issuer_id = issuer["id"]
+
+        user_rows = db_rows("SELECT id, email, phone, name, created_at FROM users WHERE id = ?", [user_id])
+        user_data = dict(user_rows[0]) if user_rows else {}
+
+        memberships = db_rows(
+            "SELECT issuer_id, role, created_at FROM memberships WHERE user_id = ?", [user_id]
+        )
+
+        customers = db_rows(
+            "SELECT rfc, legal_name, email, zip, alias, created_at FROM customer_profiles WHERE issuer_id = ?",
+            [issuer_id],
+        )
+
+        audit = db_rows(
+            "SELECT action, details, created_at FROM audit_log WHERE user_id = ? ORDER BY created_at DESC LIMIT 200",
+            [user_id],
+        )
+
+        return ok({
+            "user": user_data,
+            "memberships": [dict(m) for m in memberships],
+            "customers": [dict(c) for c in customers],
+            "audit_log": [dict(a) for a in audit],
+            "exported_at": __import__("datetime").datetime.utcnow().isoformat(),
+        })
+
+
+    # ----- LFPDPPP: Deletion request (Derecho de Cancelación) -----
+    @router.post("/account/delete-request")
+    async def api_delete_request(request: Request, issuer: dict = Depends(get_portal_issuer)):
+        """Request account deletion (LFPDPPP Art. 26). Creates a pending request for review."""
+        from services.auth.csrf import csrf_service
+        csrf_service.verify_api_csrf(request)
+
+        user_id = issuer["user_id"]
+
+        # Check for existing pending request
+        existing = db_rows(
+            "SELECT id FROM account_deletion_requests WHERE user_id = ? AND status = 'pending'",
+            [user_id],
+        )
+        if existing:
+            return ok({"message": "Ya existe una solicitud de eliminación pendiente.", "request_id": existing[0]["id"]})
+
+        body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
+        reason = body.get("reason", "")
+
+        db_execute(
+            "INSERT INTO account_deletion_requests (user_id, reason) VALUES (?, ?)",
+            [user_id, reason[:500]],
+        )
+        new_row = db_rows(
+            "SELECT id, status, requested_at FROM account_deletion_requests WHERE user_id = ? ORDER BY id DESC LIMIT 1",
+            [user_id],
+        )
+
+        return ok({
+            "message": "Solicitud de eliminación registrada. Será procesada en un plazo máximo de 20 días hábiles.",
+            "request_id": new_row[0]["id"] if new_row else None,
+        })
