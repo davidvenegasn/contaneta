@@ -281,6 +281,16 @@ def register_sat_config_routes(router, templates):
         key_body = await fiel_key.read()
         if len(cer_body) > MAX_FIEL_SIZE or len(key_body) > MAX_FIEL_SIZE:
             raise HTTPException(status_code=400, detail="Cada archivo debe medir como máximo 2 MB")
+        # Validate FIEL cert/key format before encrypting and storing
+        from services.sat.sat_credentials_secure import validate_fiel_cer, validate_fiel_key
+        try:
+            validate_fiel_cer(cer_body)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        try:
+            validate_fiel_key(key_body)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
         cred_dir = _credentials_dir(issuer_id)
         # Cifrado at-rest: guardar solo blobs cifrados (AES-GCM). Nunca persistir .cer/.key en claro.
         cer_enc_path = os.path.join(cred_dir, "fiel.cer.enc")

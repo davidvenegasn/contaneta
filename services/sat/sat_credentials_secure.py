@@ -10,6 +10,82 @@ from config import BASE_DIR
 from database import db
 from services.sat.crypto_at_rest import decrypt_bytes, decrypt_text, encrypt_bytes, encrypt_text
 
+logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# FIEL file format validation (X.509 cert + private key)
+# ---------------------------------------------------------------------------
+_FIEL_INVALID_MSG = "Archivo FIEL inválido. Sube el .cer y .key originales del SAT."
+
+
+def validate_fiel_cer(cer_bytes: bytes) -> None:
+    """Verify that *cer_bytes* is a valid DER-encoded X.509 certificate.
+
+    Raises ``ValueError`` with a user-facing Spanish message if it cannot be
+    parsed.  SAT .cer files are DER-encoded, but we also accept PEM for
+    flexibility.
+    """
+    from cryptography.x509 import load_der_x509_certificate, load_pem_x509_certificate
+
+    # Try DER first (SAT standard), then PEM as fallback
+    try:
+        load_der_x509_certificate(cer_bytes)
+        return
+    except Exception:
+        pass
+    try:
+        load_pem_x509_certificate(cer_bytes)
+        return
+    except Exception:
+        pass
+    raise ValueError(_FIEL_INVALID_MSG)
+
+
+def validate_fiel_key(key_bytes: bytes) -> None:
+    """Verify that *key_bytes* is a valid DER or PEM private key (RSA/DSA/EC).
+
+    SAT .key files are typically DER-encoded PKCS#8 (encrypted or not).
+    We only check that the blob looks like a valid private key structure;
+    we do NOT attempt to decrypt password-protected keys here (the password
+    is validated later by the PHP check_fiel script).
+
+    Raises ``ValueError`` with a user-facing Spanish message if it cannot be
+    parsed as any known private key format.
+    """
+    from cryptography.hazmat.primitives.serialization import (
+        load_der_private_key,
+        load_pem_private_key,
+    )
+
+    # Unencrypted DER
+    try:
+        load_der_private_key(key_bytes, password=None)
+        return
+    except (TypeError, ValueError, Exception):
+        pass
+
+    # Unencrypted PEM
+    try:
+        load_pem_private_key(key_bytes, password=None)
+        return
+    except (TypeError, ValueError, Exception):
+        pass
+
+    # For encrypted keys: we can't validate without the password, but we can
+    # at least check the DER structure is plausible.  PKCS#8 encrypted keys
+    # start with a SEQUENCE tag (0x30).  SAT .key files are always
+    # DER-encoded PKCS#8.
+    if key_bytes and key_bytes[0:1] == b'\x30' and len(key_bytes) >= 64:
+        # Looks like a DER-encoded structure (SEQUENCE tag). Accept it --
+        # full decryption check happens in check_fiel.php with the password.
+        return
+
+    # PEM encrypted keys start with "-----BEGIN ENCRYPTED PRIVATE KEY-----"
+    if key_bytes and b"BEGIN ENCRYPTED PRIVATE KEY" in key_bytes:
+        return
+
+    raise ValueError(_FIEL_INVALID_MSG)
+
 
 def _abs_under_base(path_like: str) -> str:
     p = (path_like or "").strip()
