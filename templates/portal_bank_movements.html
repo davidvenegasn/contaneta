@@ -431,7 +431,8 @@
           if (categoryCell) {
             categoryCell.addEventListener('click', function (e) {
               e.stopPropagation();
-              if (document.querySelector('.bank-category-popover')) return;
+              var existing = document.querySelector('.bank-category-popover');
+              if (existing) { existing.remove(); return; }
               var cat = row.getAttribute('data-categoria') || '';
               var popover = document.createElement('div');
               popover.className = 'bank-category-popover';
