@@ -1,0 +1,103 @@
+/**
+ * Design System Foundation — Unified Token Layer (_tokens.css)
+ *
+ * Provides canonical aliases and fills gaps in portal_tokens.css.
+ * Load BEFORE portal_tokens.css so that portal_tokens.css values
+ * take precedence where both define the same property.
+ *
+ * Naming convention follows the Job 9 spec:
+ *   Colors   : --bg, --bg-elevated, --surface, --border, --text, --text-muted,
+ *              --accent, --accent-hover, --success/warning/danger/info + -soft
+ *   Typo     : --fs-xs … --fs-3xl  (aliases to existing --text-* scale)
+ *   Weights  : --fw-regular … --fw-bold
+ *   Spacing  : --space-1 … --space-12  (already in portal_tokens.css)
+ *   Radius   : --radius-sm … --radius-full
+ *   Shadows  : --shadow-sm … --shadow-lg
+ *   Motion   : --motion-micro, --motion-base, --motion-slow
+ *   Z-index  : --z-base … --z-toast
+ */
+
+:root {
+  /* ============================================================
+     COLOR — gap fills (portal_tokens.css defines the primaries)
+     ============================================================ */
+
+  /* Elevated surface (cards, popovers above --bg) */
+  --bg-elevated: var(--surface-0, #ffffff);
+
+  /* Soft / light-background semantic variants (aliases to existing *-bg) */
+  --success-soft: var(--success-bg, #ecfdf5);
+  --warning-soft: var(--warn-bg, #fffbeb);
+  --danger-soft:  var(--danger-bg, #fef2f2);
+  --info-soft:    var(--info-bg, #eff6ff);
+  --accent-soft:  var(--accent-soft, #eef2ff);
+
+  /* ============================================================
+     TYPOGRAPHY — --fs-* aliases (maps to --text-* in portal_tokens)
+     ============================================================ */
+  --fs-xs:  var(--text-xs, 0.8125rem);   /* 13px */
+  --fs-sm:  var(--text-sm, 0.875rem);    /* 14px */
+  --fs-base: var(--text-base, 1rem);     /* 16px */
+  --fs-md:  var(--text-md, 1.0625rem);   /* 17px */
+  --fs-lg:  var(--text-lg, 1.25rem);     /* 20px */
+  --fs-xl:  var(--text-xl, 1.375rem);    /* 22px */
+  --fs-2xl: var(--text-2xl, 1.5rem);     /* 24px */
+  --fs-3xl: var(--text-3xl, 1.75rem);    /* 28px */
+
+  /* ============================================================
+     FONT WEIGHTS — canonical names (aliases)
+     ============================================================ */
+  --fw-regular: var(--fw-normal, 400);
+  /* --fw-medium, --fw-semibold, --fw-bold already in portal_tokens */
+
+  /* ============================================================
+     SPACING — --space-7, --space-9, --space-11 fill gaps
+     ============================================================ */
+  --space-7:  1.75rem;  /* 28px */
+  --space-9:  2.25rem;  /* 36px */
+  --space-11: 2.75rem;  /* 44px */
+
+  /* ============================================================
+     BORDER RADIUS — gap fills
+     (portal_tokens has xs:6, sm:10, base:12, md:12, lg:20, full:9999)
+     ============================================================ */
+  /* All values present; no gaps to fill. */
+
+  /* ============================================================
+     SHADOWS — canonical bare names + --shadow-lg
+     ============================================================ */
+  --shadow:    var(--shadow-1, 0 6px 18px rgba(0, 0, 0, 0.05));
+  --shadow-lg: var(--shadow-2, 0 12px 34px rgba(0, 0, 0, 0.08));
+
+  /* ============================================================
+     MOTION — --motion-base (220ms, between normal and modal)
+     ============================================================ */
+  --motion-base: 220ms;
+
+  /* ============================================================
+     Z-INDEX — canonical layer names
+     ============================================================ */
+  --z-base:   1;
+  --z-sticky: var(--z-topbar, 200);
+  /* --z-dropdown, --z-modal, --z-toast already in portal_tokens */
+}
+
+/* ============================================================
+   DARK MODE — extend nightmode with new tokens
+   ============================================================ */
+html.nightmode {
+  --bg-elevated: var(--surface-0, #1c2128);
+
+  --success-soft: var(--success-bg, rgba(63,185,80,.12));
+  --warning-soft: var(--warn-bg, rgba(210,153,34,.12));
+  --danger-soft:  var(--danger-bg, rgba(248,81,73,.12));
+  --info-soft:    var(--info-bg, rgba(88,166,255,.12));
+  --accent-soft:  var(--accent-soft, rgba(129,140,248,.14));
+}
+
+/* Reduce motion: zero out --motion-base */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-base: 0ms;
+  }
+}
