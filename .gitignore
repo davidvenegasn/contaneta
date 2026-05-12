@@ -45,3 +45,14 @@ backups/
 
 # Snapshot de respaldo: no editar ni commitear (ver docs/GUARDRAILS.md)
 _snapshot_before_mindtrip/
+
+# Bank statement & invoice samples for parser development (public PDFs from transparency portals)
+# Not committed to keep repo small; re-download via samples/*/README.md
+samples/bank_statements/**/*.pdf
+samples/invoices/**/*.pdf
+
+# Context artifacts — keep structure, ignore content
+# Comment out the next line if you WANT to commit workflow artifacts
+# context/**/*.md
+# !context/**/README.md
+# !context/**/.gitkeep
