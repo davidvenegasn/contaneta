@@ -1,9 +1,12 @@
-"""Helpers para cotizaciones: carga por public_token y generación de PDF."""
+"""Helpers para cotizaciones: carga por public_token, generación de PDF, CRUD y filtros."""
 import json
+import logging
 from io import BytesIO
 from typing import Optional
 
-from database import db, has_column
+from database import db, has_column, transaction
+
+logger = logging.getLogger(__name__)
 
 
 def get_quotation_by_public_token(public_token: str) -> Optional[dict]:
@@ -83,6 +86,235 @@ def get_quotation_by_public_token(public_token: str) -> Optional[dict]:
     return d
 
 
+DELETABLE_STATUSES = ("draft", "sent")
+"""Statuses from which a quotation may be soft-deleted."""
+
+
+def delete_quotation(issuer_id: int, quotation_id: int) -> dict:
+    """Soft-delete a quotation by setting status='deleted'.
+
+    Args:
+        issuer_id: Tenant ID (ownership check).
+        quotation_id: ID of the quotation to delete.
+
+    Returns:
+        Dict with id and new status.
+
+    Raises:
+        ValueError: If the quotation does not exist, belongs to another tenant,
+                    or its current status does not allow deletion.
+    """
+    conn = db()
+    try:
+        row = conn.execute(
+            "SELECT id, status FROM quotations WHERE issuer_id = ? AND id = ?",
+            (issuer_id, quotation_id),
+        ).fetchone()
+        if not row:
+            raise ValueError("Cotización no encontrada")
+        if row["status"] not in DELETABLE_STATUSES:
+            raise ValueError(
+                f"No se puede eliminar una cotización con estatus '{row['status']}'"
+            )
+        conn.execute(
+            "UPDATE quotations SET status = 'deleted', updated_at = datetime('now') WHERE id = ? AND issuer_id = ?",
+            (quotation_id, issuer_id),
+        )
+        conn.commit()
+        return {"id": quotation_id, "status": "deleted"}
+    finally:
+        conn.close()
+
+
+def update_quotation_items(
+    issuer_id: int, quotation_id: int, items: list[dict], issuer: dict | None = None
+) -> dict:
+    """Replace all items of a draft quotation and refresh the metadata snapshot.
+
+    Args:
+        issuer_id: Tenant ID (ownership check).
+        quotation_id: ID of the quotation whose items are replaced.
+        items: List of dicts with keys: description, quantity, unit_price, iva_rate.
+        issuer: Optional issuer dict with razon_social/rfc/regimen_fiscal for snapshot.
+
+    Returns:
+        Dict with id, items list, subtotal, iva_total, total.
+
+    Raises:
+        ValueError: If the quotation is not found or is not in 'draft' status.
+    """
+    conn = db()
+    try:
+        row = conn.execute(
+            "SELECT id, status, folio, customer_rfc, customer_legal_name, customer_email, notes, valid_until, created_at "
+            "FROM quotations WHERE issuer_id = ? AND id = ?",
+            (issuer_id, quotation_id),
+        ).fetchone()
+        if not row:
+            raise ValueError("Cotización no encontrada")
+        if row["status"] != "draft":
+            raise ValueError("Solo se pueden editar conceptos en cotizaciones en borrador")
+
+        with transaction(conn):
+            conn.execute(
+                "DELETE FROM quotation_items WHERE quotation_id = ?",
+                (quotation_id,),
+            )
+            items_list = []
+            subtotal_sum = 0.0
+            for idx, it in enumerate(items):
+                desc = (it.get("description") or "").strip()
+                if not desc:
+                    continue
+                qty = float(it.get("quantity") or 1)
+                unit_price = float(it.get("unit_price") or 0)
+                iva_rate = float(it.get("iva_rate") or 0.16)
+                conn.execute(
+                    """INSERT INTO quotation_items
+                       (quotation_id, description, quantity, unit_price, iva_rate, sort_order)
+                       VALUES (?, ?, ?, ?, ?, ?)""",
+                    (quotation_id, desc, qty, unit_price, iva_rate, idx),
+                )
+                line_sub = qty * unit_price
+                iva_line = line_sub * iva_rate
+                subtotal_sum += line_sub
+                items_list.append({
+                    "description": desc,
+                    "quantity": qty,
+                    "unit_price": unit_price,
+                    "iva_rate": iva_rate,
+                    "subtotal": round(line_sub, 2),
+                    "total_line": round(line_sub + iva_line, 2),
+                })
+
+            iva_total = round(sum(x["subtotal"] * x["iva_rate"] for x in items_list), 2)
+            total = round(subtotal_sum + iva_total, 2)
+
+            # Rebuild metadata snapshot
+            if has_column(conn, "quotations", "metadata_json"):
+                snapshot = {
+                    "issuer_name": (issuer.get("razon_social") or issuer.get("rfc") or "").strip() if issuer else "",
+                    "issuer_rfc": (issuer.get("rfc") or "").strip() if issuer else "",
+                    "issuer_regimen": (issuer.get("regimen_fiscal") or "").strip() if issuer else "",
+                    "customer_rfc": row["customer_rfc"] or "",
+                    "customer_legal_name": row["customer_legal_name"] or "",
+                    "customer_email": row["customer_email"],
+                    "items": items_list,
+                    "subtotal": round(subtotal_sum, 2),
+                    "iva_total": iva_total,
+                    "total": total,
+                    "valid_until": row["valid_until"],
+                    "notes": row["notes"] or "",
+                    "folio": row["folio"],
+                    "created_at": row["created_at"],
+                }
+                conn.execute(
+                    "UPDATE quotations SET metadata_json = ?, updated_at = datetime('now') WHERE id = ? AND issuer_id = ?",
+                    (json.dumps(snapshot), quotation_id, issuer_id),
+                )
+            else:
+                conn.execute(
+                    "UPDATE quotations SET updated_at = datetime('now') WHERE id = ? AND issuer_id = ?",
+                    (quotation_id, issuer_id),
+                )
+
+        return {
+            "id": quotation_id,
+            "items": items_list,
+            "subtotal": round(subtotal_sum, 2),
+            "iva_total": iva_total,
+            "total": total,
+        }
+    finally:
+        conn.close()
+
+
+def list_quotations(
+    issuer_id: int,
+    *,
+    limit: int = 200,
+    offset: int = 0,
+    status: str | None = None,
+    customer_rfc: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+) -> dict:
+    """List quotations for a tenant with optional filters.
+
+    Args:
+        issuer_id: Tenant ID.
+        limit: Max rows to return.
+        offset: Rows to skip.
+        status: Filter by quotation status.
+        customer_rfc: Filter by customer RFC (exact match, uppercased).
+        date_from: Filter quotations created on or after this date (YYYY-MM-DD).
+        date_to: Filter quotations created on or before this date (YYYY-MM-DD).
+
+    Returns:
+        Dict with 'items' (list of quotation dicts) and 'total' (int count).
+    """
+    conn = db()
+    try:
+        where_clauses = ["q.issuer_id = ?"]
+        params: list = [issuer_id]
+
+        if status:
+            where_clauses.append("q.status = ?")
+            params.append(status.strip().lower())
+        if customer_rfc:
+            where_clauses.append("q.customer_rfc = ?")
+            params.append(customer_rfc.strip().upper())
+        if date_from:
+            where_clauses.append("q.created_at >= ?")
+            params.append(date_from.strip())
+        if date_to:
+            # Include the full day by comparing < the next day
+            where_clauses.append("q.created_at <= ?")
+            params.append(date_to.strip() + " 23:59:59")
+
+        where_sql = " AND ".join(where_clauses)
+
+        total_row = conn.execute(
+            f"SELECT COUNT(*) AS c FROM quotations q WHERE {where_sql}",
+            tuple(params),
+        ).fetchone()
+        total = total_row["c"] if total_row else 0
+
+        rows = conn.execute(
+            f"""
+            SELECT q.id, q.folio, q.customer_rfc, q.customer_legal_name, q.customer_email,
+                   q.status, q.public_token, q.valid_until, q.notes, q.responded_at, q.created_at, q.updated_at,
+                   (SELECT COALESCE(SUM((qi.quantity * qi.unit_price) * (1 + COALESCE(qi.iva_rate, 0))), 0)
+                    FROM quotation_items qi WHERE qi.quotation_id = q.id) AS total
+            FROM quotations q WHERE {where_sql} ORDER BY q.created_at DESC
+            LIMIT ? OFFSET ?
+            """,
+            tuple(params + [limit, offset]),
+        ).fetchall()
+
+        items = [
+            {
+                "id": r["id"],
+                "folio": r.get("folio"),
+                "customer_rfc": r["customer_rfc"],
+                "customer_legal_name": r["customer_legal_name"],
+                "customer_email": r["customer_email"],
+                "status": r["status"],
+                "public_token": r["public_token"],
+                "valid_until": r["valid_until"],
+                "notes": r["notes"],
+                "responded_at": r["responded_at"],
+                "created_at": r["created_at"],
+                "updated_at": r["updated_at"],
+                "total": float(r["total"] or 0),
+            }
+            for r in rows
+        ]
+        return {"items": items, "total": total}
+    finally:
+        conn.close()
+
+
 def _safe_text(s: str, max_len: int = 200) -> str:
     """Escape y truncar para PDF."""
     if s is None:
@@ -95,9 +327,9 @@ def build_quotation_pdf(quote: dict) -> bytes:
     """Genera PDF formal de cotización: encabezado, emisor, cliente, tabla conceptos, totales, vigencia, notas."""
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import letter
-    from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib.units import inch
-    from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+    from reportlab.platypus import Paragraph, Spacer, Table, TableStyle, SimpleDocTemplate
 
     buf = BytesIO()
     margin = 0.65 * inch

@@ -4,6 +4,8 @@ import logging
 import secrets
 from datetime import datetime
 
+from typing import Optional
+
 from fastapi import Body, Depends, HTTPException, Query, Request
 
 from database import db, has_column
@@ -39,37 +41,28 @@ def register_quotations_routes(router):
         issuer: dict = Depends(get_portal_issuer),
         limit: int = Query(DEFAULT_LIST_LIMIT, ge=1, le=MAX_LIST_LIMIT, description="Máximo de registros"),
         offset: int = Query(0, ge=0, le=MAX_LIST_OFFSET, description="Registros a saltar"),
+        status: Optional[str] = Query(None, description="Filtrar por estatus"),
+        customer_rfc: Optional[str] = Query(None, description="Filtrar por RFC del cliente"),
+        date_from: Optional[str] = Query(None, description="Fecha inicio (YYYY-MM-DD)"),
+        date_to: Optional[str] = Query(None, description="Fecha fin (YYYY-MM-DD)"),
     ):
+        from services import quotations as quotations_svc
         try:
             issuer_id = issuer["id"]
         except (ValueError, KeyError, TypeError):
             logger.exception("api quotations list: issuer inválido")
             raise HTTPException(status_code=401, detail="Sesión inválida")
         try:
-            conn = db()
-            total_row = conn.execute(
-                "SELECT COUNT(*) AS c FROM quotations WHERE issuer_id = ?",
-                (issuer_id,),
-            ).fetchone()
-            total = total_row["c"] if total_row else 0
-            rows = conn.execute(
-                """
-                SELECT q.id, q.folio, q.customer_rfc, q.customer_legal_name, q.customer_email,
-                       q.status, q.public_token, q.valid_until, q.notes, q.responded_at, q.created_at, q.updated_at,
-                       (SELECT COALESCE(SUM((qi.quantity * qi.unit_price) * (1 + COALESCE(qi.iva_rate, 0))), 0)
-                        FROM quotation_items qi WHERE qi.quotation_id = q.id) AS total
-                FROM quotations q WHERE q.issuer_id = ? ORDER BY q.created_at DESC
-                LIMIT ? OFFSET ?
-                """,
-                (issuer_id, limit, offset),
-            ).fetchall()
-            conn.close()
-            items = [{"id": r["id"], "folio": r.get("folio"), "customer_rfc": r["customer_rfc"],
-                      "customer_legal_name": r["customer_legal_name"], "customer_email": r["customer_email"],
-                      "status": r["status"], "public_token": r["public_token"], "valid_until": r["valid_until"],
-                      "notes": r["notes"], "responded_at": r["responded_at"], "created_at": r["created_at"],
-                      "updated_at": r["updated_at"], "total": float(r["total"] or 0)} for r in rows]
-            return {"items": items, "total": total}
+            result = quotations_svc.list_quotations(
+                issuer_id,
+                limit=limit,
+                offset=offset,
+                status=status,
+                customer_rfc=customer_rfc,
+                date_from=date_from,
+                date_to=date_to,
+            )
+            return {"items": result["items"], "total": result["total"]}
         except Exception as e:
             logger.warning("api_quotations_list: %s", e, exc_info=True)
             raise HTTPException(status_code=500, detail="Error al cargar la lista de cotizaciones.")
@@ -300,5 +293,42 @@ def register_quotations_routes(router):
         conn.close()
         return ok({"status": status})
 
+
+    @router.delete("/quotations/{qid}")
+    def api_quotations_delete(qid: int, request: Request, issuer: dict = Depends(get_portal_issuer)):
+        """Soft-delete a quotation (set status='deleted'). Only draft or sent quotations."""
+        from services import quotations as quotations_svc
+        csrf_service.verify_api_csrf(request)
+        try:
+            issuer_id = issuer["id"]
+            result = quotations_svc.delete_quotation(issuer_id, qid)
+            return ok(result)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except HTTPException:
+            raise
+        except Exception:
+            logger.exception("api quotations delete: qid=%s issuer_id=%s", qid, issuer.get("id"))
+            raise HTTPException(status_code=500, detail="No pudimos eliminar la cotización.")
+
+
+    @router.put("/quotations/{qid}/items")
+    def api_quotations_update_items(qid: int, request: Request, payload: list = Body(...), issuer: dict = Depends(get_portal_issuer)):
+        """Replace items of a draft quotation. Accepts JSON array of {description, quantity, unit_price, iva_rate}."""
+        from services import quotations as quotations_svc
+        csrf_service.verify_api_csrf(request)
+        try:
+            issuer_id = issuer["id"]
+            if not payload:
+                raise HTTPException(status_code=400, detail="Agrega al menos un concepto a la cotización")
+            result = quotations_svc.update_quotation_items(issuer_id, qid, payload, issuer=issuer)
+            return ok(result)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except HTTPException:
+            raise
+        except Exception:
+            logger.exception("api quotations update-items: qid=%s issuer_id=%s", qid, issuer.get("id"))
+            raise HTTPException(status_code=500, detail="No pudimos actualizar los conceptos.")
 
 
