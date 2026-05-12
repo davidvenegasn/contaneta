@@ -273,7 +273,7 @@
             {% set concepto_short = concepto_display[:50] + '…' if concepto_display|length > 50 else concepto_display %}
             <tr class="bank-movements-row{% if es_cuenta_propia %} bank-row-cuenta-propia{% endif %}" data-movement-id="{{ m.id }}" data-descripcion="{{ (m.descripcion or '')|e }}" data-categoria="{{ (m.categoria or '')|e }}">
               <td class="muted u-nowrap">{{ m.fecha|fecha_corta }}</td>
-              <td class="concepto-cell bank-movements-concept-editable bank-concept-editable" title="{{ concepto_display }}">{{ concepto_short }}</td>
+              <td class="concepto-cell bank-movements-concept-editable" title="{{ concepto_display }}"><span class="bank-concept-text bank-concept-editable" title="Clic para editar">{{ concepto_short }}</span></td>
               <td>
                 {% if es_cuenta_propia %}<span class="badge badge--neutral">Cuenta propia</span>
                 {% elif es_ingreso %}<span class="badge badge--success">Ingreso</span>
@@ -393,69 +393,83 @@
           if (!id) return;
           var conceptCell = row.querySelector('.bank-movements-concept-editable');
           var categoryCell = row.querySelector('.bank-movements-category-editable');
-          if (conceptCell) {
-            conceptCell.addEventListener('click', function () {
+          var conceptText = row.querySelector('.bank-concept-text');
+          if (conceptText && conceptCell) {
+            conceptText.addEventListener('click', function (e) {
+              e.stopPropagation();
               if (conceptCell.querySelector('input')) return;
               var desc = (row.getAttribute('data-descripcion') || '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"');
               var input = document.createElement('input');
               input.type = 'text';
-              input.className = 'input input--sm';
+              input.className = 'bank-concept-edit-input';
               input.value = desc;
-              input.style.width = '100%';
-              conceptCell.textContent = '';
+              conceptCell.innerHTML = '';
               conceptCell.appendChild(input);
               input.focus();
               input.select();
               function commitConcept() {
+                if (!conceptCell.contains(input)) return;
                 var val = input.value.trim();
-                conceptCell.removeChild(input);
-                conceptCell.textContent = val.length > 50 ? val.substring(0, 50) + '…' : (val || '—');
-                conceptCell.title = 'Clic para editar';
+                var display = val.length > 50 ? val.substring(0, 50) + '…' : (val || '—');
+                conceptCell.innerHTML = '<span class="bank-concept-text bank-concept-editable" title="Clic para editar">' + (val.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')) + '</span>';
+                var newSpan = conceptCell.querySelector('.bank-concept-text');
+                if (newSpan) newSpan.textContent = display;
                 patchMovement(id, { descripcion: val }).then(function () {
                   row.setAttribute('data-descripcion', val);
                   row.querySelectorAll('.bank-movement-ver-detalle').forEach(function (b) { b.setAttribute('data-descripcion', val); });
-                }).catch(function () { conceptCell.textContent = (desc || '').length > 50 ? (desc || '').substring(0, 50) + '…' : (desc || '—'); conceptCell.title = 'Clic para editar'; });
+                }).catch(function () {
+                  conceptCell.innerHTML = '<span class="bank-concept-text bank-concept-editable" title="Clic para editar">' + ((desc || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')) + '</span>';
+                });
               }
               input.addEventListener('blur', commitConcept);
-              input.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') { ev.preventDefault(); commitConcept(); } });
+              input.addEventListener('keydown', function (ev) {
+                if (ev.key === 'Enter') { ev.preventDefault(); input.blur(); }
+                if (ev.key === 'Escape') { ev.preventDefault(); commitConcept(); }
+              });
             });
           }
           if (categoryCell) {
             categoryCell.addEventListener('click', function (e) {
-              if (e.target.tagName === 'SELECT' || categoryCell.querySelector('select')) return;
+              e.stopPropagation();
+              if (document.querySelector('.bank-category-popover')) return;
               var cat = row.getAttribute('data-categoria') || '';
-              var select = document.createElement('select');
-              select.className = 'bank-category-select';
-              select.title = 'Elegir otra categoría';
+              var popover = document.createElement('div');
+              popover.className = 'bank-category-popover';
+              var ul = document.createElement('ul');
+              ul.className = 'bank-category-popover__list';
               MULTI_CATEGORIES.forEach(function (c) {
-                var opt = document.createElement('option');
-                opt.value = c;
-                opt.textContent = catLabel(c);
-                if (c === cat) opt.selected = true;
-                select.appendChild(opt);
+                var li = document.createElement('li');
+                li.className = 'bank-category-popover__item' + (c === cat ? ' is-selected' : '');
+                li.textContent = catLabel(c);
+                li.setAttribute('data-value', c);
+                li.addEventListener('click', function (ev) {
+                  ev.stopPropagation();
+                  var val = c;
+                  categoryCell.innerHTML = '<span class="badge badge--neutral">' + escapeHtml(catLabel(val)) + '</span><span class="bank-category-chevron" aria-hidden="true"> ▼</span>';
+                  popover.remove();
+                  patchMovement(id, { categoria: val }).then(function () {
+                    row.setAttribute('data-categoria', val);
+                    row.querySelectorAll('.bank-movement-ver-detalle').forEach(function (b) { b.setAttribute('data-categoria', val); });
+                  });
+                });
+                ul.appendChild(li);
               });
-              if (cat && MULTI_CATEGORIES.indexOf(cat) < 0) {
-                var o = document.createElement('option');
-                o.value = cat;
-                o.textContent = catLabel(cat);
-                o.selected = true;
-                select.appendChild(o);
-              }
-              categoryCell.innerHTML = '';
-              categoryCell.appendChild(select);
-              select.focus();
-              setTimeout(function () { select.click(); }, 0);
-              function commitCategory() {
-                if (!categoryCell.querySelector('select')) return;
-                var val = select.value || '';
-                categoryCell.innerHTML = '<span class="badge badge--neutral">' + escapeHtml(catLabel(val)) + '</span><span class="bank-category-chevron" aria-hidden="true"> ▼</span>';
-                patchMovement(id, { categoria: val }).then(function () {
-                  row.setAttribute('data-categoria', val);
-                  row.querySelectorAll('.bank-movement-ver-detalle').forEach(function (b) { b.setAttribute('data-categoria', val); });
-                }).catch(function () { categoryCell.innerHTML = '<span class="badge badge--neutral">' + escapeHtml(catLabel(cat)) + '</span><span class="bank-category-chevron" aria-hidden="true"> ▼</span>'; });
-              }
-              select.addEventListener('change', commitCategory);
-              select.addEventListener('blur', commitCategory);
+              popover.appendChild(ul);
+              var rect = categoryCell.getBoundingClientRect();
+              popover.style.position = 'absolute';
+              popover.style.top = (window.scrollY + rect.bottom + 4) + 'px';
+              popover.style.left = (window.scrollX + rect.left) + 'px';
+              popover.style.minWidth = Math.max(rect.width, 160) + 'px';
+              document.body.appendChild(popover);
+              setTimeout(function () {
+                function onDocClick(ev) {
+                  if (!popover.contains(ev.target) && ev.target !== categoryCell && !categoryCell.contains(ev.target)) {
+                    popover.remove();
+                    document.removeEventListener('click', onDocClick);
+                  }
+                }
+                document.addEventListener('click', onDocClick);
+              }, 0);
             });
           }
         });

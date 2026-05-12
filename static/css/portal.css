@@ -7977,3 +7977,76 @@ html.nightmode .kb-help-panel { background: var(--surface, #1e293b); border-colo
 html.nightmode .kb-help-row kbd { background: rgba(255,255,255,.06); border-color: var(--border-strong, #334155); color: var(--text, #f1f5f9); }
 
 .bank-movement-editar-en-modal { display: inline-flex; align-items: center; gap: 6px; font-weight: 500; }
+
+/* Bank concept inline edit — minimal, inherits text style */
+.bank-concept-text {
+  cursor: pointer;
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.bank-concept-text:hover {
+  background: rgba(99, 102, 241, 0.06);
+  border-radius: 3px;
+}
+.bank-concept-edit-input {
+  border: none;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  padding: 0;
+  margin: 0;
+  width: 100%;
+  outline: none;
+  box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.5);
+  border-radius: 3px;
+}
+.bank-concept-edit-input:focus {
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.8);
+}
+
+/* Bank category custom popover dropdown */
+.bank-category-popover {
+  z-index: 1000;
+  background: #fff;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.04);
+  max-height: 280px;
+  overflow-y: auto;
+  padding: 4px;
+}
+.bank-category-popover__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.bank-category-popover__item {
+  padding: 8px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  border-radius: 4px;
+  color: var(--text, #1f2937);
+  white-space: nowrap;
+}
+.bank-category-popover__item:hover {
+  background: rgba(99, 102, 241, 0.08);
+  color: var(--accent, #6366f1);
+}
+.bank-category-popover__item.is-selected {
+  font-weight: 600;
+  color: var(--accent, #6366f1);
+}
+html.nightmode .bank-category-popover {
+  background: #1f2937;
+  border-color: rgba(255,255,255,0.1);
+}
+html.nightmode .bank-category-popover__item {
+  color: rgba(255,255,255,0.85);
+}
+html.nightmode .bank-category-popover__item:hover {
+  background: rgba(99, 102, 241, 0.18);
+}
