@@ -41,12 +41,47 @@ def _ensure_table(conn: sqlite3.Connection) -> None:
     _table_ready = True
 
 
+def _is_trusted_proxy(ip: str) -> bool:
+    """Check if *ip* matches any entry in TRUSTED_PROXIES (IPs or CIDR blocks)."""
+    import ipaddress
+    from config import TRUSTED_PROXIES
+
+    if not ip or ip == "unknown":
+        return False
+    try:
+        addr = ipaddress.ip_address(ip)
+    except ValueError:
+        return False
+    for entry in TRUSTED_PROXIES:
+        try:
+            if "/" in entry:
+                if addr in ipaddress.ip_network(entry, strict=False):
+                    return True
+            else:
+                if addr == ipaddress.ip_address(entry):
+                    return True
+        except ValueError:
+            continue
+    return False
+
+
 def get_client_ip(request: Request) -> str:
-    """IP del cliente: X-Forwarded-For, X-Real-IP o request.client.host."""
-    raw = request.headers.get("x-forwarded-for") or request.headers.get("x-real-ip")
-    if not raw and getattr(request, "client", None):
-        raw = getattr(request.client, "host", None)
-    return (raw or "").split(",")[0].strip() or "unknown"
+    """IP del cliente, respecting trusted proxy whitelist.
+
+    Only trust X-Forwarded-For / X-Real-IP if the direct connection
+    (request.client.host) comes from a trusted proxy.  Otherwise, use
+    request.client.host directly to prevent IP spoofing.
+    """
+    direct_ip = ""
+    if getattr(request, "client", None):
+        direct_ip = getattr(request.client, "host", "") or ""
+
+    if direct_ip and _is_trusted_proxy(direct_ip):
+        forwarded = request.headers.get("x-forwarded-for") or request.headers.get("x-real-ip")
+        if forwarded:
+            return forwarded.split(",")[0].strip() or direct_ip or "unknown"
+
+    return direct_ip or "unknown"
 
 
 def is_rate_limited(

@@ -105,6 +105,11 @@ if IS_PROD and not AT_REST_MASTER_KEY_SET:
         "Generate one: python3 -c \"import secrets; print(secrets.token_hex(32))\""
     )
 
+# Trusted proxies: only trust X-Forwarded-For when the request comes from one of these.
+# Comma-separated list of IPs or CIDR blocks. Default covers localhost and common private ranges.
+_trusted_proxies_raw = (os.getenv("TRUSTED_PROXIES") or "127.0.0.1,::1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16").strip()
+TRUSTED_PROXIES: list[str] = [s.strip() for s in _trusted_proxies_raw.split(",") if s.strip()]
+
 # En prod con Stripe: SITE_URL recomendado para redirects de checkout y webhooks
 if IS_PROD and STRIPE_SECRET_KEY and not SITE_URL:
     _log.critical(
