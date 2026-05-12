@@ -1,0 +1,164 @@
+"""Facturapi V2 — Enhanced integration scaffolding.
+
+This is a TEMPLATE file (.template extension) — NOT loaded by Python.
+Rename to facturapi_v2.py when ready to implement.
+
+Requires: FACTURAPI_KEY or FACTURAPI_TEST_KEY in .env
+"""
+
+import logging
+from typing import Any
+
+logger = logging.getLogger(__name__)
+
+
+def emit_invoice_ingreso(
+    issuer_id: int,
+    customer_data: dict,
+    items: list[dict],
+    payment_form: str = "99",
+    payment_method: str = "PUE",
+    currency: str = "MXN",
+    exchange_rate: float = 1.0,
+    cfdi_use: str = "G03",
+    export_code: str = "01",
+    series: str = None,
+    folio: str = None,
+) -> dict:
+    """Emit a standard CFDI Ingreso (income invoice).
+
+    Args:
+        issuer_id: Tenant issuer ID (resolves to Facturapi org_id).
+        customer_data: {rfc, nombre, regimen_fiscal, domicilio_fiscal_receptor, uso_cfdi}.
+        items: [{product_key, description, quantity, unit_price, tax_rate, unit_key}].
+        payment_form: SAT forma de pago (01=Efectivo, 03=Transferencia, 99=Por definir).
+        payment_method: PUE (una exhibición) or PPD (parcialidades).
+        currency: ISO currency code (MXN, USD, EUR).
+        exchange_rate: Required if currency != MXN.
+        cfdi_use: SAT uso CFDI (G03=Gastos en general, S01=Sin obligaciones).
+        export_code: "01" (no aplica), "02" (definitiva), "03" (temporal), "04" (definitiva clave A).
+        series: Optional invoice series.
+        folio: Optional invoice folio.
+
+    Returns:
+        dict with {facturapi_id, uuid, total, pdf_url, xml_url}
+
+    Raises:
+        FacturapiError on API failure.
+    """
+    raise NotImplementedError("Implement with Facturapi API call")
+
+
+def cancel_invoice(
+    issuer_id: int,
+    uuid: str,
+    reason_code: str,
+    replacement_uuid: str = None,
+) -> dict:
+    """Cancel a stamped CFDI.
+
+    Args:
+        issuer_id: Tenant issuer ID.
+        uuid: UUID of the CFDI to cancel.
+        reason_code: SAT cancellation motive:
+            "01" - Con comprobante que sustituye (requires replacement_uuid)
+            "02" - Comprobantes emitidos con errores sin relación
+            "03" - No se llevó a cabo la operación
+            "04" - Operación nominativa relacionada en factura global
+        replacement_uuid: Required when reason_code="01".
+
+    Returns:
+        dict with {status, cancel_date, acuse}
+    """
+    raise NotImplementedError("Implement with Facturapi API call")
+
+
+def emit_global_invoice(
+    issuer_id: int,
+    period_month: str,
+    periodicity: str = "01",
+    items: list[dict] = None,
+    total: float = None,
+) -> dict:
+    """Emit a Factura Global (consolidated public sales).
+
+    Used when: retail sales to "público en general" without individual RFC.
+    SAT requires consolidation by period.
+
+    Args:
+        issuer_id: Tenant issuer ID.
+        period_month: YYYY-MM of the period being invoiced.
+        periodicity: "01"=Mensual, "02"=Bimestral, "04"=Diaria, "05"=Mensual.
+        items: Line items (aggregated by product key).
+        total: Total amount if items not provided.
+
+    Returns:
+        dict with {facturapi_id, uuid, total}
+
+    Notes:
+        - Receptor RFC: XAXX010101000 (genérico nacional)
+        - Receptor nombre: PUBLICO EN GENERAL
+        - Uso CFDI: S01 (Sin obligaciones fiscales)
+        - Régimen fiscal receptor: 616
+    """
+    raise NotImplementedError("Implement with Facturapi API call")
+
+
+def emit_export_invoice(
+    issuer_id: int,
+    customer_data: dict,
+    items: list[dict],
+    export_code: str = "02",
+    currency: str = "USD",
+    exchange_rate: float = None,
+) -> dict:
+    """Emit an export services/goods invoice.
+
+    Args:
+        issuer_id: Tenant issuer ID.
+        customer_data: Foreign customer data. RFC should be XEXX010101000.
+        items: Service/product items.
+        export_code: "02" (definitiva), "03" (temporal).
+        currency: Usually USD or EUR.
+        exchange_rate: DOF rate for the invoice date (use banxico_client.get_rate).
+
+    Returns:
+        dict with {facturapi_id, uuid, total}
+
+    Notes:
+        - For services exported: uso CFDI = P01, export_code = 01 or 02
+        - For goods exported: may require Complemento de Comercio Exterior
+        - IVA at 0% for exported services (tasa 0%)
+        - Receptor RFC for foreign: XEXX010101000
+        - Receptor país: ISO country code
+    """
+    raise NotImplementedError("Implement with Facturapi API call")
+
+
+def emit_payment_complement(
+    issuer_id: int,
+    payments: list[dict],
+) -> dict:
+    """Emit a Complemento de Recepción de Pagos (REP / CFDI type P).
+
+    Args:
+        issuer_id: Tenant issuer ID.
+        payments: List of payment records:
+            [{
+                fecha_pago: "2026-05-01",
+                forma_pago: "03",
+                moneda: "MXN",
+                monto: 5000.0,
+                related_invoices: [{uuid, parcialidad, saldo_anterior, importe_pagado, saldo_insoluto}]
+            }]
+
+    Returns:
+        dict with {facturapi_id, uuid}
+
+    Notes:
+        - Links to original PPD invoices via related_invoices
+        - Each payment can cover multiple invoices partially
+        - Parcialidad = sequential payment number (1, 2, 3...)
+        - SAT rule: IVA is "caused" at payment time for PPD
+    """
+    raise NotImplementedError("Implement with Facturapi API call")
