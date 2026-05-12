@@ -1,0 +1,202 @@
+/**
+ * Tooltips — CSS-only contextual help system.
+ * Uses data-tooltip attribute for text and data-tooltip-pos for positioning.
+ * Accessible: pairs with aria-describedby for screen readers.
+ * Design tokens from portal_tokens.css.
+ */
+
+/* ── Tooltip trigger (help icon "?") ── */
+.help-tooltip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-full, 9999px);
+  background: var(--neutral-bg, #f1f5f9);
+  border: 1px solid var(--neutral-border, #e2e8f0);
+  color: var(--text-muted, #64748b);
+  font-size: 11px;
+  font-weight: var(--fw-semibold, 600);
+  line-height: 1;
+  cursor: help;
+  position: relative;
+  margin-left: var(--space-1, 0.25rem);
+  vertical-align: middle;
+  text-transform: none;
+  letter-spacing: 0;
+  flex-shrink: 0;
+  transition: background var(--motion-fast, 100ms) ease,
+              border-color var(--motion-fast, 100ms) ease,
+              color var(--motion-fast, 100ms) ease;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.help-tooltip:hover,
+.help-tooltip:focus-visible {
+  background: var(--accent-soft, #eef2ff);
+  border-color: var(--accent-border, #c7d2fe);
+  color: var(--primary, #6366f1);
+}
+
+/* ── Tooltip bubble (CSS-only via ::after) ── */
+.help-tooltip::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
+  background: var(--text, #0f172a);
+  color: var(--text-inverse, #ffffff);
+  border-radius: var(--radius-xs, 6px);
+  font-size: var(--text-2xs, 0.75rem);
+  font-weight: var(--fw-normal, 400);
+  line-height: var(--leading-normal, 1.5);
+  width: max-content;
+  max-width: 280px;
+  white-space: normal;
+  text-align: left;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--motion-fast, 100ms) ease;
+  z-index: var(--z-dropdown, 9000);
+  box-shadow: var(--shadow-2, 0 12px 34px rgba(0, 0, 0, 0.08));
+}
+
+/* ── Arrow (CSS triangle via ::before) ── */
+.help-tooltip::before {
+  content: "";
+  position: absolute;
+  border: 5px solid transparent;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--motion-fast, 100ms) ease;
+  z-index: var(--z-dropdown, 9000);
+}
+
+/* ── Position: top (default) ── */
+.help-tooltip::after,
+.help-tooltip[data-tooltip-pos="top"]::after {
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+}
+.help-tooltip::before,
+.help-tooltip[data-tooltip-pos="top"]::before {
+  bottom: calc(100% + -2px);
+  left: 50%;
+  transform: translateX(-50%);
+  border-top-color: var(--text, #0f172a);
+  border-bottom: 0;
+}
+
+/* ── Position: bottom ── */
+.help-tooltip[data-tooltip-pos="bottom"]::after {
+  bottom: auto;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+}
+.help-tooltip[data-tooltip-pos="bottom"]::before {
+  bottom: auto;
+  top: calc(100% + -2px);
+  left: 50%;
+  transform: translateX(-50%);
+  border-top-color: transparent;
+  border-bottom-color: var(--text, #0f172a);
+}
+
+/* ── Position: left ── */
+.help-tooltip[data-tooltip-pos="left"]::after {
+  bottom: auto;
+  top: 50%;
+  left: auto;
+  right: calc(100% + 8px);
+  transform: translateY(-50%);
+}
+.help-tooltip[data-tooltip-pos="left"]::before {
+  bottom: auto;
+  top: 50%;
+  left: auto;
+  right: calc(100% + -2px);
+  transform: translateY(-50%);
+  border-top-color: transparent;
+  border-left-color: var(--text, #0f172a);
+}
+
+/* ── Position: right ── */
+.help-tooltip[data-tooltip-pos="right"]::after {
+  bottom: auto;
+  top: 50%;
+  left: calc(100% + 8px);
+  right: auto;
+  transform: translateY(-50%);
+}
+.help-tooltip[data-tooltip-pos="right"]::before {
+  bottom: auto;
+  top: 50%;
+  left: calc(100% + -2px);
+  right: auto;
+  transform: translateY(-50%);
+  border-top-color: transparent;
+  border-right-color: var(--text, #0f172a);
+}
+
+/* ── Show on hover / focus ── */
+.help-tooltip:hover::after,
+.help-tooltip:hover::before,
+.help-tooltip:focus-visible::after,
+.help-tooltip:focus-visible::before {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* ── Screen reader only text (for aria-describedby targets) ── */
+.sr-tooltip-text {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ── Reduced motion ── */
+@media (prefers-reduced-motion: reduce) {
+  .help-tooltip::after,
+  .help-tooltip::before {
+    transition: none;
+  }
+  .help-tooltip {
+    transition: none;
+  }
+}
+
+/* ── Mobile adjustments ── */
+@media (max-width: 600px) {
+  .help-tooltip::after {
+    max-width: 220px;
+    font-size: 12px;
+  }
+  /* On small screens, force top position to avoid overflow */
+  .help-tooltip[data-tooltip-pos="left"]::after,
+  .help-tooltip[data-tooltip-pos="right"]::after {
+    left: 50%;
+    right: auto;
+    top: auto;
+    bottom: calc(100% + 8px);
+    transform: translateX(-50%);
+  }
+  .help-tooltip[data-tooltip-pos="left"]::before,
+  .help-tooltip[data-tooltip-pos="right"]::before {
+    left: 50%;
+    right: auto;
+    top: auto;
+    bottom: calc(100% + -2px);
+    transform: translateX(-50%);
+    border-color: transparent;
+    border-top-color: var(--text, #0f172a);
+  }
+}

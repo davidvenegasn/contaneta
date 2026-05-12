@@ -1,73 +1,16 @@
-{# Componentes reutilizables del portal: modal, alert, status_badge, page_header, empty-state, load-error. #}
+{# Componentes reutilizables del portal: empty-state, load-error, tooltip. Ver docs/UI_PATTERNS.md #}
 
-{# ── Modal ─────────────────────────────────────────────────────────────── #}
-{% macro portal_modal(id, title, subtitle='', size='default', extra_class='') %}
-{# Unified modal shell. Use with {% call %}: body goes inside modal__body.
-   Sizes: 'sm' (400px), 'default' (560px), 'lg' (720px), 'full' (90vw).
-   Optionally add a footer via the caller block (include <div class="modal__foot"> yourself). #}
-<div id="{{ id }}" class="modal {{ extra_class }}" role="dialog" aria-modal="true" aria-labelledby="{{ id }}Title" hidden aria-hidden="true">
-  <div class="modal__backdrop" data-close="true"></div>
-  <div class="modal__panel{% if size != 'default' %} modal__panel--{{ size }}{% endif %}">
-    <div class="modal__head">
-      <div>
-        <div class="modal__title" id="{{ id }}Title">{{ title }}</div>
-        {% if subtitle %}<div class="modal__subtitle">{{ subtitle }}</div>{% endif %}
-      </div>
-      <button type="button" class="icon-btn" data-close="true" aria-label="Cerrar">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path d="M6 6l12 12" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
-          <path d="M18 6 6 18" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
-        </svg>
-      </button>
-    </div>
-    <div class="modal__body">
-      {{ caller() }}
-    </div>
-  </div>
-</div>
+{# ── Help tooltip: CSS-only contextual hint with accessible markup ── #}
+{% macro portal_tooltip(text, position='top', id=none) %}
+<span class="help-tooltip"
+      tabindex="0"
+      role="img"
+      aria-label="Ayuda"
+      data-tooltip="{{ text }}"
+      {% if position != 'top' %}data-tooltip-pos="{{ position }}"{% endif %}
+      {% if id %}aria-describedby="{{ id }}"{% endif %}>?{% if id %}<span id="{{ id }}" class="sr-tooltip-text">{{ text }}</span>{% endif %}</span>
 {% endmacro %}
 
-{# ── Alert / Banner ───────────────────────────────────────────────────── #}
-{% macro portal_alert(message, variant='info', dismissible=false, id='') %}
-{# Variants: 'success', 'warning', 'error', 'info'. #}
-<div class="alert alert--{{ variant }}{% if dismissible %} alert--dismissible{% endif %}"{% if id %} id="{{ id }}"{% endif %} role="alert">
-  <span class="alert__message">{{ message }}</span>
-  {% if dismissible %}
-  <button type="button" class="alert__close icon-btn" aria-label="Cerrar" onclick="this.parentElement.remove()">
-    <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true" width="16" height="16">
-      <path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-    </svg>
-  </button>
-  {% endif %}
-</div>
-{% endmacro %}
-
-{# ── Status badge / pill ─────────────────────────────────────────────── #}
-{% macro status_badge(status, label='') %}
-{# Maps common CFDI/quotation/job statuses to badge variants.
-   Pass optional label to override the displayed text. #}
-{% set s = status|lower|trim if status else '' %}
-{% set variant_map = {
-  'vigente': 'success', 'activo': 'success', 'accepted': 'success', 'ok': 'success', 'active': 'success',
-  'cancelado': 'danger', 'cancelled': 'danger', 'rejected': 'danger', 'error': 'danger', 'failed': 'danger',
-  'pendiente': 'warn', 'pending': 'warn', 'draft': 'warn', 'sent': 'info',
-  'invoiced': 'info', 'expired': 'neutral',
-} %}
-{% set v = variant_map.get(s, 'neutral') %}
-<span class="badge badge--{{ v }} badge--xs">{{ label if label else status }}</span>
-{% endmacro %}
-
-{# ── Page section header (with optional month picker) ─────────────────── #}
-{% macro page_section_header(title, ym='', base_url='', token='', ym_label='', extra_class='') %}
-<div class="page-section-header {{ extra_class }}">
-  <h2 class="page-section-header__title section-title u-m0">{{ title }}</h2>
-  {% if ym and base_url %}
-    {{ month_picker(base_url, token, ym, ym_label) if month_picker is defined }}
-  {% endif %}
-</div>
-{% endmacro %}
-
-{# ── Empty state ──────────────────────────────────────────────────────── #}
 {% macro portal_empty_state(title, desc, id=none, show_icon=true, extra_class='', icon_type='document') %}
 <div class="empty-state empty-state--empty {{ extra_class }}"{% if id %} id="{{ id }}"{% endif %}{% if id %} hidden{% endif %}>
   {% if show_icon %}

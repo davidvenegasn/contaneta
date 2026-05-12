@@ -1,4 +1,5 @@
 {% extends "base_portal.html" %}
+{% from "portal/_ui_components.html" import portal_tooltip %}
 {% set title = 'Datos fiscales' %}
 {% block content %}
 <header class="app-header app-header--with-back">
@@ -18,15 +19,15 @@
 <div class="card p-20 fiel-card">
   <dl class="datos-fiscales-list">
     <div class="datos-fiscales-row">
-      <dt class="datos-fiscales-label">RFC</dt>
+      <dt class="datos-fiscales-label">RFC {{ portal_tooltip('Registro Federal de Contribuyentes. Es tu identificador único ante el SAT, compuesto por 12 o 13 caracteres.', id='tooltip-rfc') }}</dt>
       <dd class="datos-fiscales-value">{{ issuer_rfc or '—' }}</dd>
     </div>
     <div class="datos-fiscales-row">
-      <dt class="datos-fiscales-label">Razón social</dt>
+      <dt class="datos-fiscales-label">Razón social {{ portal_tooltip('Nombre legal completo tal como aparece en tu Constancia de Situación Fiscal del SAT. Debe coincidir exactamente.', id='tooltip-razon-social') }}</dt>
       <dd class="datos-fiscales-value">{{ issuer_razon_social|default(issuer_alias)|default('—') }}</dd>
     </div>
     <div class="datos-fiscales-row">
-      <dt class="datos-fiscales-label">Régimen fiscal</dt>
+      <dt class="datos-fiscales-label">Régimen fiscal {{ portal_tooltip('Régimen bajo el cual tributas ante el SAT (ej. RESICO, Actividad Empresarial, Sueldos y salarios). Determina tus obligaciones fiscales.', id='tooltip-regimen') }}</dt>
       <dd class="datos-fiscales-value">{{ issuer_regimen_label or '—' }}</dd>
     </div>
   </dl>

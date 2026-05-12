@@ -1,4 +1,5 @@
 {% extends "base_portal.html" %}
+{% from "portal/_ui_components.html" import portal_tooltip %}
 {% set title = 'Conectar SAT' %}
 {% block content %}
 <header class="app-header app-header--with-back fiel-header">
@@ -36,7 +37,7 @@
       <form id="satCredForm" action="/portal/config/sat" method="post" enctype="multipart/form-data" class="fiel-form" data-state="idle">
         <input type="hidden" name="csrf_token" value="{{ csrf_token|default('') }}" />
         <div class="fiel-dropzone-wrap">
-          <div class="fiel-dropzone-label">Certificado SAT (.cer)</div>
+          <div class="fiel-dropzone-label">Certificado SAT (.cer) {{ portal_tooltip('Es el archivo .cer que te entregó el SAT al tramitar tu FIEL. Contiene tu certificado digital para firmar documentos.', id='tooltip-cer') }}</div>
           <label class="fiel-dropzone" id="dropzoneCer" for="fiel_cer" data-accept=".cer">
             <input type="file" id="fiel_cer" name="fiel_cer" accept=".cer" class="fiel-dropzone__input" required />
             <span class="fiel-dropzone__icon" aria-hidden="true">
@@ -46,7 +47,7 @@
             <span class="fiel-dropzone__file" id="dropzoneCerFile" hidden><span class="fiel-dropzone__filename" id="dropzoneCerFileName"></span><span class="fiel-dropzone__filesize muted" id="dropzoneCerFileSize"></span></span>
             <button type="button" class="btn btn--sm btn--ghost fiel-dropzone__change" id="dropzoneCerChange" hidden>Cambiar archivo</button>
           </label>
-          <div class="fiel-dropzone-label">Clave privada (.key)</div>
+          <div class="fiel-dropzone-label">Clave privada (.key) {{ portal_tooltip('Es tu clave privada (.key) emitida por el SAT. Junto con el .cer y tu contraseña, forman tu firma electrónica (FIEL).', id='tooltip-key') }}</div>
           <label class="fiel-dropzone" id="dropzoneKey" for="fiel_key" data-accept=".key">
             <input type="file" id="fiel_key" name="fiel_key" accept=".key" class="fiel-dropzone__input" required />
             <span class="fiel-dropzone__icon" aria-hidden="true">
@@ -60,7 +61,7 @@
         </div>
 
         <div class="fiel-field">
-          <label class="fiel-label" for="fiel_password">Contraseña de la clave FIEL *</label>
+          <label class="fiel-label" for="fiel_password">Contraseña de la clave FIEL * {{ portal_tooltip('La contraseña que elegiste al generar tu FIEL en el portal del SAT. Es diferente a tu contraseña de acceso al SAT.', id='tooltip-fiel-pass') }}</label>
           <div class="fiel-password-wrap">
             <input type="password" id="fiel_password" name="fiel_password" autocomplete="off" class="input fiel-password-input" placeholder="Contraseña" required />
             <button type="button" class="fiel-password-toggle" id="fielPasswordToggle" aria-label="Mostrar contraseña">

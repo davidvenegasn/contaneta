@@ -16,7 +16,7 @@
   <div class="pv2-balance-col pv2-balance-col--main">
     <div class="pv2-balance-label">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-      Tus ingresos del mes{% if ym_label %} · {{ ym_label }}{% endif %}
+      Tus ingresos del mes{% if ym_label %} · {{ ym_label }}{% endif %} {{ portal_tooltip('Suma de subtotales (antes de IVA) de todas tus facturas emitidas en el mes seleccionado.', id='tooltip-ingresos') }}
     </div>
     <div class="pv2-balance-amount">
       $<span data-count-to="{{ _ing }}" data-count-decimals="2" data-count-duration="250">{{ '{:,.2f}'.format(_ing) }}</span>
@@ -25,19 +25,19 @@
 
   {# --- Gastos --- #}
   <a class="pv2-balance-col pv2-balance-col--kpi" href="/portal/facturas?tab=received">
-    <div class="pv2-balance-btn-label">Gastos</div>
+    <div class="pv2-balance-btn-label">Gastos {{ portal_tooltip('Suma de subtotales (antes de IVA) de todas tus facturas recibidas en el mes. Son tus gastos deducibles.', id='tooltip-gastos') }}</div>
     <div class="pv2-balance-btn-value">$<span data-count-to="{{ gastos_sin_iva|default(0) }}" data-count-decimals="2" data-count-duration="250">{{ '{:,.2f}'.format(gastos_sin_iva|default(0)) }}</span></div>
   </a>
 
   {# --- IVA cobrado --- #}
   <a class="pv2-balance-col pv2-balance-col--kpi" href="/portal/facturas?tab=issued">
-    <div class="pv2-balance-btn-label">IVA cobrado</div>
+    <div class="pv2-balance-btn-label">IVA cobrado {{ portal_tooltip('IVA que cobraste a tus clientes, menos las retenciones de IVA que te hicieron. Es lo que debes enterar al SAT.', id='tooltip-iva-cobrado') }}</div>
     <div class="pv2-balance-btn-value">$<span data-count-to="{{ iva_recibido_neto|default(0) }}" data-count-decimals="2" data-count-duration="250">{{ '{:,.2f}'.format(iva_recibido_neto|default(0)) }}</span></div>
   </a>
 
   {# --- IVA pagado --- #}
   <a class="pv2-balance-col pv2-balance-col--kpi" href="/portal/facturas?tab=received">
-    <div class="pv2-balance-btn-label">IVA pagado</div>
+    <div class="pv2-balance-btn-label">IVA pagado {{ portal_tooltip('IVA que pagaste en tus compras (facturas recibidas). Es acreditable contra el IVA que cobras.', id='tooltip-iva-pagado') }}</div>
     <div class="pv2-balance-btn-value">$<span data-count-to="{{ iva_pagado|default(0) }}" data-count-decimals="2" data-count-duration="250">{{ '{:,.2f}'.format(iva_pagado|default(0)) }}</span></div>
   </a>
 </div>
