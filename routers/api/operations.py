@@ -499,7 +499,7 @@ def register_operations_routes(router):
     def api_metrics_trend(
         request: Request,
         issuer: dict = Depends(get_portal_issuer),
-        months: int = Query(6, ge=1, le=12),
+        months: int = Query(12, ge=1, le=24),
     ):
         """Return monthly totals for issued/received over the last N months (for sparklines and charts).
         Smart: if user has less than N months of data, show only from first month with data."""
