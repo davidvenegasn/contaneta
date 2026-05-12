@@ -8083,3 +8083,8 @@ html.nightmode .bank-category-popover__item:hover {
   letter-spacing: -0.02em;
 }
 .ui-page-wrap .app-header { padding-top: 4px; padding-bottom: 8px; }
+
+/* ── Hub tabs spacing (facturas tabs between card header and list) ── */
+.page-section .hub-tabs { margin: 0 0 16px 0; }
+.page-section .hub-tabs + .card,
+.page-section .hub-tabs + .ym-card { margin-top: 0; }

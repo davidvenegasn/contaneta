@@ -4,14 +4,11 @@
 {% block content %}
 <div class="ui-page-wrap">
   <section class="page-section hub-section ui-v2">
-    <nav class="ui-tabs hub-tabs" role="tablist" aria-label="Facturas">
-      <a class="hub-tabs__item ui-tab {{ 'hub-tabs__item--active is-active' if active_tab == 'issued' else '' }}" href="/portal/facturas?tab=issued{{ '&ym=' ~ ym if ym else '' }}" role="tab" aria-selected="{{ active_tab == 'issued' }}">Emitidas</a>
-      <a class="hub-tabs__item ui-tab {{ 'hub-tabs__item--active is-active' if active_tab == 'received' else '' }}" href="/portal/facturas?tab=received{{ '&ym=' ~ ym if ym else '' }}" role="tab" aria-selected="{{ active_tab == 'received' }}">Recibidas</a>
-      <a class="hub-tabs__item ui-tab {{ 'hub-tabs__item--active is-active' if active_tab == 'ppd' else '' }}" href="/portal/facturas?tab=ppd{{ '&ym=' ~ ym if ym else '' }}" role="tab" aria-selected="{{ active_tab == 'ppd' }}">PPD</a>
-    </nav>
-
     {% set section_title = ("Facturas emitidas" if active_tab == "issued" else ("Facturas recibidas" if active_tab == "received" else "Facturas PPD")) %}
+    {% set _base_url = ("/portal/facturas?tab=" ~ active_tab) %}
 
+    {# ── Section header card: title + picker + totals (always first) ── #}
+    {% set _hub_tabs = true %}
     {% if active_tab == 'issued' %}
       {% include "partials/issued_list.html" with context %}
     {% elif active_tab == 'received' %}

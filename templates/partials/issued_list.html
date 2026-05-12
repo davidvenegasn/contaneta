@@ -27,6 +27,14 @@
   </div>
 </div>
 
+{% if _hub_tabs|default(false) %}
+<nav class="ui-tabs hub-tabs" role="tablist" aria-label="Facturas">
+  <a class="hub-tabs__item ui-tab {{ 'hub-tabs__item--active is-active' if active_tab == 'issued' else '' }}" href="/portal/facturas?tab=issued{{ '&ym=' ~ ym if ym else '' }}" role="tab" aria-selected="{{ active_tab == 'issued' }}">Emitidas</a>
+  <a class="hub-tabs__item ui-tab {{ 'hub-tabs__item--active is-active' if active_tab == 'received' else '' }}" href="/portal/facturas?tab=received{{ '&ym=' ~ ym if ym else '' }}" role="tab" aria-selected="{{ active_tab == 'received' }}">Recibidas</a>
+  <a class="hub-tabs__item ui-tab {{ 'hub-tabs__item--active is-active' if active_tab == 'ppd' else '' }}" href="/portal/facturas?tab=ppd{{ '&ym=' ~ ym if ym else '' }}" role="tab" aria-selected="{{ active_tab == 'ppd' }}">PPD</a>
+</nav>
+{% endif %}
+
 <div class="card card--invoice-list ui-card">
   <div class="card__header card__header--row ui-card__header">
     <h3 class="card__title section-title">Facturas emitidas</h3>
