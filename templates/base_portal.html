@@ -790,6 +790,7 @@
   const userMenu = document.getElementById('userMenu');
   const closeUserMenu = () => {
     if (!userMenu) return;
+    if (userMenu.hidden) return;
     userMenu.hidden = true;
     if (userBtn) userBtn.setAttribute('aria-expanded', 'false');
     const railBtn = document.getElementById('userMenuBtnRail');

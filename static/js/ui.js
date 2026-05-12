@@ -16,6 +16,7 @@
     }
   };
   window.uiUnlockScroll = function () {
+    if (_scrollLockCount === 0) return;
     _scrollLockCount = Math.max(0, _scrollLockCount - 1);
     if (_scrollLockCount === 0) {
       document.body.classList.remove('scroll-locked');
