@@ -10,9 +10,9 @@ Reglas:
 from __future__ import annotations
 
 import re
-from typing import Any, Optional
+from typing import Any
 
-from database import db, has_column, table_exists
+from database import db, table_exists
 
 # Regex patterns for classification
 _CARD_PAYMENT_RE = re.compile(

@@ -1,31 +1,17 @@
 """Operations API routes."""
-import hashlib
-import json
 import logging
-import os
-import re
-import secrets
-import time
 from datetime import datetime
-from io import BytesIO
 from typing import Optional
 
-from fastapi import Body, Depends, File, HTTPException, Query, Request, UploadFile
-from fastapi.responses import JSONResponse
+from fastapi import Body, Depends, HTTPException, Query, Request
 
-from config import BASE_DIR, DEV_FIXTURES
-from database import db, db_rows, has_column, list_catalog, search_catalog, table_exists
+from database import db, db_rows, table_exists
 from routers.api._helpers import (
     DEFAULT_LIST_LIMIT,
     MAX_LIST_LIMIT,
-    MAX_LIST_OFFSET,
-    QUOTATION_STATUSES,
-    _api_rate_check,
     _get_month_totals_safe,
-    _load_fixture,
 )
 from routers.deps import get_portal_issuer
-from validators import validate_customer, validate_product
 
 logger = logging.getLogger(__name__)
 
@@ -38,18 +24,9 @@ except Exception:
     MONEDA = {"MXN": "Peso Mexicano", "USD": "Dólar Americano"}
     CLAVE_UNIDAD = {"E48": "Unidad de servicio", "EA": "Cada uno", "H87": "Pieza"}
 
-from facturapi_client import FacturapiError, create_invoice, download_invoice
-from facturapi_client import cancel_invoice as facturapi_cancel
-from services import clients_service, products_service
-from services import jobs as jobs_service
 from services.action_log import log_action
 from services.auth import csrf as csrf_service
-from services.billing import subscription as subscription_service
 from services.http import ok, ok_list
-from services.invoices import invoices_engine
-from services.sat.sat_sync import get_month_totals as _get_month_totals_raw
-from services.schemas import ClientCreate, ProductCreate
-from services.ym_helpers import is_annual, sanitize_ym, ym_sql_filter
 
 
 def register_operations_routes(router):
@@ -610,7 +587,7 @@ def register_operations_routes(router):
     ):
         """Set an exchange rate for a currency+month."""
         csrf_service.verify_api_csrf(request)
-        from services.invoices.exchange_rates import get_rate, set_rate
+        from services.invoices.exchange_rates import set_rate
         moneda = (body.get("moneda") or "").strip().upper()
         period = (body.get("period") or "").strip()
         rate = body.get("rate")

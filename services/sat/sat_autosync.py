@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timezone
 
-from database import db, has_column, table_exists
+from database import db
 
 logger = logging.getLogger(__name__)
 

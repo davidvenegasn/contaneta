@@ -10,7 +10,7 @@ from urllib.parse import parse_qs, quote, urlencode, urlparse, urlunparse
 
 request_id_ctx: ContextVar[str] = ContextVar("request_id", default="-")
 
-from fastapi import Depends, FastAPI, Query, Request
+from fastapi import FastAPI, Query, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -22,7 +22,6 @@ from config import (
     BASE_DIR,
     DB_PATH,
     DEV_MODE,
-    DEV_TOKEN,
     IS_PROD,
     SESSION_COOKIE_NAME,
     SESSION_SECRET_FROM_ENV,
@@ -35,7 +34,6 @@ from routers.admin import get_admin_router
 from routers.api import router as api_router
 from routers.auth import get_auth_router
 from routers.billing import router as billing_router
-from routers.deps import get_portal_issuer
 from routers.invoicing import get_invoicing_router
 from routers.portal import get_portal_router
 from routers.public import get_public_router

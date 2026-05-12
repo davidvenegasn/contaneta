@@ -1,14 +1,12 @@
 from __future__ import annotations
 
 import argparse
-import json
 import logging
 import os
 import signal
 import sys
 import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from typing import Any, Callable
 
 from migrations_runner import apply_migrations

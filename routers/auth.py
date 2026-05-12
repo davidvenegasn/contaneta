@@ -11,7 +11,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 from config import DEV_MODE, _env_path
 from database import db
-from services import action_log, audit, email_sender, issuers
+from services import audit, email_sender, issuers
 from services import sanitize as sanitize_service
 from services.action_log import log_action
 from services.auth import csrf as csrf_service
@@ -813,7 +813,7 @@ def get_auth_router(templates):
             phone = None
 
         # Build redirect base with preserved fields
-        from urllib.parse import quote, urlencode
+        from urllib.parse import urlencode
         _keep = {}
         if email:
             _keep["email"] = email

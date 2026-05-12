@@ -1,6 +1,5 @@
 """Dependencias FastAPI (get_portal_issuer)."""
 import logging
-import time
 
 from fastapi import HTTPException, Request
 

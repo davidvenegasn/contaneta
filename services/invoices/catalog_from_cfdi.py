@@ -1,8 +1,6 @@
-import json
 import logging
 import os
 import re
-import sqlite3
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from datetime import datetime

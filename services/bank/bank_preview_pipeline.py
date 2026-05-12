@@ -6,12 +6,11 @@ from __future__ import annotations
 
 import logging
 import re
-from datetime import datetime, timezone
 from typing import Any, Optional
 
 from services.bank.bank_classifier import classify_bank_preview_movement, extract_spei_counterparty_for_display
 from services.bank.bank_detection import detect_bank_from_pdf_text_pages, extract_account_holder_from_pdf_text
-from services.bank.bank_preview_models import make_preview_movement, normalize_preview_movement
+from services.bank.bank_preview_models import make_preview_movement
 from services.pdf_to_excel import detect_statement_period_from_text
 
 logger = logging.getLogger(__name__)

@@ -147,7 +147,6 @@ def _extract_money_values(norm_text: str) -> tuple[list[float], str]:
 
 def _parse_banorte_date_start(s_norm: str) -> Optional[tuple[str, str]]:
     """(YYYY-MM-DD, resto)."""
-    import unicodedata
     _MONTHS = {
         "ENE": 1, "FEB": 2, "MAR": 3, "ABR": 4, "MAY": 5, "JUN": 6,
         "JUL": 7, "AGO": 8, "SEP": 9, "SET": 9, "OCT": 10, "NOV": 11, "DIC": 12,
@@ -241,7 +240,6 @@ def _classify(m: MovementPreview, desc_norm: str, preset: Optional[dict[str, Any
     from services.bank.bank_classifier_presets import (
         KEYWORDS_IMPUESTO,
         KEYWORDS_TARJETA,
-        MERCHANT_MAP,
         PRESET_CONSERVATIVE,
         get_preset,
     )

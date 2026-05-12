@@ -1,6 +1,6 @@
 """Manual movements — user-entered income/expense records."""
 
-from database import db, db_execute, db_rows, table_exists
+from database import db, db_rows, table_exists
 
 
 def ensure_table():

@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 from config import SESSION_SECRET
-from database import db, db_rows
+from database import db
 
 
 def _token_hash(token: str) -> str:

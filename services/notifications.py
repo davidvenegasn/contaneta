@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any
 
 from database import db, db_rows, has_column, table_exists
 from services.month_close import pdf_exists

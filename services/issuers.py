@@ -2,7 +2,7 @@
 import secrets
 
 from config import DEMO_ISSUER_ID, DEV_MODE, DEV_TOKEN
-from database import db, db_rows, has_column
+from database import db, has_column
 
 # Días de trial al registrar (sin Stripe aún). Configurable por env si se desea.
 TRIAL_DAYS_DEFAULT = 14

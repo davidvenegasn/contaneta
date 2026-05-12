@@ -3,7 +3,7 @@ import logging
 import re
 import unicodedata
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date
 from typing import Any, Optional
 
 logger = logging.getLogger(__name__)

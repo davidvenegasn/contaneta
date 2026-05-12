@@ -1,74 +1,24 @@
 """Portal dashboard routes."""
-import hashlib
-import io
 import json
 import logging
-import os
-import re
-import secrets
-import stat
-from datetime import date, datetime, timezone
-from typing import Any, Optional
+from datetime import date, datetime
 
-from fastapi import Body, Depends, File, Form, HTTPException, Query, Request, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
+from fastapi import Depends, HTTPException, Query, Request
+from fastapi.responses import HTMLResponse, RedirectResponse
 
 from config import (
-    BASE_DIR,
     COOKIE_DEMO_VIEW,
-    DB_PATH,
     DEV_MODE,
-    PORTAL_SHELL_V2,
-    REGIMEN_CODE_DESCRIPTIONS,
-    REGIMEN_LABEL_TO_CODE,
 )
-from database import db, db_rows, has_column, table_exists
+from database import db_rows
 from routers.deps import get_portal_issuer
 from routers.portal._helpers import (
-    MAX_LIST_OFFSET,
-    MESES_ES,
-    _db_row_to_dict,
-    _get_cfdi_by_uuid,
-    _safe_abs_path,
-    _strip_date_from_description,
     render_portal,
     ym_now,
 )
-from services import audit, file_access_log
-from services import quotations as quotations_service
-from services.action_log import log_action
 from services.auth import csrf as csrf_service
-from services.auth import rate_limit as rate_limit_service
-from services.auth import session as session_service
-from services.bank.bank_accounts import create_account as bank_create_account
-from services.bank.bank_accounts import delete_account as bank_delete_account
-from services.bank.bank_accounts import get_account as bank_get_account
-from services.bank.bank_accounts import list_active_accounts as bank_list_accounts
-from services.bank.bank_accounts import list_active_accounts_raw as bank_list_accounts_raw
-from services.bank.bank_accounts import list_all_accounts as bank_list_all_accounts
-from services.bank.bank_accounts import update_account as bank_update_account
-from services.bank.bank_cfdi_matching import confirm_match as match_confirm
-from services.bank.bank_cfdi_matching import find_cfdi_candidates, save_suggested_matches
-from services.bank.bank_cfdi_matching import reject_match as match_reject
-from services.bank.bank_own_accounts import detect_own_account_transfer, reclassify_own_transfers_by_rfc
-from services.bank.bank_parse_preview import parse_bank_pdf_to_movements_preview, reclassify_movements
-from services.bank.bank_preview_models import compute_dedupe_fingerprint
-from services.bank.bank_preview_pipeline import parse_bank_statement_preview
-from services.bank.bank_statement_ingest import (
-    commit_preview_to_db,
-    extract_statement_metadata,
-    ingest_bank_statement,
-    validate_statement_ownership,
-)
-from services.billing import subscription as subscription_service
-from services.errors import ExternalServiceError
-from services.invoices.catalog_from_cfdi import backfill_catalog_from_existing_cfdi
-from services.pdf_to_excel import convert_pdf_to_xlsx, ensure_parent_dir, get_storage_root, safe_join
-from services.portal_errors import portal_error_type
-from services.redirects import safe_next_url
 from services.sat.sat_sync import get_month_totals, get_sat_sync_status
-from services.sat.subprocess_utils import run_php
-from services.ym_helpers import is_annual, sanitize_ym, shift_ym, ym_sql_filter, ym_to_label
+from services.ym_helpers import sanitize_ym, shift_ym, ym_sql_filter, ym_to_label
 
 logger = logging.getLogger(__name__)
 

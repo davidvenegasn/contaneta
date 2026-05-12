@@ -1,5 +1,4 @@
 """Shared helpers for portal route modules."""
-import hashlib
 import logging
 import os
 import re
@@ -10,13 +9,12 @@ from fastapi import Request
 
 from config import (
     BASE_DIR,
-    DB_PATH,
     DEV_MODE,
     PORTAL_SHELL_V2,
     REGIMEN_CODE_DESCRIPTIONS,
     REGIMEN_LABEL_TO_CODE,
 )
-from database import db, db_rows, has_column
+from database import db, db_rows
 from services.auth import csrf as csrf_service
 
 logger = logging.getLogger(__name__)
