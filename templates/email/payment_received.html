@@ -1,0 +1,85 @@
+{% extends "email/base_email.html" %}
+
+{% block title %}Pago recibido &mdash; ContaNeta{% endblock %}
+
+{% block content %}
+<h1 style="margin: 0 0 8px; font-size: 22px; font-weight: 700; color: #1e293b;">
+  Pago recibido
+</h1>
+<p style="margin: 0 0 24px; color: #64748b; font-size: 15px;">
+  Confirmaci&oacute;n de pago registrado exitosamente.
+</p>
+
+<p style="margin: 0 0 16px; color: #334155; font-size: 15px; line-height: 1.6;">
+  Hola,
+</p>
+
+<p style="margin: 0 0 24px; color: #334155; font-size: 15px; line-height: 1.6;">
+  Te confirmamos que hemos registrado el siguiente pago:
+</p>
+
+<!-- Success badge -->
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-bottom: 24px;">
+  <tr>
+    <td align="center">
+      <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+        <tr>
+          <td style="background-color: #ecfdf5; border-radius: 8px; padding: 16px 24px; text-align: center; border: 1px solid #a7f3d0;">
+            <p style="margin: 0 0 4px; font-size: 13px; color: #065f46; font-weight: 600;">Monto recibido</p>
+            <p style="margin: 0; font-size: 28px; font-weight: 700; color: #059669;">
+              ${{ payment.amount }}
+            </p>
+            {% if payment.currency %}
+            <p style="margin: 4px 0 0; font-size: 12px; color: #065f46;">{{ payment.currency }}</p>
+            {% endif %}
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+
+<!-- Payment details table -->
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" class="detail-table" style="margin-bottom: 24px; border: 1px solid #e2e8f0; border-radius: 8px; border-collapse: separate;">
+  {% if payment.date %}
+  <tr>
+    <td class="detail-label" style="padding: 10px 16px; font-size: 13px; color: #64748b; border-bottom: 1px solid #e2e8f0; width: 40%;">Fecha de pago</td>
+    <td style="padding: 10px 16px; font-size: 14px; color: #1e293b; border-bottom: 1px solid #e2e8f0;">{{ payment.date }}</td>
+  </tr>
+  {% endif %}
+  {% if payment.method %}
+  <tr>
+    <td class="detail-label" style="padding: 10px 16px; font-size: 13px; color: #64748b; border-bottom: 1px solid #e2e8f0;">M&eacute;todo de pago</td>
+    <td style="padding: 10px 16px; font-size: 14px; color: #1e293b; border-bottom: 1px solid #e2e8f0;">{{ payment.method }}</td>
+  </tr>
+  {% endif %}
+  {% if payment.invoice_folio %}
+  <tr>
+    <td class="detail-label" style="padding: 10px 16px; font-size: 13px; color: #64748b; border-bottom: 1px solid #e2e8f0;">Factura asociada</td>
+    <td style="padding: 10px 16px; font-size: 14px; color: #1e293b; border-bottom: 1px solid #e2e8f0;">{{ payment.invoice_folio }}</td>
+  </tr>
+  {% endif %}
+  {% if payment.payer_name %}
+  <tr>
+    <td class="detail-label" style="padding: 10px 16px; font-size: 13px; color: #64748b;">Pagador</td>
+    <td style="padding: 10px 16px; font-size: 14px; color: #1e293b;">{{ payment.payer_name }}</td>
+  </tr>
+  {% endif %}
+</table>
+
+{% if payment.reference %}
+<p style="margin: 0 0 24px; color: #64748b; font-size: 13px;">
+  Referencia: <strong>{{ payment.reference }}</strong>
+</p>
+{% endif %}
+
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="border-top: 1px solid #e2e8f0; margin-top: 8px;">
+  <tr>
+    <td style="padding-top: 20px;">
+      <p style="margin: 0; color: #64748b; font-size: 13px; line-height: 1.5;">
+        Esta es una confirmaci&oacute;n autom&aacute;tica. Conserva este correo como comprobante de pago.
+      </p>
+    </td>
+  </tr>
+</table>
+{% endblock %}
