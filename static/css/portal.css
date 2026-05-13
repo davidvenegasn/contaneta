@@ -8108,3 +8108,46 @@ html.nightmode .bank-category-popover__item:hover {
 .btn-icon-eye:hover { background: rgba(99, 102, 241, 0.08); color: var(--accent, #6366f1); }
 .btn-icon-eye:focus-visible { outline: 2px solid var(--accent, #6366f1); outline-offset: 2px; }
 .ym-card--collapsed .btn-icon-eye { color: var(--accent, #6366f1); }
+
+/* ── Settings tabs ── */
+.settings-tabs {
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid var(--border, #e5e7eb);
+  padding-bottom: 0;
+}
+.settings-tab {
+  padding: 8px 16px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--muted, #6b7280);
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.settings-tab:hover { color: var(--text, #1f2937); }
+.settings-tab.is-active {
+  color: var(--accent, #6366f1);
+  border-bottom-color: var(--accent, #6366f1);
+}
+
+/* ── Alert variants ── */
+.alert--warning {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: var(--warning-bg, #fff3cd);
+  border: 1px solid var(--warning-border, #ffc107);
+  color: var(--warning-text, #856404);
+  font-size: 0.875rem;
+}
+
+/* ── Search form narrow ── */
+.search-form-narrow { max-width: 280px; }
+@media (max-width: 640px) {
+  .search-form-narrow { max-width: 100%; }
+}
