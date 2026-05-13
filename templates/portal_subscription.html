@@ -1,0 +1,262 @@
+{% extends "base_portal.html" %}
+
+{% block content %}
+  <header class="app-header app-header--mb-14">
+    <div class="app-header__left">
+      <div class="app-title">Mi suscripcion</div>
+      <div class="app-subtitle muted">Estado de tu plan, uso del mes e historial de pagos.</div>
+    </div>
+  </header>
+
+  {# ---------- Current plan status ---------- #}
+  <div class="card u-mb-14">
+    <h2 class="u-m0 u-mb-3 u-text-base">Plan actual: <strong>{{ sub_status.plan_label }}</strong></h2>
+    {% if plan_limits.get('price_monthly') %}
+    <p class="muted">${{ plan_limits.price_monthly }} MXN/mes</p>
+    {% else %}
+    <p class="muted">Sin costo</p>
+    {% endif %}
+
+    <div style="margin-top:8px;">
+      {% if sub_status.status == 'active' %}
+        <span class="badge badge--success">Suscripcion activa</span>
+      {% elif sub_status.status == 'trialing' %}
+        <span class="badge badge--info">Periodo de prueba</span>
+      {% elif sub_status.status == 'past_due' %}
+        <span class="badge badge--warn">Pago pendiente</span>
+      {% elif sub_status.status == 'canceled' %}
+        <span class="badge badge--danger">Cancelada</span>
+      {% elif sub_status.status == 'free' %}
+        <span class="badge badge--neutral">Plan gratuito</span>
+      {% else %}
+        <span class="badge badge--neutral">{{ sub_status.status or 'Sin suscripcion' }}</span>
+      {% endif %}
+    </div>
+
+    {% if sub_status.current_period_end %}
+    <p class="muted u-text-sm" style="margin-top:6px;">
+      Proximo vencimiento: {{ sub_status.current_period_end[:10] }}
+    </p>
+    {% endif %}
+
+    {% if sub_status.created_at %}
+    <p class="muted u-text-sm" style="margin-top:4px;">
+      Suscrito desde: {{ sub_status.created_at[:10] }}
+    </p>
+    {% endif %}
+  </div>
+
+  {# ---------- Usage metrics ---------- #}
+  <div class="card u-mb-14">
+    <h2 class="u-m0 u-mb-3 u-text-base">Uso del mes</h2>
+    <div class="sub-usage-grid">
+
+      {# Invoices #}
+      <div class="sub-usage-card">
+        <div class="sub-usage-card__label">Facturas emitidas</div>
+        <div class="sub-usage-card__value">
+          <span class="sub-usage-card__num">{{ usage.invoices_count }}</span>
+          {% if usage.invoices_limit > 0 %}
+          <span class="muted">/ {{ usage.invoices_limit }}</span>
+          {% else %}
+          <span class="muted">/ Ilimitadas</span>
+          {% endif %}
+        </div>
+        {% if usage.invoices_limit > 0 %}
+        <div class="sub-usage-bar">
+          <div class="sub-usage-bar__fill sub-usage-bar__fill--{{ 'danger' if usage.invoices_pct >= 90 else ('warn' if usage.invoices_pct >= 70 else 'ok') }}" style="width:{{ usage.invoices_pct }}%;"></div>
+        </div>
+        {% endif %}
+        {% if not can_invoice %}
+        <p class="u-text-sm" style="color:var(--danger, #ef4444); margin-top:6px;">Limite alcanzado</p>
+        {% endif %}
+      </div>
+
+      {# Storage #}
+      <div class="sub-usage-card">
+        <div class="sub-usage-card__label">Almacenamiento</div>
+        <div class="sub-usage-card__value">
+          <span class="sub-usage-card__num">{{ usage.storage_used_mb }}</span>
+          <span class="muted">/ {{ usage.storage_limit_mb }} MB</span>
+        </div>
+        {% if usage.storage_limit_mb > 0 %}
+        <div class="sub-usage-bar">
+          <div class="sub-usage-bar__fill sub-usage-bar__fill--{{ 'danger' if usage.storage_pct >= 90 else ('warn' if usage.storage_pct >= 70 else 'ok') }}" style="width:{{ usage.storage_pct }}%;"></div>
+        </div>
+        {% endif %}
+      </div>
+
+      {# SAT syncs #}
+      <div class="sub-usage-card">
+        <div class="sub-usage-card__label">Syncs SAT</div>
+        <div class="sub-usage-card__value">
+          <span class="sub-usage-card__num">{{ usage.sat_syncs_count }}</span>
+        </div>
+      </div>
+
+      {# Bank imports #}
+      <div class="sub-usage-card">
+        <div class="sub-usage-card__label">Importaciones bancarias</div>
+        <div class="sub-usage-card__value">
+          <span class="sub-usage-card__num">{{ usage.bank_imports_count }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# ---------- Upgrade / downgrade ---------- #}
+  <div class="card u-mb-14">
+    <h2 class="u-m0 u-mb-3 u-text-base">Planes disponibles</h2>
+    <div class="sub-plans-grid">
+      {% for key, p in all_plans.items() %}
+      <div class="sub-plan-card {{ 'sub-plan-card--current' if key == sub_status.plan else '' }} {{ 'sub-plan-card--recommended' if key == 'pro' and key != sub_status.plan else '' }}">
+        {% if key == 'pro' and key != sub_status.plan %}
+        <span class="badge badge--primary sub-plan-card__badge">Recomendado</span>
+        {% endif %}
+        <div class="sub-plan-card__name">{{ p.name }}</div>
+        <div class="sub-plan-card__price">
+          {% if p.get('price_monthly') %}
+            ${{ p.price_monthly }} <span class="muted" style="font-size:14px;">MXN/mes</span>
+          {% else %}
+            Gratis
+          {% endif %}
+        </div>
+        <ul class="sub-plan-card__features">
+          <li>{% if p.invoices_per_month < 0 %}Facturas ilimitadas{% else %}{{ p.invoices_per_month }} facturas/mes{% endif %}</li>
+          <li>{{ p.storage_mb }} MB almacenamiento</li>
+        </ul>
+        {% if key == sub_status.plan %}
+        <div style="margin-top:12px;">
+          <span class="badge badge--success">Plan actual</span>
+        </div>
+        {% elif key in ('basic', 'pro', 'enterprise') %}
+        <div style="margin-top:12px;">
+          <button type="button" class="btn btn-primary btn-sm sub-upgrade-btn" data-plan="{{ key }}">
+            {% if all_plans[sub_status.plan].get('price_monthly', 0) < (p.get('price_monthly') or 0) %}
+              Mejorar a {{ p.name }}
+            {% else %}
+              Elegir {{ p.name }}
+            {% endif %}
+          </button>
+        </div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  {# ---------- Cancel subscription ---------- #}
+  {% if sub_status.status in ('active', 'trialing') and sub_status.stripe_subscription_id %}
+  <div class="card u-mb-14">
+    <h2 class="u-m0 u-mb-3 u-text-base">Cancelar suscripcion</h2>
+    <p class="muted u-text-sm">Si cancelas, tu plan seguira activo hasta el final del periodo de facturacion actual.</p>
+    <button type="button" class="btn btn-sm" style="background: var(--danger, #ef4444); color: #fff; margin-top:8px;" id="cancel-sub-btn">
+      Cancelar suscripcion
+    </button>
+  </div>
+  {% endif %}
+
+  {# ---------- Payment history ---------- #}
+  <div class="card">
+    <h2 class="u-m0 u-mb-3 u-text-base">Historial de pagos</h2>
+    {% if payments %}
+    <table class="table table--compact" style="width:100%;">
+      <thead>
+        <tr>
+          <th>Fecha</th>
+          <th>Plan</th>
+          <th>Estado</th>
+          <th style="text-align:right;">Monto</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in payments %}
+        <tr>
+          <td>{{ p.date[:10] if p.date else '—' }}</td>
+          <td>{{ p.plan_label }}</td>
+          <td>
+            {% if p.status == 'active' %}
+              <span class="badge badge--success">Activo</span>
+            {% elif p.status == 'canceled' %}
+              <span class="badge badge--danger">Cancelado</span>
+            {% elif p.status == 'past_due' %}
+              <span class="badge badge--warn">Pendiente</span>
+            {% else %}
+              <span class="badge badge--neutral">{{ p.status }}</span>
+            {% endif %}
+          </td>
+          <td style="text-align:right;">{% if p.amount %}${{ p.amount }} MXN{% else %}—{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="muted u-text-sm">No hay pagos registrados.</p>
+    {% endif %}
+  </div>
+
+  <style>
+    .sub-usage-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+    .sub-usage-card { border: 1px solid var(--border, #e2e8f0); border-radius: 10px; padding: 12px; }
+    .sub-usage-card__label { font-weight: 600; font-size: 14px; }
+    .sub-usage-card__value { margin-top: 6px; }
+    .sub-usage-card__num { font-size: 20px; font-weight: 600; }
+    .sub-usage-bar { margin-top: 6px; background: var(--neutral-bg, #e2e8f0); border-radius: 4px; height: 6px; overflow: hidden; }
+    .sub-usage-bar__fill { height: 100%; border-radius: 4px; transition: width .3s ease; }
+    .sub-usage-bar__fill--ok { background: var(--success, #22c55e); }
+    .sub-usage-bar__fill--warn { background: var(--warn, #d97706); }
+    .sub-usage-bar__fill--danger { background: var(--danger, #ef4444); }
+    .sub-plans-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; }
+    .sub-plan-card { border: 1px solid var(--border, #e2e8f0); border-radius: 14px; padding: 16px; position: relative; }
+    .sub-plan-card--current { border: 2px solid var(--primary, #6366f1); background: var(--accent-soft, #eff6ff); }
+    .sub-plan-card--recommended { border-color: var(--primary, #6366f1); box-shadow: 0 4px 16px rgba(99,102,241,.12); }
+    .sub-plan-card__badge { position: absolute; top: -10px; right: 12px; }
+    .sub-plan-card__name { font-weight: 700; font-size: 17px; letter-spacing: -0.01em; }
+    .sub-plan-card__price { margin-top: 6px; font-size: 24px; font-weight: 700; letter-spacing: -0.02em; }
+    .sub-plan-card__features { margin: 10px 0 0; padding-left: 0; font-size: 13px; color: var(--muted, #64748b); list-style: none; }
+    .sub-plan-card__features li { margin-bottom: 4px; padding-left: 20px; position: relative; }
+    .sub-plan-card__features li::before { content: '\2713'; position: absolute; left: 0; color: var(--success, #059669); font-weight: 700; font-size: 12px; }
+    .badge--danger { background: #ef4444; color: #fff; }
+    .badge--primary { background: var(--primary, #6366f1); color: #fff; }
+    .badge--info { background: #3b82f6; color: #fff; }
+  </style>
+
+  <script>
+  /* Upgrade buttons — redirect to Stripe checkout */
+  document.querySelectorAll('.sub-upgrade-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var plan = btn.getAttribute('data-plan');
+      btn.disabled = true;
+      (window.portalFetchJSON ? window.portalFetchJSON('/billing/checkout', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan: plan })
+      }, { timeoutMs: 30000, retry: 0 }) : Promise.resolve({ ok: false }))
+        .then(function(r) {
+          if (r && r.ok && r.data && r.data.url) {
+            window.location.href = r.data.url;
+            return;
+          }
+          btn.disabled = false;
+          if (window.uiToast) window.uiToast({ type: 'danger', title: 'Error', message: (r && r.data && r.data.detail) || 'No se pudo iniciar el pago.' });
+        })
+        .catch(function() {
+          btn.disabled = false;
+          if (window.uiToast) window.uiToast({ type: 'danger', title: 'Error de conexion', message: 'Revisa tu conexion e intenta de nuevo.' });
+        });
+    });
+  });
+
+  /* Cancel subscription confirmation */
+  var cancelBtn = document.getElementById('cancel-sub-btn');
+  if (cancelBtn) {
+    cancelBtn.addEventListener('click', function() {
+      if (!confirm('Estas seguro que deseas cancelar tu suscripcion? Tu plan seguira activo hasta el final del periodo actual.')) return;
+      cancelBtn.disabled = true;
+      if (window.uiToast) window.uiToast({ type: 'info', title: 'Cancelacion', message: 'Para cancelar tu suscripcion, contacta a soporte.' });
+      cancelBtn.disabled = false;
+    });
+  }
+  </script>
+{% endblock %}

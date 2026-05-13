@@ -55,6 +55,34 @@ def register_misc_routes(router, templates):
             },
         )
 
+    # ---------- Subscription lifecycle ----------
+    @router.get("/subscription", response_class=HTMLResponse)
+    def portal_subscription(request: Request, issuer: dict = Depends(get_portal_issuer)):
+        """Render subscription lifecycle page with status, usage, and payment history."""
+        from services import subscription_lifecycle as sl
+        issuer_id = int(issuer.get("id") or 0)
+        status = sl.get_subscription_status(issuer_id)
+        usage = sl.get_usage_metrics(issuer_id)
+        payments = sl.get_payment_history(issuer_id, limit=10)
+        can_invoice = sl.can_create_invoice(issuer_id)
+        plan_limits = sl.get_plan_limits(status.get("plan", "free"))
+        all_plans = {k: sl.get_plan_limits(k) for k in sl.PLAN_LIMITS}
+        return _render_portal(
+            request,
+            issuer=issuer,
+            template_name="portal_subscription.html",
+            active_page="subscription",
+            title="Mi suscripcion",
+            extra={
+                "sub_status": status,
+                "usage": usage,
+                "payments": payments,
+                "can_invoice": can_invoice,
+                "plan_limits": plan_limits,
+                "all_plans": all_plans,
+            },
+        )
+
     @router.get("/info", response_class=RedirectResponse)
     def portal_info():
         """Redirige a la página pública de seguridad (misma para usuarios y visitantes)."""
