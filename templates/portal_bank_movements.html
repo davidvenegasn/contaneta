@@ -1,4 +1,5 @@
 {% extends "base_portal.html" %}
+{% from "portal/_ui_components.html" import portal_tooltip %}
 {% set title = title|default('Movimientos') %}
 
 {% block content %}
@@ -11,17 +12,17 @@
     </div>
     <div class="dashboard-metrics">
       <div class="card metric-card metric-card--income">
-        <div class="metric-label">Total ingresos</div>
+        <div class="metric-label">Total ingresos {{ portal_tooltip('Suma de depósitos del mes, excluyendo movimientos clasificados como Cuenta propia.', id='tooltip-bank-ingresos') }}</div>
         <div class="metric-value">$<span data-count-to="{{ sum_ingresos|default(0) }}" data-count-decimals="2" data-count-duration="250">{{ '{:,.2f}'.format(sum_ingresos|default(0)) }}</span></div>
         <div class="metric-sub">{{ ym_label|default('') }}</div>
       </div>
       <div class="card metric-card metric-card--expense">
-        <div class="metric-label">Total gastos</div>
+        <div class="metric-label">Total gastos {{ portal_tooltip('Suma de retiros del mes, excluyendo movimientos clasificados como Cuenta propia.', id='tooltip-bank-gastos') }}</div>
         <div class="metric-value">$<span data-count-to="{{ sum_gastos|default(0) }}" data-count-decimals="2" data-count-duration="250">{{ '{:,.2f}'.format(sum_gastos|default(0)) }}</span></div>
         <div class="metric-sub">{{ ym_label|default('') }}</div>
       </div>
       <div class="card metric-card">
-        <div class="metric-label">Cuenta propia</div>
+        <div class="metric-label">Cuenta propia {{ portal_tooltip('Movimientos entre tus propias cuentas bancarias — no son ingresos ni gastos reales.', id='tooltip-bank-cuenta-propia') }}</div>
         <div class="metric-value metric-value--compact">
           <div>Entradas: ${{ '{:,.2f}'.format(cuenta_propia_entradas|default(0)) }}</div>
           <div>Salidas: ${{ '{:,.2f}'.format(cuenta_propia_salidas|default(0)) }}</div>

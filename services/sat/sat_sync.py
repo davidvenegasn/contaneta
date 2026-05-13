@@ -6,6 +6,8 @@ from services.ym_helpers import ym_sql_filter
 
 logger = logging.getLogger(__name__)
 
+_RETENCIONES_WARNED = False
+
 
 def get_sat_sync_status(issuer_id: int) -> dict:
     """Estado del sync SAT para un issuer: last_sync_at, status (running|ok|error), message."""
@@ -77,6 +79,12 @@ def get_month_totals(issuer_id: int, ym: str, direction: str, metodo_pago: str =
             base_where += " AND UPPER(TRIM(COALESCE(metodo_pago,''))) = ?"
             params.append(metodo_pago.upper().strip())
         has_retenciones = has_column(conn, "sat_cfdi", "retenciones")
+        global _RETENCIONES_WARNED
+        if not has_retenciones and not _RETENCIONES_WARNED:
+            logger.warning(
+                "sat_cfdi table lacks 'retenciones' column — total_iva_neto will not account for retenciones"
+            )
+            _RETENCIONES_WARNED = True
         if has_retenciones:
             row = conn.execute(
                 f"""

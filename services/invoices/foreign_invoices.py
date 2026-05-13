@@ -1,7 +1,11 @@
 """Foreign invoices — invoices/gastos de servicios internacionales."""
 
+import logging
+
 from database import db, db_rows, table_exists
 from services.ym_helpers import is_annual
+
+logger = logging.getLogger(__name__)
 
 
 def ensure_table():
@@ -132,7 +136,18 @@ def compute_totals(issuer_id: int, period_month: str = None) -> dict:
     Returns:
         dict with sum_ingresos, sum_gastos (both floats in MXN).
     """
-    where = ["issuer_id = ?"]
+    # Warn once if rows with NULL period_month exist for this issuer
+    null_rows = db_rows(
+        "SELECT COUNT(*) AS n FROM foreign_invoices WHERE issuer_id = ? AND period_month IS NULL",
+        (issuer_id,),
+    )
+    if null_rows and null_rows[0].get("n", 0) > 0:
+        logger.warning(
+            "foreign_invoices: %d rows with NULL period_month for issuer %d — excluded from totals",
+            null_rows[0]["n"], issuer_id,
+        )
+
+    where = ["issuer_id = ?", "period_month IS NOT NULL"]
     params: list = [issuer_id]
     if period_month:
         if is_annual(period_month):
