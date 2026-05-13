@@ -137,10 +137,10 @@ class TestSessionInvalidation:
 
     def test_new_session_valid_after_password_change(self):
         """A session created AFTER password_changed_at should remain valid."""
-        from datetime import datetime, timedelta
+        from datetime import datetime, timedelta, timezone
 
         # Set password_changed_at to 1 hour ago
-        pw_change_time = datetime.utcnow() - timedelta(hours=1)
+        pw_change_time = datetime.now(timezone.utc) - timedelta(hours=1)
         pw_change_str = pw_change_time.strftime("%Y-%m-%d %H:%M:%S")
         conn = db()
         conn.execute(
