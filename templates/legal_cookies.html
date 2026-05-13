@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  {% set seo_title = "Política de Cookies · ContaNeta" %}
+  {% set seo_description = "Política de cookies de ContaNeta. Tipos de cookies utilizadas, finalidades, gestión de preferencias y cookies de terceros." %}
+  {% include "_meta_seo.html" %}
+  <title>Política de Cookies · ContaNeta</title>
+  <link rel="stylesheet" href="/static/css/form.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --legal-bg: #f8f9fa;
+      --legal-card: #ffffff;
+      --legal-text: #1a1a2e;
+      --legal-muted: #6c757d;
+      --legal-accent: #0d9488;
+      --legal-accent-soft: #e6fffa;
+      --legal-border: rgba(0, 0, 0, 0.06);
+    }
+    body {
+      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+      margin: 0; padding: 0;
+      background: var(--legal-bg);
+      color: var(--legal-text);
+      min-height: 100vh;
+    }
+    .legal-wrap { max-width: 720px; margin: 0 auto; padding: 2.5rem 1.25rem 3rem; }
+    .legal-nav { margin-bottom: 2rem; font-size: 14px; }
+    .legal-nav a { color: var(--legal-accent); font-weight: 600; text-decoration: none; }
+    .legal-nav a:hover { text-decoration: underline; }
+    .legal-header { text-align: center; margin-bottom: 2rem; }
+    .legal-header h1 { margin: 0 0 0.5rem; font-size: 1.75rem; font-weight: 700; letter-spacing: -0.02em; }
+    .legal-header .legal-updated { font-size: 0.85rem; color: var(--legal-muted); }
+    .legal-toc {
+      background: var(--legal-card);
+      border: 1px solid var(--legal-border);
+      border-radius: 12px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .legal-toc h2 { margin: 0 0 0.75rem; font-size: 0.95rem; font-weight: 600; color: var(--legal-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+    .legal-toc ol { margin: 0; padding-left: 1.25rem; }
+    .legal-toc li { margin-bottom: 0.35rem; font-size: 0.9rem; line-height: 1.4; }
+    .legal-toc a { color: var(--legal-accent); text-decoration: none; }
+    .legal-toc a:hover { text-decoration: underline; }
+    .legal-section {
+      background: var(--legal-card);
+      border: 1px solid var(--legal-border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-bottom: 1rem;
+    }
+    .legal-section h2 { margin: 0 0 0.75rem; font-size: 1.1rem; font-weight: 600; color: var(--legal-text); }
+    .legal-section h3 { margin: 1rem 0 0.5rem; font-size: 0.95rem; font-weight: 600; }
+    .legal-section p, .legal-section li { font-size: 0.9rem; line-height: 1.6; color: #374151; }
+    .legal-section ul, .legal-section ol { padding-left: 1.25rem; }
+    .legal-section ul li { margin-bottom: 0.35rem; }
+    .legal-section table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0;
+      font-size: 0.85rem;
+    }
+    .legal-section th, .legal-section td {
+      border: 1px solid var(--legal-border);
+      padding: 0.6rem 0.75rem;
+      text-align: left;
+    }
+    .legal-section th {
+      background: #f1f5f9;
+      font-weight: 600;
+      color: var(--legal-text);
+    }
+    .legal-section td { color: #374151; }
+    .legal-footer {
+      text-align: center;
+      margin-top: 2rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--legal-border);
+      font-size: 0.85rem;
+      color: var(--legal-muted);
+    }
+    .legal-footer a { color: var(--legal-accent); text-decoration: none; margin: 0 0.5rem; }
+    .legal-footer a:hover { text-decoration: underline; }
+    @media print {
+      body { background: #fff; }
+      .legal-wrap { max-width: 100%; padding: 1rem; }
+      .legal-nav, .legal-footer { display: none; }
+      .legal-section { border: none; box-shadow: none; padding: 0; margin-bottom: 1.5rem; }
+      .legal-toc { border: 1px solid #ccc; }
+    }
+  </style>
+</head>
+<body>
+  <div class="legal-wrap">
+    <nav class="legal-nav">
+      <a href="/">← Volver al inicio</a>
+    </nav>
+
+    <header class="legal-header">
+      <h1>Política de Cookies</h1>
+      <p class="legal-updated">Última actualización: 13 de mayo de 2026</p>
+    </header>
+
+    <nav class="legal-toc">
+      <h2>Contenido</h2>
+      <ol>
+        <li><a href="#que-son">¿Qué son las cookies?</a></li>
+        <li><a href="#tipos">Tipos de cookies que utilizamos</a></li>
+        <li><a href="#detalle">Detalle de cookies utilizadas</a></li>
+        <li><a href="#terceros">Cookies de terceros</a></li>
+        <li><a href="#gestionar">Cómo gestionar las cookies</a></li>
+        <li><a href="#consecuencias">Consecuencias de desactivar cookies</a></li>
+        <li><a href="#actualizaciones">Actualizaciones a esta política</a></li>
+        <li><a href="#contacto">Contacto</a></li>
+      </ol>
+    </nav>
+
+    <section class="legal-section" id="que-son">
+      <h2>1. ¿Qué son las cookies?</h2>
+      <p>Las cookies son pequeños archivos de texto que se almacenan en su dispositivo (ordenador, tableta o teléfono móvil) cuando usted visita un sitio web. Las cookies permiten al sitio web recordar sus acciones y preferencias durante un período de tiempo, para que no tenga que volver a introducirlos cada vez que visite el sitio.</p>
+      <p>ContaNeta utiliza cookies y tecnologías similares (como localStorage) para el funcionamiento de la plataforma, la seguridad de su sesión y la mejora de su experiencia de usuario.</p>
+    </section>
+
+    <section class="legal-section" id="tipos">
+      <h2>2. Tipos de cookies que utilizamos</h2>
+      <h3>Cookies estrictamente necesarias</h3>
+      <p>Son esenciales para el funcionamiento de la plataforma. Sin estas cookies, servicios fundamentales como el inicio de sesión y la navegación segura no serían posibles. <strong>No requieren consentimiento</strong> ya que son indispensables para la prestación del servicio.</p>
+
+      <h3>Cookies funcionales</h3>
+      <p>Permiten recordar sus preferencias y personalizar su experiencia en la plataforma, como el período fiscal seleccionado, las preferencias de visualización y el modo nocturno.</p>
+
+      <h3>Cookies de rendimiento</h3>
+      <p>Nos ayudan a entender cómo interactúan los usuarios con la plataforma, permitiéndonos identificar y solucionar problemas técnicos. Estas cookies recopilan información de forma agregada y anónima.</p>
+    </section>
+
+    <section class="legal-section" id="detalle">
+      <h2>3. Detalle de cookies utilizadas</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Nombre</th>
+            <th>Tipo</th>
+            <th>Finalidad</th>
+            <th>Duración</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>session</code></td>
+            <td>Necesaria</td>
+            <td>Autenticación del usuario. Contiene un token firmado (HMAC-SHA256) con el ID de usuario y emisor. No contiene la contraseña ni datos personales en texto claro.</td>
+            <td>Sesión del navegador o hasta expiración configurada</td>
+          </tr>
+          <tr>
+            <td><code>csrf_token</code></td>
+            <td>Necesaria</td>
+            <td>Protección contra ataques de falsificación de solicitudes entre sitios (CSRF). Se genera un token único por formulario.</td>
+            <td>1 hora</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>localStorage (almacenamiento local del navegador)</h3>
+      <p>Además de las cookies, utilizamos localStorage para almacenar preferencias del usuario en su navegador:</p>
+      <table>
+        <thead>
+          <tr>
+            <th>Clave</th>
+            <th>Tipo</th>
+            <th>Finalidad</th>
+            <th>Duración</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>portal_selected_ym_{id}</code></td>
+            <td>Funcional</td>
+            <td>Recuerda el período fiscal (año-mes) seleccionado por el usuario para mantener consistencia al navegar entre secciones.</td>
+            <td>Permanente (hasta que el usuario lo borre)</td>
+          </tr>
+          <tr>
+            <td><code>portal_nightmode</code></td>
+            <td>Funcional</td>
+            <td>Preferencia de modo nocturno (tema oscuro) del usuario.</td>
+            <td>Permanente (hasta que el usuario lo borre)</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="legal-section" id="terceros">
+      <h2>4. Cookies de terceros</h2>
+      <p>ContaNeta puede utilizar servicios de terceros que establecen sus propias cookies:</p>
+      <table>
+        <thead>
+          <tr>
+            <th>Tercero</th>
+            <th>Finalidad</th>
+            <th>Más información</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Stripe</strong></td>
+            <td>Procesamiento de pagos. Stripe utiliza cookies para la prevención de fraude y la seguridad del proceso de pago.</td>
+            <td><a href="https://stripe.com/privacy" target="_blank" rel="noopener noreferrer">Política de privacidad de Stripe</a></td>
+          </tr>
+          <tr>
+            <td><strong>Google Fonts</strong></td>
+            <td>Carga de tipografías web para la interfaz de usuario. Google puede registrar datos de uso de forma agregada.</td>
+            <td><a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Política de privacidad de Google</a></td>
+          </tr>
+        </tbody>
+      </table>
+      <p>Estos terceros tienen sus propias políticas de privacidad y uso de cookies. Le recomendamos revisarlas para entender cómo gestionan su información.</p>
+    </section>
+
+    <section class="legal-section" id="gestionar">
+      <h2>5. Cómo gestionar las cookies</h2>
+      <p>Usted puede controlar y/o eliminar las cookies según desee. A continuación, le indicamos cómo hacerlo en los navegadores más comunes:</p>
+      <ul>
+        <li><strong>Google Chrome:</strong> Configuración → Privacidad y seguridad → Cookies y otros datos de sitios</li>
+        <li><strong>Mozilla Firefox:</strong> Opciones → Privacidad y seguridad → Cookies y datos del sitio</li>
+        <li><strong>Safari:</strong> Preferencias → Privacidad → Gestionar datos de sitios web</li>
+        <li><strong>Microsoft Edge:</strong> Configuración → Cookies y permisos del sitio → Cookies y datos almacenados</li>
+      </ul>
+      <p>Para borrar el almacenamiento local (localStorage), puede utilizar las herramientas de desarrollo de su navegador (generalmente accesibles con la tecla F12) o configurar su navegador para borrar estos datos al cerrar.</p>
+      <p>También puede configurar su navegador para que le notifique cuando se establezca una cookie, permitiéndole aceptarla o rechazarla individualmente.</p>
+    </section>
+
+    <section class="legal-section" id="consecuencias">
+      <h2>6. Consecuencias de desactivar cookies</h2>
+      <p>Si desactiva o elimina las cookies estrictamente necesarias:</p>
+      <ul>
+        <li>No podrá iniciar sesión en la plataforma</li>
+        <li>Los formularios no funcionarán correctamente (protección CSRF)</li>
+        <li>No podrá utilizar las funcionalidades del portal</li>
+      </ul>
+      <p>Si desactiva las cookies funcionales y el almacenamiento local:</p>
+      <ul>
+        <li>No se recordará su período fiscal seleccionado al navegar entre secciones</li>
+        <li>Se perderán sus preferencias de visualización (modo nocturno)</li>
+        <li>La experiencia de uso puede ser menos fluida</li>
+      </ul>
+    </section>
+
+    <section class="legal-section" id="actualizaciones">
+      <h2>7. Actualizaciones a esta política</h2>
+      <p>ContaNeta se reserva el derecho de actualizar esta Política de Cookies para reflejar cambios en las cookies que utilizamos o por otros motivos operativos, legales o reglamentarios.</p>
+      <p>Le recomendamos revisar esta página periódicamente para estar informado sobre el uso de cookies. La fecha de última actualización se indica al inicio de este documento.</p>
+    </section>
+
+    <section class="legal-section" id="contacto">
+      <h2>8. Contacto</h2>
+      <p>Si tiene preguntas sobre el uso de cookies en ContaNeta, puede comunicarse con nosotros a través de:</p>
+      <ul>
+        <li><strong>Correo electrónico:</strong> privacidad@contaneta.com</li>
+        <li><strong>Sitio web:</strong> <a href="/">contaneta.com</a></li>
+      </ul>
+    </section>
+
+    <footer class="legal-footer">
+      <p>
+        <a href="/privacy">Aviso de Privacidad</a>
+        <a href="/terms">Términos y Condiciones</a>
+        <a href="/seguridad">Seguridad</a>
+      </p>
+      <p>ContaNeta · Facturación electrónica y sincronización con el SAT.</p>
+      <p><a href="/">← Volver al inicio</a></p>
+    </footer>
+  </div>
+</body>
+</html>

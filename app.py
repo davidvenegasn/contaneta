@@ -35,6 +35,7 @@ from routers.api import router as api_router
 from routers.auth import get_auth_router
 from routers.billing import router as billing_router
 from routers.invoicing import get_invoicing_router
+from routers.legal import get_legal_router
 from routers.portal import get_portal_router
 from routers.public import get_public_router
 from services import issuers
@@ -1002,6 +1003,7 @@ app.include_router(get_portal_router(templates))
 app.include_router(get_invoicing_router(templates))
 app.include_router(get_admin_router(templates))
 app.include_router(billing_router)
+app.include_router(get_legal_router(templates))
 
 logger = logging.getLogger(__name__)
 

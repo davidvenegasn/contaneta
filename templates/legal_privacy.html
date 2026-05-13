@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  {% set seo_title = "Aviso de Privacidad · ContaNeta" %}
+  {% set seo_description = "Aviso de privacidad integral de ContaNeta conforme a la LFPDPPP. Datos recabados, finalidades, derechos ARCO, transferencias y contacto." %}
+  {% include "_meta_seo.html" %}
+  <title>Aviso de Privacidad · ContaNeta</title>
+  <link rel="stylesheet" href="/static/css/form.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --legal-bg: #f8f9fa;
+      --legal-card: #ffffff;
+      --legal-text: #1a1a2e;
+      --legal-muted: #6c757d;
+      --legal-accent: #0d9488;
+      --legal-accent-soft: #e6fffa;
+      --legal-border: rgba(0, 0, 0, 0.06);
+    }
+    body {
+      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+      margin: 0; padding: 0;
+      background: var(--legal-bg);
+      color: var(--legal-text);
+      min-height: 100vh;
+    }
+    .legal-wrap { max-width: 720px; margin: 0 auto; padding: 2.5rem 1.25rem 3rem; }
+    .legal-nav { margin-bottom: 2rem; font-size: 14px; }
+    .legal-nav a { color: var(--legal-accent); font-weight: 600; text-decoration: none; }
+    .legal-nav a:hover { text-decoration: underline; }
+    .legal-header { text-align: center; margin-bottom: 2rem; }
+    .legal-header h1 { margin: 0 0 0.5rem; font-size: 1.75rem; font-weight: 700; letter-spacing: -0.02em; }
+    .legal-header .legal-updated { font-size: 0.85rem; color: var(--legal-muted); }
+    .legal-toc {
+      background: var(--legal-card);
+      border: 1px solid var(--legal-border);
+      border-radius: 12px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .legal-toc h2 { margin: 0 0 0.75rem; font-size: 0.95rem; font-weight: 600; color: var(--legal-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+    .legal-toc ol { margin: 0; padding-left: 1.25rem; }
+    .legal-toc li { margin-bottom: 0.35rem; font-size: 0.9rem; line-height: 1.4; }
+    .legal-toc a { color: var(--legal-accent); text-decoration: none; }
+    .legal-toc a:hover { text-decoration: underline; }
+    .legal-section {
+      background: var(--legal-card);
+      border: 1px solid var(--legal-border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-bottom: 1rem;
+    }
+    .legal-section h2 { margin: 0 0 0.75rem; font-size: 1.1rem; font-weight: 600; color: var(--legal-text); }
+    .legal-section h3 { margin: 1rem 0 0.5rem; font-size: 0.95rem; font-weight: 600; }
+    .legal-section p, .legal-section li { font-size: 0.9rem; line-height: 1.6; color: #374151; }
+    .legal-section ul, .legal-section ol { padding-left: 1.25rem; }
+    .legal-section ul li { margin-bottom: 0.35rem; }
+    .legal-footer {
+      text-align: center;
+      margin-top: 2rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--legal-border);
+      font-size: 0.85rem;
+      color: var(--legal-muted);
+    }
+    .legal-footer a { color: var(--legal-accent); text-decoration: none; margin: 0 0.5rem; }
+    .legal-footer a:hover { text-decoration: underline; }
+    @media print {
+      body { background: #fff; }
+      .legal-wrap { max-width: 100%; padding: 1rem; }
+      .legal-nav, .legal-footer { display: none; }
+      .legal-section { border: none; box-shadow: none; padding: 0; margin-bottom: 1.5rem; }
+      .legal-toc { border: 1px solid #ccc; }
+    }
+  </style>
+</head>
+<body>
+  <div class="legal-wrap">
+    <nav class="legal-nav">
+      <a href="/">← Volver al inicio</a>
+    </nav>
+
+    <header class="legal-header">
+      <h1>Aviso de Privacidad Integral</h1>
+      <p class="legal-updated">Última actualización: 13 de mayo de 2026</p>
+    </header>
+
+    <nav class="legal-toc">
+      <h2>Contenido</h2>
+      <ol>
+        <li><a href="#responsable">Identidad del responsable</a></li>
+        <li><a href="#datos">Datos personales que recabamos</a></li>
+        <li><a href="#finalidades">Finalidades del tratamiento</a></li>
+        <li><a href="#base-legal">Base legal del tratamiento</a></li>
+        <li><a href="#arco">Derechos ARCO</a></li>
+        <li><a href="#transferencias">Transferencias de datos</a></li>
+        <li><a href="#conservacion">Conservación de datos</a></li>
+        <li><a href="#cookies">Cookies y tecnologías similares</a></li>
+        <li><a href="#seguridad">Medidas de seguridad</a></li>
+        <li><a href="#modificaciones">Modificaciones al aviso</a></li>
+        <li><a href="#contacto">Contacto</a></li>
+      </ol>
+    </nav>
+
+    <section class="legal-section" id="responsable">
+      <h2>1. Identidad del responsable</h2>
+      <p><strong>ContaNeta</strong> (en adelante, "el Responsable") es la persona moral o física responsable del tratamiento de sus datos personales, con domicilio en Ciudad de México, México.</p>
+      <p>El Responsable se compromete a proteger la privacidad de los usuarios de la plataforma ContaNeta, de conformidad con la Ley Federal de Protección de Datos Personales en Posesión de los Particulares (LFPDPPP), su Reglamento, y los Lineamientos del Aviso de Privacidad.</p>
+    </section>
+
+    <section class="legal-section" id="datos">
+      <h2>2. Datos personales que recabamos</h2>
+      <p>Para la prestación de nuestros servicios, recabamos las siguientes categorías de datos personales:</p>
+      <h3>Datos de identificación</h3>
+      <ul>
+        <li>Nombre completo o razón social</li>
+        <li>Registro Federal de Contribuyentes (RFC)</li>
+        <li>Régimen fiscal</li>
+        <li>Código postal del domicilio fiscal</li>
+        <li>Correo electrónico</li>
+        <li>Número de teléfono (cuando se use como medio de registro)</li>
+      </ul>
+      <h3>Datos fiscales</h3>
+      <ul>
+        <li>Comprobantes Fiscales Digitales por Internet (CFDI) emitidos y recibidos</li>
+        <li>Información de facturación (conceptos, montos, impuestos)</li>
+        <li>Datos de clientes y proveedores registrados en la plataforma</li>
+        <li>Estados de cuenta bancarios cargados voluntariamente</li>
+      </ul>
+      <h3>Datos de la e.firma (FIEL)</h3>
+      <ul>
+        <li>Certificado (.cer) y llave privada (.key) del SAT, proporcionados voluntariamente para la sincronización de CFDI</li>
+        <li>Estos datos se almacenan cifrados en reposo (AES-GCM) y solo se utilizan para el proceso de descarga ante el SAT</li>
+      </ul>
+      <h3>Datos de uso y navegación</h3>
+      <ul>
+        <li>Dirección IP</li>
+        <li>Navegador y sistema operativo</li>
+        <li>Páginas visitadas y acciones realizadas dentro de la plataforma</li>
+        <li>Cookies de sesión (ver <a href="/cookies">Política de Cookies</a>)</li>
+      </ul>
+      <p><strong>No recabamos datos personales sensibles</strong> (origen étnico, estado de salud, creencias religiosas, orientación sexual, datos biométricos, ni información genética).</p>
+    </section>
+
+    <section class="legal-section" id="finalidades">
+      <h2>3. Finalidades del tratamiento</h2>
+      <h3>Finalidades primarias (necesarias para el servicio)</h3>
+      <ul>
+        <li>Crear y administrar su cuenta de usuario</li>
+        <li>Prestar el servicio de facturación electrónica y descarga de CFDI</li>
+        <li>Sincronizar comprobantes fiscales con el SAT mediante su e.firma</li>
+        <li>Gestionar la conciliación bancaria y fiscal</li>
+        <li>Procesar pagos y gestionar la suscripción al servicio</li>
+        <li>Compartir información fiscal con su despacho contable autorizado</li>
+        <li>Emitir cotizaciones y documentos fiscales</li>
+        <li>Cumplir con obligaciones legales y fiscales aplicables</li>
+      </ul>
+      <h3>Finalidades secundarias (no necesarias, pero legítimas)</h3>
+      <ul>
+        <li>Enviar comunicaciones sobre actualizaciones del servicio</li>
+        <li>Realizar análisis estadísticos internos para mejorar la plataforma</li>
+        <li>Enviar información sobre nuevas funcionalidades o planes</li>
+      </ul>
+      <p>Si usted no desea que sus datos personales sean tratados para las finalidades secundarias, puede manifestarlo al correo indicado en la sección de Contacto.</p>
+    </section>
+
+    <section class="legal-section" id="base-legal">
+      <h2>4. Base legal del tratamiento</h2>
+      <p>El tratamiento de sus datos personales se fundamenta en:</p>
+      <ul>
+        <li><strong>Consentimiento:</strong> al registrarse en la plataforma y aceptar este Aviso de Privacidad y los Términos y Condiciones</li>
+        <li><strong>Relación contractual:</strong> el tratamiento es necesario para la ejecución del contrato de prestación de servicios</li>
+        <li><strong>Obligación legal:</strong> cumplimiento de disposiciones fiscales mexicanas (Código Fiscal de la Federación, Ley del ISR, Ley del IVA)</li>
+        <li><strong>Interés legítimo:</strong> seguridad de la plataforma, prevención de fraude, mejora del servicio</li>
+      </ul>
+      <p>Marco normativo aplicable: <strong>Ley Federal de Protección de Datos Personales en Posesión de los Particulares (LFPDPPP)</strong>, publicada en el Diario Oficial de la Federación el 5 de julio de 2010, su Reglamento y los Lineamientos del Aviso de Privacidad.</p>
+    </section>
+
+    <section class="legal-section" id="arco">
+      <h2>5. Derechos ARCO</h2>
+      <p>Usted tiene derecho a:</p>
+      <ul>
+        <li><strong>Acceso:</strong> conocer qué datos personales tenemos de usted y las condiciones de su tratamiento</li>
+        <li><strong>Rectificación:</strong> solicitar la corrección de sus datos personales cuando sean inexactos o estén incompletos</li>
+        <li><strong>Cancelación:</strong> solicitar la eliminación de sus datos cuando considere que no se requieren para alguna de las finalidades señaladas</li>
+        <li><strong>Oposición:</strong> oponerse al tratamiento de sus datos para fines específicos</li>
+      </ul>
+      <p>Para ejercer cualquiera de estos derechos, deberá enviar una solicitud al correo electrónico indicado en la sección de Contacto, incluyendo:</p>
+      <ul>
+        <li>Nombre completo y RFC</li>
+        <li>Descripción clara del derecho que desea ejercer</li>
+        <li>Documentos que acrediten su identidad o la representación legal</li>
+        <li>Correo electrónico para recibir la respuesta</li>
+      </ul>
+      <p>El Responsable responderá en un plazo máximo de <strong>20 días hábiles</strong> contados a partir de la recepción de la solicitud. Si la solicitud es procedente, se hará efectiva dentro de los <strong>15 días hábiles</strong> siguientes.</p>
+      <p>Usted puede revocar su consentimiento para el tratamiento de sus datos en cualquier momento, sin que se le atribuyan efectos retroactivos, mediante solicitud al mismo correo.</p>
+    </section>
+
+    <section class="legal-section" id="transferencias">
+      <h2>6. Transferencias de datos</h2>
+      <p>Sus datos personales podrán ser transferidos y tratados dentro y fuera del país, conforme a lo siguiente:</p>
+      <ul>
+        <li><strong>Despacho contable autorizado:</strong> si usted autoriza a un despacho contable (por ejemplo, V&G Fiscal), dicho despacho tendrá acceso a su información fiscal en la medida necesaria para prestar el servicio de contabilidad contratado</li>
+        <li><strong>Procesador de pagos (Stripe):</strong> para procesar los pagos de su suscripción, compartimos datos de facturación con Stripe, Inc., quien cuenta con sus propias políticas de privacidad y certificaciones de seguridad (PCI DSS)</li>
+        <li><strong>SAT (Servicio de Administración Tributaria):</strong> la comunicación con los servicios web del SAT para la descarga de CFDI implica el envío de su e.firma al servidor del SAT, conforme a la normativa fiscal vigente</li>
+        <li><strong>Autoridades competentes:</strong> cuando sea requerido por ley, orden judicial o procedimiento administrativo</li>
+      </ul>
+      <p><strong>No vendemos, alquilamos ni comercializamos</strong> sus datos personales con terceros para fines de mercadotecnia.</p>
+    </section>
+
+    <section class="legal-section" id="conservacion">
+      <h2>7. Conservación de datos</h2>
+      <p>Los datos personales se conservarán durante el tiempo que sea necesario para cumplir con las finalidades descritas y conforme a los plazos legales aplicables:</p>
+      <ul>
+        <li><strong>Datos de cuenta:</strong> mientras la cuenta esté activa y hasta 1 año después de su cancelación</li>
+        <li><strong>Datos fiscales (CFDI):</strong> conforme al plazo de conservación del Código Fiscal de la Federación (5 años)</li>
+        <li><strong>Datos de facturación:</strong> conforme a obligaciones fiscales y mercantiles aplicables</li>
+        <li><strong>Credenciales de e.firma:</strong> se eliminan de forma segura cuando el usuario revoca la autorización o cancela su cuenta</li>
+        <li><strong>Registros de auditoría:</strong> 90 días para bitácoras de error; períodos mayores para registros de acceso y acciones críticas</li>
+      </ul>
+      <p>Una vez cumplidos los plazos de conservación, los datos serán bloqueados y posteriormente eliminados de forma segura.</p>
+    </section>
+
+    <section class="legal-section" id="cookies">
+      <h2>8. Cookies y tecnologías similares</h2>
+      <p>Utilizamos cookies y tecnologías similares para el funcionamiento de la plataforma. Para información detallada sobre el uso de cookies, consulte nuestra <a href="/cookies">Política de Cookies</a>.</p>
+    </section>
+
+    <section class="legal-section" id="seguridad">
+      <h2>9. Medidas de seguridad</h2>
+      <p>Implementamos medidas de seguridad técnicas, administrativas y físicas para proteger sus datos personales contra daño, pérdida, alteración, destrucción, uso, acceso o tratamiento no autorizado:</p>
+      <ul>
+        <li>Cifrado de contraseñas con algoritmos seguros (hashing)</li>
+        <li>Cifrado en reposo (AES-GCM) para credenciales sensibles como la e.firma</li>
+        <li>Aislamiento de datos por cuenta (multi-tenancy con filtrado por issuer_id)</li>
+        <li>Sesiones firmadas con HMAC-SHA256 y tokens CSRF en formularios</li>
+        <li>Cabeceras de seguridad HTTP (CSP, HSTS, X-Frame-Options)</li>
+        <li>Copias de seguridad regulares y procedimientos de recuperación</li>
+        <li>Limitación de intentos de acceso (rate limiting)</li>
+        <li>Registro de auditoría de acciones significativas</li>
+      </ul>
+      <p>Para más información sobre nuestras prácticas de seguridad, visite nuestra página de <a href="/seguridad">Seguridad</a>.</p>
+    </section>
+
+    <section class="legal-section" id="modificaciones">
+      <h2>10. Modificaciones al aviso</h2>
+      <p>El Responsable se reserva el derecho de efectuar modificaciones o actualizaciones al presente Aviso de Privacidad. Cualquier cambio será notificado a través de la plataforma y/o por correo electrónico.</p>
+      <p>Le recomendamos revisar periódicamente este aviso para estar informado sobre cómo protegemos su información.</p>
+    </section>
+
+    <section class="legal-section" id="contacto">
+      <h2>11. Contacto</h2>
+      <p>Para ejercer sus derechos ARCO, revocar su consentimiento, limitar el uso o divulgación de sus datos, o cualquier duda sobre este Aviso de Privacidad, puede comunicarse con nosotros a través de:</p>
+      <ul>
+        <li><strong>Correo electrónico:</strong> privacidad@contaneta.com</li>
+        <li><strong>Sitio web:</strong> <a href="/">contaneta.com</a></li>
+      </ul>
+      <p>El Responsable dará respuesta a su solicitud en los plazos establecidos por la LFPDPPP.</p>
+    </section>
+
+    <footer class="legal-footer">
+      <p>
+        <a href="/terms">Términos y Condiciones</a>
+        <a href="/cookies">Política de Cookies</a>
+        <a href="/seguridad">Seguridad</a>
+      </p>
+      <p>ContaNeta · Facturación electrónica y sincronización con el SAT.</p>
+      <p><a href="/">← Volver al inicio</a></p>
+    </footer>
+  </div>
+</body>
+</html>

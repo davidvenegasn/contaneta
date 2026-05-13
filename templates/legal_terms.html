@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  {% set seo_title = "Términos y Condiciones · ContaNeta" %}
+  {% set seo_description = "Términos y condiciones de uso de la plataforma ContaNeta. Descripción del servicio, obligaciones del usuario, pagos, propiedad intelectual y jurisdicción." %}
+  {% include "_meta_seo.html" %}
+  <title>Términos y Condiciones · ContaNeta</title>
+  <link rel="stylesheet" href="/static/css/form.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --legal-bg: #f8f9fa;
+      --legal-card: #ffffff;
+      --legal-text: #1a1a2e;
+      --legal-muted: #6c757d;
+      --legal-accent: #0d9488;
+      --legal-accent-soft: #e6fffa;
+      --legal-border: rgba(0, 0, 0, 0.06);
+    }
+    body {
+      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+      margin: 0; padding: 0;
+      background: var(--legal-bg);
+      color: var(--legal-text);
+      min-height: 100vh;
+    }
+    .legal-wrap { max-width: 720px; margin: 0 auto; padding: 2.5rem 1.25rem 3rem; }
+    .legal-nav { margin-bottom: 2rem; font-size: 14px; }
+    .legal-nav a { color: var(--legal-accent); font-weight: 600; text-decoration: none; }
+    .legal-nav a:hover { text-decoration: underline; }
+    .legal-header { text-align: center; margin-bottom: 2rem; }
+    .legal-header h1 { margin: 0 0 0.5rem; font-size: 1.75rem; font-weight: 700; letter-spacing: -0.02em; }
+    .legal-header .legal-updated { font-size: 0.85rem; color: var(--legal-muted); }
+    .legal-toc {
+      background: var(--legal-card);
+      border: 1px solid var(--legal-border);
+      border-radius: 12px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .legal-toc h2 { margin: 0 0 0.75rem; font-size: 0.95rem; font-weight: 600; color: var(--legal-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+    .legal-toc ol { margin: 0; padding-left: 1.25rem; }
+    .legal-toc li { margin-bottom: 0.35rem; font-size: 0.9rem; line-height: 1.4; }
+    .legal-toc a { color: var(--legal-accent); text-decoration: none; }
+    .legal-toc a:hover { text-decoration: underline; }
+    .legal-section {
+      background: var(--legal-card);
+      border: 1px solid var(--legal-border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-bottom: 1rem;
+    }
+    .legal-section h2 { margin: 0 0 0.75rem; font-size: 1.1rem; font-weight: 600; color: var(--legal-text); }
+    .legal-section h3 { margin: 1rem 0 0.5rem; font-size: 0.95rem; font-weight: 600; }
+    .legal-section p, .legal-section li { font-size: 0.9rem; line-height: 1.6; color: #374151; }
+    .legal-section ul, .legal-section ol { padding-left: 1.25rem; }
+    .legal-section ul li { margin-bottom: 0.35rem; }
+    .legal-footer {
+      text-align: center;
+      margin-top: 2rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--legal-border);
+      font-size: 0.85rem;
+      color: var(--legal-muted);
+    }
+    .legal-footer a { color: var(--legal-accent); text-decoration: none; margin: 0 0.5rem; }
+    .legal-footer a:hover { text-decoration: underline; }
+    @media print {
+      body { background: #fff; }
+      .legal-wrap { max-width: 100%; padding: 1rem; }
+      .legal-nav, .legal-footer { display: none; }
+      .legal-section { border: none; box-shadow: none; padding: 0; margin-bottom: 1.5rem; }
+      .legal-toc { border: 1px solid #ccc; }
+    }
+  </style>
+</head>
+<body>
+  <div class="legal-wrap">
+    <nav class="legal-nav">
+      <a href="/">← Volver al inicio</a>
+    </nav>
+
+    <header class="legal-header">
+      <h1>Términos y Condiciones</h1>
+      <p class="legal-updated">Última actualización: 13 de mayo de 2026</p>
+    </header>
+
+    <nav class="legal-toc">
+      <h2>Contenido</h2>
+      <ol>
+        <li><a href="#descripcion">Descripción del servicio</a></li>
+        <li><a href="#aceptacion">Aceptación de los términos</a></li>
+        <li><a href="#registro">Registro y cuenta de usuario</a></li>
+        <li><a href="#obligaciones">Obligaciones del usuario</a></li>
+        <li><a href="#planes">Planes y pagos</a></li>
+        <li><a href="#propiedad">Propiedad intelectual</a></li>
+        <li><a href="#sat">Integración con el SAT</a></li>
+        <li><a href="#despacho">Despacho contable</a></li>
+        <li><a href="#limitacion">Limitación de responsabilidad</a></li>
+        <li><a href="#terminacion">Terminación y cancelación</a></li>
+        <li><a href="#modificaciones">Modificaciones a los términos</a></li>
+        <li><a href="#legislacion">Legislación aplicable y jurisdicción</a></li>
+        <li><a href="#contacto">Contacto</a></li>
+      </ol>
+    </nav>
+
+    <section class="legal-section" id="descripcion">
+      <h2>1. Descripción del servicio</h2>
+      <p><strong>ContaNeta</strong> es una plataforma SaaS (Software as a Service) de facturación electrónica y gestión fiscal diseñada para contribuyentes mexicanos. El servicio incluye, según el plan contratado:</p>
+      <ul>
+        <li>Emisión de Comprobantes Fiscales Digitales por Internet (CFDI)</li>
+        <li>Descarga y sincronización de CFDI emitidos y recibidos desde el SAT</li>
+        <li>Gestión de clientes y catálogos fiscales</li>
+        <li>Conciliación bancaria y fiscal</li>
+        <li>Generación de cotizaciones</li>
+        <li>Panel de resumen fiscal mensual</li>
+        <li>Acceso para despachos contables autorizados</li>
+      </ul>
+      <p>El servicio se presta a través de la plataforma web accesible en el dominio de ContaNeta y está sujeto a la disponibilidad y funcionalidades de cada plan.</p>
+    </section>
+
+    <section class="legal-section" id="aceptacion">
+      <h2>2. Aceptación de los términos</h2>
+      <p>Al registrarse en la plataforma, el usuario declara haber leído, entendido y aceptado los presentes Términos y Condiciones, así como el <a href="/privacy">Aviso de Privacidad</a> y la <a href="/cookies">Política de Cookies</a>.</p>
+      <p>Si usted no está de acuerdo con alguno de estos términos, le solicitamos que no utilice la plataforma.</p>
+      <p>El uso continuado del servicio después de la publicación de modificaciones a estos términos constituirá su aceptación de los mismos.</p>
+    </section>
+
+    <section class="legal-section" id="registro">
+      <h2>3. Registro y cuenta de usuario</h2>
+      <p>Para utilizar la plataforma, el usuario deberá registrarse proporcionando información veraz y actualizada. El usuario se compromete a:</p>
+      <ul>
+        <li>Proporcionar datos verídicos, completos y actualizados al momento del registro</li>
+        <li>Mantener la confidencialidad de sus credenciales de acceso (correo/teléfono y contraseña)</li>
+        <li>Notificar de inmediato cualquier uso no autorizado de su cuenta</li>
+        <li>Ser el único responsable de todas las actividades que se realicen con su cuenta</li>
+      </ul>
+      <p>ContaNeta se reserva el derecho de suspender o cancelar cuentas que proporcionen información falsa o que incumplan estos términos.</p>
+    </section>
+
+    <section class="legal-section" id="obligaciones">
+      <h2>4. Obligaciones del usuario</h2>
+      <p>El usuario se compromete a:</p>
+      <ul>
+        <li>Usar el servicio exclusivamente para fines lícitos relacionados con su actividad fiscal y comercial</li>
+        <li>No intentar acceder a datos de otros usuarios o cuentas ajenas</li>
+        <li>No realizar ingeniería inversa, descompilar o intentar obtener el código fuente de la plataforma</li>
+        <li>No utilizar la plataforma para transmitir virus, malware o contenido malicioso</li>
+        <li>No sobrecargar intencionalmente los servidores o infraestructura del servicio</li>
+        <li>Cumplir con todas las disposiciones fiscales aplicables en México</li>
+        <li>Ser responsable de la veracidad y legalidad de los datos fiscales que ingrese a la plataforma</li>
+      </ul>
+    </section>
+
+    <section class="legal-section" id="planes">
+      <h2>5. Planes y pagos</h2>
+      <h3>5.1 Planes de servicio</h3>
+      <p>ContaNeta ofrece diferentes planes con distintos niveles de funcionalidad. Las características de cada plan se describen en la página de <a href="/pricing">Precios</a>. ContaNeta se reserva el derecho de modificar las características y precios de los planes, notificando previamente a los usuarios.</p>
+      <h3>5.2 Período de prueba</h3>
+      <p>Ciertos planes pueden incluir un período de prueba gratuito. Al término del período de prueba, se aplicarán los cargos correspondientes al plan seleccionado, salvo que el usuario cancele antes.</p>
+      <h3>5.3 Facturación y pagos</h3>
+      <ul>
+        <li>Los pagos se procesan a través de <strong>Stripe</strong>, nuestro procesador de pagos certificado PCI DSS</li>
+        <li>ContaNeta no almacena datos de tarjetas de crédito o débito en sus servidores</li>
+        <li>La facturación es mensual o anual, según el plan contratado</li>
+        <li>Los cargos se realizan de forma automática al inicio de cada período de facturación</li>
+      </ul>
+      <h3>5.4 Reembolsos</h3>
+      <p>Los reembolsos se evaluarán caso por caso. En general, no se otorgan reembolsos por períodos parciales de uso ni por incumplimiento de obligaciones del usuario.</p>
+    </section>
+
+    <section class="legal-section" id="propiedad">
+      <h2>6. Propiedad intelectual</h2>
+      <p>Todos los derechos de propiedad intelectual sobre la plataforma ContaNeta, incluyendo pero no limitado a código fuente, diseño, logotipos, textos, gráficos e interfaces, son propiedad exclusiva de ContaNeta o sus licenciantes.</p>
+      <p>El usuario conserva la propiedad sobre los datos que ingrese a la plataforma. Al utilizar el servicio, el usuario otorga a ContaNeta una licencia limitada para procesar, almacenar y mostrar dichos datos con el único fin de prestar el servicio contratado.</p>
+      <p>Queda prohibida la reproducción, distribución, modificación o uso comercial de cualquier elemento de la plataforma sin autorización expresa y por escrito de ContaNeta.</p>
+    </section>
+
+    <section class="legal-section" id="sat">
+      <h2>7. Integración con el SAT</h2>
+      <p>La funcionalidad de sincronización con el SAT requiere que el usuario proporcione voluntariamente sus credenciales de e.firma (FIEL). Al hacerlo, el usuario:</p>
+      <ul>
+        <li>Autoriza expresamente a ContaNeta a utilizar su e.firma para descargar CFDI del servicio web del SAT</li>
+        <li>Reconoce que las credenciales se almacenan cifradas en reposo y se usan exclusivamente para este propósito</li>
+        <li>Entiende que puede revocar esta autorización en cualquier momento desde la configuración de su cuenta</li>
+        <li>Acepta que la disponibilidad de la sincronización depende de los servicios web del SAT, sobre los cuales ContaNeta no tiene control</li>
+      </ul>
+      <p>ContaNeta no se hace responsable por interrupciones, errores o cambios en los servicios del SAT que afecten la sincronización de CFDI.</p>
+    </section>
+
+    <section class="legal-section" id="despacho">
+      <h2>8. Despacho contable</h2>
+      <p>El usuario podrá autorizar a un despacho contable para acceder a su información fiscal dentro de la plataforma. Al hacerlo:</p>
+      <ul>
+        <li>El despacho autorizado tendrá acceso a la información fiscal del usuario según el nivel de permisos otorgado</li>
+        <li>El usuario es responsable de elegir y autorizar a su despacho contable</li>
+        <li>El usuario puede revocar dicha autorización en cualquier momento</li>
+        <li>ContaNeta no es responsable de las decisiones fiscales, contables o legales que tome el despacho</li>
+      </ul>
+    </section>
+
+    <section class="legal-section" id="limitacion">
+      <h2>9. Limitación de responsabilidad</h2>
+      <p>El servicio se ofrece <strong>"tal cual"</strong> (as is) y <strong>"según disponibilidad"</strong> (as available). ContaNeta no garantiza:</p>
+      <ul>
+        <li>Que el servicio será ininterrumpido, oportuno, seguro o libre de errores</li>
+        <li>Que los resultados obtenidos a través del servicio serán exactos o confiables para efectos fiscales distintos a los contemplados</li>
+        <li>Que los defectos del servicio serán corregidos de inmediato</li>
+      </ul>
+      <p>En la máxima medida permitida por la legislación mexicana aplicable:</p>
+      <ul>
+        <li>ContaNeta no será responsable por daños indirectos, incidentales, especiales, consecuentes o punitivos</li>
+        <li>La responsabilidad total de ContaNeta no excederá el monto pagado por el usuario durante los últimos 12 meses de servicio</li>
+        <li>La responsabilidad por decisiones fiscales o contables recae en el contribuyente y, en su caso, en su despacho contable</li>
+      </ul>
+    </section>
+
+    <section class="legal-section" id="terminacion">
+      <h2>10. Terminación y cancelación</h2>
+      <h3>10.1 Cancelación por el usuario</h3>
+      <p>El usuario puede cancelar su cuenta en cualquier momento. Al cancelar:</p>
+      <ul>
+        <li>Se desactivará el acceso a la plataforma al final del período de facturación vigente</li>
+        <li>Los datos se conservarán conforme a los plazos establecidos en el <a href="/privacy">Aviso de Privacidad</a></li>
+        <li>No se otorgarán reembolsos por el período restante del plan</li>
+      </ul>
+      <h3>10.2 Terminación por ContaNeta</h3>
+      <p>ContaNeta podrá suspender o terminar el acceso del usuario cuando:</p>
+      <ul>
+        <li>El usuario incumpla estos Términos y Condiciones</li>
+        <li>Se detecte uso fraudulento o ilegal de la plataforma</li>
+        <li>El usuario no realice el pago correspondiente a su plan</li>
+        <li>Sea requerido por orden judicial o autoridad competente</li>
+      </ul>
+    </section>
+
+    <section class="legal-section" id="modificaciones">
+      <h2>11. Modificaciones a los términos</h2>
+      <p>ContaNeta se reserva el derecho de modificar estos Términos y Condiciones en cualquier momento. Las modificaciones entrarán en vigor a partir de su publicación en la plataforma.</p>
+      <p>En caso de cambios sustanciales, se notificará a los usuarios a través de la plataforma y/o por correo electrónico con al menos <strong>30 días naturales</strong> de anticipación.</p>
+      <p>El uso continuado del servicio después de la publicación de los cambios constituirá la aceptación de los términos modificados.</p>
+    </section>
+
+    <section class="legal-section" id="legislacion">
+      <h2>12. Legislación aplicable y jurisdicción</h2>
+      <p>Los presentes Términos y Condiciones se rigen por las leyes de los <strong>Estados Unidos Mexicanos</strong>.</p>
+      <p>Para la interpretación y cumplimiento de los presentes términos, las partes se someten a la jurisdicción de los <strong>tribunales competentes de la Ciudad de México</strong>, renunciando a cualquier otro fuero que pudiera corresponderles por razón de sus domicilios presentes o futuros.</p>
+      <p>En caso de controversia, las partes procurarán resolver sus diferencias de manera amistosa. De no llegar a un acuerdo, se someterán a un procedimiento de mediación ante un centro de mediación autorizado en la Ciudad de México antes de acudir a los tribunales.</p>
+    </section>
+
+    <section class="legal-section" id="contacto">
+      <h2>13. Contacto</h2>
+      <p>Para cualquier duda, comentario o solicitud relacionada con estos Términos y Condiciones, puede comunicarse con nosotros a través de:</p>
+      <ul>
+        <li><strong>Correo electrónico:</strong> legal@contaneta.com</li>
+        <li><strong>Sitio web:</strong> <a href="/">contaneta.com</a></li>
+      </ul>
+    </section>
+
+    <footer class="legal-footer">
+      <p>
+        <a href="/privacy">Aviso de Privacidad</a>
+        <a href="/cookies">Política de Cookies</a>
+        <a href="/seguridad">Seguridad</a>
+      </p>
+      <p>ContaNeta · Facturación electrónica y sincronización con el SAT.</p>
+      <p><a href="/">← Volver al inicio</a></p>
+    </footer>
+  </div>
+</body>
+</html>
