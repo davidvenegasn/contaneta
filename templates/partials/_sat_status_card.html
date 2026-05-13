@@ -1,0 +1,84 @@
+{# SAT connection status card — compact widget for dashboard or config pages. #}
+{# Expected context: sat_status (dict from get_sat_connection_status), fiel_warning (dict|None). #}
+
+{% set status = sat_status|default({}) %}
+{% set warning = fiel_warning|default(None) %}
+{% set connected = status.get('connected', false) %}
+{% set last_sync_at = status.get('last_sync_at') %}
+{% set last_sync_status = status.get('last_sync_status') %}
+{% set invoices_synced = status.get('invoices_synced', 0) %}
+
+<div class="card ui-card" style="max-width:420px;">
+  <div class="card-header ui-card__header" style="padding:.75rem 1rem;">
+    <h4 class="section-title u-m0" style="font-size:.95rem;">Conexion SAT</h4>
+  </div>
+  <div style="padding:.75rem 1rem;">
+    {# Connection status indicator #}
+    <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem;">
+      {% if connected and (not warning or warning.level != 'error') %}
+        {# Green dot — connected #}
+        <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#22c55e;flex-shrink:0;" title="Conectado"></span>
+        <span style="font-weight:600;color:#166534;">Conectado</span>
+      {% elif connected and warning and warning.level == 'warning' %}
+        {# Yellow dot — warning #}
+        <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#eab308;flex-shrink:0;" title="Advertencia"></span>
+        <span style="font-weight:600;color:#854d0e;">Conectado (con advertencia)</span>
+      {% else %}
+        {# Red dot — disconnected or error #}
+        <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#ef4444;flex-shrink:0;" title="Desconectado"></span>
+        <span style="font-weight:600;color:#991b1b;">No conectado</span>
+      {% endif %}
+    </div>
+
+    {# FIEL warning banner #}
+    {% if warning %}
+      <div style="background:{% if warning.level == 'error' %}#fef2f2{% else %}#fffbeb{% endif %};border:1px solid {% if warning.level == 'error' %}#fecaca{% else %}#fde68a{% endif %};border-radius:6px;padding:.5rem .75rem;margin-bottom:.5rem;font-size:.85rem;">
+        <span style="color:{% if warning.level == 'error' %}#991b1b{% else %}#92400e{% endif %};">
+          {{ warning.message }}
+          {% if warning.days_remaining is not none %}
+            ({{ warning.days_remaining }} dias restantes)
+          {% endif %}
+        </span>
+      </div>
+    {% endif %}
+
+    {# Sync details #}
+    <div style="font-size:.85rem;color:#6b7280;">
+      <div style="display:flex;justify-content:space-between;margin-bottom:.25rem;">
+        <span>Ultima sincronizacion:</span>
+        <span style="color:#374151;font-weight:500;">
+          {% if last_sync_at %}
+            {{ last_sync_at[:16]|replace('T', ' ') }}
+          {% else %}
+            Nunca
+          {% endif %}
+        </span>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:.25rem;">
+        <span>Estado:</span>
+        <span style="font-weight:500;color:{% if last_sync_status == 'success' %}#166534{% elif last_sync_status == 'error' %}#991b1b{% else %}#6b7280{% endif %};">
+          {% if last_sync_status == 'success' %}
+            Exitoso
+          {% elif last_sync_status == 'error' %}
+            Error
+          {% else %}
+            —
+          {% endif %}
+        </span>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:.25rem;">
+        <span>CFDI sincronizados:</span>
+        <span style="color:#374151;font-weight:500;">{{ invoices_synced }}</span>
+      </div>
+    </div>
+
+    {# Sync now button placeholder #}
+    <div style="margin-top:.75rem;">
+      <button type="button" class="btn btn--secondary" disabled
+              style="width:100%;font-size:.85rem;opacity:.6;cursor:not-allowed;"
+              title="Proximamente">
+        Sincronizar ahora
+      </button>
+    </div>
+  </div>
+</div>

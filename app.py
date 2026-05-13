@@ -38,6 +38,7 @@ from routers.invoicing import get_invoicing_router
 from routers.legal import get_legal_router
 from routers.portal import get_portal_router
 from routers.public import get_public_router
+from routers.sat_status import router as sat_status_router
 from services import issuers
 from services.auth import session
 from services.errors import AppError
@@ -1008,6 +1009,7 @@ app.include_router(get_invoicing_router(templates))
 app.include_router(get_admin_router(templates))
 app.include_router(billing_router)
 app.include_router(get_legal_router(templates))
+app.include_router(sat_status_router)
 
 logger = logging.getLogger(__name__)
 

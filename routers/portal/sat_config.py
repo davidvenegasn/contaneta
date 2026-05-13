@@ -182,49 +182,7 @@ def register_sat_config_routes(router, templates):
         log_action(request, "sat_sync_started", user_id=user_id, issuer_id=issuer_id)
         return JSONResponse({"ok": True, "message": "Sincronización iniciada."})
 
-    @router.get("/sat/status", response_class=JSONResponse)
-    def portal_sat_status(request: Request, issuer: dict = Depends(get_portal_issuer)):
-        """Estado del sync SAT para este issuer: último sync, en proceso / ok / error."""
-        issuer_id = issuer["id"]
-        conn = db()
-        try:
-            running = conn.execute(
-                "SELECT 1 FROM sat_jobs WHERE issuer_id = ? AND status IN ('queued','running') LIMIT 1",
-                (issuer_id,),
-            ).fetchone()
-            last_ok = conn.execute(
-                "SELECT MAX(finished_at) AS t FROM sat_jobs WHERE issuer_id = ? AND status = 'ok'",
-                (issuer_id,),
-            ).fetchone()
-            last_error = conn.execute(
-                "SELECT finished_at, last_error FROM sat_jobs WHERE issuer_id = ? AND status = 'error' ORDER BY finished_at DESC LIMIT 1",
-                (issuer_id,),
-            ).fetchone()
-            sync_state = conn.execute(
-                "SELECT MAX(last_run_at) AS t FROM sat_sync_state WHERE issuer_id = ?",
-                (issuer_id,),
-            ).fetchone()
-        finally:
-            conn.close()
-        last_sync_at = (sync_state and sync_state["t"]) or (last_ok and last_ok["t"]) or None
-        if running:
-            status = "running"
-            message = "Sincronización en proceso"
-        elif last_error and last_ok and last_error["t"] and last_ok["t"] and last_error["t"] > last_ok["t"]:
-            status = "error"
-            message = (last_error["last_error"] or "Error en la última sincronización")[:200]
-        elif last_error and not last_ok:
-            status = "error"
-            message = (last_error["last_error"] or "Error en la última sincronización")[:200]
-        else:
-            status = "ok"
-            message = None
-        return JSONResponse({
-            "ok": True,
-            "last_sync_at": last_sync_at,
-            "status": status,
-            "message": message,
-        })
+    # NOTE: /sat/status route moved to routers/sat_status.py (richer API, fixes KeyError bug)
 
     @router.get("/config/sat", response_class=HTMLResponse)
     def portal_config_sat(request: Request, issuer: dict = Depends(get_portal_issuer)):
