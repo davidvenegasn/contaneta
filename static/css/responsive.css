@@ -552,6 +552,36 @@
   }
 }
 
+/* ============================================================
+   MOBILE QUALITY PASS — phase 2 coverage gaps
+   ============================================================ */
+
+/* 480px: settings tabs condense */
+@media (max-width: 480px) {
+  .settings-tabs,
+  [role="tablist"].portal-tabs {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .settings-tab,
+  [role="tab"] {
+    padding: 6px 10px;
+    font-size: var(--text-xs);
+    min-height: 36px;
+  }
+}
+
+/* 768px: CFDI drawer grid stack */
+@media (max-width: 768px) {
+  .cfdi-drawer__grid {
+    grid-template-columns: 1fr;
+    gap: var(--space-2);
+  }
+  .cfdi-drawer__body {
+    padding: 16px;
+  }
+}
+
 /* ── Print: hide mobile-only elements ── */
 @media print {
   .mobile-tab-bar,

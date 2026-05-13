@@ -176,6 +176,8 @@
   }
   .pv2 .pv2-balance-col--main {
     grid-column: 1 / -1;
+    border-bottom: 1px solid var(--pv2-border-2, rgba(15,23,42,0.08));
+    padding-bottom: var(--space-4);
   }
 }
 @media (max-width: 540px) {
