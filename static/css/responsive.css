@@ -582,6 +582,44 @@
   }
 }
 
+/* ============================================================
+   MOBILE QUALITY PASS — phase 3 touch targets
+   ============================================================ */
+
+/* 768px + pointer:coarse: ensure min 44px tappable area on touch devices */
+@media (max-width: 768px) and (pointer: coarse) {
+  .btn,
+  .ui-btn,
+  button:not(.btn-icon-eye):not(.close-btn),
+  a.btn,
+  .icon-btn {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  .btn--sm,
+  .ui-btn--sm {
+    min-height: 40px;
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  /* Prevent iOS auto-zoom on input focus */
+  input[type="text"],
+  input[type="email"],
+  input[type="tel"],
+  input[type="number"],
+  input[type="password"],
+  input[type="search"],
+  select,
+  textarea {
+    font-size: 16px;
+  }
+  /* Click area for table rows that act as buttons */
+  tr[onclick],
+  tr.clickable td {
+    min-height: 44px;
+  }
+}
+
 /* ── Print: hide mobile-only elements ── */
 @media print {
   .mobile-tab-bar,
