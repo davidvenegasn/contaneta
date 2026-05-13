@@ -119,12 +119,7 @@
     </div>
     {% from 'portal/_ui_components.html' import portal_empty_state, portal_load_error %}
     {{ portal_load_error('loadErrorState') }}
-    {% call portal_empty_state('No tienes facturas emitidas en ' ~ (ym_label|default('este mes')), 'Crea tu primera factura y comienza a facturar.', id='emptyState', icon_type='invoice') %}
-      <a href="/portal/create" class="btn btn--primary btn--lg ui-btn ui-btn--primary" style="font-size: 15px; padding: 12px 28px; gap: 8px;">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>
-        Crear mi primera factura
-      </a>
-    {% endcall %}
+    {% call portal_empty_state('No tienes facturas emitidas en ' ~ (ym_label|default('este mes')), '', id='emptyState', icon_type='invoice') %}{% endcall %}
   </div>
 </div>
 
