@@ -1,0 +1,153 @@
+/* accessibility.css — WCAG 2.1 AA compliance utilities and enhancements.
+ *
+ * This file supplements the existing focus/motion styles in portal_tokens.css
+ * and components.css with additional accessibility utilities.
+ */
+
+/* ============================================================
+   1. Screen-reader only utility (.sr-only)
+   Visually hidden but available to assistive technology.
+   ============================================================ */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Allow the element to become visible when focused (e.g. skip-nav) */
+.sr-only-focusable:focus,
+.sr-only-focusable:active {
+  position: static;
+  width: auto;
+  height: auto;
+  padding: inherit;
+  margin: 0;
+  overflow: visible;
+  clip: auto;
+  white-space: normal;
+}
+
+/* ============================================================
+   2. Focus indicators — enhanced visible outlines
+   Supplements existing :focus-visible rules in portal_tokens.css.
+   ============================================================ */
+:focus-visible {
+  outline: 2px solid var(--primary, #6366f1);
+  outline-offset: 2px;
+}
+
+/* Focus-within for form groups — subtle highlight on parent */
+.form-group:focus-within,
+.concept-block:focus-within {
+  outline: 2px solid var(--primary-light, #c7d2fe);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ============================================================
+   3. Reduced-motion support
+   Disable animations/transitions for users who prefer reduced motion.
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ============================================================
+   4. High-contrast mode support
+   Improve visibility for forced-colors / Windows High Contrast Mode.
+   ============================================================ */
+@media (forced-colors: active) {
+  /* Ensure focus outlines use system highlight color */
+  :focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+
+  /* Ensure buttons and links are visible */
+  .btn,
+  .icon-btn,
+  a {
+    forced-color-adjust: none;
+    border: 1px solid ButtonText;
+  }
+
+  /* Ensure form controls have visible borders */
+  input,
+  select,
+  textarea {
+    border: 1px solid ButtonText;
+  }
+
+  /* Ensure SVG icons remain visible */
+  .icon {
+    forced-color-adjust: auto;
+  }
+}
+
+/* ============================================================
+   5. Form accessibility — visual cues for required/invalid states
+   ============================================================ */
+
+/* Required field indicator (when aria-required="true") */
+[aria-required="true"] + label::after,
+label:has(+ [aria-required="true"])::after {
+  content: " *";
+  color: var(--danger, #ef4444);
+  font-weight: 600;
+}
+
+/* Invalid field styling (when aria-invalid="true") */
+[aria-invalid="true"] {
+  border-color: var(--danger, #ef4444) !important;
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2);
+}
+
+/* Hint text associated via aria-describedby */
+.field-hint {
+  font-size: 0.8125rem;
+  color: var(--text-muted, #6b7280);
+  margin-top: 0.25rem;
+  line-height: 1.4;
+}
+
+/* Error message associated via aria-describedby */
+.field-error {
+  font-size: 0.8125rem;
+  color: var(--danger, #ef4444);
+  margin-top: 0.25rem;
+  line-height: 1.4;
+  font-weight: 500;
+}
+
+/* ============================================================
+   6. Live region styling
+   Visual treatment for aria-live regions.
+   ============================================================ */
+[aria-live="assertive"]:not(:empty),
+[role="alert"]:not(:empty) {
+  /* Ensure live regions are visible when they have content */
+  display: block;
+}
+
+/* ============================================================
+   7. Skip navigation link enhancement
+   Supplements existing .skip-nav styles in portal.css.
+   ============================================================ */
+.skip-nav:focus {
+  z-index: 100000;
+  outline: 3px solid var(--primary, #6366f1);
+  outline-offset: 2px;
+}
