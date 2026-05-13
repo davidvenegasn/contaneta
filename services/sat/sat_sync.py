@@ -68,6 +68,10 @@ def get_month_totals(issuer_id: int, ym: str, direction: str, metodo_pago: str =
             base_where += " AND (total IS NULL OR total >= 0.01)"
         else:
             base_where += " AND total IS NOT NULL AND total >= 0.01 AND (tipo_comprobante IS NULL OR UPPER(TRIM(tipo_comprobante)) != 'N')"
+        base_where += (
+            " AND COALESCE(UPPER(TRIM(status)), '') NOT IN ('C','CANCELADO','CANCELADA','0')"
+            " AND UPPER(TRIM(COALESCE(status,''))) NOT LIKE 'CANCEL%'"
+        )
         params: list = [issuer_id, direction, ym]
         if metodo_pago:
             base_where += " AND UPPER(TRIM(COALESCE(metodo_pago,''))) = ?"

@@ -52,31 +52,37 @@ def get_monthly_trend(issuer_id: int, months: int = 12) -> list[dict]:
             y -= 1
     ym_list.reverse()
 
+    _cancelled_filter = (
+        " AND COALESCE(UPPER(TRIM(status)), '') NOT IN ('C','CANCELADO','CANCELADA','0')"
+        " AND UPPER(TRIM(COALESCE(status,''))) NOT LIKE 'CANCEL%%'"
+    )
     # Fetch issued totals grouped by month
     issued_rows = db_rows(
-        """
+        f"""
         SELECT substr(fecha_emision, 1, 7) AS ym,
-               COALESCE(SUM(COALESCE(total, 0)), 0) AS total
+               COALESCE(SUM(COALESCE(subtotal, total)), 0) AS total
         FROM sat_cfdi
         WHERE issuer_id = ? AND direction = 'issued'
           AND fecha_emision IS NOT NULL
           AND (total IS NULL OR total >= 0.01)
           AND substr(fecha_emision, 1, 7) >= ?
+          {_cancelled_filter}
         GROUP BY substr(fecha_emision, 1, 7)
         """,
         (issuer_id, ym_list[0]),
     )
     # Fetch received totals grouped by month
     received_rows = db_rows(
-        """
+        f"""
         SELECT substr(fecha_emision, 1, 7) AS ym,
-               COALESCE(SUM(COALESCE(total, 0)), 0) AS total
+               COALESCE(SUM(COALESCE(subtotal, total)), 0) AS total
         FROM sat_cfdi
         WHERE issuer_id = ? AND direction = 'received'
           AND fecha_emision IS NOT NULL
           AND total IS NOT NULL AND total >= 0.01
           AND (tipo_comprobante IS NULL OR UPPER(TRIM(tipo_comprobante)) != 'N')
           AND substr(fecha_emision, 1, 7) >= ?
+          {_cancelled_filter}
         GROUP BY substr(fecha_emision, 1, 7)
         """,
         (issuer_id, ym_list[0]),
