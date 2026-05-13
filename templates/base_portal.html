@@ -2148,7 +2148,12 @@
 
     function fetchStatus() {
       (window.portalFetchJSON ? window.portalFetchJSON('/portal/sat/status', { credentials: 'same-origin', headers: { 'Accept': 'application/json' } }, { timeoutMs: 30000, retry: 1 }) : Promise.resolve({ ok: false, status: 0, data: null }))
-        .then(function (r) { if (r && r.ok && r.data && r.data.ok) updateUI(r.data); })
+        .then(function (r) {
+          if (!r || !r.ok || !r.data) return;
+          var d = r.data;
+          var st = d.status || (d.last_sync_status === 'success' ? 'ok' : (d.last_sync_status || 'ok'));
+          updateUI({ status: st });
+        })
         .catch(function () {});
     }
 
