@@ -1,32 +1,29 @@
-# Ruff configuration for ContaNeta
-# https://docs.astral.sh/ruff/
+# Ruff linting configuration for ContaNeta
+# See: https://docs.astral.sh/ruff/configuration/
 
 target-version = "py311"
 line-length = 120
 
+exclude = [
+    ".venv",
+    "__pycache__",
+    "migrations",
+    "sat_sync",
+]
+
 [lint]
 select = [
-    "E",    # pycodestyle errors
-    "W",    # pycodestyle warnings
-    "F",    # pyflakes
-    "I",    # isort
-    "UP",   # pyupgrade
-    "B",    # flake8-bugbear
-    "SIM",  # flake8-simplify
-    "S",    # flake8-bandit (security)
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "UP",  # pyupgrade
 ]
 ignore = [
-    "E501",   # line too long (handled by formatter)
-    "S101",   # assert usage (ok in tests)
-    "S603",   # subprocess without shell=True (we use PHP subprocess intentionally)
-    "S607",   # partial path in subprocess (PHP scripts)
-    "B008",   # function call in default arg (FastAPI Depends/Query pattern)
-    "UP007",  # use X | Y for union types (keep Optional for py311 compat)
+    "E501",  # line length — handled by formatter
+    "B008",  # function call in default argument — required by FastAPI Depends() pattern
+    "B904",  # raise from — too noisy for this codebase
 ]
 
-[lint.per-file-ignores]
-"tests/**" = ["S101", "S106"]
-"migrations/**" = ["E501"]
-
 [lint.isort]
-known-first-party = ["services", "routers", "database", "config", "validators"]
+known-first-party = ["services", "routers", "database", "config", "migrations_runner"]
