@@ -142,7 +142,7 @@
   <section class="fade-in fade-in--3">
     <div class="dashboard-chart-card" id="trendChartCard">
       <div class="dashboard-chart-card__head">
-        <span class="dashboard-chart-card__title">Tendencia de 12 meses</span>
+        <span class="dashboard-chart-card__title">Tendencia</span>
         <div class="dashboard-chart-card__legend">
           <span><span class="dashboard-chart-card__legend-dot" style="background:#6366f1;"></span> Ingresos</span>
           <span><span class="dashboard-chart-card__legend-dot" style="background:#ef4444;"></span> Gastos</span>
@@ -1123,7 +1123,7 @@
       tip.style.top = y + 'px';
     }
 
-    fetch('/api/metrics/trend?months=12')
+    fetch('/api/metrics/trend?months=6')
       .then(function(r) { return r.json(); })
       .then(function(res) {
         if (!res.ok || !res.data || !res.data.length) {
@@ -1131,6 +1131,13 @@
           return;
         }
         var data = res.data;
+        data = data.filter(function(d) {
+          return (Number(d.ingresos) > 0) || (Number(d.gastos) > 0);
+        });
+        if (!data.length) {
+          container.innerHTML = '<p class="muted u-text-xs" style="margin:auto;">Sin datos históricos</p>';
+          return;
+        }
         var maxVal = 1;
         data.forEach(function(d) {
           if (d.ingresos > maxVal) maxVal = d.ingresos;
