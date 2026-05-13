@@ -108,6 +108,10 @@ templates.env.globals["min"] = min
 templates.env.globals["max"] = max
 templates.env.globals["site_url"] = SITE_URL or ""
 
+# Static asset versioning (cache-busting via content hash)
+from services.static_version import static_url as _static_url
+templates.env.globals["static_url"] = _static_url
+
 
 def _jinja_tojson(value):
     """Filtro tojson para templates (partials/bank_upload y otros)."""
