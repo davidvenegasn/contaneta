@@ -89,13 +89,25 @@
 {# ── Fiscal data section ── #}
 <div class="settings-panel" id="panel-fiscal" hidden>
   <div class="card p-20">
+    {% set _fiel = fiel_data|default({}) %}
+    {% set _rfc_default = issuer_rfc or _fiel.get('rfc', '') %}
+    {% set _razon_default = issuer_alias or _fiel.get('nombre', '') %}
+    {% set _from_fiel_rfc = (not issuer_rfc) and _fiel.get('rfc') %}
+    {% set _from_fiel_razon = (not issuer_alias) and _fiel.get('nombre') %}
+
     <h2 class="u-m0 u-mb-3 u-text-base">Datos fiscales del emisor</h2>
-    <p class="muted u-text-sm" style="margin:0 0 16px;">Información fiscal asociada a tu cuenta de facturación.</p>
+    <p class="muted u-text-sm" style="margin:0 0 16px;">
+      Información fiscal asociada a tu cuenta de facturación.
+      {% if _fiel %}<br>Los valores predeterminados se obtienen de tu certificado FIEL.{% endif %}
+    </p>
 
     <dl class="datos-fiscales-list" style="margin-bottom:16px;">
       <div class="datos-fiscales-row" style="display:flex; gap:8px; padding:6px 0;">
         <dt style="font-size:13px; font-weight:500; min-width:120px; color:var(--muted, #6b7280);">RFC</dt>
-        <dd style="margin:0; font-size:14px;">{{ issuer_rfc or '—' }}</dd>
+        <dd style="margin:0; font-size:14px;">
+          {{ _rfc_default or '—' }}
+          {% if _from_fiel_rfc %}<span class="muted u-text-xs" style="margin-left:6px;">(del FIEL)</span>{% endif %}
+        </dd>
       </div>
     </dl>
 
@@ -104,8 +116,11 @@
       <input type="hidden" name="csrf_token" value="{{ csrf_token or '' }}" />
       <div style="display:flex; flex-direction:column; gap:14px; max-width:400px;">
         <div>
-          <label for="settings-razon" style="display:block; font-size:13px; font-weight:500; margin-bottom:4px;">Razón social</label>
-          <input type="text" id="settings-razon" name="razon_social" value="{{ issuer_alias or '' }}" class="form-input" style="width:100%;" />
+          <label for="settings-razon" style="display:block; font-size:13px; font-weight:500; margin-bottom:4px;">
+            Razón social
+            {% if _from_fiel_razon %}<span class="muted u-text-xs">(del FIEL)</span>{% endif %}
+          </label>
+          <input type="text" id="settings-razon" name="razon_social" value="{{ _razon_default }}" class="form-input" style="width:100%;" />
         </div>
         <div>
           <label for="settings-regimen" style="display:block; font-size:13px; font-weight:500; margin-bottom:4px;">Régimen fiscal</label>
@@ -115,6 +130,7 @@
             <option value="{{ code }}" {{ 'selected' if issuer_tax_system == code else '' }}>{{ code }} — {{ desc }}</option>
             {% endfor %}
           </select>
+          <p class="muted u-text-xs" style="margin:4px 0 0;">El régimen no se extrae del FIEL. Selecciónalo manualmente.</p>
         </div>
         <div>
           <button type="submit" class="btn btn--primary btn--sm">Guardar datos fiscales</button>
@@ -125,7 +141,10 @@
     <dl class="datos-fiscales-list">
       <div class="datos-fiscales-row" style="display:flex; gap:8px; padding:6px 0;">
         <dt style="font-size:13px; font-weight:500; min-width:120px; color:var(--muted, #6b7280);">Razón social</dt>
-        <dd style="margin:0; font-size:14px;">{{ issuer_alias or '—' }}</dd>
+        <dd style="margin:0; font-size:14px;">
+          {{ _razon_default or '—' }}
+          {% if _from_fiel_razon %}<span class="muted u-text-xs" style="margin-left:6px;">(del FIEL)</span>{% endif %}
+        </dd>
       </div>
       <div class="datos-fiscales-row" style="display:flex; gap:8px; padding:6px 0;">
         <dt style="font-size:13px; font-weight:500; min-width:120px; color:var(--muted, #6b7280);">Régimen fiscal</dt>

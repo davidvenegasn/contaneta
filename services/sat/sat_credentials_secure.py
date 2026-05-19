@@ -224,6 +224,59 @@ def _decrypt_file_to_temp(issuer_id: int, rel_path: str, *, aad: bytes) -> str:
     return out_path
 
 
+def extract_fiel_subject(issuer_id: int) -> dict:
+    """Extract RFC and razón social from the issuer's stored FIEL certificate.
+
+    Reads the encrypted-at-rest .cer file, decrypts to memory, parses with
+    cryptography.x509, and pulls the Mexican SAT-relevant subject attributes:
+      - RFC: from serialNumber attribute (OID 2.5.4.5). SAT format is usually
+        "RFC / CURP" for personas físicas or just "RFC" for personas morales.
+      - nombre: from commonName (CN, OID 2.5.4.3) — razón social or full name.
+
+    Returns an empty dict if no credentials configured or parsing fails. Never
+    raises; this is best-effort metadata used as form defaults.
+    """
+    try:
+        ensure_fiel_encrypted(int(issuer_id))
+        row = _read_sat_credentials_row(int(issuer_id))
+        if not row:
+            return {}
+        cer_rel = (row.get("fiel_cer_path") or "").strip()
+        if not cer_rel:
+            return {}
+        abs_path = _abs_under_base(cer_rel)
+        with open(abs_path, "rb") as f:
+            blob = f.read()
+        try:
+            cer_bytes = decrypt_bytes(blob, aad=b"fiel.cer")
+        except Exception:
+            cer_bytes = blob  # not encrypted yet
+        from cryptography.x509 import load_der_x509_certificate, load_pem_x509_certificate
+        from cryptography.x509.oid import NameOID
+        cert = None
+        for loader in (load_der_x509_certificate, load_pem_x509_certificate):
+            try:
+                cert = loader(cer_bytes)
+                break
+            except Exception:
+                continue
+        if cert is None:
+            return {}
+        out: dict = {}
+        for attr in cert.subject:
+            if attr.oid == NameOID.SERIAL_NUMBER:
+                raw = (attr.value or "").strip()
+                rfc = raw.split("/")[0].strip().upper()
+                if rfc:
+                    out["rfc"] = rfc
+            elif attr.oid == NameOID.COMMON_NAME:
+                out["nombre"] = (attr.value or "").strip()
+        return out
+    except Exception as e:
+        logger.warning("extract_fiel_subject failed for issuer %s: %s", issuer_id, e)
+        return {}
+
+
 @contextmanager
 def decrypted_fiel_env(issuer_id: int) -> Iterator[dict[str, str]]:
     """

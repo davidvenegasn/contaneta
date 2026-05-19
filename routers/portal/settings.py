@@ -32,14 +32,19 @@ def register_settings_routes(router, templates):
         user = users_service.get_user_by_id(user_id) if user_id else None
         membership_role = getattr(request.state, "membership_role", "viewer")
         from database import db_rows
+        issuer_id = int(issuer.get("id") or 0)
         fiel_rows = db_rows(
             "SELECT validation_ok FROM sat_credentials WHERE issuer_id = ? LIMIT 1",
-            (int(issuer.get("id") or 0),),
+            (issuer_id,),
         )
         sat_status = {
             "configured": bool(fiel_rows),
             "validated": bool(fiel_rows and fiel_rows[0].get("validation_ok")),
         }
+        fiel_data: dict = {}
+        if sat_status["configured"]:
+            from services.sat.sat_credentials_secure import extract_fiel_subject
+            fiel_data = extract_fiel_subject(issuer_id)
         return _render(
             request,
             issuer=issuer,
@@ -53,6 +58,7 @@ def register_settings_routes(router, templates):
                 "success_msg": success,
                 "error_msg": error,
                 "sat_status": sat_status,
+                "fiel_data": fiel_data,
             },
         )
 
