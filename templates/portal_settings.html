@@ -31,6 +31,7 @@
   <button type="button" class="settings-tab is-active" data-tab="profile">Perfil</button>
   <button type="button" class="settings-tab" data-tab="password">Contraseña</button>
   <button type="button" class="settings-tab" data-tab="fiscal">Datos fiscales</button>
+  <button type="button" class="settings-tab" data-tab="sat">Sellos SAT</button>
 </div>
 
 {# ── Profile section ── #}
@@ -133,6 +134,35 @@
     </dl>
     <p class="muted u-text-sm">Solo el dueño o administrador puede editar estos datos.</p>
     {% endif %}
+  </div>
+</div>
+
+{# ── SAT (sellos / FIEL) section ── #}
+<div class="settings-panel" id="panel-sat" hidden>
+  <div class="card p-20">
+    <h2 class="u-m0 u-mb-3 u-text-base">Sellos SAT (FIEL)</h2>
+    <p class="muted u-text-sm" style="margin:0 0 16px;">Credenciales para sincronizar tus facturas con el SAT.</p>
+
+    {% set _sat = sat_status|default({'configured': false, 'validated': false}) %}
+    <dl class="datos-fiscales-list" style="margin-bottom:16px;">
+      <div class="datos-fiscales-row" style="display:flex; gap:8px; padding:6px 0;">
+        <dt style="font-size:13px; font-weight:500; min-width:160px; color:var(--muted, #6b7280);">Estado</dt>
+        <dd style="margin:0; font-size:14px;">
+          {% if _sat.validated %}
+            <span style="color:var(--success, #22c55e); font-weight:600;">✓ Configurada y validada</span>
+          {% elif _sat.configured %}
+            <span style="color:var(--warn, #f59e0b); font-weight:600;">⚠ Cargada, pendiente de validar</span>
+          {% else %}
+            <span style="color:var(--muted, #6b7280);">Sin configurar</span>
+          {% endif %}
+        </dd>
+      </div>
+    </dl>
+
+    <a href="/portal/config/sat" class="btn btn--primary">
+      {% if _sat.configured %}Reconfigurar sellos SAT{% else %}Configurar sellos SAT{% endif %}
+    </a>
+    <p class="muted u-text-sm" style="margin-top:12px;">Necesitas tu certificado (.cer), clave privada (.key) y contraseña de FIEL.</p>
   </div>
 </div>
 
