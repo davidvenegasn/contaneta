@@ -676,6 +676,11 @@ async def security_headers_middleware(request: Request, call_next):
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
     if "Permissions-Policy" not in response.headers:
         response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=(), payment=(), usb=(), serial=()"
+    # Prevent browser/proxy caching of dynamic per-tenant pages. Static assets
+    # (versioned by ?v=hash) keep their own Cache-Control via StaticFiles.
+    if "Cache-Control" not in response.headers and not request.url.path.startswith("/static/"):
+        response.headers["Cache-Control"] = "no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
     if "Content-Security-Policy" not in response.headers:
         # CSP básico; frame-ancestors 'none' evita que la app se embeba en iframes
         csp = (
