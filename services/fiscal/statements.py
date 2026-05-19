@@ -54,6 +54,8 @@ def _income_totals_ytd(issuer_id: int, ym: str) -> dict:
           AND substr(fecha_emision, 1, 4) = ?
           AND substr(fecha_emision, 1, 7) <= ?
           AND (total IS NULL OR total >= 0.01)
+          AND COALESCE(UPPER(TRIM(status)), '') NOT IN ('C','CANCELADO','CANCELADA','0')
+          AND UPPER(TRIM(COALESCE(status,''))) NOT LIKE 'CANCEL%'
         """,
         (issuer_id, year, ym),
     )
@@ -83,6 +85,8 @@ def _expense_totals_ytd(issuer_id: int, ym: str) -> dict:
           AND substr(fecha_emision, 1, 7) <= ?
           AND total IS NOT NULL AND total >= 0.01
           AND (tipo_comprobante IS NULL OR UPPER(TRIM(tipo_comprobante)) != 'N')
+          AND COALESCE(UPPER(TRIM(status)), '') NOT IN ('C','CANCELADO','CANCELADA','0')
+          AND UPPER(TRIM(COALESCE(status,''))) NOT LIKE 'CANCEL%'
         """,
         (issuer_id, year, ym),
     )

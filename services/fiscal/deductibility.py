@@ -147,6 +147,8 @@ def compute_deductible_totals(issuer_id: int, ym: str) -> dict:
         f"issuer_id = ? AND direction = 'received' AND fecha_emision IS NOT NULL AND {ym_filt}"
         " AND total IS NOT NULL AND total >= 0.01"
         " AND (tipo_comprobante IS NULL OR UPPER(TRIM(tipo_comprobante)) != 'N')"
+        " AND COALESCE(UPPER(TRIM(status)), '') NOT IN ('C','CANCELADO','CANCELADA','0')"
+        " AND UPPER(TRIM(COALESCE(status,''))) NOT LIKE 'CANCEL%'"
     )
     rows = db_rows(
         f"""SELECT uuid, COALESCE(subtotal, total) AS subtotal, COALESCE(impuestos, 0) AS impuestos,

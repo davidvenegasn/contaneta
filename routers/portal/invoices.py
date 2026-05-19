@@ -332,6 +332,8 @@ def register_invoices_routes(router, templates):
                     FROM sat_cfdi
                     WHERE issuer_id = ? AND direction = 'issued' AND fecha_emision IS NOT NULL
                       AND (total IS NULL OR total >= 0.01)
+                      AND COALESCE(UPPER(TRIM(status)), '') NOT IN ('C','CANCELADO','CANCELADA','0')
+                      AND UPPER(TRIM(COALESCE(status,''))) NOT LIKE 'CANCEL%'
                     GROUP BY ym ORDER BY ym DESC;
                 """, (issuer_id,))
                 for m in months:
@@ -364,12 +366,16 @@ def register_invoices_routes(router, templates):
                       )
                     ORDER BY fecha_emision DESC LIMIT {_row_limit};
                 """, (issuer_id, ym, issuer_id, ym))
-                months = db_rows("""
+                _ppd_extra = " AND UPPER(TRIM(COALESCE(metodo_pago,''))) = 'PPD'" if tab == "ppd" else ""
+                months = db_rows(f"""
                     SELECT substr(fecha_emision,1,7) AS ym, count(*) AS n
                     FROM sat_cfdi
                     WHERE issuer_id = ? AND direction = 'received' AND fecha_emision IS NOT NULL
                       AND total IS NOT NULL AND total >= 0.01
                       AND (tipo_comprobante IS NULL OR UPPER(TRIM(tipo_comprobante)) != 'N')
+                      AND COALESCE(UPPER(TRIM(status)), '') NOT IN ('C','CANCELADO','CANCELADA','0')
+                      AND UPPER(TRIM(COALESCE(status,''))) NOT LIKE 'CANCEL%'
+                      {_ppd_extra}
                     GROUP BY ym ORDER BY ym DESC;
                 """, (issuer_id,))
                 for m in months:
@@ -423,6 +429,8 @@ def register_invoices_routes(router, templates):
                 WHERE issuer_id = ? AND direction = 'received'
                   AND UPPER(TRIM(COALESCE(tipo_comprobante,''))) = 'N'
                   AND fecha_emision IS NOT NULL
+                  AND COALESCE(UPPER(TRIM(status)), '') NOT IN ('C','CANCELADO','CANCELADA','0')
+                  AND UPPER(TRIM(COALESCE(status,''))) NOT LIKE 'CANCEL%'
                 GROUP BY ym ORDER BY ym DESC;
             """, (issuer_id,))
             for m in months:

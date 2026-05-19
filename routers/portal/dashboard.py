@@ -214,6 +214,8 @@ def register_dashboard_routes(router, templates):
                 SELECT substr(fecha_emision,1,7) AS ym, count(*) AS n
                 FROM sat_cfdi
                 WHERE issuer_id = ? AND direction = 'issued' AND fecha_emision IS NOT NULL
+                  AND COALESCE(UPPER(TRIM(status)), '') NOT IN ('C','CANCELADO','CANCELADA','0')
+                  AND UPPER(TRIM(COALESCE(status,''))) NOT LIKE 'CANCEL%'
                 GROUP BY ym ORDER BY ym DESC
                 """,
                 (issuer_id,),
@@ -223,6 +225,8 @@ def register_dashboard_routes(router, templates):
                 SELECT substr(fecha_emision,1,7) AS ym, count(*) AS n
                 FROM sat_cfdi
                 WHERE issuer_id = ? AND direction = 'received' AND fecha_emision IS NOT NULL
+                  AND COALESCE(UPPER(TRIM(status)), '') NOT IN ('C','CANCELADO','CANCELADA','0')
+                  AND UPPER(TRIM(COALESCE(status,''))) NOT LIKE 'CANCEL%'
                 GROUP BY ym ORDER BY ym DESC
                 """,
                 (issuer_id,),
