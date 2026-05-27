@@ -1,13 +1,15 @@
-"""Portal settings routes — user profile, password change, issuer fiscal data."""
+"""Portal settings routes — user profile, password change, issuer fiscal data, account deletion."""
 import logging
 
 from fastapi import Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from config import REGIMEN_CODE_DESCRIPTIONS
+from database import db, db_rows, table_exists
 from routers.deps import get_portal_issuer
 from routers.portal._helpers import render_portal
 from services.auth import csrf as csrf_service
+from services.auth import session as session_service
 from services.auth import users as users_service
 from services import issuers as issuers_service
 
@@ -45,6 +47,15 @@ def register_settings_routes(router, templates):
         if sat_status["configured"]:
             from services.sat.sat_credentials_secure import extract_fiel_subject
             fiel_data = extract_fiel_subject(issuer_id)
+        # Check for pending deletion request
+        deletion_pending = None
+        if user_id:
+            del_rows = db_rows(
+                "SELECT scheduled_for FROM account_deletion_requests WHERE user_id = ? AND status = 'pending' LIMIT 1",
+                (user_id,),
+            )
+            if del_rows:
+                deletion_pending = del_rows[0].get("scheduled_for")
         return _render(
             request,
             issuer=issuer,
@@ -59,6 +70,7 @@ def register_settings_routes(router, templates):
                 "error_msg": error,
                 "sat_status": sat_status,
                 "fiel_data": fiel_data,
+                "deletion_pending": deletion_pending,
             },
         )
 
@@ -172,5 +184,89 @@ def register_settings_routes(router, templates):
         )
         return RedirectResponse(
             url="/portal/settings?success=Datos+fiscales+actualizados",
+            status_code=302,
+        )
+
+    # ---------- Account deletion (LFPDPPP) ----------
+
+    @router.post("/settings/delete-account", response_class=RedirectResponse)
+    def portal_delete_account(
+        request: Request,
+        issuer: dict = Depends(get_portal_issuer),
+        csrf_token: str = Form(""),
+        confirm_text: str = Form(""),
+    ):
+        """Request account deletion with 30-day grace period (LFPDPPP compliance).
+
+        User must type 'ELIMINAR' to confirm. Creates a pending request in
+        account_deletion_requests, logs the user out.
+
+        TODO: scripts/process_deletion_queue.py — cron job to actually delete
+        accounts after the 30-day grace period has passed.
+        """
+        if not csrf_service.verify_csrf_token(csrf_token):
+            raise HTTPException(status_code=403, detail="Token CSRF inválido o expirado")
+        user_id = getattr(request.state, "user_id", None) or 0
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Sesión inválida")
+        if confirm_text.strip() != "ELIMINAR":
+            return RedirectResponse(
+                url="/portal/settings?error=Escribe+ELIMINAR+para+confirmar",
+                status_code=302,
+            )
+        conn = db()
+        try:
+            if not table_exists(conn, "account_deletion_requests"):
+                raise HTTPException(status_code=500, detail="Tabla de solicitudes no disponible")
+            # Check for existing pending request
+            existing = conn.execute(
+                "SELECT id FROM account_deletion_requests WHERE user_id = ? AND status = 'pending' LIMIT 1",
+                (user_id,),
+            ).fetchone()
+            if existing:
+                return RedirectResponse(
+                    url="/portal/settings?error=Ya+existe+una+solicitud+de+eliminación+pendiente",
+                    status_code=302,
+                )
+            conn.execute(
+                """INSERT INTO account_deletion_requests (user_id, status, requested_at, scheduled_for)
+                   VALUES (?, 'pending', datetime('now'), datetime('now', '+30 days'))""",
+                (user_id,),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+        logger.info("Account deletion requested for user_id=%s", user_id)
+        # Force logout
+        cookie_name = session_service.get_session_cookie_name()
+        resp = RedirectResponse(url="/login?msg=deletion_requested", status_code=302)
+        resp.delete_cookie(cookie_name)
+        return resp
+
+    @router.post("/settings/cancel-deletion", response_class=RedirectResponse)
+    def portal_cancel_deletion(
+        request: Request,
+        issuer: dict = Depends(get_portal_issuer),
+        csrf_token: str = Form(""),
+    ):
+        """Cancel a pending account deletion request."""
+        if not csrf_service.verify_csrf_token(csrf_token):
+            raise HTTPException(status_code=403, detail="Token CSRF inválido o expirado")
+        user_id = getattr(request.state, "user_id", None) or 0
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Sesión inválida")
+        conn = db()
+        try:
+            conn.execute(
+                "UPDATE account_deletion_requests SET status = 'rejected', reviewed_at = datetime('now'), "
+                "reviewer_notes = 'Cancelled by user' WHERE user_id = ? AND status = 'pending'",
+                (user_id,),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+        logger.info("Account deletion cancelled by user_id=%s", user_id)
+        return RedirectResponse(
+            url="/portal/settings?success=Solicitud+de+eliminación+cancelada",
             status_code=302,
         )
