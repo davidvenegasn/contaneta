@@ -1328,4 +1328,27 @@ a {{ color: #0369a1; text-decoration: none; }}
         """Intentional exception to verify Sentry integration. Admin only."""
         raise RuntimeError("Sentry test: intentional error from /admin/sentry-test")
 
+    @router.post("/test-email")
+    def admin_test_email(
+        request: Request,
+        _admin: tuple = Depends(require_admin),
+    ):
+        """Send a test email to the current admin user."""
+        from services import email_sender, email_templates
+        from services.auth.users import get_user_by_id
+        admin_user_id = _admin[0]
+        user = get_user_by_id(admin_user_id)
+        if not user or not user.get("email"):
+            return {"ok": False, "error": "No se encontró email del admin"}
+        to = user["email"]
+        if not email_sender.is_configured():
+            return {"ok": False, "error": "SMTP no configurado. Define SMTP_HOST, SMTP_USER, SMTP_PASSWORD en .env"}
+        html = email_templates.render_welcome_email(
+            user_name=user.get("name") or to.split("@")[0],
+            login_url=f"{request.base_url}portal/home",
+        )
+        plain = f"Correo de prueba desde ContaNeta. Si ves esto, SMTP funciona.\n\nIr al portal: {request.base_url}portal/home"
+        sent = email_sender.send_email(to=to, subject="[TEST] Correo de prueba — ContaNeta", body_plain=plain, body_html=html)
+        return {"ok": sent, "sent_to": to[:50], "smtp_host": email_sender.SMTP_HOST}
+
     return router

@@ -923,7 +923,14 @@ def health():
         "pdfplumber_available": pdfplumber_ok,
         "sat_sync_dir_exists": checks.get("sat_sync_dir_exists", False),
         "php_available": checks.get("php_available", False),
+        "smtp_configured": _smtp_configured(),
     }
+
+
+def _smtp_configured() -> bool:
+    """Check if SMTP env vars are set (no secrets exposed)."""
+    from services.email_sender import is_configured
+    return is_configured()
 
 
 @app.get("/ready")

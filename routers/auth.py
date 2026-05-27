@@ -11,7 +11,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 from config import DEV_MODE, _env_path
 from database import db, db_rows
-from services import audit, email_sender, issuers
+from services import audit, email_sender, email_templates, issuers
 from services import sanitize as sanitize_service
 from services.action_log import log_action
 from services.auth import csrf as csrf_service
@@ -355,7 +355,8 @@ def get_auth_router(templates):
             token = verification_service.create_email_verification(user["id"], expires_hours=24)
             verify_url = f"{_base_url(request)}/verify-email?token={token}"
             body = f"Hola,\n\nVerifica tu correo abriendo este enlace (válido 24 h):\n{verify_url}\n\nSi no creaste esta cuenta, ignora este mensaje."
-            email_sender.send_email(to=email, subject="Verifica tu correo — ContaNeta", body_plain=body)
+            html = email_templates.render_welcome_email(user_name=name or email.split("@")[0], login_url=verify_url)
+            email_sender.send_email(to=email, subject="Verifica tu correo — ContaNeta", body_plain=body, body_html=html)
         except Exception as e:
             logger.exception("Signup send verification email: %s", e)
         resp = RedirectResponse(url="/portal/home", status_code=302)
@@ -430,7 +431,8 @@ def get_auth_router(templates):
             token = verification_service.create_email_verification(user["id"], expires_hours=24)
             verify_url = f"{_base_url(request)}/verify-email?token={token}"
             body = f"Hola,\n\nVerifica tu correo: {verify_url}\n\nVálido 24 h."
-            email_sender.send_email(to=email, subject="Verifica tu correo — ContaNeta", body_plain=body)
+            html = email_templates.render_welcome_email(user_name=name or email.split("@")[0], login_url=verify_url)
+            email_sender.send_email(to=email, subject="Verifica tu correo — ContaNeta", body_plain=body, body_html=html)
         except Exception as e:
             logger.exception("Register send verification: %s", e)
         resp = RedirectResponse(url="/portal/home", status_code=302)
@@ -473,7 +475,8 @@ def get_auth_router(templates):
                 token = verification_service.create_password_reset(user["id"], expires_hours=2)
                 reset_url = f"{_base_url(request)}/reset-password?token={token}"
                 body = f"Hola,\n\nPara restablecer tu contraseña abre este enlace (válido 2 h):\n{reset_url}\n\nSi no solicitaste esto, ignora el correo."
-                email_sender.send_email(to=email, subject="Restablecer contraseña — ContaNeta", body_plain=body)
+                html = email_templates.render_password_reset_email(reset_url=reset_url, expiry_minutes=120)
+                email_sender.send_email(to=email, subject="Restablecer contraseña — ContaNeta", body_plain=body, body_html=html)
             except Exception as e:
                 logger.exception("Forgot send reset email: %s", e)
         return RedirectResponse(url="/forgot?sent=1", status_code=302)
