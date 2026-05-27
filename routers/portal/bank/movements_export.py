@@ -85,12 +85,13 @@ def register_bank_movements_export_routes(router, templates):
                 where_clauses.append("cfdi_match_status = ?")
                 params.append(cfdi_match_status.strip().lower())
             if search and search.strip():
-                q = f"%{search.strip()}%"
+                _s = search.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+                q = f"%{_s}%"
                 if has_column(conn, "bank_movements", "raw_description"):
-                    where_clauses.append("(descripcion LIKE ? OR contraparte_hint LIKE ? OR raw_description LIKE ?)")
+                    where_clauses.append("(descripcion LIKE ? ESCAPE '\\' OR contraparte_hint LIKE ? ESCAPE '\\' OR raw_description LIKE ? ESCAPE '\\')")
                     params.extend([q, q, q])
                 else:
-                    where_clauses.append("(descripcion LIKE ? OR contraparte_hint LIKE ?)")
+                    where_clauses.append("(descripcion LIKE ? ESCAPE '\\' OR contraparte_hint LIKE ? ESCAPE '\\')")
                     params.extend([q, q])
             where_sql = " AND ".join(where_clauses)
             rows = conn.execute(
