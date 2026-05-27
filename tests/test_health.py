@@ -34,8 +34,13 @@ def test_health_json_shape():
         "migration_version",
         "storage_exists",
         "storage_writable",
+        "disk_free_mb",
+        "disk_ok",
+        "stripe_configured",
     ):
-        assert k in j
+        assert k in j, f"Missing key: {k}"
+    assert isinstance(j["disk_ok"], bool)
+    assert j["disk_free_mb"] is None or isinstance(j["disk_free_mb"], int)
 
 
 def test_ready_json_shape():

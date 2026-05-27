@@ -78,6 +78,8 @@ echo "--- Health ---"
 check_json "/health returns status:ok" '"status":"ok"\|"status": "ok"' "$BASE_URL/health"
 check_json "/health DB readable" '"db_readable":true\|"db_readable": true' "$BASE_URL/health"
 check_json "/health migrations applied" '"migrations_applied":true\|"migrations_applied": true' "$BASE_URL/health"
+check_json "/health disk_ok" '"disk_ok":true\|"disk_ok": true' "$BASE_URL/health"
+check_json "/health storage_writable" '"storage_writable":true\|"storage_writable": true' "$BASE_URL/health"
 check "/ready returns 200" "200" "$BASE_URL/ready"
 check "/status returns 200" "200" "$BASE_URL/status"
 echo

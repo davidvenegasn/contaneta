@@ -923,7 +923,10 @@ def health():
         "pdfplumber_available": pdfplumber_ok,
         "sat_sync_dir_exists": checks.get("sat_sync_dir_exists", False),
         "php_available": checks.get("php_available", False),
+        "disk_free_mb": checks.get("disk_free_mb"),
+        "disk_ok": checks.get("disk_ok", True),
         "smtp_configured": _smtp_configured(),
+        "stripe_configured": _stripe_configured(),
     }
 
 
@@ -931,6 +934,12 @@ def _smtp_configured() -> bool:
     """Check if SMTP env vars are set (no secrets exposed)."""
     from services.email_sender import is_configured
     return is_configured()
+
+
+def _stripe_configured() -> bool:
+    """Check if Stripe env vars are set (no secrets exposed)."""
+    import os
+    return bool(os.environ.get("STRIPE_SECRET_KEY"))
 
 
 @app.get("/ready")
