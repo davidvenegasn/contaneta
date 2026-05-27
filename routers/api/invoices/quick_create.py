@@ -21,6 +21,7 @@ from services.auth import csrf as csrf_service
 from services.billing import subscription as subscription_service
 from services.http import ok
 from services.invoices import invoices_engine
+from services.invoices.preflight import validate_can_issue_invoice
 
 
 def register_invoices_quick_routes(router):
@@ -41,6 +42,11 @@ def register_invoices_quick_routes(router):
         user_id = getattr(request.state, "user_id", 0) or 0
         if not subscription_service.can_issuer_use_sync_and_timbrado(issuer.get("id"), user_id):
             raise HTTPException(status_code=402, detail="Actualiza tu plan para emitir facturas.")
+        # Pre-flight checks
+        preflight = validate_can_issue_invoice(issuer.get("id"), user_id)
+        if not preflight["ok"]:
+            first = preflight["errors"][0]
+            raise HTTPException(status_code=400, detail=f"{first['message']} {first['action']}")
         customer_id = payload.get("customer_id")
         items_in = payload.get("items")
         product_id = payload.get("product_id")
@@ -324,6 +330,12 @@ def register_invoices_quick_routes(router):
             facturapi_id=fact_id, uuid=uuid, total=total,
         )
         conn.close()
+        # Track usage for plan limits
+        try:
+            from services.billing.plan_guard import record_usage
+            record_usage(issuer_id, "invoice")
+        except Exception:
+            pass  # non-critical
 
         # ----- Guardar XML en storage + registrar en sat_cfdi para descargas /portal/sat/xml|pdf/{uuid} -----
         try:
