@@ -669,7 +669,7 @@ async def security_headers_middleware(request: Request, call_next):
     if "X-Content-Type-Options" not in response.headers:
         response.headers["X-Content-Type-Options"] = "nosniff"
     if "X-Frame-Options" not in response.headers:
-        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-Frame-Options"] = "SAMEORIGIN"
     if "Referrer-Policy" not in response.headers:
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     if IS_PROD and "Strict-Transport-Security" not in response.headers:
@@ -687,12 +687,12 @@ async def security_headers_middleware(request: Request, call_next):
             "default-src 'self'; "
             "base-uri 'self'; "
             "object-src 'none'; "
-            "frame-ancestors 'none'; "
+            "frame-ancestors 'self'; "
             "form-action 'self'; "
             "script-src 'self' 'unsafe-inline' https://js.stripe.com; "
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
             "font-src 'self' https://fonts.gstatic.com; "
-            "frame-src 'self' https://js.stripe.com https://hooks.stripe.com; "
+            "frame-src 'self' blob: https://js.stripe.com https://hooks.stripe.com; "
             "img-src 'self' data:; "
             "connect-src 'self' https://api.stripe.com;"
         )

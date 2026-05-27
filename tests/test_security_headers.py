@@ -16,7 +16,7 @@ def test_x_content_type_options():
 
 
 def test_x_frame_options():
-    assert _get_headers().get("x-frame-options") == "DENY"
+    assert _get_headers().get("x-frame-options") == "SAMEORIGIN"
 
 
 def test_referrer_policy():
@@ -32,7 +32,7 @@ def test_permissions_policy():
 def test_content_security_policy():
     csp = _get_headers().get("content-security-policy", "")
     assert "default-src 'self'" in csp
-    assert "frame-ancestors 'none'" in csp
+    assert "frame-ancestors 'self'" in csp
     assert "object-src 'none'" in csp
 
 
