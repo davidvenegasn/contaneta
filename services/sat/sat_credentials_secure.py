@@ -271,6 +271,14 @@ def extract_fiel_subject(issuer_id: int) -> dict:
                     out["rfc"] = rfc
             elif attr.oid == NameOID.COMMON_NAME:
                 out["nombre"] = (attr.value or "").strip()
+        # Certificate expiry
+        from datetime import datetime, timezone
+        try:
+            expires_utc = cert.not_valid_after_utc
+        except AttributeError:
+            expires_utc = cert.not_valid_after.replace(tzinfo=timezone.utc)
+        out["expires_at"] = expires_utc.isoformat()
+        out["days_until_expiry"] = (expires_utc - datetime.now(timezone.utc)).days
         return out
     except Exception as e:
         logger.warning("extract_fiel_subject failed for issuer %s: %s", issuer_id, e)
