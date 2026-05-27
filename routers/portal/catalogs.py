@@ -62,9 +62,10 @@ def register_catalogs_routes(router, templates):
                 try:
                     if table_exists(conn, "clients"):
                         if query:
-                            like = f"%{query}%"
+                            from services.db_utils import escape_like
+                            like = f"%{escape_like(query)}%"
                             total_row = conn.execute(
-                                "SELECT COUNT(*) AS c FROM clients WHERE issuer_id = ? AND (rfc LIKE ? OR COALESCE(name,'') LIKE ?)",
+                                "SELECT COUNT(*) AS c FROM clients WHERE issuer_id = ? AND (rfc LIKE ? ESCAPE '\\' OR COALESCE(name,'') LIKE ? ESCAPE '\\')",
                                 (issuer_id, like, like),
                             ).fetchone()
                             total = int(total_row.get("c") or total_row.get("n") or 0) if total_row else 0
@@ -73,7 +74,7 @@ def register_catalogs_routes(router, templates):
                                 """
                                 SELECT id, rfc, name, cp, regimen_fiscal, uso_cfdi_default, email, phone, last_seen_at
                                 FROM clients
-                                WHERE issuer_id = ? AND (rfc LIKE ? OR COALESCE(name,'') LIKE ?)
+                                WHERE issuer_id = ? AND (rfc LIKE ? ESCAPE '\\' OR COALESCE(name,'') LIKE ? ESCAPE '\\')
                                 ORDER BY COALESCE(last_seen_at, created_at) DESC
                                 LIMIT ? OFFSET ?
                                 """,
@@ -103,9 +104,10 @@ def register_catalogs_routes(router, templates):
                 conn = db()
                 try:
                     if query:
-                        like = f"%{query}%"
+                        from services.db_utils import escape_like
+                        like = f"%{escape_like(query)}%"
                         total_row = conn.execute(
-                            "SELECT COUNT(*) AS c FROM products WHERE issuer_id = ? AND (COALESCE(name,'') LIKE ? OR COALESCE(clave_prod_serv,'') LIKE ?)",
+                            "SELECT COUNT(*) AS c FROM products WHERE issuer_id = ? AND (COALESCE(name,'') LIKE ? ESCAPE '\\' OR COALESCE(clave_prod_serv,'') LIKE ? ESCAPE '\\')",
                             (issuer_id, like, like),
                         ).fetchone()
                         total = int(total_row.get("c") or total_row.get("n") or 0) if total_row else 0
@@ -116,7 +118,7 @@ def register_catalogs_routes(router, templates):
                                    default_unit_price, default_currency, active, updated_at
                             FROM products
                             WHERE issuer_id = ?
-                              AND (COALESCE(name,'') LIKE ? OR COALESCE(clave_prod_serv,'') LIKE ?)
+                              AND (COALESCE(name,'') LIKE ? ESCAPE '\\' OR COALESCE(clave_prod_serv,'') LIKE ? ESCAPE '\\')
                             ORDER BY active DESC, updated_at DESC
                             LIMIT ? OFFSET ?
                             """,
@@ -191,14 +193,15 @@ def register_catalogs_routes(router, templates):
                 conn = db()
                 try:
                     if query:
-                        like = f"%{query}%"
+                        from services.db_utils import escape_like
+                        like = f"%{escape_like(query)}%"
                         rows = conn.execute(
                             """
                             SELECT id, clave_prod_serv, raw_description, clave_unidad, unidad,
                                    unit_price_hint, currency, times_seen, last_seen_at
                             FROM product_observations
                             WHERE issuer_id = ?
-                              AND (COALESCE(raw_description,'') LIKE ? OR COALESCE(clave_prod_serv,'') LIKE ?)
+                              AND (COALESCE(raw_description,'') LIKE ? ESCAPE '\\' OR COALESCE(clave_prod_serv,'') LIKE ? ESCAPE '\\')
                             ORDER BY times_seen DESC, last_seen_at DESC
                             LIMIT 500
                             """,

@@ -43,13 +43,14 @@ def register_operations_routes(router):
         if len(q) < 2:
             return {"clientes": [], "proveedores": [], "productos": [], "facturas": [], "movimientos": []}
 
-        like = f"%{q}%"
+        from services.db_utils import escape_like
+        like = f"%{escape_like(q)}%"
         limit = 5
 
         # Clients
         clientes = db_rows(
             """SELECT id, rfc, legal_name, alias FROM customer_profiles
-               WHERE issuer_id = ? AND (legal_name LIKE ? OR rfc LIKE ? OR alias LIKE ?)
+               WHERE issuer_id = ? AND (legal_name LIKE ? ESCAPE '\\' OR rfc LIKE ? ESCAPE '\\' OR alias LIKE ? ESCAPE '\\')
                ORDER BY legal_name LIMIT ?""",
             (issuer_id, like, like, like, limit),
         ) or []
@@ -60,7 +61,7 @@ def register_operations_routes(router):
             """SELECT rfc_emisor AS rfc, nombre_emisor AS nombre, COUNT(*) AS facturas
                FROM sat_cfdi
                WHERE issuer_id = ? AND direction = 'received'
-                 AND (nombre_emisor LIKE ? OR rfc_emisor LIKE ?)
+                 AND (nombre_emisor LIKE ? ESCAPE '\\' OR rfc_emisor LIKE ? ESCAPE '\\')
                GROUP BY rfc_emisor
                ORDER BY facturas DESC LIMIT ?""",
             (issuer_id, like, like, limit),
@@ -70,7 +71,7 @@ def register_operations_routes(router):
         # Products
         productos = db_rows(
             """SELECT id, description, product_key, unit_price FROM issuer_products
-               WHERE issuer_id = ? AND (description LIKE ? OR product_key LIKE ?)
+               WHERE issuer_id = ? AND (description LIKE ? ESCAPE '\\' OR product_key LIKE ? ESCAPE '\\')
                ORDER BY description LIMIT ?""",
             (issuer_id, like, like, limit),
         ) or []
@@ -81,9 +82,9 @@ def register_operations_routes(router):
             """SELECT uuid, direction, fecha_emision, nombre_emisor, nombre_receptor, total, rfc_emisor, rfc_receptor
                FROM sat_cfdi
                WHERE issuer_id = ? AND (
-                 nombre_receptor LIKE ? OR nombre_emisor LIKE ?
-                 OR rfc_receptor LIKE ? OR rfc_emisor LIKE ?
-                 OR uuid LIKE ?
+                 nombre_receptor LIKE ? ESCAPE '\\' OR nombre_emisor LIKE ? ESCAPE '\\'
+                 OR rfc_receptor LIKE ? ESCAPE '\\' OR rfc_emisor LIKE ? ESCAPE '\\'
+                 OR uuid LIKE ? ESCAPE '\\'
                )
                ORDER BY fecha_emision DESC LIMIT ?""",
             (issuer_id, like, like, like, like, like, limit),
@@ -108,7 +109,7 @@ def register_operations_routes(router):
             if table_exists(db(), "bank_movements"):
                 movimientos = db_rows(
                     """SELECT id, fecha, concepto, monto, tipo FROM bank_movements
-                       WHERE issuer_id = ? AND concepto LIKE ?
+                       WHERE issuer_id = ? AND concepto LIKE ? ESCAPE '\\'
                        ORDER BY fecha DESC LIMIT ?""",
                     (issuer_id, like, limit),
                 ) or []

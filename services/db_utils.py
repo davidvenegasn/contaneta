@@ -34,6 +34,25 @@ def execute_many(conn: sqlite3.Connection, sql: str, seq_params: Iterable[Sequen
     conn.executemany(sql, seq_params)
 
 
+def escape_like(value: str) -> str:
+    """Escape LIKE metacharacters (%, _, \\\\) for safe use in SQL LIKE clauses.
+
+    The returned value should be used with ``ESCAPE '\\\\'`` in the SQL query.
+
+    Args:
+        value: Raw user input string.
+
+    Returns:
+        Escaped string safe for LIKE patterns.
+    """
+    return (
+        value
+        .replace("\\", "\\\\")
+        .replace("%", "\\%")
+        .replace("_", "\\_")
+    )
+
+
 def scalar(conn: sqlite3.Connection, sql: str, params: Sequence[Any] = ()) -> Any:
     cur = conn.execute(sql, params)
     row = cur.fetchone()

@@ -69,10 +69,11 @@ def register_invoices_received_routes(router):
 
         # Search filter
         if search:
-            search_term = f"%{search.upper()}%"
+            from services.db_utils import escape_like
+            search_term = f"%{escape_like(search.upper())}%"
             where_parts.append(
-                "(UPPER(COALESCE(uuid,'')) LIKE ? OR UPPER(COALESCE(rfc_emisor,'')) LIKE ? "
-                "OR UPPER(COALESCE(nombre_emisor,'')) LIKE ? OR UPPER(COALESCE(concepto,'')) LIKE ?)"
+                "(UPPER(COALESCE(uuid,'')) LIKE ? ESCAPE '\\' OR UPPER(COALESCE(rfc_emisor,'')) LIKE ? ESCAPE '\\' "
+                "OR UPPER(COALESCE(nombre_emisor,'')) LIKE ? ESCAPE '\\' OR UPPER(COALESCE(concepto,'')) LIKE ? ESCAPE '\\')"
             )
             params.extend([search_term, search_term, search_term, search_term])
 

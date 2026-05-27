@@ -153,9 +153,8 @@ def register_bank_movements_list_routes(router, templates):
                 where_clauses.append("confidence_score >= ?")
                 params.append(min_confidence)
             if search and search.strip():
-                # Escape LIKE metacharacters so user input is treated literally
-                _s = search.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-                q = f"%{_s}%"
+                from services.db_utils import escape_like
+                q = f"%{escape_like(search.strip())}%"
                 if has_column(conn, "bank_movements", "raw_description"):
                     where_clauses.append("(descripcion LIKE ? ESCAPE '\\' OR contraparte_hint LIKE ? ESCAPE '\\' OR raw_description LIKE ? ESCAPE '\\')")
                     params.extend([q, q, q])

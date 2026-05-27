@@ -377,14 +377,16 @@ def get_admin_router(templates):
                           END AS sat_badge
                    FROM issuers i"""
         if search:
-            like = f"%{search}%"
+            from services.db_utils import escape_like
+            _s = escape_like(search)
+            like = f"%{_s}%"
             rows = db_rows(
                 f"""{issuer_select}
-                   WHERE i.rfc LIKE ? OR i.razon_social LIKE ?
+                   WHERE i.rfc LIKE ? ESCAPE '\\' OR i.razon_social LIKE ? ESCAPE '\\'
                       OR i.id IN (
                         SELECT m.issuer_id FROM memberships m
                         JOIN users u ON u.id = m.user_id
-                        WHERE u.email LIKE ?
+                        WHERE u.email LIKE ? ESCAPE '\\'
                       )
                    ORDER BY i.id""",
                 (like, like, like),
@@ -544,8 +546,9 @@ def get_admin_router(templates):
             where.append("j.issuer_id = ?")
             params.append(int(issuer_id))
         if q and q.strip():
-            where.append("j.name LIKE ?")
-            params.append(f"%{q.strip()}%")
+            from services.db_utils import escape_like
+            where.append("j.name LIKE ? ESCAPE '\\'")
+            params.append(f"%{escape_like(q.strip())}%")
         rows = db_rows(
             f"""
             SELECT j.id, j.issuer_id, i.rfc AS issuer_rfc, i.razon_social AS issuer_name,
