@@ -10,7 +10,7 @@ from fastapi import APIRouter, Form, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from config import DEV_MODE, _env_path
-from database import db, db_rows
+from database import db, db_rows, has_column
 from services import audit, email_sender, email_templates, issuers
 from services import sanitize as sanitize_service
 from services.action_log import log_action
@@ -898,6 +898,11 @@ def get_auth_router(templates):
                 ("PENDIENTE", razon_social, None),
             )
             issuer_id = cur.lastrowid
+            if has_column(conn, "issuers", "trial_expires_at"):
+                conn.execute(
+                    "UPDATE issuers SET trial_expires_at = datetime('now', '+14 days') WHERE id = ?",
+                    (issuer_id,),
+                )
             conn.commit()
         finally:
             conn.close()
@@ -1006,6 +1011,11 @@ def get_auth_router(templates):
                     (rfc, razon_social, (regimen_fiscal or "").strip() or None),
                 )
                 issuer_id = cur.lastrowid
+                if has_column(conn, "issuers", "trial_expires_at"):
+                    conn.execute(
+                        "UPDATE issuers SET trial_expires_at = datetime('now', '+14 days') WHERE id = ?",
+                        (issuer_id,),
+                    )
                 users.add_membership(user_id, issuer_id, "owner")
             if authorize_firm == "on":
                 firm_id = users.get_firm_user_id()
