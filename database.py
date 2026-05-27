@@ -1,6 +1,7 @@
 """Conexiones y helpers para invoicing.db y catalogs.db."""
 import logging
 import os
+import random
 import sqlite3
 import time
 from contextlib import contextmanager
@@ -8,6 +9,9 @@ from contextlib import contextmanager
 from config import CATALOGS_DB, DB_PATH
 
 logger = logging.getLogger(__name__)
+
+_MAX_RETRIES = 3
+_BASE_DELAY = 0.05  # 50ms
 
 
 def _row_factory(cursor, row):
@@ -49,24 +53,50 @@ def transaction(conn: sqlite3.Connection):
         raise
 
 
+def _is_locked_error(e: Exception) -> bool:
+    """Return True if the exception is a SQLite 'database is locked' error."""
+    return isinstance(e, sqlite3.OperationalError) and "locked" in str(e).lower()
+
+
 def db_rows(sql: str, params: tuple = ()) -> list[dict]:
-    """Ejecuta SELECT y devuelve filas como list[dict]."""
-    conn = db()
-    try:
-        cur = conn.execute(sql, params)
-        return [dict(r) for r in cur.fetchall()]
-    finally:
-        conn.close()
+    """Ejecuta SELECT y devuelve filas como list[dict]. Retries on lock."""
+    last_err: Exception | None = None
+    for attempt in range(_MAX_RETRIES):
+        conn = db()
+        try:
+            cur = conn.execute(sql, params)
+            return [dict(r) for r in cur.fetchall()]
+        except sqlite3.OperationalError as e:
+            if not _is_locked_error(e) or attempt == _MAX_RETRIES - 1:
+                raise
+            last_err = e
+            delay = _BASE_DELAY * (2 ** attempt) + random.uniform(0, 0.05)
+            logger.warning("db_rows locked (attempt %d/%d), retrying in %.3fs", attempt + 1, _MAX_RETRIES, delay)
+            time.sleep(delay)
+        finally:
+            conn.close()
+    raise last_err  # type: ignore[misc]
 
 
 def db_execute(sql: str, params: tuple = ()) -> None:
-    """Ejecuta INSERT/UPDATE/DELETE y hace commit."""
-    conn = db()
-    try:
-        conn.execute(sql, params)
-        conn.commit()
-    finally:
-        conn.close()
+    """Ejecuta INSERT/UPDATE/DELETE y hace commit. Retries on lock."""
+    last_err: Exception | None = None
+    for attempt in range(_MAX_RETRIES):
+        conn = db()
+        try:
+            conn.execute(sql, params)
+            conn.commit()
+            return
+        except sqlite3.OperationalError as e:
+            if not _is_locked_error(e) or attempt == _MAX_RETRIES - 1:
+                raise
+            last_err = e
+            delay = _BASE_DELAY * (2 ** attempt) + random.uniform(0, 0.05)
+            logger.warning("db_execute locked (attempt %d/%d), retrying in %.3fs", attempt + 1, _MAX_RETRIES, delay)
+            time.sleep(delay)
+        finally:
+            conn.close()
+    raise last_err  # type: ignore[misc]
 
 
 def table_exists(conn: sqlite3.Connection, name: str) -> bool:
@@ -199,14 +229,16 @@ def search_catalog(table: str, q: str, limit: int = 20) -> list[dict]:
         cols = _table_columns(con, table)
         key_col = _pick_column(cols, ["id", "clave", "key"])
         label_col = _pick_column(cols, ["texto", "descripcion", "description", "value", "nombre"])
+        from services.db_utils import escape_like
+        _q = escape_like(q)
         rows = con.execute(
             f"""
             SELECT {key_col} AS k, {label_col} AS v
             FROM {table}
-            WHERE ({label_col} LIKE ? OR {key_col} LIKE ?)
+            WHERE ({label_col} LIKE ? ESCAPE '\\' OR {key_col} LIKE ? ESCAPE '\\')
             LIMIT ?
             """,
-            (f"%{q}%", f"%{q}%", int(limit)),
+            (f"%{_q}%", f"%{_q}%", int(limit)),
         ).fetchall()
         return [{"key": str(r["k"]), "label": str(r["v"])} for r in rows]
     finally:
