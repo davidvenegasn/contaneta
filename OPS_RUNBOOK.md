@@ -57,7 +57,7 @@ uvicorn app:app --host 0.0.0.0 --port 8000
 En producción suele usarse **gunicorn**:
 
 ```bash
-gunicorn app:app -w 4 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000
+gunicorn app:app -w 1 --threads 4 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000
 ```
 
 Si usas **systemd**, el servicio podría llamarse `conta-invoicing`; en ese caso:

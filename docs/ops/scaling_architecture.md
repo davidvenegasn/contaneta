@@ -150,7 +150,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
-CMD ["gunicorn", "app:app", "-k", "uvicorn.workers.UvicornWorker", "-w", "2", "-b", "0.0.0.0:8000"]
+CMD ["gunicorn", "app:app", "-k", "uvicorn.workers.UvicornWorker", "-w", "1", "--threads", "4", "-b", "0.0.0.0:8000"]
 ```
 
 ## Backup Strategy

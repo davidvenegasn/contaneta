@@ -65,7 +65,7 @@
 | **R2** | **Fuga de datos entre tenants** (issuer A ve XML/PDF de issuer B) | Todas las descargas ya filtran por issuer_id (invoicing.py). Revisar cualquier endpoint que devuelva sat_cfdi, customer_profiles, quotations por issuer_id de sesión. Auditoría rápida: grep “issuer_id” en SELECT de APIs. |
 | **R3** | **Sesión inválida o secret débil** (sesiones predecibles o rotas) | SESSION_SECRET obligatorio en prod (valor fijo 32+ bytes). COOKIE_SECURE=1 con HTTPS. No usar secret por defecto (secrets.token_hex en cada proceso) en producción. |
 | **R4** | **SAT sync bloquea o falla en silencio** (cron no configurado o PHP no encontrado) | Documentar en runbook: crontab con ruta absoluta a cron_sat_sync.sh; PHP en PATH o variable; log a archivo (ej. /tmp/sat_sync.log). Añadir en health (opcional) un indicador “último sync exitoso” por issuer. |
-| **R5** | **SQLite locked / timeouts bajo carga** | Usar WAL y busy_timeout (5000 ms) en todas las conexiones. Limitar workers (gunicorn -w 2 o 4). Backups con cp o sqlite3 .backup para no bloquear escrituras. Ver AUDITORIA_SQLITE_DIAGNOSTICO.md. |
+| **R5** | **SQLite locked / timeouts bajo carga** | Usar WAL y busy_timeout (5000 ms) en todas las conexiones. Limitar a 1 worker con threads (gunicorn -w 1 --threads 4). Backups con cp o sqlite3 .backup para no bloquear escrituras. Ver AUDITORIA_SQLITE_DIAGNOSTICO.md. |
 
 ---
 

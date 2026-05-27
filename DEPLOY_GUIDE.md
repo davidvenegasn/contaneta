@@ -152,7 +152,7 @@ Group=conta
 WorkingDirectory=/var/www/conta-invoicing
 Environment="PATH=/var/www/conta-invoicing/venv/bin"
 EnvironmentFile=/var/www/conta-invoicing/.env
-ExecStart=/var/www/conta-invoicing/venv/bin/gunicorn app:app -k uvicorn.workers.UvicornWorker -w 2 -b 127.0.0.1:8000
+ExecStart=/var/www/conta-invoicing/venv/bin/gunicorn app:app -k uvicorn.workers.UvicornWorker -w 1 --threads 4 -b 127.0.0.1:8000
 Restart=always
 RestartSec=5
 
@@ -161,7 +161,7 @@ WantedBy=multi-user.target
 ```
 
 - **Restart=always** y **RestartSec=5**: si el proceso cae, systemd lo reinicia a los 5 segundos.
-- **-w 2**: 2 workers; ajusta según CPUs.
+- **-w 1 --threads 4**: SQLite WAL requiere un solo writer process. Usa threads para concurrencia, no workers.
 - **-b 127.0.0.1:8000**: escucha solo en localhost; el proxy inverso (Nginx/Caddy) se conecta aquí.
 
 Si no usas gunicorn:

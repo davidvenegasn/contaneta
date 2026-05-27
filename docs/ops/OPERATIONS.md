@@ -142,7 +142,7 @@ Group=conta
 WorkingDirectory=/var/www/conta-invoicing
 Environment="PATH=/var/www/conta-invoicing/venv/bin"
 EnvironmentFile=/var/www/conta-invoicing/.env
-ExecStart=/var/www/conta-invoicing/venv/bin/gunicorn app:app -k uvicorn.workers.UvicornWorker -w 2 -b 127.0.0.1:8000
+ExecStart=/var/www/conta-invoicing/venv/bin/gunicorn app:app -k uvicorn.workers.UvicornWorker -w 1 --threads 4 -b 127.0.0.1:8000
 Restart=always
 RestartSec=5
 
@@ -174,7 +174,7 @@ uvicorn app:app --host 0.0.0.0 --port 8000
 En producción con gunicorn:
 
 ```bash
-gunicorn app:app -w 4 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000
+gunicorn app:app -w 1 --threads 4 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000
 ```
 
 **Con systemd:**

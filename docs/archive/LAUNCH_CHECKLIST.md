@@ -60,7 +60,7 @@ Seguir **QA_STEPS.md** sección "Pruebas rápidas (15 min)": registro, login, po
 ### 7. Arrancar en producción (ejemplo con gunicorn)
 ```bash
 .venv/bin/pip install gunicorn
-.venv/bin/gunicorn app:app -w 2 -k uvicorn.workers.UvicornWorker --bind 127.0.0.1:8000
+.venv/bin/gunicorn app:app -w 1 --threads 4 -k uvicorn.workers.UvicornWorker --bind 127.0.0.1:8000
 ```
 (O usar systemd/supervisor con ese comando; ver OPERATIONS.md.)
 
@@ -311,9 +311,9 @@ find "$BACKUP_DIR" -name "xml_*.tar.gz" -mtime +30 -delete
 
 **Comando sugerido:**
 ```bash
-uvicorn app:app --host 127.0.0.1 --port 8000 --workers 2
-# O con Gunicorn
-gunicorn app:app -w 2 -k uvicorn.workers.UvicornWorker --bind 127.0.0.1:8000
+uvicorn app:app --host 127.0.0.1 --port 8000 --workers 1
+# O con Gunicorn (SQLite WAL requires single writer process; use threads for concurrency)
+gunicorn app:app -w 1 --threads 4 -k uvicorn.workers.UvicornWorker --bind 127.0.0.1:8000
 ```
 
 ---
