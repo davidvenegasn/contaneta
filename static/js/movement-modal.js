@@ -222,6 +222,13 @@
             }
           }
         }
+        // Set tipo toggle from backend detection
+        if (prefillData.tipo) {
+          var tipoBtns = invModal.querySelectorAll('.mm-tipo-btn');
+          tipoBtns.forEach(function(b) { b.classList.remove('mm-tipo-btn--active'); });
+          tipoBtns.forEach(function(b) { if (b.dataset.tipo === prefillData.tipo) b.classList.add('mm-tipo-btn--active'); });
+          fiTipo.value = prefillData.tipo;
+        }
         // Auto-fetch exchange rate for the invoice month
         fetchExchangeRate();
         updateEquiv();
@@ -360,7 +367,8 @@
       if (autoSave && !d.auto_saved) {
         _failedCount++;
         window.openAddInvoiceModal(d);
-        if (window.portalToast) window.portalToast({type:'warning', title:'Completa los datos de ' + file.name, message: d.reason === 'no_amount' ? 'No se pudo detectar el monto.' : 'Revisa los datos extraídos'});
+        var warnMsg = d.reason === 'no_amount' ? 'No se pudo detectar el monto.' : d.tipo_undetected ? 'Confirma si es ingreso o gasto.' : 'Revisa los datos extraídos';
+        if (window.portalToast) window.portalToast({type:'warning', title:'Completa los datos de ' + file.name, message: warnMsg});
         _processNext();
         return;
       }
@@ -418,6 +426,14 @@
       for (var j = 0; j < el.options.length; j++) {
         if (el.options[j].value === data.pais || el.options[j].text === data.pais) { el.selectedIndex = j; break; }
       }
+    }
+    // Set tipo toggle from backend detection
+    if (data.tipo) {
+      var tipoBtns = document.querySelectorAll('#fiTipoToggle .mm-tipo-btn');
+      tipoBtns.forEach(function(b) { b.classList.remove('mm-tipo-btn--active'); });
+      tipoBtns.forEach(function(b) { if (b.dataset.tipo === data.tipo) b.classList.add('mm-tipo-btn--active'); });
+      var fiTipoEl = document.getElementById('fiTipo');
+      if (fiTipoEl) fiTipoEl.value = data.tipo;
     }
     if (window._updateInvoiceEquiv) window._updateInvoiceEquiv();
   }

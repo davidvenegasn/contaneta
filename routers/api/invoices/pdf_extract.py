@@ -71,10 +71,23 @@ def register_invoices_pdf_extract_routes(router):
                         pass
             if not text.strip():
                 raise HTTPException(status_code=400, detail="No se pudo extraer texto del PDF. Puede ser un PDF escaneado (imagen).")
-            data = _parse_invoice_text(text, tables)
+            # Build issuer context for tipo detection
+            issuer_id = int(issuer.get("id") or 0)
+            issuer_ctx: dict = {}
+            if issuer_id > 0:
+                from database import db_rows
+                iss_rows = db_rows("SELECT razon_social, rfc FROM issuers WHERE id = ? LIMIT 1", (issuer_id,))
+                issuer_ctx = dict(iss_rows[0]) if iss_rows else {}
+                uid = getattr(request.state, "user_id", None)
+                if uid:
+                    from services.auth.users import get_user_by_id
+                    u = get_user_by_id(uid)
+                    if u:
+                        issuer_ctx["nombre"] = u.get("name") or ""
+
+            data = _parse_invoice_text(text, tables, issuer_context=issuer_ctx)
 
             if auto_save:
-                issuer_id = int(issuer.get("id") or 0)
                 if issuer_id <= 0:
                     raise HTTPException(status_code=401, detail="Sesion invalida")
                 from services.invoices import foreign_invoices as fi
@@ -82,7 +95,11 @@ def register_invoices_pdf_extract_routes(router):
                 # Fill defaults for auto-save
                 from services.invoices.exchange_rates import get_rate
                 moneda = data.get("moneda") or "USD"
-                tipo = data.get("tipo") or "GASTO"
+                tipo = data.get("tipo")
+                if not tipo:
+                    # Cannot auto-save without confirmed tipo; let user choose
+                    return ok({**data, "auto_saved": False, "tipo_undetected": True, "needs_user_confirm": True})
+
                 fecha = data.get("fecha") or datetime.now().strftime("%Y-%m-%d")
                 period = fecha[:7] if len(fecha) >= 7 else datetime.now().strftime("%Y-%m")
                 tipo_cambio = get_rate(moneda, period)
