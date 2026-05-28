@@ -16,7 +16,7 @@ from services import file_access_log
 from services.action_log import log_action
 from services.bank.bank_own_accounts import reclassify_own_transfers_by_rfc
 from services.bank.bank_parse_preview import reclassify_movements
-from services.bank.bank_statement_ingest import commit_preview_to_db
+from services.bank.bank_statement_commit import commit_preview_to_db
 from services.pdf_to_excel import get_storage_root, safe_join
 
 logger = logging.getLogger(__name__)

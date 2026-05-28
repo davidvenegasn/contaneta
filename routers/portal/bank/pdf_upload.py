@@ -27,7 +27,7 @@ from services.bank.bank_accounts import list_active_accounts_raw as bank_list_ac
 from services.bank.bank_own_accounts import detect_own_account_transfer, reclassify_own_transfers_by_rfc
 from services.bank.bank_parse_preview import parse_bank_pdf_to_movements_preview
 from services.bank.bank_preview_pipeline import parse_bank_statement_preview
-from services.bank.bank_statement_ingest import extract_statement_metadata
+from services.bank.bank_ingest_helpers import extract_statement_metadata
 from services.pdf_to_excel import convert_pdf_to_xlsx, ensure_parent_dir, get_storage_root, safe_join
 from services.portal_errors import portal_error_type
 
