@@ -100,6 +100,7 @@
 .quick-invoice-modal__close { background: none; border: none; font-size: 24px; line-height: 1; cursor: pointer; color: var(--text-muted, #64748b); padding: 4px; }
 .quick-invoice-modal__close:hover { color: var(--text, #111); }
 .quick-invoice-modal__desc { margin: 0 20px 14px; font-size: var(--fs-xs); }
+.quick-invoice-modal__plan-usage { margin: 0 20px 10px; }
 .quick-invoice-modal__body { padding: 0 20px 20px; }
 .quick-invoice-modal__row { margin-bottom: 10px; }
 .quick-invoice-modal__label { font-weight: var(--fw-semibold); font-size: var(--text-2xs); color: var(--text-muted); display: block; margin-bottom: 2px; }

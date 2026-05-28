@@ -30,6 +30,7 @@
   var modalCancel = document.getElementById('quickInvoiceModalCancel');
   var modalSubmit = document.getElementById('quickInvoiceModalSubmit');
   var modalError = document.getElementById('quickInvoiceModalError');
+  var modalPlanUsage = document.getElementById('quickInvoicePlanUsage');
   var modalCustomerName = document.getElementById('quickModalCustomerName');
   var modalCustomerZip = document.getElementById('quickModalCustomerZip');
   var modalCustomerTaxSystem = document.getElementById('quickModalCustomerTaxSystem');
@@ -306,6 +307,28 @@
       selectEl.appendChild(opt);
     });
     if (selected != null) selectEl.value = String(selected);
+  }
+
+  function renderPlanUsageBadge() {
+    if (!modalPlanUsage) return;
+    var pu = state.bootstrap && state.bootstrap.plan_usage;
+    if (!pu) { modalPlanUsage.hidden = true; return; }
+    var current = Number(pu.current) || 0;
+    var limit = Number(pu.limit) || 0;
+    var allowed = pu.allowed !== false;
+    var cls = allowed ? 'badge badge--info' : 'badge badge--danger';
+    var text = limit > 0
+      ? (current + ' / ' + limit + ' facturas este mes')
+      : (current + ' facturas este mes');
+    if (!allowed) text += ' — Límite alcanzado';
+    modalPlanUsage.innerHTML = '<span class="' + cls + '">' + text + '</span>';
+    modalPlanUsage.hidden = false;
+    if (modalSubmit) {
+      if (!allowed) {
+        modalSubmit.disabled = true;
+        modalSubmit.title = 'Has alcanzado el límite de tu plan';
+      }
+    }
   }
 
   function populateCatalogSelects(cats) {
@@ -745,6 +768,7 @@
       modalError.hidden = true;
       modalError.textContent = '';
     }
+    renderPlanUsageBadge();
     updateModalTotals();
 
     openPortal(modal, {

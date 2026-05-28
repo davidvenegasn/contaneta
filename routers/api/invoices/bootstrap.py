@@ -102,9 +102,23 @@ def register_invoices_bootstrap_routes(router):
                     for r in rows_p
                 ]
             conn.close()
+            # Plan usage for badge
+            plan_usage = None
+            try:
+                from services.billing.plans import check_limit
+                usage_info = check_limit(issuer_id=issuer_id, action="invoice")
+                plan_usage = {
+                    "current": usage_info.get("usage", 0),
+                    "limit": usage_info.get("limit", 0),
+                    "plan": usage_info.get("plan", "free"),
+                    "allowed": usage_info.get("allowed", True),
+                }
+            except Exception:
+                pass
             payload = {
                 "clients": clients,
                 "products": products,
+                "plan_usage": plan_usage,
                 "catalogs": _load_bootstrap_catalogs(),
                 "defaults": {
                     "currency": "MXN",
