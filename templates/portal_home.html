@@ -47,6 +47,21 @@
     </div>
   </header>
 
+  {# ── FIEL Expiry Warning ── #}
+  {% set _fiel = fiel_data|default({}) %}
+  {% if _fiel.days_until_expiry is defined and _fiel.days_until_expiry <= 30 %}
+  <div class="card fade-in fade-in--1" style="margin-bottom:16px; padding:12px 16px; border-left:4px solid var(--danger, #ef4444); background:var(--danger-bg, #fef2f2);">
+    <p style="margin:0; font-size:14px; color:var(--danger, #ef4444); font-weight:600;">
+      {% if _fiel.days_until_expiry <= 0 %}
+        Tu FIEL está EXPIRADA hace {{ (-_fiel.days_until_expiry)|int }} días — no puedes emitir facturas.
+      {% else %}
+        Tu FIEL expira en {{ _fiel.days_until_expiry }} días — renuévala en <a href="https://sat.gob.mx" target="_blank" rel="noopener" style="color:inherit; text-decoration:underline;">sat.gob.mx</a>
+      {% endif %}
+      <a href="/portal/settings#panel-sat" style="margin-left:8px; color:inherit; text-decoration:underline;">Ver configuración</a>
+    </p>
+  </div>
+  {% endif %}
+
   {# ── Onboarding Stepper ── #}
   {% if onboarding and not onboarding.all_done %}
   <div class="onboarding-stepper fade-in fade-in--1" id="onboardingStepper" data-issuer="{{ issuer_id }}">

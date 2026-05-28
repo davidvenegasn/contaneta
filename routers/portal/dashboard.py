@@ -123,6 +123,13 @@ def register_dashboard_routes(router, templates):
             has_fiel = bool(
                 db_rows("SELECT 1 FROM sat_credentials WHERE issuer_id = ? LIMIT 1", (issuer_id,))
             )
+            fiel_data: dict = {}
+            if has_fiel:
+                try:
+                    from services.sat.sat_credentials_secure import extract_fiel_subject
+                    fiel_data = extract_fiel_subject(issuer_id)
+                except Exception:
+                    pass
             cust_count = db_rows("SELECT COUNT(*) AS n FROM customer_profiles WHERE issuer_id = ?", (issuer_id,))
             prod_count = db_rows("SELECT COUNT(*) AS n FROM issuer_products WHERE issuer_id = ?", (issuer_id,))
             any_issued = db_rows(
@@ -276,6 +283,7 @@ def register_dashboard_routes(router, templates):
                     "quick_customers_json": quick_customers_json,
                     "quick_products_json": quick_products_json,
                     "sat_sync_status": _get_sat_sync_status(issuer_id),
+                    "fiel_data": fiel_data,
                     "has_fiel_validated": has_fiel and bool(
                         db_rows(
                             "SELECT 1 FROM sat_credentials WHERE issuer_id = ? AND validation_ok = 1 LIMIT 1",

@@ -176,6 +176,23 @@
           {% endif %}
         </dd>
       </div>
+      {% set _fiel = fiel_data|default({}) %}
+      {% if _fiel.days_until_expiry is defined %}
+      <div class="datos-fiscales-row" style="display:flex; gap:8px; padding:6px 0;">
+        <dt style="font-size:13px; font-weight:500; min-width:160px; color:var(--muted, #6b7280);">Vigencia FIEL</dt>
+        <dd style="margin:0; font-size:14px;">
+          {% if _fiel.days_until_expiry > 90 %}
+            <span class="badge badge--success">Válida hasta {{ _fiel.expires_at[:10] }} ({{ _fiel.days_until_expiry }} días)</span>
+          {% elif _fiel.days_until_expiry > 30 %}
+            <span class="badge badge--warn">Expira pronto: {{ _fiel.days_until_expiry }} días — Renueva con anticipación</span>
+          {% elif _fiel.days_until_expiry > 0 %}
+            <span class="badge badge--danger">Expira en {{ _fiel.days_until_expiry }} días — Renueva YA en sat.gob.mx</span>
+          {% else %}
+            <span class="badge badge--danger">EXPIRADA hace {{ (-_fiel.days_until_expiry)|int }} días — no puedes emitir facturas</span>
+          {% endif %}
+        </dd>
+      </div>
+      {% endif %}
     </dl>
 
     <a href="/portal/config/sat" class="btn btn--primary">
