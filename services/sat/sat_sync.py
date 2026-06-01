@@ -114,11 +114,17 @@ def get_month_totals(issuer_id: int, ym: str, direction: str, metodo_pago: str =
             total_base = float(row.get("total_base") or 0)
             total_iva = float(row.get("total_iva") or 0)
             total_retenciones = float(row.get("total_retenciones") or 0) if has_retenciones else 0.0
-        return {
+        result = {
             "total_base": total_base,
             "total_iva": total_iva,
             "total_retenciones": total_retenciones,
             "total_iva_neto": max(0.0, total_iva - total_retenciones) if direction == "issued" else total_iva,
         }
+        logger.debug(
+            "KPI issuer=%s ym=%s dir=%s base=%.2f iva=%.2f ret=%.2f neto=%.2f",
+            issuer_id, ym, direction,
+            total_base, total_iva, total_retenciones, result["total_iva_neto"],
+        )
+        return result
     finally:
         conn.close()

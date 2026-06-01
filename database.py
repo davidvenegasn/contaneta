@@ -3,12 +3,24 @@ import logging
 import os
 import random
 import sqlite3
+import sys
 import time
 from contextlib import contextmanager
 
 from config import CATALOGS_DB, DB_PATH
 
 logger = logging.getLogger(__name__)
+
+# Optional SQL query logging for debugging KPI race conditions.
+# Enable with LOG_SQL=1 environment variable.
+_SQL_LOG = os.getenv("LOG_SQL", "0") == "1"
+
+
+def _log_query(sql: str, params: tuple, duration_ms: float) -> None:
+    """Log SQL query with timing to stderr when LOG_SQL=1."""
+    if _SQL_LOG:
+        sql_preview = " ".join(sql.split())[:200]
+        sys.stderr.write(f"[SQL {duration_ms:.0f}ms] {sql_preview} | params={params}\n")
 
 _MAX_RETRIES = 3
 _BASE_DELAY = 0.05  # 50ms
@@ -64,8 +76,11 @@ def db_rows(sql: str, params: tuple = ()) -> list[dict]:
     for attempt in range(_MAX_RETRIES):
         conn = db()
         try:
+            t0 = time.monotonic()
             cur = conn.execute(sql, params)
-            return [dict(r) for r in cur.fetchall()]
+            rows = [dict(r) for r in cur.fetchall()]
+            _log_query(sql, params, (time.monotonic() - t0) * 1000)
+            return rows
         except sqlite3.OperationalError as e:
             if not _is_locked_error(e) or attempt == _MAX_RETRIES - 1:
                 raise
