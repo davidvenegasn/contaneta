@@ -42,7 +42,6 @@
   function countUp(el, opts) {
     if (!el || !el.nodeType) return;
     if (el._countUpDone) return;
-    el._countUpDone = true;
     var to = parseFloat(el.getAttribute('data-count-to'));
     if (isNaN(to)) return;
     var duration = parseInt(el.getAttribute('data-count-duration'), 10) || 250;
@@ -52,9 +51,11 @@
     var prefix = el.getAttribute('data-count-prefix') || '';
     var suffix = el.getAttribute('data-count-suffix') || '';
 
-    // Always show final value immediately — never display intermediate numbers.
-    // This prevents the race condition where users see animated partial values.
+    // CRITICAL: set final value FIRST so failed animations don't leave wrong text.
+    // If rAF fails, tab backgrounds, or JS interrupts — the span already shows
+    // the correct number. Animation is decorative and optional.
     el.textContent = formatNumber(to, decimals, prefix, suffix);
+    el._countUpDone = true;
 
     if (prefersReducedMotion()) return;
 
