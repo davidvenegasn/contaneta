@@ -413,6 +413,19 @@
       html += '</div>';
     }
 
+    // Metadata-only CFDI counts (pending XML download)
+    var mc = d.metadata_counts || {};
+    var metaIssued = mc.issued_metadata_only || 0;
+    var metaReceived = mc.received_metadata_only || 0;
+    if (metaIssued > 0 || metaReceived > 0) {
+      html += '<div style="margin-top:6px;padding:8px 12px;background:#eff6ff;border:1px solid #93c5fd;border-radius:8px;font-size:13px;">';
+      html += '<div style="font-weight:500;color:#1e40af;margin-bottom:2px;">CFDIs pendientes de XML</div>';
+      if (metaIssued > 0) html += '<div style="color:#1e40af;">' + metaIssued + ' emitida(s)</div>';
+      if (metaReceived > 0) html += '<div style="color:#1e40af;">' + metaReceived + ' recibida(s)</div>';
+      html += '<div style="font-size:11px;color:#3b82f6;margin-top:2px;">Se descargarán en la próxima sincronización.</div>';
+      html += '</div>';
+    }
+
     if (!pending && !jobs.length && !ss.issued && !ss.received) {
       html = '<p class="muted" style="margin:0;">Aún no se ha sincronizado. La primera sincronización se inicia automáticamente al guardar las credenciales.</p>';
     }

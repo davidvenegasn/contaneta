@@ -386,11 +386,35 @@ def register_operations_routes(router):
         # Summary flags
         has_queued = any(j.get("status") in ("queued", "running") for j in recent_jobs)
 
+        # Metadata-only CFDI counts (shows CFDIs pending XML download)
+        metadata_counts = {}
+        try:
+            from services.sat.sat_metadata_only_repair import count_metadata_only
+            metadata_counts = count_metadata_only(issuer_id)
+        except Exception:
+            pass
+
+        # Generic job queue status (sat_full_sync uses the jobs table)
+        generic_jobs = []
+        try:
+            generic_jobs = db_rows(
+                """SELECT id, name, status, progress, created_at, updated_at
+                   FROM jobs WHERE issuer_id = ? AND name LIKE 'sat_%'
+                   ORDER BY id DESC LIMIT 5""",
+                (issuer_id,),
+            )
+            if not has_queued:
+                has_queued = any(j.get("status") in ("queued", "running") for j in generic_jobs)
+        except Exception:
+            pass
+
         return ok({
             "credentials": creds,
             "sync_state": sync_states,
             "recent_jobs": recent_jobs,
             "has_pending_jobs": has_queued,
+            "metadata_counts": metadata_counts,
+            "generic_jobs": generic_jobs,
         })
 
 

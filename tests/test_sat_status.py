@@ -332,3 +332,41 @@ def test_should_isolate_tenant_data(client):
     assert data["connected"] is False
     assert data["invoices_synced"] == 0
     assert data["sync_history"] == []
+
+
+# ─── API /api/sat/status (operations.py) ───
+
+
+def test_should_return_metadata_counts_in_api_sat_status(client):
+    """GET /api/sat/status should include metadata_counts in response."""
+    # Seed a metadata-only CFDI for ISSUER_SAT
+    conn = db()
+    try:
+        conn.execute(
+            "INSERT OR IGNORE INTO sat_cfdi "
+            "(issuer_id, direction, uuid, fecha_emision, total, xml_status, status) "
+            "VALUES (?, 'issued', 'meta-only-status-test', '2026-05-15', 0.0, NULL, '1')",
+            (ISSUER_SAT,),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    cookies = make_session_cookie(issuer_id=ISSUER_SAT, user_id=USER_SAT)
+    resp = client.get("/api/sat/status", cookies=cookies)
+    assert resp.status_code == 200
+    body = resp.json()
+    data = body["data"]
+    assert "metadata_counts" in data
+    assert data["metadata_counts"].get("issued_metadata_only", 0) >= 1
+
+
+def test_should_return_generic_jobs_in_api_sat_status(client):
+    """GET /api/sat/status should include generic_jobs from jobs table."""
+    cookies = make_session_cookie(issuer_id=ISSUER_SAT, user_id=USER_SAT)
+    resp = client.get("/api/sat/status", cookies=cookies)
+    assert resp.status_code == 200
+    body = resp.json()
+    data = body["data"]
+    assert "generic_jobs" in data
+    assert isinstance(data["generic_jobs"], list)
