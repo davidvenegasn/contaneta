@@ -596,46 +596,49 @@ def register_operations_routes(router):
         from datetime import date
         today = date.today()
 
-        # Smart range: detect first month with data
+        # Single connection for atomic snapshot — all KPI reads see same data
+        _trend_conn = db()
         try:
-            conn = db()
-            row = conn.execute(
-                "SELECT MIN(substr(fecha_emision,1,7)) AS first_ym FROM sat_cfdi WHERE issuer_id = ? AND fecha_emision IS NOT NULL",
-                (issuer_id,),
-            ).fetchone()
-            conn.close()
-            first_ym = (row["first_ym"] or "") if row else ""
-        except Exception:
-            first_ym = ""
-
-        if first_ym and len(first_ym) == 7:
+            # Smart range: detect first month with data
             try:
-                fy, fm = int(first_ym[:4]), int(first_ym[5:7])
-                months_with_data = (today.year - fy) * 12 + (today.month - fm) + 1
-                months = min(months, max(1, months_with_data))
-            except (ValueError, TypeError):
-                pass
+                row = _trend_conn.execute(
+                    "SELECT MIN(substr(fecha_emision,1,7)) AS first_ym FROM sat_cfdi WHERE issuer_id = ? AND fecha_emision IS NOT NULL",
+                    (issuer_id,),
+                ).fetchone()
+                first_ym = (row["first_ym"] or "") if row else ""
+            except Exception:
+                first_ym = ""
 
-        result = []
-        y, m = today.year, today.month
-        # Build list of last N months (inclusive of current)
-        ym_list = []
-        for _ in range(months):
-            ym_list.append(f"{y:04d}-{m:02d}")
-            m -= 1
-            if m <= 0:
-                m = 12
-                y -= 1
-        ym_list.reverse()
-        for ym in ym_list:
-            tot_issued = _get_month_totals_safe(issuer_id, ym, "issued")
-            tot_received = _get_month_totals_safe(issuer_id, ym, "received")
-            result.append({
-                "ym": ym,
-                "ingresos": tot_issued.get("total_base", 0),
-                "gastos": tot_received.get("total_base", 0),
-                "iva_cobrado": tot_issued.get("total_iva_neto", 0),
-                "iva_pagado": tot_received.get("total_iva", 0),
-            })
+            if first_ym and len(first_ym) == 7:
+                try:
+                    fy, fm = int(first_ym[:4]), int(first_ym[5:7])
+                    months_with_data = (today.year - fy) * 12 + (today.month - fm) + 1
+                    months = min(months, max(1, months_with_data))
+                except (ValueError, TypeError):
+                    pass
+
+            result = []
+            y, m = today.year, today.month
+            # Build list of last N months (inclusive of current)
+            ym_list = []
+            for _ in range(months):
+                ym_list.append(f"{y:04d}-{m:02d}")
+                m -= 1
+                if m <= 0:
+                    m = 12
+                    y -= 1
+            ym_list.reverse()
+            for ym in ym_list:
+                tot_issued = _get_month_totals_safe(issuer_id, ym, "issued", conn=_trend_conn)
+                tot_received = _get_month_totals_safe(issuer_id, ym, "received", conn=_trend_conn)
+                result.append({
+                    "ym": ym,
+                    "ingresos": tot_issued.get("total_base", 0),
+                    "gastos": tot_received.get("total_base", 0),
+                    "iva_cobrado": tot_issued.get("total_iva_neto", 0),
+                    "iva_pagado": tot_received.get("total_iva", 0),
+                })
+        finally:
+            _trend_conn.close()
         return ok(result)
 

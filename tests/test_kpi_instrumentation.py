@@ -101,3 +101,34 @@ def test_should_render_same_kpis_on_double_request():
     r2 = client.get("/portal/home")
     # Both should succeed (or both redirect to login)
     assert r1.status_code == r2.status_code
+
+
+def test_should_pass_shared_conn_through_safe_wrapper():
+    """_get_month_totals_safe with shared conn should not close it."""
+    from database import db as get_db
+    from routers.api._helpers import _get_month_totals_safe
+    conn = get_db()
+    try:
+        r1 = _get_month_totals_safe(99999, "2026-06", "issued", conn=conn)
+        r2 = _get_month_totals_safe(99999, "2026-06", "received", conn=conn)
+        # Connection still usable
+        conn.execute("SELECT 1")
+        assert isinstance(r1, dict)
+        assert isinstance(r2, dict)
+        assert "total_base" in r1
+    finally:
+        conn.close()
+
+
+def test_should_return_consistent_trend_on_double_request():
+    """Two calls to /api/metrics/trend should return identical data."""
+    from fastapi.testclient import TestClient
+    from app import app
+    from tests.helpers import make_session_cookie
+    cookies = make_session_cookie(issuer_id=99999, user_id=99999)
+    client = TestClient(app, raise_server_exceptions=False, cookies=cookies)
+    r1 = client.get("/api/metrics/trend?months=3")
+    r2 = client.get("/api/metrics/trend?months=3")
+    assert r1.status_code == r2.status_code
+    if r1.status_code == 200:
+        assert r1.json() == r2.json()

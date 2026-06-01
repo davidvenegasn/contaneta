@@ -183,9 +183,13 @@ def _load_bootstrap_catalogs() -> dict:
     return catalogs
 
 
-def _get_month_totals_safe(issuer_id, ym, direction):
-    """Wrapper that never raises — returns zeros on error."""
+def _get_month_totals_safe(issuer_id, ym, direction, *, conn=None):
+    """Wrapper that never raises — returns zeros on error.
+
+    Args:
+        conn: Optional shared DB connection for atomic multi-call snapshots.
+    """
     try:
-        return _get_month_totals_raw(issuer_id, ym, direction)
+        return _get_month_totals_raw(issuer_id, ym, direction, conn=conn)
     except Exception:
         return {"total_base": 0, "total_iva": 0, "total_retenciones": 0, "total_iva_neto": 0}
