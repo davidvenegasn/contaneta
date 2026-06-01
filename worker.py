@@ -39,12 +39,14 @@ def _load_handlers() -> dict[str, JobHandler]:
         handle_sat_verify_pending,
         handle_sat_xml_backfill,
     )
+    from services.sat.sat_full_sync import handle_sat_full_sync
     return {
         "sat_sync_month": handle_sat_sync_month,
         "sat_refresh_light": handle_sat_refresh_light,
         "sat_verify_credentials": handle_sat_verify_credentials,
         "sat_xml_backfill": handle_sat_xml_backfill,
         "sat_verify_pending": handle_sat_verify_pending,
+        "sat_full_sync": handle_sat_full_sync,
     }
 
 
