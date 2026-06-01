@@ -1,0 +1,17 @@
+{# Sync progress banner — shows when SAT sync jobs are active.
+   Included in portal_home.html. JS polls /api/sync/progress. #}
+<div id="syncProgressBanner" class="card fade-in fade-in--1" hidden
+     style="margin-bottom:16px; padding:12px 16px; border-left:4px solid var(--primary, #2563eb); background:var(--primary-bg, #eff6ff);">
+  <div style="display:flex; align-items:center; gap:10px;">
+    <span class="spinner spinner--sm" id="syncSpinner" aria-hidden="true"></span>
+    <div style="flex:1;">
+      <p style="margin:0; font-size:14px; font-weight:500; color:var(--primary, #2563eb);" id="syncBannerText">
+        Sincronizando facturas del SAT…
+      </p>
+      <p style="margin:2px 0 0; font-size:12px; color:var(--muted);" id="syncBannerDetail"></p>
+    </div>
+    <button type="button" class="icon-btn" id="syncBannerDismiss" aria-label="Ocultar" style="color:var(--muted);">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M18 6 6 18M6 6l12 12"/></svg>
+    </button>
+  </div>
+</div>

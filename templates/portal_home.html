@@ -120,6 +120,11 @@
   })();
   </script>
 
+  {# ── Sync Progress Banner ── #}
+  {% if has_fiel_validated %}
+  {% include "partials/sync_progress_banner.html" %}
+  {% endif %}
+
   {% set _has_data = (ingresos_sin_iva|default(0)|float + gastos_sin_iva|default(0)|float + count_issued|default(0) + count_received|default(0)) != 0 %}
   {% set _fiel_ok = onboarding.get('fiel_validated', false) if onboarding else false %}
   {% if not _has_data and not _fiel_ok and not (onboarding.get('has_any_issued') if onboarding else false) %}
@@ -1219,5 +1224,8 @@
   })();
   </script>
 
+  {% if has_fiel_validated %}
+  <script src="/static/js/sync_progress.js"></script>
+  {% endif %}
 </div>
 {% endblock %}

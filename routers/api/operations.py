@@ -418,6 +418,44 @@ def register_operations_routes(router):
         })
 
 
+    # ── Sync Progress (lightweight banner endpoint) ─────────────────
+
+    @router.get("/sync/progress")
+    def api_sync_progress(issuer: dict = Depends(get_portal_issuer)):
+        """Lightweight sync progress for dashboard banner polling."""
+        issuer_id = int(issuer.get("id") or 0)
+        if issuer_id <= 0:
+            raise HTTPException(status_code=401, detail="Sesión inválida")
+        # Count sat_jobs by status
+        sat_counts = {"queued": 0, "running": 0, "ok": 0, "error": 0}
+        try:
+            for row in db_rows(
+                "SELECT status, COUNT(*) AS n FROM sat_jobs WHERE issuer_id = ? GROUP BY status",
+                (issuer_id,),
+            ):
+                sat_counts[row["status"]] = row["n"]
+        except Exception:
+            pass
+        # Count generic jobs (sat_full_sync etc)
+        gen_counts = {"queued": 0, "running": 0, "success": 0, "failed": 0}
+        try:
+            for row in db_rows(
+                "SELECT status, COUNT(*) AS n FROM jobs WHERE issuer_id = ? AND name LIKE 'sat_%' GROUP BY status",
+                (issuer_id,),
+            ):
+                gen_counts[row["status"]] = row["n"]
+        except Exception:
+            pass
+        active = sat_counts["queued"] + sat_counts["running"] + gen_counts["queued"] + gen_counts["running"]
+        done = sat_counts["ok"] + gen_counts["success"]
+        total = active + done + sat_counts["error"] + gen_counts["failed"]
+        return ok({
+            "syncing": active > 0,
+            "active": active,
+            "done": done,
+            "total": total,
+        })
+
     # ── Manual Movements ─────────────────────────────────────────────
 
     @router.post("/movements/manual")
