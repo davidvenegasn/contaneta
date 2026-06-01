@@ -24,7 +24,16 @@ from services.dashboard import get_monthly_trend  # noqa: E402
 from services.sat.sat_sync import get_month_totals  # noqa: E402
 
 ISSUER_ID = 8888
-YM = "2026-03"
+
+
+def _ym_today() -> str:
+    """Return current year-month string, always within get_monthly_trend window."""
+    from datetime import date
+    t = date.today()
+    return f"{t.year:04d}-{t.month:02d}"
+
+
+YM = _ym_today()
 
 
 @pytest.fixture(autouse=True)

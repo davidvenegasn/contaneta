@@ -25,7 +25,15 @@ from tests.helpers import make_session_cookie
 
 ISSUER_ID = 8870
 USER_ID = 8870
-YM = "2026-03"
+
+
+def _ym_today() -> str:
+    from datetime import date
+    t = date.today()
+    return f"{t.year:04d}-{t.month:02d}"
+
+
+YM = _ym_today()
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -49,6 +57,8 @@ def seed():
             "VALUES (?, ?, 'owner', datetime('now'))",
             (USER_ID, ISSUER_ID),
         )
+        # Clean stale test data (dates may have changed)
+        conn.execute("DELETE FROM sat_cfdi WHERE issuer_id = ?", (ISSUER_ID,))
         # CFDI 1: parsed XML, total=0 — should SHOW
         conn.execute(
             "INSERT OR IGNORE INTO sat_cfdi "

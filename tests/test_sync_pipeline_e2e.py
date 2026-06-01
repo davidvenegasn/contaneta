@@ -31,7 +31,15 @@ from tests.helpers import make_session_cookie
 
 ISSUER_ID = 9800
 USER_ID = 9800
-YM = "2026-04"
+
+
+def _ym_today() -> str:
+    from datetime import date
+    t = date.today()
+    return f"{t.year:04d}-{t.month:02d}"
+
+
+YM = _ym_today()
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -72,6 +80,8 @@ def seed():
             "VALUES (?, 'issued', '2026-01-01', '2026-04-30', datetime('now'))",
             (ISSUER_ID,),
         )
+        # Clean stale test data (dates may have changed)
+        conn.execute("DELETE FROM sat_cfdi WHERE issuer_id = ?", (ISSUER_ID,))
 
         # Simulate post-metadata-sync state: mix of parsed and metadata-only
         # Parsed (total from XML) — should always show
