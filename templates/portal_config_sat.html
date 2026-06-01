@@ -111,7 +111,10 @@
       <div id="satSyncContent">
         <p class="muted" style="margin:0;">Cargando estado…</p>
       </div>
-      <button type="button" class="btn btn--sm btn--primary" id="satManualSyncBtn" style="margin-top:10px;">Sincronizar ahora</button>
+      <div style="display:flex;gap:8px;margin-top:10px;">
+        <button type="button" class="btn btn--sm btn--primary" id="satManualSyncBtn">Sincronizar ahora</button>
+        <button type="button" class="btn btn--sm btn--ghost" id="satFullResyncBtn">Resync completo</button>
+      </div>
       <p class="muted" style="font-size:11px;margin-top:4px;">Puede tardar unos minutos. Se ejecuta en segundo plano.</p>
     </div>
     {% endif %}
@@ -136,6 +139,23 @@
     <div class="modal__foot">
       <button type="button" class="btn btn--ghost" data-close="true">Cancelar</button>
       <button type="button" class="btn btn-primary" id="fielReplaceConfirm">Continuar</button>
+    </div>
+  </div>
+</div>
+
+<div id="fullResyncModal" class="modal" hidden aria-hidden="true" role="dialog">
+  <div class="modal__backdrop" data-close="true"></div>
+  <div class="modal__panel">
+    <div class="modal__head">
+      <h2 class="modal__title">Resincronización completa</h2>
+      <button type="button" class="icon-btn" data-close="true" aria-label="Cerrar"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+    </div>
+    <div class="modal__body">
+      <p class="muted">Se descargarán todas las facturas emitidas y recibidas del último año. Esto puede tardar varios minutos y se ejecuta en segundo plano.</p>
+    </div>
+    <div class="modal__foot">
+      <button type="button" class="btn btn--ghost" data-close="true">Cancelar</button>
+      <button type="button" class="btn btn-primary" id="fullResyncConfirm">Iniciar resync</button>
     </div>
   </div>
 </div>
@@ -458,6 +478,48 @@
   }
 
   poll();
+
+  // Full resync button + modal
+  var fullResyncBtn = document.getElementById('satFullResyncBtn');
+  var fullResyncModal = document.getElementById('fullResyncModal');
+  var fullResyncConfirm = document.getElementById('fullResyncConfirm');
+  if (fullResyncBtn && fullResyncModal) {
+    fullResyncBtn.addEventListener('click', function() {
+      fullResyncModal.hidden = false;
+      fullResyncModal.setAttribute('aria-hidden', 'false');
+    });
+    fullResyncModal.querySelectorAll('[data-close="true"]').forEach(function(el) {
+      el.addEventListener('click', function() {
+        fullResyncModal.hidden = true;
+        fullResyncModal.setAttribute('aria-hidden', 'true');
+      });
+    });
+    if (fullResyncConfirm) {
+      fullResyncConfirm.addEventListener('click', function() {
+        fullResyncModal.hidden = true;
+        fullResyncModal.setAttribute('aria-hidden', 'true');
+        fullResyncBtn.disabled = true;
+        fullResyncBtn.textContent = 'Resincronizando…';
+        var fetchFn = window.portalFetchJSON || function(url, opts) {
+          return fetch(url, Object.assign({ credentials: 'same-origin' }, opts)).then(function(r) { return r.json().then(function(d) { return { data: d }; }); });
+        };
+        fetchFn('/portal/sat/full-resync', { method: 'POST', headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' } })
+          .then(function(r) {
+            var d = r.data || r;
+            if (d.ok) {
+              pollStart = Date.now();
+              if (timer) clearTimeout(timer);
+              poll();
+            }
+            setTimeout(function() { fullResyncBtn.disabled = false; fullResyncBtn.textContent = 'Resync completo'; }, 60000);
+          })
+          .catch(function() {
+            fullResyncBtn.disabled = false;
+            fullResyncBtn.textContent = 'Resync completo';
+          });
+      });
+    }
+  }
 
   // Manual sync button
   var syncBtn = document.getElementById('satManualSyncBtn');

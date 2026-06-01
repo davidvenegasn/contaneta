@@ -370,3 +370,26 @@ def test_should_return_generic_jobs_in_api_sat_status(client):
     data = body["data"]
     assert "generic_jobs" in data
     assert isinstance(data["generic_jobs"], list)
+
+
+# ─── Full resync endpoint ───
+
+
+def test_should_enqueue_full_resync_when_fiel_valid(client):
+    """POST /portal/sat/full-resync should enqueue jobs for both directions."""
+    cookies = make_session_cookie(issuer_id=ISSUER_SAT, user_id=USER_SAT)
+    resp = client.post("/portal/sat/full-resync", cookies=cookies,
+                       headers={"Accept": "application/json"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["ok"] is True
+    assert "job_ids" in body
+    assert len(body["job_ids"]) == 2
+
+
+def test_should_reject_full_resync_without_valid_fiel(client):
+    """POST /portal/sat/full-resync should fail if FIEL is not validated."""
+    cookies = make_session_cookie(issuer_id=ISSUER_NO_SAT, user_id=USER_NO_SAT)
+    resp = client.post("/portal/sat/full-resync", cookies=cookies,
+                       headers={"Accept": "application/json"})
+    assert resp.status_code == 400

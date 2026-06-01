@@ -316,6 +316,42 @@ def register_sat_config_routes(router, templates):
             return JSONResponse({"ok": True, "message": msg, "validation_ok": valid_ok, "validation_message": valid_message})
         return RedirectResponse(url="/portal/config/sat?saved=1", status_code=302)
 
+    @router.post("/sat/full-resync", response_class=JSONResponse)
+    def portal_sat_full_resync(request: Request, issuer: dict = Depends(get_portal_issuer)):
+        """Enqueue a full historical resync (issued + received) via the atomic pipeline."""
+        if rate_limit_service.is_rate_limited(request, "sat_sync"):
+            return JSONResponse({"ok": False, "message": "Demasiados intentos. Espera un minuto."}, status_code=429)
+        issuer_id = issuer["id"]
+        user_id = getattr(request.state, "user_id", 0) or 0
+        if not subscription_service.can_issuer_use_sync_and_timbrado(issuer_id, user_id):
+            return JSONResponse(
+                {"ok": False, "message": "Tu periodo de prueba ha terminado. Actualiza tu plan."},
+                status_code=402,
+            )
+        conn = db()
+        try:
+            _ensure_sat_credentials_validation_columns(conn)
+            cred = conn.execute(
+                "SELECT validation_ok FROM sat_credentials WHERE issuer_id = ?",
+                (issuer_id,),
+            ).fetchone()
+            if not cred or cred["validation_ok"] != 1:
+                return JSONResponse({"ok": False, "message": "Valida tu FIEL antes de resincronizar."}, status_code=400)
+        finally:
+            conn.close()
+        from services.sat.sat_full_sync import enqueue_sat_full_sync
+        job_ids = []
+        for direction in ("issued", "received"):
+            jid = enqueue_sat_full_sync(issuer_id, direction=direction, backfill_days=365)
+            if jid:
+                job_ids.append(jid)
+        audit.log(
+            action="sat_full_resync", user_id=user_id, issuer_id=issuer_id,
+            request=request, entity="jobs", entity_id=str(job_ids),
+        )
+        log_action(request, "sat_full_resync", user_id=user_id, issuer_id=issuer_id)
+        return JSONResponse({"ok": True, "message": "Resincronización completa iniciada. Puede tardar varios minutos.", "job_ids": job_ids})
+
     @router.post("/config/sat/validate", response_class=JSONResponse)
     def portal_config_sat_validate(request: Request, issuer: dict = Depends(get_portal_issuer)):
         if rate_limit_service.is_rate_limited(request, "validate"):
