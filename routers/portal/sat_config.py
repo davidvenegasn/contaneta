@@ -401,14 +401,16 @@ def register_sat_config_routes(router, templates):
         start = date.fromisoformat(start_date)
         today = date.today()
         job_ids = []
+        priority = 10  # Recent months get higher priority
         cursor = date(today.year, today.month, 1)
         while cursor >= start:
             for direction in ("issued", "received"):
                 days_back = (today - cursor).days + 30
-                jid = enqueue_sat_full_sync(issuer_id, direction=direction, backfill_days=days_back)
+                jid = enqueue_sat_full_sync(issuer_id, direction=direction, backfill_days=days_back, priority=priority)
                 if jid:
                     job_ids.append(jid)
             cursor = cursor - relativedelta(months=1)
+            priority = max(0, priority - 1)
         audit.log(action="sat_history_sync", user_id=user_id, issuer_id=issuer_id,
                   request=request, entity="jobs", entity_id=str(job_ids),
                   details=f"option={history_option}")

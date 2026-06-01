@@ -562,6 +562,8 @@ def apply_migrations(
                         _safe_add_column(conn, "users", "password_changed_at", "TEXT")
                     elif version == "049":
                         _safe_add_column(conn, "users", "session_nonce", "TEXT")
+                    elif version == "054":
+                        _safe_add_column(conn, "jobs", "priority", "INTEGER NOT NULL DEFAULT 0")
                     else:
                         with open(filepath, "r", encoding="utf-8") as f:
                             sql = f.read()

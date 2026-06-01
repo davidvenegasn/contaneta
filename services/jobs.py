@@ -54,6 +54,7 @@ def enqueue_job(
     *,
     run_after: str | None = None,
     max_attempts: int = 3,
+    priority: int = 0,
 ) -> int:
     """
     Encola un job con dedupe:
@@ -71,6 +72,7 @@ def enqueue_job(
         max_attempts = 1
     if max_attempts > 20:
         max_attempts = 20
+    priority = int(priority or 0)
 
     conn = db()
     try:
@@ -99,6 +101,7 @@ def enqueue_job(
                     issuer_id, name, status, progress, message,
                     payload_json, payload_hash,
                     attempts, max_attempts, run_after,
+                    priority,
                     locked_by, locked_at,
                     result_json, error_json,
                     created_at, updated_at
@@ -107,12 +110,13 @@ def enqueue_job(
                     ?, ?, 'queued', 0, NULL,
                     ?, ?,
                     0, ?, COALESCE(?, datetime('now')),
+                    ?,
                     NULL, NULL,
                     NULL, NULL,
                     datetime('now'), datetime('now')
                 )
                 """,
-                (issuer_id, name, payload_json, p_hash, max_attempts, ra),
+                (issuer_id, name, payload_json, p_hash, max_attempts, ra, priority),
             )
             conn.commit()
             return int(cur.lastrowid)
@@ -178,7 +182,7 @@ def claim_next_job(worker_id: str, *, lease_seconds: int = 900) -> dict | None:
             FROM jobs
             WHERE status = 'queued'
               AND (run_after IS NULL OR datetime(run_after) <= datetime('now'))
-            ORDER BY datetime(created_at) ASC, id ASC
+            ORDER BY COALESCE(priority, 0) DESC, datetime(created_at) ASC, id ASC
             LIMIT 1
             """,
         )

@@ -107,8 +107,13 @@ def enqueue_sat_full_sync(
     issuer_id: int,
     direction: str = "issued",
     backfill_days: int = 180,
+    priority: int = 0,
 ) -> int | None:
-    """Enqueue a sat_full_sync job via the generic job queue."""
+    """Enqueue a sat_full_sync job via the generic job queue.
+
+    Args:
+        priority: Higher values are picked first by the worker (0 = normal).
+    """
     from services.jobs import enqueue_job
     return enqueue_job(
         "sat_full_sync",
@@ -119,4 +124,5 @@ def enqueue_sat_full_sync(
             "backfill_days": backfill_days,
         },
         max_attempts=2,
+        priority=priority,
     )
