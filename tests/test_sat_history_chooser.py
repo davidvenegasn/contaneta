@@ -140,3 +140,36 @@ def test_should_calculate_correct_start_date_for_history_sync(client):
     assert "start_date" in body
     assert body["start_date"].startswith("20")
     assert len(body["job_ids"]) >= 2
+
+
+def test_should_allow_full_5_years_for_pro_plan(client):
+    """POST start-history-sync with full_5_years on pro plan returns 200."""
+    with patch("services.billing.plans.get_issuer_plan", return_value="pro"), \
+         patch("services.sat.sat_full_sync.enqueue_sat_full_sync", return_value=99):
+        resp = client.post(
+            "/portal/config/sat/start-history-sync",
+            json={"history_option": "full_5_years"},
+            headers={"Accept": "application/json"},
+        )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["ok"] is True
+    assert len(body["job_ids"]) >= 2
+
+
+def test_should_render_expand_button_on_config_page(client):
+    """GET /portal/config/sat should include the expand history button."""
+    resp = client.get("/portal/config/sat")
+    assert resp.status_code == 200
+    assert b"satExpandHistoryBtn" in resp.content
+    assert b"Ampliar historial" in resp.content
+
+
+def test_should_reject_invalid_history_option(client):
+    """POST start-history-sync with invalid option returns 400."""
+    resp = client.post(
+        "/portal/config/sat/start-history-sync",
+        json={"history_option": "invalid_option"},
+        headers={"Accept": "application/json"},
+    )
+    assert resp.status_code == 400

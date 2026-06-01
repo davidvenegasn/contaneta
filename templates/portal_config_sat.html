@@ -111,8 +111,9 @@
       <div id="satSyncContent">
         <p class="muted" style="margin:0;">Cargando estado…</p>
       </div>
-      <div style="display:flex;gap:8px;margin-top:10px;">
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
         <button type="button" class="btn btn--sm btn--primary" id="satManualSyncBtn">Sincronizar ahora</button>
+        <button type="button" class="btn btn--sm btn--ghost" id="satExpandHistoryBtn">Ampliar historial</button>
         <button type="button" class="btn btn--sm btn--ghost" id="satFullResyncBtn">Resync completo</button>
       </div>
       <p class="muted" style="font-size:11px;margin-top:4px;">Puede tardar unos minutos. Se ejecuta en segundo plano.</p>
@@ -594,6 +595,36 @@
 (function(){
   var modal = document.getElementById('historyChooserModal');
   if (!modal) return;
+
+  // Plan-based unlock of 5-year option
+  var issuerPlan = '{{ issuer_plan|default("free") }}';
+  if (issuerPlan === 'pro') {
+    var proLabel = document.getElementById('historyPro');
+    var proInput = document.getElementById('historyProInput');
+    var proBadge = document.getElementById('historyProBadge');
+    var proNote = document.getElementById('historyProNote');
+    if (proLabel) proLabel.classList.remove('radio-card--disabled');
+    if (proLabel) proLabel.style.opacity = '';
+    if (proInput) proInput.disabled = false;
+    if (proBadge) proBadge.style.display = 'none';
+    if (proNote) proNote.innerHTML = 'Descarga completa &middot; ~2 horas';
+  }
+
+  // "Ampliar historial" button opens the modal
+  var expandBtn = document.getElementById('satExpandHistoryBtn');
+  if (expandBtn) {
+    expandBtn.addEventListener('click', function() {
+      // Hide cert preview (not relevant for expand)
+      var preview = document.getElementById('certPreview');
+      if (preview) preview.hidden = true;
+      // Pre-select smart default
+      var radio = modal.querySelector('input[value="current_year"]');
+      if (radio) radio.checked = true;
+      modal.hidden = false;
+      modal.setAttribute('aria-hidden', 'false');
+    });
+  }
+
   modal.querySelectorAll('[data-close="true"]').forEach(function(el) {
     el.addEventListener('click', function() {
       modal.hidden = true;

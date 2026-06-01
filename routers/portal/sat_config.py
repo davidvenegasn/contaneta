@@ -204,6 +204,12 @@ def register_sat_config_routes(router, templates):
             conn.close()
         cred = dict(row) if row else None
         from datetime import date as _date
+        issuer_plan = "free"
+        try:
+            from services.billing.plans import get_issuer_plan
+            issuer_plan = get_issuer_plan(issuer_id)
+        except Exception:
+            pass
         return _render_portal(
             request,
             issuer=issuer,
@@ -217,6 +223,7 @@ def register_sat_config_routes(router, templates):
                 "validation_ok": cred.get("validation_ok") if cred else None,
                 "validation_message": cred.get("validation_message") if cred else None,
                 "current_year": _date.today().year,
+                "issuer_plan": issuer_plan,
             },
         )
 
