@@ -120,6 +120,12 @@ def _run_fiel_validation(issuer_id: int) -> tuple:
                         )
     finally:
         conn.close()
+    if ok:
+        try:
+            from services.sat.auto_update_issuer_from_fiel import maybe_update_issuer_from_fiel
+            maybe_update_issuer_from_fiel(issuer_id)
+        except Exception:
+            logger.exception("Failed auto-update from FIEL for issuer %s", issuer_id)
     return ok, message
 
 
