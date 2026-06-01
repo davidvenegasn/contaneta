@@ -70,7 +70,7 @@ def register_month_close_routes(router, templates):
             f"""
             SELECT COUNT(*) AS n FROM sat_cfdi
             WHERE issuer_id = ? AND direction = 'issued' AND fecha_emision IS NOT NULL
-              AND {_ym_filt} AND (total IS NULL OR total >= 0.01)
+              AND {_ym_filt} AND (xml_status = 'parsed' OR total IS NULL OR total >= 0.01)
             """,
             (issuer_id, ym_val),
         )

@@ -43,7 +43,7 @@ def register_invoices_issued_routes(router):
             "direction = 'issued'",
             "fecha_emision IS NOT NULL",
             _ym_filt,
-            "(total IS NULL OR total >= 0.01)",
+            "(xml_status = 'parsed' OR total IS NULL OR total >= 0.01)",
         ]
         params = [issuer_id, ym]
 
@@ -57,7 +57,7 @@ def register_invoices_issued_routes(router):
                     ) AS rn
                     FROM sat_cfdi
                     WHERE issuer_id = ? AND direction = 'issued' AND fecha_emision IS NOT NULL
-                      AND {_ym_filt} AND (total IS NULL OR total >= 0.01)
+                      AND {_ym_filt} AND (xml_status = 'parsed' OR total IS NULL OR total >= 0.01)
                 ) WHERE rn = 1
             )
         """
@@ -116,7 +116,7 @@ def register_invoices_issued_routes(router):
                 f"""
                 SELECT uuid, fecha_emision, rfc_receptor, nombre_receptor, concepto, total, moneda,
                        COALESCE(impuestos, 0) AS impuestos, COALESCE(retenciones, 0) AS retenciones,
-                       metodo_pago, status, xml_path
+                       metodo_pago, status, xml_path, xml_status
                 FROM sat_cfdi
                 WHERE {where_clause}
                 ORDER BY fecha_emision DESC

@@ -66,7 +66,7 @@ def register_dashboard_routes(router, templates):
                 f"""
                 SELECT COUNT(*) AS n FROM sat_cfdi
                 WHERE issuer_id = ? AND direction = 'issued' AND fecha_emision IS NOT NULL
-                  AND {_ym_filt} AND (total IS NULL OR total >= 0.01)
+                  AND {_ym_filt} AND (xml_status = 'parsed' OR total IS NULL OR total >= 0.01)
                 """,
                 (issuer_id, ym),
             )
@@ -91,7 +91,7 @@ def register_dashboard_routes(router, templates):
                 SELECT direction, fecha_emision, nombre, total, uuid FROM (
                   SELECT direction, fecha_emision, nombre_receptor AS nombre, total, uuid FROM sat_cfdi
                   WHERE issuer_id = ? AND direction = 'issued' AND fecha_emision IS NOT NULL
-                    AND (total IS NULL OR total >= 0.01)
+                    AND (xml_status = 'parsed' OR total IS NULL OR total >= 0.01)
                   UNION ALL
                   SELECT direction, fecha_emision, nombre_emisor AS nombre, total, uuid FROM sat_cfdi
                   WHERE issuer_id = ? AND direction = 'received' AND fecha_emision IS NOT NULL
@@ -133,7 +133,7 @@ def register_dashboard_routes(router, templates):
             cust_count = db_rows("SELECT COUNT(*) AS n FROM customer_profiles WHERE issuer_id = ?", (issuer_id,))
             prod_count = db_rows("SELECT COUNT(*) AS n FROM issuer_products WHERE issuer_id = ?", (issuer_id,))
             any_issued = db_rows(
-                "SELECT 1 FROM sat_cfdi WHERE issuer_id = ? AND direction = 'issued' AND (total IS NULL OR total >= 0.01) LIMIT 1",
+                "SELECT 1 FROM sat_cfdi WHERE issuer_id = ? AND direction = 'issued' AND (xml_status = 'parsed' OR total IS NULL OR total >= 0.01) LIMIT 1",
                 (issuer_id,),
             )
             fiel_validated = has_fiel and bool(
@@ -316,7 +316,7 @@ def register_dashboard_routes(router, templates):
                 f"""
                 SELECT COUNT(*) AS n FROM sat_cfdi
                 WHERE issuer_id = ? AND direction = 'issued' AND fecha_emision IS NOT NULL
-                  AND {_ym_filt} AND (total IS NULL OR total >= 0.01)
+                  AND {_ym_filt} AND (xml_status = 'parsed' OR total IS NULL OR total >= 0.01)
                 """,
                 (issuer_id, ym),
             )

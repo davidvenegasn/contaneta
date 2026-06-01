@@ -151,7 +151,7 @@ def register_invoices_received_routes(router):
                 f"""
                 SELECT uuid, fecha_emision, rfc_emisor, nombre_emisor, concepto, total, moneda,
                        COALESCE(impuestos, 0) AS impuestos, COALESCE(retenciones, 0) AS retenciones,
-                       metodo_pago, status, xml_path,
+                       metodo_pago, status, xml_path, xml_status,
                        (
                          SELECT bm.id
                          FROM bank_invoice_matches bim

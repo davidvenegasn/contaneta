@@ -314,7 +314,7 @@ def register_invoices_routes(router, templates):
                            metodo_pago, status, xml_path
                     FROM sat_cfdi
                     WHERE issuer_id = ? AND direction = 'issued' AND fecha_emision IS NOT NULL
-                      AND {_ym_filt} AND (total IS NULL OR total >= 0.01)
+                      AND {_ym_filt} AND (xml_status = 'parsed' OR total IS NULL OR total >= 0.01)
                       AND id IN (
                         SELECT id FROM (
                           SELECT id, ROW_NUMBER() OVER (
@@ -322,7 +322,7 @@ def register_invoices_routes(router, templates):
                             ORDER BY (CASE WHEN COALESCE(total,0) >= 0.01 THEN 0 ELSE 1 END), id
                           ) AS rn
                           FROM sat_cfdi
-                          WHERE issuer_id = ? AND direction = 'issued' AND fecha_emision IS NOT NULL AND {_ym_filt} AND (total IS NULL OR total >= 0.01)
+                          WHERE issuer_id = ? AND direction = 'issued' AND fecha_emision IS NOT NULL AND {_ym_filt} AND (xml_status = 'parsed' OR total IS NULL OR total >= 0.01)
                         ) WHERE rn = 1
                       )
                     ORDER BY fecha_emision DESC LIMIT {_row_limit};
@@ -331,7 +331,7 @@ def register_invoices_routes(router, templates):
                     SELECT substr(fecha_emision,1,7) AS ym, count(*) AS n
                     FROM sat_cfdi
                     WHERE issuer_id = ? AND direction = 'issued' AND fecha_emision IS NOT NULL
-                      AND (total IS NULL OR total >= 0.01)
+                      AND (xml_status = 'parsed' OR total IS NULL OR total >= 0.01)
                       AND COALESCE(UPPER(TRIM(status)), '') NOT IN ('C','CANCELADO','CANCELADA','0')
                       AND UPPER(TRIM(COALESCE(status,''))) NOT LIKE 'CANCEL%'
                     GROUP BY ym ORDER BY ym DESC;
@@ -686,7 +686,7 @@ def register_invoices_routes(router, templates):
                        COALESCE(impuestos, 0) AS iva, total, status
                 FROM sat_cfdi
                 WHERE issuer_id = ? AND direction = 'issued' AND fecha_emision IS NOT NULL
-                  AND {_ym_filt} AND (total IS NULL OR total >= 0.01)
+                  AND {_ym_filt} AND (xml_status = 'parsed' OR total IS NULL OR total >= 0.01)
                 ORDER BY fecha_emision DESC
             """, (issuer_id, period)) or []
             headers = ["Fecha", "Receptor", "RFC", "Concepto", "Subtotal", "IVA", "Total", "UUID", "Estado"]

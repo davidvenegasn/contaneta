@@ -240,7 +240,7 @@ def register_operations_routes(router):
             SELECT direction, fecha_emision, nombre, total, uuid FROM (
               SELECT direction, fecha_emision, nombre_receptor AS nombre, total, uuid FROM sat_cfdi
               WHERE issuer_id = ? AND direction = 'issued' AND fecha_emision IS NOT NULL
-                AND (total IS NULL OR total >= 0.01)
+                AND (xml_status = 'parsed' OR total IS NULL OR total >= 0.01)
               UNION ALL
               SELECT direction, fecha_emision, nombre_emisor AS nombre, total, uuid FROM sat_cfdi
               WHERE issuer_id = ? AND direction = 'received' AND fecha_emision IS NOT NULL

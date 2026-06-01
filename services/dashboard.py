@@ -64,7 +64,7 @@ def get_monthly_trend(issuer_id: int, months: int = 12) -> list[dict]:
         FROM sat_cfdi
         WHERE issuer_id = ? AND direction = 'issued'
           AND fecha_emision IS NOT NULL
-          AND (total IS NULL OR total >= 0.01)
+          AND (xml_status = 'parsed' OR total IS NULL OR total >= 0.01)
           AND substr(fecha_emision, 1, 7) >= ?
           {_cancelled_filter}
         GROUP BY substr(fecha_emision, 1, 7)
@@ -126,7 +126,7 @@ def get_top_clients(issuer_id: int, limit: int = 5) -> list[dict]:
         WHERE issuer_id = ? AND direction = 'issued'
           AND fecha_emision IS NOT NULL
           AND fecha_emision >= ? AND fecha_emision <= ?
-          AND (total IS NULL OR total >= 0.01)
+          AND (xml_status = 'parsed' OR total IS NULL OR total >= 0.01)
         GROUP BY rfc_receptor
         ORDER BY total DESC
         LIMIT ?
@@ -268,7 +268,7 @@ def _check_ppd_pending(issuer_id: int) -> dict | None:
               AND UPPER(TRIM(COALESCE(metodo_pago, ''))) = 'PPD'
               AND fecha_emision IS NOT NULL
               AND fecha_emision < ?
-              AND (total IS NULL OR total >= 0.01)
+              AND (xml_status = 'parsed' OR total IS NULL OR total >= 0.01)
               AND COALESCE(status, '') NOT IN ('cancelled', 'cancelado', 'Cancelado')
             """,
             (issuer_id, cutoff),

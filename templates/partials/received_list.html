@@ -386,6 +386,8 @@
       const iva = formatMoney(row.impuestos || 0, row.moneda);
       const metodoPago = row.metodo_pago ? `<span class="badge badge--neutral badge--xs">${escapeHtml(row.metodo_pago)}</span>` : '<span class="muted">—</span>';
       const status = renderStatus(row.status);
+      const xmlPending = row.xml_status !== 'parsed' && (row.total == null || parseFloat(row.total) < 0.01);
+      const pendingBadge = xmlPending ? '<span class="badge badge--neutral badge--xs" title="Estamos descargando el detalle desde SAT">Procesando datos</span>' : '';
       const deductPct = row.deductibility_pct != null ? row.deductibility_pct : 100;
       const deductSrc = row.deductibility_source || 'default';
       const deductOpts = [100, 50, 8.5, 0];
@@ -416,7 +418,7 @@
         <td><div class="u-fw-semibold" title="${emisor}">${emisor}</div><div class="muted u-text-xs font-mono">${rfc}</div></td>
         <td class="concepto-cell" title="${conceptoFull}">${concepto}</td>
         <td><div class="uuid-copy-wrap"><span class="uuid-copy-wrap__text">${uuid}</span>${uuidCopyBtn}</div></td>
-        <td class="u-fw-semibold">${total}</td>
+        <td class="u-fw-semibold">${total}${pendingBadge ? ' ' + pendingBadge : ''}</td>
         <td class="muted">${iva}</td>
         <td>${metodoPago}</td>
         <td>${status}</td>

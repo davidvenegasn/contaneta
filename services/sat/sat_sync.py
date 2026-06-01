@@ -67,7 +67,7 @@ def get_month_totals(issuer_id: int, ym: str, direction: str, metodo_pago: str =
             f"issuer_id = ? AND direction = ? AND fecha_emision IS NOT NULL AND {ym_sql_filter(ym)}"
         )
         if direction == "issued":
-            base_where += " AND (total IS NULL OR total >= 0.01)"
+            base_where += " AND (xml_status = 'parsed' OR total IS NULL OR total >= 0.01)"
         else:
             base_where += " AND total IS NOT NULL AND total >= 0.01 AND (tipo_comprobante IS NULL OR UPPER(TRIM(tipo_comprobante)) != 'N')"
         base_where += (

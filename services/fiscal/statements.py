@@ -53,7 +53,7 @@ def _income_totals_ytd(issuer_id: int, ym: str) -> dict:
           AND fecha_emision IS NOT NULL
           AND substr(fecha_emision, 1, 4) = ?
           AND substr(fecha_emision, 1, 7) <= ?
-          AND (total IS NULL OR total >= 0.01)
+          AND (xml_status = 'parsed' OR total IS NULL OR total >= 0.01)
           AND COALESCE(UPPER(TRIM(status)), '') NOT IN ('C','CANCELADO','CANCELADA','0')
           AND UPPER(TRIM(COALESCE(status,''))) NOT LIKE 'CANCEL%'
         """,
@@ -109,7 +109,7 @@ def _uncollected_issued(issuer_id: int, ym: str) -> float:
           AND direction = 'issued'
           AND fecha_emision IS NOT NULL
           AND substr(fecha_emision, 1, 7) <= ?
-          AND (total IS NULL OR total >= 0.01)
+          AND (xml_status = 'parsed' OR total IS NULL OR total >= 0.01)
           AND UPPER(TRIM(COALESCE(metodo_pago, ''))) = 'PPD'
         """,
         (issuer_id, ym),
