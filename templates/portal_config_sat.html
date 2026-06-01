@@ -160,6 +160,8 @@
   </div>
 </div>
 
+{% include "portal_sat_history_chooser.html" %}
+
 <script>
 (function(){
   var form = document.getElementById('satCredForm');
@@ -263,12 +265,54 @@
 
   if (form) {
     var statusBadgeSubmit = document.getElementById('fielStatusBadge');
-    form.addEventListener('submit', function() {
+    form.addEventListener('submit', function(e) {
+      e.preventDefault();
       form.setAttribute('data-state', 'validating');
       form.classList.add('fiel-form--validating');
       if (saveBtn) { saveBtn.disabled = true; saveBtn.querySelector('.fiel-submit__text').textContent = 'Validando…'; }
       if (saveSpinner) saveSpinner.hidden = false;
       if (statusBadgeSubmit) statusBadgeSubmit.innerHTML = '<span class="fiel-status-badge fiel-status-badge--validating">Validando…</span>';
+
+      var fd = new FormData(form);
+      fetch('/portal/config/sat', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Accept': 'application/json' },
+        body: fd
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        showResult(data.validation_ok, data.message || (data.validation_ok ? 'FIEL válida.' : 'Error.'));
+        if (data.validation_ok && data.cert_info && data.cert_info.rfc) {
+          var modal = document.getElementById('historyChooserModal');
+          if (modal) {
+            var rfcEl = document.getElementById('certRfcDisplay');
+            var nameEl = document.getElementById('certNameDisplay');
+            var preview = document.getElementById('certPreview');
+            if (rfcEl) rfcEl.textContent = data.cert_info.rfc || '';
+            if (nameEl) nameEl.textContent = data.cert_info.nombre || '';
+            if (preview && (data.cert_info.rfc || data.cert_info.nombre)) preview.hidden = false;
+            var defOpt = data.default_history_option || 'last_3_months';
+            var radio = modal.querySelector('input[value="' + defOpt + '"]');
+            if (radio) radio.checked = true;
+            modal.hidden = false;
+            modal.setAttribute('aria-hidden', 'false');
+          }
+        } else if (data.validation_ok) {
+          if (window.uiSuccessOverlay) {
+            window.uiSuccessOverlay({ title: 'SAT Configurado', message: data.message || 'FIEL válida.', actions: [{ label: 'Entendido', onClick: function() { if (window.uiSuccessOverlayClose) window.uiSuccessOverlayClose(); window.location.reload(); } }] });
+          } else {
+            window.location.href = '/portal/config/sat?saved=1';
+          }
+        }
+      })
+      .catch(function() { showResult(false, 'Error de conexión. Revisa tu red e intenta de nuevo.'); })
+      .finally(function() {
+        form.setAttribute('data-state', 'idle');
+        form.classList.remove('fiel-form--validating');
+        if (saveBtn) { saveBtn.disabled = false; saveBtn.querySelector('.fiel-submit__text').textContent = 'Guardar y validar'; }
+        if (saveSpinner) saveSpinner.hidden = true;
+      });
     });
   }
 
@@ -542,6 +586,48 @@
           syncBtn.disabled = false;
           syncBtn.textContent = 'Sincronizar ahora';
         });
+    });
+  }
+})();
+
+/* ── History Chooser Modal ── */
+(function(){
+  var modal = document.getElementById('historyChooserModal');
+  if (!modal) return;
+  modal.querySelectorAll('[data-close="true"]').forEach(function(el) {
+    el.addEventListener('click', function() {
+      modal.hidden = true;
+      modal.setAttribute('aria-hidden', 'true');
+      window.location.reload();
+    });
+  });
+  var startBtn = document.getElementById('historyStartBtn');
+  if (startBtn) {
+    startBtn.addEventListener('click', function() {
+      var selected = modal.querySelector('input[name="history_option"]:checked');
+      if (!selected) return;
+      startBtn.disabled = true;
+      startBtn.textContent = 'Iniciando…';
+      fetch('/portal/config/sat/start-history-sync', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ history_option: selected.value })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        modal.hidden = true;
+        modal.setAttribute('aria-hidden', 'true');
+        if (data.ok && window.uiSuccessOverlay) {
+          window.uiSuccessOverlay({ title: 'Descarga iniciada', message: 'Se están descargando tus facturas. Puedes cerrar esta página, se completará en segundo plano.', actions: [{ label: 'Entendido', onClick: function() { if (window.uiSuccessOverlayClose) window.uiSuccessOverlayClose(); window.location.reload(); } }] });
+        } else {
+          window.location.reload();
+        }
+      })
+      .catch(function() {
+        startBtn.disabled = false;
+        startBtn.textContent = 'Empezar descarga';
+      });
     });
   }
 })();

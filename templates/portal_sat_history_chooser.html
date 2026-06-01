@@ -1,0 +1,62 @@
+{# History chooser modal — shown after FIEL validation succeeds.
+   Included in portal_config_sat.html. JS controls visibility. #}
+<div id="historyChooserModal" class="modal" hidden aria-hidden="true" role="dialog">
+  <div class="modal__backdrop" data-close="true"></div>
+  <div class="modal__panel" style="max-width:520px;">
+    <div class="modal__head">
+      <h2 class="modal__title">Elige cuánto historial descargar</h2>
+      <button type="button" class="icon-btn" data-close="true" aria-label="Cerrar">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
+          <path d="M18 6 6 18"/><path d="m6 6 12 12"/>
+        </svg>
+      </button>
+    </div>
+    <div class="modal__body">
+      {# Cert preview section #}
+      <div id="certPreview" style="padding:12px 16px;background:var(--surface-alt,#f8fafc);border-radius:8px;margin-bottom:16px;" hidden>
+        <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;margin-bottom:4px;">Datos del certificado FIEL</div>
+        <div style="font-size:15px;font-weight:500;" id="certRfcDisplay"></div>
+        <div style="font-size:14px;color:var(--muted);" id="certNameDisplay"></div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <label class="radio-card" style="display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border:1px solid var(--border);border-radius:8px;cursor:pointer;">
+          <input type="radio" name="history_option" value="last_3_months" style="margin-top:3px;" />
+          <div>
+            <div style="font-weight:500;">Últimos 3 meses</div>
+            <div style="font-size:13px;color:var(--muted);">Recomendado para empezar · ~5 min</div>
+          </div>
+        </label>
+        <label class="radio-card" style="display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border:1px solid var(--border);border-radius:8px;cursor:pointer;">
+          <input type="radio" name="history_option" value="current_year" style="margin-top:3px;" />
+          <div>
+            <div style="font-weight:500;">Desde enero {{ current_year }}</div>
+            <div style="font-size:13px;color:var(--muted);">Declaración anual · ~15 min</div>
+          </div>
+        </label>
+        <label class="radio-card" style="display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border:1px solid var(--border);border-radius:8px;cursor:pointer;">
+          <input type="radio" name="history_option" value="last_12_months" style="margin-top:3px;" />
+          <div>
+            <div style="font-weight:500;">Últimos 12 meses</div>
+            <div style="font-size:13px;color:var(--muted);">Cierre anual completo · ~30 min</div>
+          </div>
+        </label>
+        <label class="radio-card radio-card--disabled" style="display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border:1px solid var(--border);border-radius:8px;opacity:0.6;" id="historyPro">
+          <input type="radio" name="history_option" value="full_5_years" style="margin-top:3px;" disabled id="historyProInput" />
+          <div>
+            <div style="font-weight:500;">Histórico completo (5 años)
+              <span class="badge badge--xs" style="background:#7c3aed;color:#fff;margin-left:4px;" id="historyProBadge">PRO</span>
+            </div>
+            <div style="font-size:13px;color:var(--muted);">
+              <span id="historyProNote">Requiere plan Pro · <a href="/portal/plan" style="color:var(--primary);">Subir de plan</a></span>
+            </div>
+          </div>
+        </label>
+      </div>
+    </div>
+    <div class="modal__foot">
+      <button type="button" class="btn btn--ghost" data-close="true">Omitir</button>
+      <button type="button" class="btn btn-primary" id="historyStartBtn">Empezar descarga</button>
+    </div>
+  </div>
+</div>

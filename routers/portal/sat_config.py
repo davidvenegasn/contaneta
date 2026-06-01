@@ -203,6 +203,7 @@ def register_sat_config_routes(router, templates):
         finally:
             conn.close()
         cred = dict(row) if row else None
+        from datetime import date as _date
         return _render_portal(
             request,
             issuer=issuer,
@@ -215,6 +216,7 @@ def register_sat_config_routes(router, templates):
                 "validation_at": cred.get("validation_at") if cred else None,
                 "validation_ok": cred.get("validation_ok") if cred else None,
                 "validation_message": cred.get("validation_message") if cred else None,
+                "current_year": _date.today().year,
             },
         )
 
@@ -313,7 +315,22 @@ def register_sat_config_routes(router, templates):
                 logger.exception("Failed to enqueue onboarding sync for issuer %s", issuer_id)
         if request.headers.get("accept", "").find("application/json") >= 0:
             msg = "Credenciales guardadas. Tus facturas de los últimos 2 meses se descargarán en ~5 minutos." if valid_ok else "Credenciales guardadas."
-            return JSONResponse({"ok": True, "message": msg, "validation_ok": valid_ok, "validation_message": valid_message})
+            # Include cert subject info and smart default for history chooser
+            cert_info = {}
+            default_option = "last_3_months"
+            if valid_ok:
+                try:
+                    from services.sat.sat_credentials_secure import extract_fiel_subject
+                    cert_info = extract_fiel_subject(issuer_id) or {}
+                except Exception:
+                    pass
+                try:
+                    from services.sat.sat_autosync import default_history_option
+                    default_option = default_history_option()
+                except Exception:
+                    pass
+            return JSONResponse({"ok": True, "message": msg, "validation_ok": valid_ok, "validation_message": valid_message,
+                                 "cert_info": cert_info, "default_history_option": default_option})
         return RedirectResponse(url="/portal/config/sat?saved=1", status_code=302)
 
     @router.post("/sat/full-resync", response_class=JSONResponse)
@@ -351,6 +368,52 @@ def register_sat_config_routes(router, templates):
         )
         log_action(request, "sat_full_resync", user_id=user_id, issuer_id=issuer_id)
         return JSONResponse({"ok": True, "message": "Resincronización completa iniciada. Puede tardar varios minutos.", "job_ids": job_ids})
+
+    @router.post("/config/sat/start-history-sync", response_class=JSONResponse)
+    async def portal_config_sat_start_history_sync(request: Request, issuer: dict = Depends(get_portal_issuer)):
+        """Start history sync based on user-chosen depth option."""
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+        history_option = (body.get("history_option") or "last_3_months").strip()
+        valid_options = {"last_3_months", "current_year", "last_12_months", "full_5_years"}
+        if history_option not in valid_options:
+            return JSONResponse({"ok": False, "message": "Opción inválida."}, status_code=400)
+        issuer_id = issuer["id"]
+        user_id = getattr(request.state, "user_id", 0) or 0
+        # Plan gate: full_5_years requires pro plan
+        if history_option == "full_5_years":
+            from services.billing.plans import get_issuer_plan
+            plan = get_issuer_plan(issuer_id)
+            if plan not in ("pro",):
+                return JSONResponse(
+                    {"ok": False, "message": "El historial completo (5 años) requiere plan Pro."},
+                    status_code=403,
+                )
+        if not subscription_service.can_issuer_use_sync_and_timbrado(issuer_id, user_id):
+            return JSONResponse({"ok": False, "message": "Tu periodo de prueba ha terminado."}, status_code=402)
+        from services.sat.sat_autosync import history_option_to_start_date
+        from services.sat.sat_full_sync import enqueue_sat_full_sync
+        start_date = history_option_to_start_date(history_option)
+        from datetime import date
+        from dateutil.relativedelta import relativedelta
+        start = date.fromisoformat(start_date)
+        today = date.today()
+        job_ids = []
+        cursor = date(today.year, today.month, 1)
+        while cursor >= start:
+            for direction in ("issued", "received"):
+                days_back = (today - cursor).days + 30
+                jid = enqueue_sat_full_sync(issuer_id, direction=direction, backfill_days=days_back)
+                if jid:
+                    job_ids.append(jid)
+            cursor = cursor - relativedelta(months=1)
+        audit.log(action="sat_history_sync", user_id=user_id, issuer_id=issuer_id,
+                  request=request, entity="jobs", entity_id=str(job_ids),
+                  details=f"option={history_option}")
+        log_action(request, "sat_history_sync", user_id=user_id, issuer_id=issuer_id)
+        return JSONResponse({"ok": True, "message": "Descarga de historial iniciada.", "job_ids": job_ids, "start_date": start_date})
 
     @router.post("/config/sat/validate", response_class=JSONResponse)
     def portal_config_sat_validate(request: Request, issuer: dict = Depends(get_portal_issuer)):

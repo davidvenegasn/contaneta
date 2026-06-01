@@ -88,6 +88,43 @@ def enqueue_sat_sync(
         conn.close()
 
 
+def default_history_option() -> str:
+    """Return the smart default history option based on current date.
+
+    If Jan-Mar: 'last_3_months' (just getting started, keep it light).
+    If Apr+: 'current_year' (need data since January for annual tax prep).
+    """
+    from datetime import date
+    if date.today().month <= 3:
+        return "last_3_months"
+    return "current_year"
+
+
+def history_option_to_start_date(option: str) -> str:
+    """Convert a history option to a start date string (YYYY-MM-DD).
+
+    Args:
+        option: One of 'last_3_months', 'current_year', 'last_12_months', 'full_5_years'.
+
+    Returns:
+        ISO date string for the first day of the starting month.
+    """
+    from datetime import date
+    from dateutil.relativedelta import relativedelta
+    today = date.today()
+    if option == "last_3_months":
+        start = today - relativedelta(months=3)
+    elif option == "current_year":
+        start = date(today.year, 1, 1)
+    elif option == "last_12_months":
+        start = today - relativedelta(months=12)
+    elif option == "full_5_years":
+        start = today - relativedelta(years=5)
+    else:
+        start = today - relativedelta(months=3)
+    return date(start.year, start.month, 1).isoformat()
+
+
 def enqueue_onboarding_sync(issuer_id: int) -> list[int]:
     """Enqueue initial sync (current + previous month, issued + received).
     Returns list of created job ids.
