@@ -45,7 +45,6 @@
     el._countUpDone = true;
     var to = parseFloat(el.getAttribute('data-count-to'));
     if (isNaN(to)) return;
-    var from = parseFloat(el.getAttribute('data-count-from')) || 0;
     var duration = parseInt(el.getAttribute('data-count-duration'), 10) || 250;
     var decimals = el.hasAttribute('data-count-decimals')
       ? parseInt(el.getAttribute('data-count-decimals'), 10)
@@ -53,26 +52,18 @@
     var prefix = el.getAttribute('data-count-prefix') || '';
     var suffix = el.getAttribute('data-count-suffix') || '';
 
-    if (prefersReducedMotion()) {
-      el.textContent = formatNumber(to, decimals, prefix, suffix);
-      return;
-    }
+    // Always show final value immediately — never display intermediate numbers.
+    // This prevents the race condition where users see animated partial values.
+    el.textContent = formatNumber(to, decimals, prefix, suffix);
 
-    var startTime = null;
-    function step(timestamp) {
-      if (!startTime) startTime = timestamp;
-      var elapsed = timestamp - startTime;
-      var t = Math.min(elapsed / duration, 1);
-      var eased = easeOutExpo(t);
-      var current = from + (to - from) * eased;
-      el.textContent = formatNumber(current, decimals, prefix, suffix);
-      if (t < 1) {
-        window.requestAnimationFrame(step);
-      } else {
-        el.textContent = formatNumber(to, decimals, prefix, suffix);
-      }
-    }
-    window.requestAnimationFrame(step);
+    if (prefersReducedMotion()) return;
+
+    // Decorative fade-in animation (value is already correct in the DOM)
+    el.style.opacity = '0';
+    el.style.transition = 'opacity ' + duration + 'ms ease-out';
+    window.requestAnimationFrame(function() {
+      el.style.opacity = '1';
+    });
   }
 
   function initCountUp() {
