@@ -59,9 +59,15 @@ def get_sat_sync_status(issuer_id: int) -> dict:
     return {"last_sync_at": last_sync_at, "status": status, "message": message}
 
 
-def get_month_totals(issuer_id: int, ym: str, direction: str, metodo_pago: str = None) -> dict:
-    """Totales del mes para emitidas o recibidas: base (subtotal), IVA y retenciones."""
-    conn = db()
+def get_month_totals(issuer_id: int, ym: str, direction: str, metodo_pago: str = None, *, conn=None) -> dict:
+    """Totales del mes para emitidas o recibidas: base (subtotal), IVA y retenciones.
+
+    Args:
+        conn: Optional existing DB connection for atomic multi-call snapshots.
+              If None, creates and closes its own connection.
+    """
+    _conn = conn or db()
+    _close = conn is None
     try:
         base_where = (
             f"issuer_id = ? AND direction = ? AND fecha_emision IS NOT NULL AND {ym_sql_filter(ym)}"
@@ -78,7 +84,7 @@ def get_month_totals(issuer_id: int, ym: str, direction: str, metodo_pago: str =
         if metodo_pago:
             base_where += " AND UPPER(TRIM(COALESCE(metodo_pago,''))) = ?"
             params.append(metodo_pago.upper().strip())
-        has_retenciones = has_column(conn, "sat_cfdi", "retenciones")
+        has_retenciones = has_column(_conn, "sat_cfdi", "retenciones")
         global _RETENCIONES_WARNED
         if not has_retenciones and not _RETENCIONES_WARNED:
             logger.warning(
@@ -86,7 +92,7 @@ def get_month_totals(issuer_id: int, ym: str, direction: str, metodo_pago: str =
             )
             _RETENCIONES_WARNED = True
         if has_retenciones:
-            row = conn.execute(
+            row = _conn.execute(
                 f"""
                 SELECT
                     COALESCE(SUM(COALESCE(subtotal, total)), 0) AS total_base,
@@ -98,7 +104,7 @@ def get_month_totals(issuer_id: int, ym: str, direction: str, metodo_pago: str =
                 params,
             ).fetchone()
         else:
-            row = conn.execute(
+            row = _conn.execute(
                 f"""
                 SELECT
                     COALESCE(SUM(COALESCE(subtotal, total)), 0) AS total_base,
@@ -127,4 +133,5 @@ def get_month_totals(issuer_id: int, ym: str, direction: str, metodo_pago: str =
         )
         return result
     finally:
-        conn.close()
+        if _close:
+            _conn.close()

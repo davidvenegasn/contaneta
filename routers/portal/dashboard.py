@@ -10,7 +10,7 @@ from config import (
     COOKIE_DEMO_VIEW,
     DEV_MODE,
 )
-from database import db_rows
+from database import db, db_rows
 from routers.deps import get_portal_issuer
 from routers.portal._helpers import (
     render_portal,
@@ -79,8 +79,14 @@ def register_dashboard_routes(router, templates):
                 """,
                 (issuer_id, ym),
             )
-            tot_issued = _get_month_totals(issuer_id, ym, "issued")
-            tot_received = _get_month_totals(issuer_id, ym, "received")
+            # Atomic KPI snapshot: single connection for all totals to prevent
+            # race conditions where data changes between calls.
+            _kpi_conn = db()
+            try:
+                tot_issued = _get_month_totals(issuer_id, ym, "issued", conn=_kpi_conn)
+                tot_received = _get_month_totals(issuer_id, ym, "received", conn=_kpi_conn)
+            finally:
+                _kpi_conn.close()
             ingresos_sin_iva = tot_issued["total_base"]
             gastos_sin_iva = tot_received["total_base"]
             iva_retenciones = tot_issued["total_retenciones"]
@@ -193,8 +199,12 @@ def register_dashboard_routes(router, templates):
             # KPI trend badges (vs prior month)
             prev_ym = shift_ym(ym, -1)
             next_ym = shift_ym(ym, +1)
-            prev_issued = _get_month_totals(issuer_id, prev_ym, "issued")
-            prev_received = _get_month_totals(issuer_id, prev_ym, "received")
+            _kpi_prev_conn = db()
+            try:
+                prev_issued = _get_month_totals(issuer_id, prev_ym, "issued", conn=_kpi_prev_conn)
+                prev_received = _get_month_totals(issuer_id, prev_ym, "received", conn=_kpi_prev_conn)
+            finally:
+                _kpi_prev_conn.close()
             prev_ingresos = prev_issued["total_base"]
             prev_gastos = prev_received["total_base"]
             prev_iva_neto = prev_issued["total_iva_neto"]

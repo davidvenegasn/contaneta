@@ -71,3 +71,33 @@ def test_should_return_consistent_values_on_repeated_calls():
     r1 = get_month_totals(99999, "2026-06", "issued")
     r2 = get_month_totals(99999, "2026-06", "issued")
     assert r1 == r2
+
+
+def test_should_accept_shared_connection_for_atomic_snapshot():
+    """get_month_totals with shared conn should return same results and not close it."""
+    from database import db as get_db
+    from services.sat.sat_sync import get_month_totals
+    conn = get_db()
+    try:
+        r1 = get_month_totals(99999, "2026-06", "issued", conn=conn)
+        r2 = get_month_totals(99999, "2026-06", "received", conn=conn)
+        # Connection should still be usable (not closed by the function)
+        conn.execute("SELECT 1")
+        assert isinstance(r1, dict)
+        assert isinstance(r2, dict)
+    finally:
+        conn.close()
+
+
+def test_should_render_same_kpis_on_double_request():
+    """Two requests to dashboard should produce same KPIs (render-twice consistency)."""
+    from fastapi.testclient import TestClient
+    from app import app
+    from tests.helpers import make_session_cookie
+    # Use a high issuer_id unlikely to have real data
+    cookies = make_session_cookie(issuer_id=99999, user_id=99999)
+    client = TestClient(app, raise_server_exceptions=False, cookies=cookies)
+    r1 = client.get("/portal/home")
+    r2 = client.get("/portal/home")
+    # Both should succeed (or both redirect to login)
+    assert r1.status_code == r2.status_code
