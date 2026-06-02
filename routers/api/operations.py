@@ -1,9 +1,10 @@
 """Operations API routes."""
+import hashlib
 import logging
 from datetime import datetime
 from typing import Optional
 
-from fastapi import Body, Depends, HTTPException, Query, Request
+from fastapi import Body, Depends, HTTPException, Query, Request, Response
 
 from database import db, db_rows, table_exists
 from routers.api._helpers import (
@@ -585,6 +586,7 @@ def register_operations_routes(router):
     @router.get("/metrics/trend")
     def api_metrics_trend(
         request: Request,
+        response: Response,
         issuer: dict = Depends(get_portal_issuer),
         months: int = Query(12, ge=1, le=24),
     ):
@@ -640,5 +642,12 @@ def register_operations_routes(router):
                 })
         finally:
             _trend_conn.close()
+        # Debug header: fingerprint of KPI data for race-condition debugging
+        snapshot_input = "|".join(
+            f"{r['ym']}:{r['ingresos']}:{r['gastos']}" for r in result
+        )
+        response.headers["X-KPI-Snapshot"] = hashlib.sha256(
+            snapshot_input.encode()
+        ).hexdigest()[:12]
         return ok(result)
 
