@@ -2,7 +2,7 @@
 import logging
 
 from fastapi import Depends, Query, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 
 from database import db, db_rows
 from routers.deps import get_portal_issuer
@@ -13,6 +13,7 @@ from services.fiscal.calculators import (
     calc_pfae_general,
     calc_resico_pf,
 )
+from services.fiscal.excel_export import build_fiscal_excel
 from services.invoices import foreign_invoices as fi
 from services.sat.sat_sync import get_month_totals
 from services.ym_helpers import sanitize_ym, shift_ym, ym_to_label
@@ -159,3 +160,23 @@ def register_fiscal_routes(router, templates):
         except Exception:
             logger.exception("portal: error renderizando /portal/fiscal")
             raise
+
+    @router.get("/fiscal/export")
+    def portal_fiscal_export(
+        request: Request,
+        issuer: dict = Depends(get_portal_issuer),
+        ym: str | None = Query(None),
+    ):
+        """Download fiscal papers of work as XLSX."""
+        issuer_id = issuer["id"]
+        if not ym:
+            ym = ym_now()
+        ym = sanitize_ym(ym, ym_now())
+        alias = (issuer.get("alias") or issuer.get("razon_social") or "ContaNeta").replace(" ", "_")[:30]
+        xlsx = build_fiscal_excel(issuer_id, ym, issuer_alias=issuer.get("alias") or issuer.get("razon_social") or "")
+        filename = f"ContaNeta_papeles_{alias}_{ym}.xlsx"
+        return Response(
+            content=xlsx,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
