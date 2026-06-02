@@ -427,21 +427,29 @@ def register_operations_routes(router):
         issuer_id = int(issuer.get("id") or 0)
         if issuer_id <= 0:
             raise HTTPException(status_code=401, detail="Sesión inválida")
-        # Count sat_jobs by status
+        # Count sat_jobs by status — exclude stale jobs (>2h old) to avoid phantom banner
         sat_counts = {"queued": 0, "running": 0, "ok": 0, "error": 0}
         try:
             for row in db_rows(
-                "SELECT status, COUNT(*) AS n FROM sat_jobs WHERE issuer_id = ? GROUP BY status",
+                "SELECT status, COUNT(*) AS n FROM sat_jobs "
+                "WHERE issuer_id = ? "
+                "AND (status NOT IN ('queued','running') "
+                "     OR datetime(COALESCE(updated_at, created_at)) >= datetime('now', '-2 hours')) "
+                "GROUP BY status",
                 (issuer_id,),
             ):
                 sat_counts[row["status"]] = row["n"]
         except Exception:
             pass
-        # Count generic jobs (sat_full_sync etc)
+        # Count generic jobs (sat_full_sync etc) — same staleness filter
         gen_counts = {"queued": 0, "running": 0, "success": 0, "failed": 0}
         try:
             for row in db_rows(
-                "SELECT status, COUNT(*) AS n FROM jobs WHERE issuer_id = ? AND name LIKE 'sat_%' GROUP BY status",
+                "SELECT status, COUNT(*) AS n FROM jobs "
+                "WHERE issuer_id = ? AND name LIKE 'sat_%' "
+                "AND (status NOT IN ('queued','running') "
+                "     OR datetime(COALESCE(updated_at, created_at)) >= datetime('now', '-2 hours')) "
+                "GROUP BY status",
                 (issuer_id,),
             ):
                 gen_counts[row["status"]] = row["n"]
