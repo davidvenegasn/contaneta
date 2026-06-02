@@ -90,13 +90,13 @@ def get_public_router(templates):
         rejection_reason: str = Form(default=""),
     ):
         token = (public_token or "").strip()
-        act = (action or request.form.get("action") or "").strip().lower()
+        act = (action or "").strip().lower()
         if not token:
             return HTMLResponse("<p>Link inválido.</p>", status_code=400)
         if act not in ("accept", "reject", "aceptar", "rechazar"):
             return HTMLResponse("<p>Acción inválida.</p>", status_code=400)
         status = "accepted" if act in ("accept", "aceptar") else "rejected"
-        reason = (rejection_reason or request.form.get("rejection_reason") or "").strip() or None
+        reason = (rejection_reason or "").strip() or None
         client_ip = request.client.host if request.client else None
         user_agent = request.headers.get("user-agent")
         now = datetime.now().isoformat()
