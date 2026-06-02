@@ -62,14 +62,30 @@ fi
 green "  Server reachable"
 echo
 
-# ── HTTPS ──
+# ── HTTPS + SSL Cert ──
 echo "--- HTTPS ---"
 if [[ "$BASE_URL" == https://* ]]; then
-    SSL_EXPIRE=$(echo | openssl s_client -connect "${BASE_URL#https://}:443" -servername "${BASE_URL#https://}" 2>/dev/null | openssl x509 -noout -enddate 2>/dev/null | cut -d= -f2 || echo "unknown")
+    DOMAIN="${BASE_URL#https://}"
+    DOMAIN="${DOMAIN%%/*}"
+    SSL_EXPIRE=$(echo | openssl s_client -connect "${DOMAIN}:443" -servername "${DOMAIN}" 2>/dev/null | openssl x509 -noout -enddate 2>/dev/null | cut -d= -f2 || echo "unknown")
     green "  SSL certificate expires: $SSL_EXPIRE"
     PASS=$((PASS + 1))
+    # Warn if cert expires within 30 days
+    if [ "$SSL_EXPIRE" != "unknown" ]; then
+        EXPIRE_EPOCH=$(date -j -f "%b %d %T %Y %Z" "$SSL_EXPIRE" "+%s" 2>/dev/null || date -d "$SSL_EXPIRE" "+%s" 2>/dev/null || echo 0)
+        NOW_EPOCH=$(date "+%s")
+        DAYS_LEFT=$(( (EXPIRE_EPOCH - NOW_EPOCH) / 86400 ))
+        if [ "$DAYS_LEFT" -lt 30 ] 2>/dev/null; then
+            red "  WARNING: SSL cert expires in $DAYS_LEFT days — renew soon!"
+            FAIL=$((FAIL + 1))
+        else
+            green "  SSL cert valid for ~${DAYS_LEFT} days"
+            PASS=$((PASS + 1))
+        fi
+    fi
 else
     red "  WARNING: Not using HTTPS"
+    FAIL=$((FAIL + 1))
 fi
 echo
 
@@ -86,9 +102,16 @@ echo
 
 # ── Public Pages ──
 echo "--- Public Pages ---"
+check "GET /" "200|302" "$BASE_URL/"
 check "GET /login" "200" "$BASE_URL/login"
 check "GET /signup" "200" "$BASE_URL/signup"
 check "GET /pricing" "200|302" "$BASE_URL/pricing"
+check "GET /privacy" "200" "$BASE_URL/privacy"
+check "GET /terms" "200" "$BASE_URL/terms"
+check "GET /cookies" "200|302" "$BASE_URL/cookies"
+check "GET /forgot-password" "200" "$BASE_URL/forgot-password"
+check "GET /robots.txt" "200" "$BASE_URL/robots.txt"
+check "GET /sitemap.xml" "200" "$BASE_URL/sitemap.xml"
 echo
 
 # ── Auth Enforcement ──

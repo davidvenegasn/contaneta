@@ -304,15 +304,77 @@ En producción, el proxy suele exponer `https://tu-dominio.com/health`; comprueb
 
 ---
 
+## 14. Pre-Deploy Validation
+
+Before every deployment, run the pre-deploy check script:
+
+```bash
+bash scripts/predeploy_check.sh
+```
+
+This validates:
+- Python >= 3.11
+- SQLite >= 3.35 (for RETURNING support)
+- `import app` succeeds
+- All pytest tests pass
+- Required environment variables present (`SESSION_SECRET`, `APP_DB_PATH`, `SITE_URL`)
+- `storage/` directory is writable
+- No source files exceed 350 lines
+
+If any check fails, the script exits with code 1 — **do not deploy**.
+
+---
+
+## 15. Post-Deploy Smoke Tests
+
+After deploying, run the production smoke test:
+
+```bash
+BASE_URL=https://tu-dominio.com bash scripts/smoke_prod.sh
+```
+
+This checks:
+- Server connectivity and `/health` response
+- SSL certificate validity (warns if <30 days to expiry)
+- All health sub-checks (db_readable, migrations_applied, disk_ok, storage_writable)
+- Public pages respond correctly (login, signup, privacy, terms, etc.)
+- Auth enforcement (portal and API reject unauthenticated requests)
+- Security headers present (X-Content-Type-Options, X-Frame-Options)
+- DEV_MODE is off (`/debug-oauth` not exposed)
+
+For a full manual checklist, see `scripts/post_deploy_manual_checklist.md`.
+
+---
+
+## 16. Cron Jobs
+
+Recommended crontab for the `conta` user:
+
+```cron
+# Backups — daily at 02:00
+0 2 * * * cd /var/www/conta-invoicing && bash scripts/backup_db.sh
+5 2 * * * cd /var/www/conta-invoicing && bash scripts/backup_storage.sh
+
+# SAT sync — every 6 hours
+0 */6 * * * cd /var/www/conta-invoicing && bash sat_sync/cron_sat_sync.sh
+
+# Expire stale SAT jobs — daily at 03:00
+0 3 * * * cd /var/www/conta-invoicing && .venv/bin/python scripts/expire_stale_sat_jobs.py
+```
+
+---
+
 ## Resumen rápido
 
 1. Usuario y deps del sistema.
 2. Clonar repo, venv, `pip install -r requirements.txt` (+ gunicorn si usas systemd con gunicorn).
 3. `.env` con DEV_MODE=0, SESSION_SECRET, COOKIE_SECURE=1, APP_DB_PATH si aplica.
 4. `python scripts/run_migrations.py`.
-5. systemd: `conta-invoicing.service` con Restart=always.
-6. Nginx o Caddy como reverse proxy + HTTPS (Let's Encrypt).
-7. Cron para backups con rotación (backup_db.sh, backup_storage.sh).
-8. Monitorear con GET /health.
+5. **Pre-deploy check:** `bash scripts/predeploy_check.sh` — must pass.
+6. systemd: `conta-invoicing.service` con Restart=always.
+7. Nginx o Caddy como reverse proxy + HTTPS (Let's Encrypt).
+8. **Post-deploy smoke:** `BASE_URL=https://... bash scripts/smoke_prod.sh`.
+9. Cron para backups, SAT sync, y expire stale jobs.
+10. Monitorear con GET /health.
 
 Con esto el servidor puede correr 24/7, reiniciar solo ante fallos, tener HTTPS, backups rotados y health check listo.
