@@ -7,6 +7,7 @@ from routers.admin.issuers import register_issuer_routes
 from routers.admin.jobs import register_job_routes
 from routers.admin.ops import register_ops_routes
 from routers.admin.sat import register_sat_admin_routes
+from routers.admin.stats import register_stats_routes
 
 
 def get_admin_router(templates):
@@ -19,5 +20,6 @@ def get_admin_router(templates):
     register_ops_routes(router, templates)
     register_impersonate_routes(router, templates)
     register_sat_admin_routes(router, templates)
+    register_stats_routes(router, templates)
 
     return router
