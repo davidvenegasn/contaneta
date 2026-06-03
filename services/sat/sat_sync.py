@@ -22,7 +22,7 @@ def get_sat_sync_status(issuer_id: int) -> dict:
             (issuer_id,),
         ).fetchone()
         last_error = conn.execute(
-            "SELECT finished_at, last_error FROM sat_jobs WHERE issuer_id = ? AND status = 'error' ORDER BY finished_at DESC LIMIT 1",
+            "SELECT finished_at AS t, last_error FROM sat_jobs WHERE issuer_id = ? AND status = 'error' ORDER BY finished_at DESC LIMIT 1",
             (issuer_id,),
         ).fetchone()
         sync_state = conn.execute(
