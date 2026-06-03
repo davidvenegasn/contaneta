@@ -6,7 +6,7 @@ Works with the existing sat_jobs table (processed by scripts/sat_worker.py).
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from database import db
 
@@ -303,3 +303,96 @@ def update_sync_state_after_job(
             )
     finally:
         conn.close()
+
+
+# ── Multi-tier cron helpers ──────────────────────────────────────────
+
+
+def _get_fiel_issuers() -> list[int]:
+    """Return issuer_ids with validated FIEL credentials."""
+    conn = db()
+    try:
+        rows = conn.execute(
+            "SELECT DISTINCT sc.issuer_id FROM sat_credentials sc "
+            "JOIN issuers i ON i.id = sc.issuer_id AND i.active = 1 "
+            "WHERE sc.validation_ok = 1"
+        ).fetchall()
+        return [r["issuer_id"] for r in rows]
+    finally:
+        conn.close()
+
+
+def _ym_range(months_back: int) -> list[str]:
+    """Return list of YYYY-MM strings from current month back N months."""
+    from dateutil.relativedelta import relativedelta
+    today = date.today()
+    result = []
+    for i in range(months_back):
+        d = today - relativedelta(months=i)
+        result.append(f"{d.year:04d}-{d.month:02d}")
+    return result
+
+
+def enqueue_active_issuers_current_month() -> int:
+    """Enqueue sync for current month of all issuers with validated FIEL.
+
+    Called by hourly cron. Uses smart priority (current month = urgent).
+    Returns number of jobs enqueued.
+    """
+    from services.sat.sat_priority import compute_priority, is_user_active_recently
+
+    issuers = _get_fiel_issuers()
+    ym = _ym_range(1)[0]
+    count = 0
+    for iid in issuers:
+        active = is_user_active_recently(iid)
+        prio = compute_priority(iid, ym, user_active_recently=active)
+        for direction in ("issued", "received"):
+            jid = enqueue_sat_sync(iid, direction, priority=prio)
+            if jid and jid > 0:
+                count += 1
+    return count
+
+
+def enqueue_active_issuers_last_3_months() -> int:
+    """Enqueue sync for last 3 months of all issuers with validated FIEL.
+
+    Called by daily cron. Priority decreases for older months.
+    Returns number of jobs enqueued.
+    """
+    from services.sat.sat_priority import compute_priority, is_user_active_recently
+
+    issuers = _get_fiel_issuers()
+    yms = _ym_range(3)
+    count = 0
+    for iid in issuers:
+        active = is_user_active_recently(iid)
+        for ym in yms:
+            prio = compute_priority(iid, ym, user_active_recently=active)
+            for direction in ("issued", "received"):
+                jid = enqueue_sat_sync(iid, direction, priority=prio)
+                if jid and jid > 0:
+                    count += 1
+    return count
+
+
+def enqueue_active_issuers_last_6_months() -> int:
+    """Enqueue sync for last 6 months of all issuers with validated FIEL.
+
+    Called by weekly cron. Deep backfill with low priority for old months.
+    Returns number of jobs enqueued.
+    """
+    from services.sat.sat_priority import compute_priority, is_user_active_recently
+
+    issuers = _get_fiel_issuers()
+    yms = _ym_range(6)
+    count = 0
+    for iid in issuers:
+        active = is_user_active_recently(iid)
+        for ym in yms:
+            prio = compute_priority(iid, ym, user_active_recently=active)
+            for direction in ("issued", "received"):
+                jid = enqueue_sat_sync(iid, direction, priority=prio)
+                if jid and jid > 0:
+                    count += 1
+    return count

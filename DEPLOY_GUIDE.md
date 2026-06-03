@@ -355,11 +355,13 @@ Recommended crontab for the `conta` user:
 0 2 * * * cd /var/www/conta-invoicing && bash scripts/backup_db.sh
 5 2 * * * cd /var/www/conta-invoicing && bash scripts/backup_storage.sh
 
-# SAT sync — every 6 hours
-0 */6 * * * cd /var/www/conta-invoicing && bash sat_sync/cron_sat_sync.sh
+# SAT sync — multi-tier schedule
+0 * * * *   cd /var/www/conta-invoicing && bash scripts/sat_cron_hourly.sh >> /var/log/sat_hourly.log 2>&1
+0 3 * * *   cd /var/www/conta-invoicing && bash scripts/sat_cron_daily.sh >> /var/log/sat_daily.log 2>&1
+0 4 * * 0   cd /var/www/conta-invoicing && bash scripts/sat_cron_weekly.sh >> /var/log/sat_weekly.log 2>&1
 
-# Expire stale SAT jobs — daily at 03:00
-0 3 * * * cd /var/www/conta-invoicing && .venv/bin/python scripts/expire_stale_sat_jobs.py
+# Expire stale SAT jobs — daily at 05:00
+0 5 * * * cd /var/www/conta-invoicing && .venv/bin/python scripts/expire_stale_sat_jobs.py
 ```
 
 ---
