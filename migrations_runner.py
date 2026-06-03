@@ -570,6 +570,13 @@ def apply_migrations(
                             "CREATE INDEX IF NOT EXISTS idx_sat_jobs_priority "
                             "ON sat_jobs(status, priority, id)"
                         )
+                    elif version == "056":
+                        _safe_add_column(conn, "sat_jobs", "run_after", "TEXT")
+                        _safe_add_column(conn, "sat_jobs", "error_category", "TEXT")
+                        conn.execute(
+                            "CREATE INDEX IF NOT EXISTS idx_sat_jobs_run_after "
+                            "ON sat_jobs(status, run_after)"
+                        )
                     else:
                         with open(filepath, "r", encoding="utf-8") as f:
                             sql = f.read()

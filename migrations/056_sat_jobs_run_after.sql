@@ -1,0 +1,2 @@
+-- 056: Add run_after column to sat_jobs for scheduled retries.
+-- Applied via migrations_runner.py (safe_add_column).

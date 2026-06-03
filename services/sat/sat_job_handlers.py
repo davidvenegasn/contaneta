@@ -38,6 +38,52 @@ COOLDOWN_SECONDS = int(os.environ.get("SAT_SYNC_COOLDOWN_SECONDS", "7200"))
 
 
 # ---------------------------------------------------------------------------
+# Error categorization for retry strategy
+# ---------------------------------------------------------------------------
+
+def classify_sat_error(error_msg: str) -> str:
+    """Categorize SAT errors to decide retry strategy.
+
+    Returns one of: 'network', 'empty', 'rate_limit', 'auth', 'sat_5xx', 'unknown'.
+    """
+    msg = (error_msg or "").lower()
+    if any(s in msg for s in ["could not resolve host", "connection refused",
+                               "timeout", "timed out", "network", "dns"]):
+        return "network"
+    if "sin información" in msg or "no_records" in msg or "no records" in msg:
+        return "empty"
+    if "rate" in msg or "too many" in msg or "429" in msg:
+        return "rate_limit"
+    if "unauthorized" in msg or "401" in msg or "fiel" in msg and "invalid" in msg:
+        return "auth"
+    if "500" in msg or "internal server" in msg or "502" in msg or "503" in msg:
+        return "sat_5xx"
+    return "unknown"
+
+
+# Retry delays per error category (seconds). Index = attempt number.
+RETRY_DELAYS = {
+    "network": [300, 900, 3600, 21600],      # 5min, 15min, 1h, 6h
+    "empty": [3600, 21600, 86400],            # 1h, 6h, 24h
+    "rate_limit": [3600, 7200, 14400],        # 1h, 2h, 4h
+    "sat_5xx": [600, 1800, 7200],             # 10min, 30min, 2h
+    "unknown": [1800, 7200, 86400],           # 30min, 2h, 24h
+    "auth": [],                               # no retry — manual fix needed
+}
+
+
+def get_max_attempts_for_category(category: str) -> int:
+    """Return max retry attempts for an error category."""
+    return len(RETRY_DELAYS.get(category, [])) + 1  # +1 for initial attempt
+
+
+def should_retry(category: str, attempt: int) -> bool:
+    """Return True if this error category allows retrying at this attempt."""
+    delays = RETRY_DELAYS.get(category, [])
+    return attempt < len(delays)
+
+
+# ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
