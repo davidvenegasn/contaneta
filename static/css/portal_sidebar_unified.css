@@ -46,6 +46,7 @@ nav.psb {
   width: 100%;
   box-sizing: border-box;
   flex-shrink: 0;
+  min-height: 40px;
 }
 
 @media (min-width: 1100px) {
@@ -86,8 +87,8 @@ nav.psb {
   box-sizing: border-box;
   text-decoration: none;
   color: #0f172a;
-  font-size: var(--fs-sm);
-  font-weight: var(--fw-semibold);
+  font-size: 15px;
+  font-weight: var(--fw-semibold, 600);
   letter-spacing: -0.02em;
   border-radius: 12px;
   transition: background 0.2s ease, color 0.2s ease;
@@ -243,11 +244,13 @@ nav.psb {
 
 .psb-dual .drawer-link {
   margin-left: 0 !important;
-  padding: 6px 4px !important;
+  padding: 0 8px 0 0 !important;
+  min-height: 40px;
   border-radius: 0;
   background: transparent !important;
-  font-size: var(--fs-sm);
-  font-weight: var(--fw-semibold);
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: var(--fw-semibold, 600);
   letter-spacing: -0.02em;
   line-height: 1.25;
   white-space: nowrap;

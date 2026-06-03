@@ -16,10 +16,8 @@
       </div>
       <div class="psb-brand-row__drawer">
         <div class="portal-drawer__head">
-          <span class="portal-drawer__brand" style="display:flex; align-items:center; gap:8px;">
-            <svg width="20" height="20" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect width="32" height="32" rx="8" fill="var(--accent, #6366f1)"/><text x="16" y="22" text-anchor="middle" font-family="system-ui, sans-serif" font-weight="700" font-size="18" fill="#fff">C</text></svg>
-            ContaNeta
-          </span>
+          <a href="/" class="portal-drawer__brand portal-drawer__brand--wordmark" aria-label="Ir a la página principal de Contaneta"
+             style="display:inline-flex;align-items:baseline;color:#0A0A0A;text-decoration:none;font-weight:500;font-size:20px;letter-spacing:-0.5px;line-height:1;padding-left:4px;">contaneta<span style="color:#6366F1;">.</span></a>
           <button type="button" class="mobile-menu-close" id="mobileMenuClose" aria-label="Cerrar menú">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
           </button>
@@ -103,12 +101,8 @@
         <span class="psb-nav-link__txt">Cotizaciones</span>
       </a>
       <a class="psb-nav-link {{ 'is-active' if (active_page == 'fiscal' or (nav_is_active is defined and nav_is_active('/portal/fiscal'))) else '' }}" href="/portal/fiscal">
-        <span class="psb-nav-link__rail">{{ icon_summary() }}<span class="rail-tooltip">Fiscal</span></span>
-        <span class="psb-nav-link__txt">Resumen Fiscal</span>
-      </a>
-      <a class="psb-nav-link {{ 'is-active' if (active_page == 'estados_financieros' or (nav_is_active is defined and nav_is_active('/portal/estados-financieros'))) else '' }}" href="/portal/estados-financieros">
-        <span class="psb-nav-link__rail"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 17V9"/><path d="M18 17V5"/><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M8 17v-3"/></svg><span class="rail-tooltip">Estados Financieros</span></span>
-        <span class="psb-nav-link__txt">Estados Financieros</span>
+        <span class="psb-nav-link__rail">{{ icon_summary() }}<span class="rail-tooltip">Impuestos</span></span>
+        <span class="psb-nav-link__txt">Impuestos</span>
       </a>
 
       <div class="psb-section">

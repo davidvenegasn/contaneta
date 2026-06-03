@@ -16,13 +16,19 @@
 </header>
 
 {% if success_msg %}
-<div class="card u-mb-14 card--success-bg" style="border-left:4px solid var(--success, #22c55e); padding:12px 16px;">
-  <p class="u-m0">{{ success_msg }}</p>
+<div class="inline-alert inline-alert--success u-mb-14" role="status">
+  <span class="inline-alert__icon" aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M20 6 9 17l-5-5"/></svg>
+  </span>
+  <p class="inline-alert__text">{{ success_msg }}</p>
 </div>
 {% endif %}
 {% if error_msg %}
-<div class="card u-mb-14 card--warn-bg" style="border-left:4px solid var(--warn, #f59e0b); padding:12px 16px;">
-  <p class="u-m0">{{ error_msg }}</p>
+<div class="inline-alert inline-alert--warning u-mb-14" role="alert">
+  <span class="inline-alert__icon" aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
+  </span>
+  <p class="inline-alert__text">{{ error_msg }}</p>
 </div>
 {% endif %}
 

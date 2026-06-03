@@ -335,15 +335,14 @@
             {% block topbar_actions %}{% endblock %}
           </div>
 
-          <!-- Plan badge (discrete) -->
-          <a href="/portal/plan" class="plan-badge u-hidden" id="topbarPlanBadge" title="Mi plan"></a>
-
           <!-- Menú usuario (en shell v2 el trigger está en el rail; aquí solo el panel) -->
           <div class="user-menu-wrap {% if portal_shell_v2|default(false) %}user-menu-wrap--rail-only{% endif %}">
-            <button type="button" class="topbar-user{% if is_impersonating|default(false) %} topbar-user--impersonating{% endif %}" id="userMenuBtn" aria-haspopup="menu" aria-expanded="false" title="{{ issuer_alias }}">
+            {% set _alias_parts = (issuer_alias or '').split() %}
+            {% set _alias_display = (_alias_parts[:-2] | join(' ')) if _alias_parts|length > 2 else (_alias_parts[0] if _alias_parts else (issuer_alias or '')) %}
+            {% set _alias_initial = (_alias_display[:1] | upper) if _alias_display else 'U' %}
+            <button type="button" class="topbar-user{% if is_impersonating|default(false) %} topbar-user--impersonating{% endif %}" id="userMenuBtn" aria-haspopup="menu" aria-expanded="false" title="{{ issuer_alias }}" aria-label="Menú de usuario ({{ _alias_display }})">
               {% if is_impersonating|default(false) %}<span class="topbar-user__pill" aria-hidden="true">Soporte</span>{% endif %}
-              <span class="topbar-user__dot" aria-hidden="true"></span>
-              <span class="topbar-user__text">{{ issuer_alias }}</span>
+              <span class="topbar-user__avatar" aria-hidden="true">{{ _alias_initial }}</span>
               <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                 <path d="m6 9 6 6 6-6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
@@ -364,6 +363,7 @@
               <a class="user-menu__item user-menu__item--with-icon" href="/portal/plan" role="menuitem">
                 <span class="user-menu__item-icon" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M21 12a9 9 0 1 1-9-9" stroke-linecap="round"/><path d="M21 3v6h-6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
                 Mi plan
+                <span class="user-menu__plan-badge u-hidden" id="topbarPlanBadge" aria-hidden="true"></span>
               </a>
               <div class="user-menu__sep" aria-hidden="true"></div>
               <form method="get" action="/logout" class="user-menu__logout-form user-menu__logout-form--prominent form-reset">
@@ -786,17 +786,16 @@
             el.innerHTML = html;
           }
         }
-        // Plan badge (discrete)
+        // Plan badge (dentro del dropdown, al lado de "Mi plan")
         if (planBadge && data.plan_label) {
           var pl = (data.plan_label || '').toLowerCase();
           planBadge.classList.remove('u-hidden');
           var badgeText = data.plan_label;
           if (pl === 'trial' && data.trial_days_left != null) {
-            badgeText = 'Trial: ' + data.trial_days_left + 'd';
+            badgeText = 'Trial · ' + data.trial_days_left + 'd';
           }
           planBadge.textContent = badgeText;
-          planBadge.className = 'plan-badge plan-badge--' + (pl === 'trial' ? 'trial' : 'paid');
-          planBadge.title = 'Mi plan: ' + data.plan_label + (data.trial_days_left != null ? ' (' + data.trial_days_left + ' días restantes)' : '');
+          planBadge.className = 'user-menu__plan-badge user-menu__plan-badge--' + (pl === 'trial' ? 'trial' : 'paid');
         }
       })
       .catch(function() {
