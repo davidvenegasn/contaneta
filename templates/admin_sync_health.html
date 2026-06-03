@@ -1,0 +1,91 @@
+{% extends "base_admin.html" %}
+{% block title %}Sync Health{% endblock %}
+{% block content %}
+  <h1>Sync Health</h1>
+  <p style="color:#64748b; margin-bottom: 16px;">Estado de sincronización SAT para todos los emisores con FIEL.</p>
+
+  <!-- KPI cards -->
+  <div class="card">
+    <div class="stats">
+      <div class="stat">
+        <div class="n">{{ stats.total_fiel_issuers }}</div>
+        <div class="label">Issuers con FIEL</div>
+      </div>
+      <div class="stat">
+        <div class="n">{{ stats.queued_now }}</div>
+        <div class="label">En cola ahora</div>
+      </div>
+      <div class="stat">
+        <div class="n">{{ stats.ok_24h }}</div>
+        <div class="label">OK (24h)</div>
+      </div>
+      <div class="stat">
+        <div class="n" style="{% if stats.errors_24h > 0 %}color:#dc2626{% endif %}">{{ stats.errors_24h }}</div>
+        <div class="label">Errores (24h)</div>
+      </div>
+      <div class="stat">
+        <div class="n">{{ stats.success_rate if stats.success_rate is not none else '—' }}{% if stats.success_rate is not none %}%{% endif %}</div>
+        <div class="label">Tasa éxito (24h)</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stale issuers -->
+  {% if stale_issuers and stale_issuers|length > 0 %}
+  <div class="card">
+    <h2 style="color:#dc2626;">Issuers sin sync reciente (48h+)</h2>
+    <div style="overflow-x:auto;">
+    <table>
+      <thead>
+        <tr>
+          <th>Issuer ID</th><th>RFC</th><th>Último OK</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for si in stale_issuers %}
+        <tr>
+          <td><a href="/admin/issuers/{{ si.issuer_id }}" style="color:#0369a1;">{{ si.issuer_id }}</a></td>
+          <td>{{ si.rfc }}</td>
+          <td class="muted">{{ si.last_ok or 'Nunca' }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Per-issuer sync status -->
+  <div class="card">
+    <h2>Estado por emisor</h2>
+    {% if per_issuer and per_issuer|length > 0 %}
+    <div style="overflow-x:auto;">
+    <table>
+      <thead>
+        <tr>
+          <th>Issuer</th><th>RFC</th>
+          <th>Emitidos OK</th><th>Emitidos Error</th><th>Cooldown</th>
+          <th>Recibidos OK</th><th>Recibidos Error</th><th>Cooldown</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for pi in per_issuer %}
+        <tr>
+          <td><a href="/admin/issuers/{{ pi.issuer_id }}" style="color:#0369a1;">{{ pi.issuer_id }}</a></td>
+          <td>{{ pi.rfc }}</td>
+          <td class="muted">{{ pi.issued_last_ok or '—' }}</td>
+          <td class="muted" style="{% if pi.issued_last_error %}color:#dc2626{% endif %}">{{ (pi.issued_last_error or '—')[:60] }}</td>
+          <td class="muted">{{ pi.issued_cooldown or '—' }}</td>
+          <td class="muted">{{ pi.received_last_ok or '—' }}</td>
+          <td class="muted" style="{% if pi.received_last_error %}color:#dc2626{% endif %}">{{ (pi.received_last_error or '—')[:60] }}</td>
+          <td class="muted">{{ pi.received_cooldown or '—' }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% else %}
+      <p style="margin:0;color:#64748b;">Sin emisores con FIEL configurada.</p>
+    {% endif %}
+  </div>
+{% endblock %}
