@@ -753,8 +753,16 @@ async def redirect_token_middleware(request: Request, call_next):
 
 
 @app.get("/")
-def root():
-    return RedirectResponse(url="/portal/home")
+def root(request: Request):
+    """Landing page for anonymous visitors; redirect to portal if logged in."""
+    if request.cookies.get(SESSION_COOKIE_NAME):
+        return RedirectResponse(url="/portal/home")
+    from datetime import date
+    from services.billing.plans import PLANS
+    return templates.TemplateResponse(request, "landing.html", {
+        "plans": PLANS,
+        "current_year": date.today().year,
+    })
 
 
 @app.get("/favicon.ico", include_in_schema=False)

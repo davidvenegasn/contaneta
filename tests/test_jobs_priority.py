@@ -50,10 +50,11 @@ def seed():
 
 
 def _clean_jobs():
-    """Remove all test jobs before each test."""
+    """Remove all queued/pending jobs so claim_next_job only sees test jobs."""
     conn = db()
     try:
         conn.execute("DELETE FROM jobs WHERE issuer_id = ?", (ISSUER_ID,))
+        conn.execute("UPDATE jobs SET status = 'ok' WHERE status = 'queued'")
         conn.commit()
     finally:
         conn.close()
