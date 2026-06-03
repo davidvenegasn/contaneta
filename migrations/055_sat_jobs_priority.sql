@@ -1,0 +1,2 @@
+-- 055: Add priority column to sat_jobs for smart ordering.
+-- Applied via migrations_runner.py (safe_add_column).

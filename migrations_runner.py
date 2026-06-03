@@ -564,6 +564,12 @@ def apply_migrations(
                         _safe_add_column(conn, "users", "session_nonce", "TEXT")
                     elif version == "054":
                         _safe_add_column(conn, "jobs", "priority", "INTEGER NOT NULL DEFAULT 0")
+                    elif version == "055":
+                        _safe_add_column(conn, "sat_jobs", "priority", "INTEGER NOT NULL DEFAULT 100")
+                        conn.execute(
+                            "CREATE INDEX IF NOT EXISTS idx_sat_jobs_priority "
+                            "ON sat_jobs(status, priority, id)"
+                        )
                     else:
                         with open(filepath, "r", encoding="utf-8") as f:
                             sql = f.read()

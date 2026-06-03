@@ -34,6 +34,7 @@ def enqueue_sat_sync(
     *,
     job_type: str = "xml",
     dry_run: bool = False,
+    priority: int = 100,
 ) -> int | None:
     """Enqueue a sat_jobs entry with dedupe.  Returns job id or None if skipped."""
     if direction not in ("issued", "received"):
@@ -76,9 +77,9 @@ def enqueue_sat_sync(
             return -1
 
         conn.execute(
-            """INSERT INTO sat_jobs (issuer_id, job_type, direction, status, created_at, updated_at)
-               VALUES (?, ?, ?, 'queued', datetime('now'), datetime('now'))""",
-            (issuer_id, job_type, direction),
+            """INSERT INTO sat_jobs (issuer_id, job_type, direction, status, priority, created_at, updated_at)
+               VALUES (?, ?, ?, 'queued', ?, datetime('now'), datetime('now'))""",
+            (issuer_id, job_type, direction, priority),
         )
         conn.commit()
         job_id = conn.execute("SELECT last_insert_rowid() AS rid").fetchone()["rid"]
@@ -131,7 +132,7 @@ def enqueue_onboarding_sync(issuer_id: int) -> list[int]:
     """
     ids = []
     for direction in ("issued", "received"):
-        jid = enqueue_sat_sync(issuer_id, direction, job_type="xml")
+        jid = enqueue_sat_sync(issuer_id, direction, job_type="xml", priority=1)
         if jid:
             ids.append(jid)
     return ids
