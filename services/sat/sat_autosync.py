@@ -337,14 +337,20 @@ def enqueue_active_issuers_current_month() -> int:
     """Enqueue sync for current month of all issuers with validated FIEL.
 
     Called by hourly cron. Uses smart priority (current month = urgent).
+    Skips issuers inactive for 90+ days.
     Returns number of jobs enqueued.
     """
-    from services.sat.sat_priority import compute_priority, is_user_active_recently
+    from services.sat.sat_priority import (
+        compute_priority, is_user_active_recently, should_skip_inactive_issuer,
+    )
 
     issuers = _get_fiel_issuers()
     ym = _ym_range(1)[0]
     count = 0
     for iid in issuers:
+        if should_skip_inactive_issuer(iid):
+            logger.debug("Skipping inactive issuer %s for current month sync", iid)
+            continue
         active = is_user_active_recently(iid)
         prio = compute_priority(iid, ym, user_active_recently=active)
         for direction in ("issued", "received"):
@@ -358,14 +364,19 @@ def enqueue_active_issuers_last_3_months() -> int:
     """Enqueue sync for last 3 months of all issuers with validated FIEL.
 
     Called by daily cron. Priority decreases for older months.
+    Skips issuers inactive for 90+ days.
     Returns number of jobs enqueued.
     """
-    from services.sat.sat_priority import compute_priority, is_user_active_recently
+    from services.sat.sat_priority import (
+        compute_priority, is_user_active_recently, should_skip_inactive_issuer,
+    )
 
     issuers = _get_fiel_issuers()
     yms = _ym_range(3)
     count = 0
     for iid in issuers:
+        if should_skip_inactive_issuer(iid):
+            continue
         active = is_user_active_recently(iid)
         for ym in yms:
             prio = compute_priority(iid, ym, user_active_recently=active)
@@ -380,14 +391,19 @@ def enqueue_active_issuers_last_6_months() -> int:
     """Enqueue sync for last 6 months of all issuers with validated FIEL.
 
     Called by weekly cron. Deep backfill with low priority for old months.
+    Skips issuers inactive for 90+ days.
     Returns number of jobs enqueued.
     """
-    from services.sat.sat_priority import compute_priority, is_user_active_recently
+    from services.sat.sat_priority import (
+        compute_priority, is_user_active_recently, should_skip_inactive_issuer,
+    )
 
     issuers = _get_fiel_issuers()
     yms = _ym_range(6)
     count = 0
     for iid in issuers:
+        if should_skip_inactive_issuer(iid):
+            continue
         active = is_user_active_recently(iid)
         for ym in yms:
             prio = compute_priority(iid, ym, user_active_recently=active)

@@ -577,6 +577,8 @@ def apply_migrations(
                             "CREATE INDEX IF NOT EXISTS idx_sat_jobs_run_after "
                             "ON sat_jobs(status, run_after)"
                         )
+                    elif version == "057":
+                        _safe_add_column(conn, "users", "last_login_at", "TEXT")
                     else:
                         with open(filepath, "r", encoding="utf-8") as f:
                             sql = f.read()

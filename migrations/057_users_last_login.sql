@@ -1,0 +1,2 @@
+-- 057: Add last_login_at column to users for activity tracking.
+-- Applied via migrations_runner.py (safe_add_column).

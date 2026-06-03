@@ -124,6 +124,15 @@ def register_login_routes(router, templates):
                 return RedirectResponse(url="/login?error=bad_credentials", status_code=302)
             logger.debug("LOGIN: password OK, setting session")
             clear_login_cooldown(email)
+            # Track last login time for sync prioritization
+            try:
+                from database import db_execute
+                db_execute(
+                    "UPDATE users SET last_login_at = datetime('now') WHERE id = ?",
+                    (user["id"],),
+                )
+            except Exception:
+                pass  # non-critical
             memberships = users.get_memberships_for_user(user["id"])
             if not memberships:
                 audit.log(action="login", user_id=user["id"], issuer_id=0, details="credentials", request=request)

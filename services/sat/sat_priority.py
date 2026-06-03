@@ -57,7 +57,7 @@ def compute_priority(
 def is_user_active_recently(issuer_id: int, days: int = 7) -> bool:
     """Check if any user linked to this issuer has been active recently.
 
-    Uses audit_log to detect recent activity (login, page views, etc.).
+    Checks users.last_login_at first (fast), falls back to audit_log.
 
     Args:
         issuer_id: Tenant ID.
@@ -67,6 +67,18 @@ def is_user_active_recently(issuer_id: int, days: int = 7) -> bool:
         True if at least one linked user has recent activity.
     """
     try:
+        # Fast path: check last_login_at on users table
+        rows = db_rows(
+            "SELECT 1 FROM users u "
+            "JOIN memberships m ON m.user_id = u.id AND m.issuer_id = ? "
+            "WHERE u.last_login_at IS NOT NULL "
+            "AND datetime(u.last_login_at) >= datetime('now', '-' || ? || ' days') "
+            "LIMIT 1",
+            (issuer_id, days),
+        )
+        if rows:
+            return True
+        # Fallback: check audit_log
         rows = db_rows(
             "SELECT 1 FROM audit_log al "
             "JOIN memberships m ON m.user_id = al.user_id AND m.issuer_id = ? "
@@ -77,3 +89,41 @@ def is_user_active_recently(issuer_id: int, days: int = 7) -> bool:
         return bool(rows)
     except Exception:
         return False
+
+
+def should_skip_inactive_issuer(issuer_id: int, max_days_inactive: int = 90) -> bool:
+    """Skip sync for issuers whose owners haven't logged in for X days.
+
+    Saves SAT rate limit and CPU. They can re-sync via the 'expand history'
+    button when they come back.
+
+    Args:
+        issuer_id: Tenant ID.
+        max_days_inactive: Skip if no login within this many days.
+
+    Returns:
+        True if sync should be skipped (all owners inactive).
+    """
+    try:
+        # Check if ANY linked user has logged in recently
+        rows = db_rows(
+            "SELECT 1 FROM users u "
+            "JOIN memberships m ON m.user_id = u.id AND m.issuer_id = ? "
+            "WHERE u.last_login_at IS NOT NULL "
+            "AND datetime(u.last_login_at) >= datetime('now', '-' || ? || ' days') "
+            "LIMIT 1",
+            (issuer_id, max_days_inactive),
+        )
+        if rows:
+            return False  # has active user, don't skip
+        # Also check audit_log as fallback
+        rows = db_rows(
+            "SELECT 1 FROM audit_log al "
+            "JOIN memberships m ON m.user_id = al.user_id AND m.issuer_id = ? "
+            "WHERE al.created_at > datetime('now', '-' || ? || ' days') "
+            "LIMIT 1",
+            (issuer_id, max_days_inactive),
+        )
+        return not bool(rows)
+    except Exception:
+        return False  # on error, don't skip (safer)
