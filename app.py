@@ -754,14 +754,14 @@ async def redirect_token_middleware(request: Request, call_next):
 
 @app.get("/")
 def root(request: Request):
-    """Landing page for anonymous visitors; redirect to portal if logged in."""
-    if request.cookies.get(SESSION_COOKIE_NAME):
-        return RedirectResponse(url="/portal/home")
+    """Landing page. Logged-in visitors see a 'Ir al portal' CTA instead of login/register."""
     from datetime import date
     from services.billing.plans import PLANS
-    return templates.TemplateResponse(request, "landing.html", {
+    is_logged_in = bool(request.cookies.get(SESSION_COOKIE_NAME))
+    return templates.TemplateResponse(request, "public_landing.html", {
         "plans": PLANS,
         "current_year": date.today().year,
+        "is_logged_in": is_logged_in,
     })
 
 

@@ -39,32 +39,36 @@ def test_root_shows_landing_for_anonymous(anon_client):
     """GET / without session should render the landing page."""
     resp = anon_client.get("/", follow_redirects=False)
     assert resp.status_code == 200
-    assert "ContaNeta" in resp.text
-    assert "Prueba gratis" in resp.text
+    assert "contaneta" in resp.text.lower()
+    assert "prueba gratis" in resp.text.lower()
 
 
-def test_root_redirects_authenticated_to_portal(anon_client):
-    """GET / with a session cookie should redirect to /portal/home."""
+def test_root_shows_landing_for_authenticated_with_portal_cta(anon_client):
+    """GET / with a session cookie should still show landing, but with 'Ir al portal' CTA."""
     from tests.helpers import make_session_cookie
     cookies = make_session_cookie(issuer_id=1, user_id=1)
     resp = anon_client.get("/", follow_redirects=False, cookies=cookies)
-    assert resp.status_code in (302, 307)
-    assert "/portal/home" in resp.headers.get("location", "")
+    assert resp.status_code == 200
+    assert "Ir al portal" in resp.text
 
 
 def test_landing_includes_plan_prices(anon_client):
-    """Landing page should display plan prices from PLANS config."""
+    """Landing page should display the 3 plan prices."""
     resp = anon_client.get("/")
-    assert "$299" in resp.text or "$599" in resp.text
+    # New landing: Básico $119, Acompañado $499, Personalizado $1,299
+    assert "$119" in resp.text
+    assert "$499" in resp.text
+    assert "$1,299" in resp.text
 
 
 def test_landing_has_nav_links(anon_client):
-    """Landing page should have navigation links to pricing, demo, login."""
+    """Landing page should have navigation links to login and register."""
     resp = anon_client.get("/")
-    assert "/pricing" in resp.text
-    assert "/demo" in resp.text
     assert "/login" in resp.text
-    assert "/signup" in resp.text
+    assert "/register" in resp.text
+    # In-page anchors for sections
+    assert "#precios" in resp.text
+    assert "#funciones" in resp.text
 
 
 def test_pricing_has_spei_section(anon_client):
