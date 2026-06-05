@@ -93,6 +93,10 @@ STRIPE_WEBHOOK_SECRET = (os.getenv("STRIPE_WEBHOOK_SECRET") or "").strip() or No
 STRIPE_PRICE_ID = (os.getenv("STRIPE_PRICE_ID") or "").strip() or None
 SITE_URL = (os.getenv("SITE_URL") or "").strip() or None
 
+# Facturapi webhook signing secret (HMAC-SHA256 over raw body).
+# Generate in Facturapi dashboard → Configuración → Webhooks → endpoint.
+FACTURAPI_WEBHOOK_SECRET = (os.getenv("FACTURAPI_WEBHOOK_SECRET") or "").strip() or ""
+
 # Portal shell V2: rail + drawer (Mindtrip-style, delgado a la izquierda solo iconos). 0 = sidebar clásico; 1 = rail + drawer.
 PORTAL_SHELL_V2 = os.getenv("PORTAL_SHELL_V2", "0") == "1"
 

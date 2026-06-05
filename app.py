@@ -32,6 +32,7 @@ from config import (
 from migrations_runner import apply_migrations
 from routers.admin import get_admin_router
 from routers.api import router as api_router
+from routers.api.webhooks import router as webhooks_router
 from routers.auth import get_auth_router
 from routers.billing import router as billing_router
 from routers.invoicing import get_invoicing_router
@@ -1037,6 +1038,7 @@ app.include_router(get_portal_router(templates))
 app.include_router(get_invoicing_router(templates))
 app.include_router(get_admin_router(templates))
 app.include_router(billing_router)
+app.include_router(webhooks_router)
 app.include_router(get_legal_router(templates))
 app.include_router(sat_status_router)
 
