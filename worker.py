@@ -40,6 +40,7 @@ def _load_handlers() -> dict[str, JobHandler]:
         handle_sat_xml_backfill,
     )
     from services.sat.sat_full_sync import handle_sat_full_sync
+    from services.facturapi.provision import handle_facturapi_provision_org
     return {
         "sat_sync_month": handle_sat_sync_month,
         "sat_refresh_light": handle_sat_refresh_light,
@@ -47,6 +48,7 @@ def _load_handlers() -> dict[str, JobHandler]:
         "sat_xml_backfill": handle_sat_xml_backfill,
         "sat_verify_pending": handle_sat_verify_pending,
         "sat_full_sync": handle_sat_full_sync,
+        "facturapi_provision_org": handle_facturapi_provision_org,
     }
 
 

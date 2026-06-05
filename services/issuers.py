@@ -204,6 +204,26 @@ def create_issuer_with_token(
             (issuer_id, token),
         )
         conn.commit()
-        return (issuer_id, token)
     finally:
         conn.close()
+
+    # Enqueue Facturapi org provisioning out-of-band. Signup must not block on
+    # Facturapi availability. If FACTURAPI_SECRET_KEY is unset the job will
+    # fail and stay queued for retry — no impact on the signup response.
+    try:
+        from services import jobs as jobs_service
+        jobs_service.enqueue_job(
+            name="facturapi_provision_org",
+            issuer_id=issuer_id,
+            payload={"reason": "signup"},
+            max_attempts=5,
+        )
+    except Exception:
+        # Never let job enqueueing break signup. The org can be backfilled
+        # later by re-enqueueing manually.
+        import logging
+        logging.getLogger(__name__).exception(
+            "Failed to enqueue facturapi_provision_org for issuer_id=%s", issuer_id
+        )
+
+    return (issuer_id, token)

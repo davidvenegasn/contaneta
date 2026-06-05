@@ -1,0 +1,169 @@
+{% extends "base_portal.html" %}
+{% set title = 'Configurar facturación' %}
+
+{% block content %}
+<header class="app-header app-header--with-back">
+  <div class="app-header__left">
+    <a href="/portal/home" class="btn btn--ghost btn--sm app-header__back" style="text-decoration:none;">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" width="18" height="18"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+      Inicio
+    </a>
+    <div>
+      <h1 class="app-title">Configurar facturación</h1>
+      <p class="app-subtitle muted">Sube tu CSD, firma tu carta manifiesto y queda listo para emitir CFDIs.</p>
+    </div>
+  </div>
+</header>
+
+<div id="facturapiSetup"
+     data-org-id="{{ facturapi_org_id or '' }}"
+     data-manifest-signed="{{ '1' if manifest_signed_at else '0' }}"
+     data-iframe-url="{{ iframe_url or '' }}">
+
+  {# ── State 1: org provisioning still pending ─────────────────────────── #}
+  {% if not facturapi_org_id %}
+  <div class="card u-mb-14" id="stateProvisioning">
+    <h2 class="card__title">Preparando tu cuenta</h2>
+    <p>Estamos creando tu organización en nuestro proveedor de timbrado. Esto suele tardar unos segundos.</p>
+    <p class="muted u-mt-8">Esta página se actualizará sola en cuanto esté lista.</p>
+    <form id="retryProvisionForm" method="post" action="/portal/api/facturapi/retry-provision" class="u-mt-12">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button type="submit" class="btn btn--ghost btn--sm">Reintentar manualmente</button>
+    </form>
+  </div>
+
+  {# ── State 2: ready to upload CSD + sign manifesto ────────────────────── #}
+  {% elif not manifest_signed_at %}
+  <div class="card u-mb-14" id="stateCsd">
+    <h2 class="card__title">Paso 1 — Sube tu CSD</h2>
+    <p>Necesitamos tu Certificado de Sello Digital (CSD), no tu FIEL. Los archivos van directo a nuestro proveedor de timbrado, no se almacenan en ContaNeta.</p>
+    <form id="csdUploadForm" method="post" action="/portal/api/facturapi/upload-csd" enctype="multipart/form-data" class="u-mt-12">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div class="form-row">
+        <label for="cer_file">Certificado (.cer)</label>
+        <input id="cer_file" type="file" name="cer_file" accept=".cer" required>
+      </div>
+      <div class="form-row u-mt-8">
+        <label for="key_file">Llave privada (.key)</label>
+        <input id="key_file" type="file" name="key_file" accept=".key" required>
+      </div>
+      <div class="form-row u-mt-8">
+        <label for="csd_password">Contraseña de la llave</label>
+        <input id="csd_password" type="password" name="password" autocomplete="off" required>
+      </div>
+      <div class="form-row u-mt-12">
+        <button type="submit" class="btn btn--primary" id="csdSubmitBtn">Subir CSD</button>
+      </div>
+      <p id="csdFeedback" class="muted u-mt-8" role="status" aria-live="polite"></p>
+    </form>
+  </div>
+
+  <div class="card u-mb-14" id="stateManifest" {% if not iframe_url %}hidden{% endif %}>
+    <h2 class="card__title">Paso 2 — Firma tu carta manifiesto</h2>
+    <p>Firma con tu e.firma (FIEL) — solo se usa una vez para autorizar al PAC. No se almacena.</p>
+    {% if iframe_url %}
+    <iframe src="{{ iframe_url }}"
+            title="Carta manifiesto"
+            style="width:100%;min-height:520px;border:1px solid var(--border, #e5e7eb);border-radius:12px;margin-top:12px;"
+            sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>
+    {% endif %}
+  </div>
+
+  {# ── State 3: all done ────────────────────────────────────────────────── #}
+  {% else %}
+  <div class="card u-mb-14" id="stateDone">
+    <h2 class="card__title">✓ Listo para facturar</h2>
+    <p>Tu CSD está cargado y tu carta manifiesto firmada. Puedes empezar a emitir CFDIs ahora.</p>
+    <p class="muted u-mt-8">Firmado el: {{ manifest_signed_at }}</p>
+    <div class="u-mt-12">
+      <a href="/portal/home" class="btn btn--primary">Ir al inicio</a>
+      <a href="/invoicing/new" class="btn btn--ghost">Emitir factura</a>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<script>
+(function () {
+  var root = document.getElementById('facturapiSetup');
+  if (!root) return;
+
+  var orgId = root.dataset.orgId || '';
+  var manifestSigned = root.dataset.manifestSigned === '1';
+
+  // Poll /portal/api/facturapi/status until something changes, then reload.
+  var pollInterval = null;
+  function startPolling() {
+    if (pollInterval) return;
+    pollInterval = setInterval(function () {
+      fetch('/portal/api/facturapi/status', { credentials: 'same-origin' })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          if (!data || data.ok !== true) return;
+          var changed = false;
+          if (!orgId && data.provisioned) changed = true;
+          if (!manifestSigned && data.manifest_signed) changed = true;
+          if (changed) {
+            clearInterval(pollInterval);
+            window.location.reload();
+          }
+        })
+        .catch(function () { /* swallow */ });
+    }, 3000);
+  }
+
+  // Always poll — the iframe gives no completion signal we can read cross-origin,
+  // and the org may still be provisioning.
+  startPolling();
+
+  // CSD upload handling
+  var csdForm = document.getElementById('csdUploadForm');
+  if (csdForm) {
+    var feedback = document.getElementById('csdFeedback');
+    var submitBtn = document.getElementById('csdSubmitBtn');
+    csdForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+      feedback.textContent = 'Subiendo a Facturapi…';
+      feedback.style.color = '';
+      submitBtn.disabled = true;
+      var fd = new FormData(csdForm);
+      fetch(csdForm.action, {
+        method: 'POST',
+        body: fd,
+        credentials: 'same-origin'
+      })
+        .then(function (r) { return r.json().then(function (j) { return { status: r.status, body: j }; }); })
+        .then(function (res) {
+          if (res.body && res.body.ok) {
+            feedback.style.color = 'var(--success, #16a34a)';
+            feedback.textContent = '✓ CSD cargado. Ahora firma la carta manifiesto abajo.';
+            setTimeout(function () { window.location.reload(); }, 1200);
+          } else {
+            feedback.style.color = 'var(--danger, #dc2626)';
+            var msg = (res.body && res.body.error && res.body.error.message) || 'Error al subir CSD';
+            feedback.textContent = msg;
+            submitBtn.disabled = false;
+          }
+        })
+        .catch(function () {
+          feedback.style.color = 'var(--danger, #dc2626)';
+          feedback.textContent = 'Error de red. Intenta de nuevo.';
+          submitBtn.disabled = false;
+        });
+    });
+  }
+
+  // Retry provision (manual button)
+  var retryForm = document.getElementById('retryProvisionForm');
+  if (retryForm) {
+    retryForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var fd = new FormData(retryForm);
+      fetch(retryForm.action, { method: 'POST', body: fd, credentials: 'same-origin' })
+        .then(function () { window.location.reload(); })
+        .catch(function () { window.location.reload(); });
+    });
+  }
+})();
+</script>
+{% endblock %}
