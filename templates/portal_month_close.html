@@ -10,7 +10,7 @@
     <form method="get" action="/portal/month-close" style="display:flex; gap:10px; align-items:end;">
       <div>
         <div class="muted" style="font-size:12px; margin-bottom:6px;">Mes (YYYY-MM)</div>
-        <input name="ym" value="{{ ym }}" style="padding:10px 12px; border:1px solid #cbd5e1; border-radius:10px; width:140px;" />
+        <input name="ym" value="{{ ym }}" class="form-input" style="padding:10px 12px; border-radius:10px; width:140px;" />
       </div>
       <button class="btn btn-primary" type="submit">Ver</button>
     </form>
@@ -58,10 +58,10 @@
     <h2 style="margin-top:0;">Checklist</h2>
     <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap:12px;">
       {% for it in items %}
-      <div style="border:1px solid #e2e8f0; border-radius:14px; padding:14px; background:#fff;">
+      <div class="nightmode-card">
         <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:10px;">
           <div>
-            <div style="font-weight:600; color:#0f172a;">{{ it.label }}</div>
+            <div style="font-weight:600; color:var(--text, #0f172a);">{{ it.label }}</div>
             <div class="muted" style="font-size:13px; margin-top:6px;">{{ it.meta }}</div>
           </div>
           {% if it.ok %}

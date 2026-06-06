@@ -16,37 +16,32 @@
     {# Connection status indicator #}
     <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem;">
       {% if connected and (not warning or warning.level != 'error') %}
-        {# Green dot — connected #}
-        <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#22c55e;flex-shrink:0;" title="Conectado"></span>
-        <span style="font-weight:600;color:#166534;">Conectado</span>
+        <span class="sat-status-dot sat-status-dot--ok" title="Conectado"></span>
+        <span class="sat-status-text--ok">Conectado</span>
       {% elif connected and warning and warning.level == 'warning' %}
-        {# Yellow dot — warning #}
-        <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#eab308;flex-shrink:0;" title="Advertencia"></span>
-        <span style="font-weight:600;color:#854d0e;">Conectado (con advertencia)</span>
+        <span class="sat-status-dot sat-status-dot--warn" title="Advertencia"></span>
+        <span class="sat-status-text--warn">Conectado (con advertencia)</span>
       {% else %}
-        {# Red dot — disconnected or error #}
-        <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#ef4444;flex-shrink:0;" title="Desconectado"></span>
-        <span style="font-weight:600;color:#991b1b;">No conectado</span>
+        <span class="sat-status-dot sat-status-dot--error" title="Desconectado"></span>
+        <span class="sat-status-text--error">No conectado</span>
       {% endif %}
     </div>
 
     {# FIEL warning banner #}
     {% if warning %}
-      <div style="background:{% if warning.level == 'error' %}#fef2f2{% else %}#fffbeb{% endif %};border:1px solid {% if warning.level == 'error' %}#fecaca{% else %}#fde68a{% endif %};border-radius:6px;padding:.5rem .75rem;margin-bottom:.5rem;font-size:.85rem;">
-        <span style="color:{% if warning.level == 'error' %}#991b1b{% else %}#92400e{% endif %};">
-          {{ warning.message }}
-          {% if warning.days_remaining is not none %}
-            ({{ warning.days_remaining }} dias restantes)
-          {% endif %}
-        </span>
+      <div class="fiel-warning-banner {{ 'fiel-warning-banner--error' if warning.level == 'error' else 'fiel-warning-banner--warn' }}" style="margin-bottom:.5rem;">
+        {{ warning.message }}
+        {% if warning.days_remaining is not none %}
+          ({{ warning.days_remaining }} dias restantes)
+        {% endif %}
       </div>
     {% endif %}
 
     {# Sync details #}
-    <div style="font-size:.85rem;color:#6b7280;">
+    <div class="muted" style="font-size:.85rem;">
       <div style="display:flex;justify-content:space-between;margin-bottom:.25rem;">
         <span>Ultima sincronizacion:</span>
-        <span style="color:#374151;font-weight:500;">
+        <span style="font-weight:500;color:var(--text-secondary, #374151);">
           {% if last_sync_at %}
             {{ last_sync_at[:16]|replace('T', ' ') }}
           {% else %}
@@ -56,7 +51,7 @@
       </div>
       <div style="display:flex;justify-content:space-between;margin-bottom:.25rem;">
         <span>Estado:</span>
-        <span style="font-weight:500;color:{% if last_sync_status == 'success' %}#166534{% elif last_sync_status == 'error' %}#991b1b{% else %}#6b7280{% endif %};">
+        <span class="{{ 'sat-status-text--ok' if last_sync_status == 'success' else ('sat-status-text--error' if last_sync_status == 'error' else '') }}" style="font-weight:500;">
           {% if last_sync_status == 'success' %}
             Exitoso
           {% elif last_sync_status == 'error' %}
@@ -68,7 +63,7 @@
       </div>
       <div style="display:flex;justify-content:space-between;margin-bottom:.25rem;">
         <span>CFDI sincronizados:</span>
-        <span style="color:#374151;font-weight:500;">{{ invoices_synced }}</span>
+        <span style="font-weight:500;color:var(--text-secondary, #374151);">{{ invoices_synced }}</span>
       </div>
     </div>
 

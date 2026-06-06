@@ -18,9 +18,9 @@
 {% macro status_pill(s) %}
   {% set st = (s or '').upper() %}
   {% if st in ['V','VIGENTE'] %}
-    <span class="pill" style="border-color:#cfead9; background:#f3fcf6;">Vigente</span>
+    <span class="pill pill--vigente-inline">Vigente</span>
   {% elif st in ['C','CANCELADO','CANCELADA'] %}
-    <span class="pill" style="border-color:#f2c9c9; background:#fff4f4;">Cancelada</span>
+    <span class="pill pill--cancelada-inline">Cancelada</span>
   {% else %}
     <span class="pill">{{ s or '-' }}</span>
   {% endif %}
@@ -117,7 +117,7 @@
                   {% elif r.xml_status == 'pending' %}
                     <span class="muted" style="font-size:11px;">Descargando...</span>
                   {% elif r.xml_status == 'error' %}
-                    <span class="muted" style="font-size:11px; color:#d32f2f;">Error</span>
+                    <span class="muted" style="font-size:11px; color:var(--danger, #d32f2f);">Error</span>
                   {% else %}
                     <span class="muted">(sin XML)</span>
                   {% endif %}

@@ -1,0 +1,480 @@
+/**
+ * Dark-mode overrides for components that lack html.nightmode rules.
+ *
+ * Loaded AFTER all other portal CSS so higher source-order wins
+ * without needing !important. Uses tokens defined in the
+ * html.nightmode {} block of portal.css:3715.
+ *
+ * Organised by source file / component area.
+ */
+
+/* ============================================================
+   1. portal_shell.css — Modals
+   ============================================================ */
+html.nightmode .modal__backdrop {
+  background: rgba(0, 0, 0, 0.65);
+}
+html.nightmode .modal__panel {
+  background: var(--surface, #161b22);
+  border-color: var(--border-strong, rgba(255,255,255,.14));
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.5);
+}
+html.nightmode .modal__panel .modal__head {
+  border-bottom-color: var(--border, rgba(255,255,255,.08));
+}
+html.nightmode .modal__panel .modal__foot {
+  border-top-color: var(--border, rgba(255,255,255,.08));
+}
+html.nightmode .modal__panel .modal__title {
+  color: var(--text, #e6edf3);
+}
+html.nightmode .modal__panel .modal__subtitle {
+  color: var(--text-muted, #8b949e);
+}
+
+/* ============================================================
+   2. portal_components.css — Quick-invoice modals
+   ============================================================ */
+html.nightmode .quick-invoice-modal__backdrop {
+  background: rgba(0, 0, 0, 0.6);
+}
+html.nightmode .quick-invoice-modal__panel {
+  background: var(--surface, #161b22);
+  box-shadow: 0 20px 50px rgba(0,0,0,.5);
+}
+html.nightmode .quick-invoice-modal__header {
+  background: var(--surface, #161b22);
+  border-bottom-color: var(--border, rgba(255,255,255,.08));
+}
+html.nightmode .quick-invoice-modal__close {
+  color: var(--text-muted, #8b949e);
+}
+html.nightmode .quick-invoice-modal__close:hover {
+  color: var(--text, #e6edf3);
+}
+html.nightmode .quick-invoice-modal__footer {
+  background: var(--surface, #161b22);
+  border-top-color: var(--border, rgba(255,255,255,.08));
+}
+html.nightmode .quick-invoice-modal__section .quick-form-grid {
+  background: var(--surface-2, #21262d);
+  border-color: var(--border, rgba(255,255,255,.08));
+}
+html.nightmode .quick-invoice-modal__error {
+  background: var(--danger-bg, rgba(248,81,73,.12));
+  color: var(--danger-text, #f85149);
+  border-color: var(--danger-border, rgba(248,81,73,.3));
+}
+html.nightmode .quick-invoice-modal__label {
+  color: var(--text-muted, #8b949e);
+}
+html.nightmode .quick-invoice-modal__section-title {
+  color: var(--text-muted, #8b949e);
+}
+
+/* ============================================================
+   3. portal_components.css — Pills (hardcoded hex)
+   ============================================================ */
+html.nightmode .pill--sent {
+  border-color: rgba(88,166,255,.3);
+  background: rgba(88,166,255,.12);
+}
+html.nightmode .pill--invoiced {
+  border-color: rgba(129,140,248,.3);
+  background: rgba(129,140,248,.12);
+}
+
+/* ============================================================
+   4. portal_components.css — Table scroll-fade
+   ============================================================ */
+html.nightmode .table-wrap--fade::after {
+  background: linear-gradient(to right, transparent, var(--surface-0, #1c2128));
+}
+
+/* ============================================================
+   5. portal_components.css — Guides page
+   ============================================================ */
+html.nightmode .guides-search__input {
+  background: var(--surface, #161b22);
+  border-color: var(--border-strong, rgba(255,255,255,.14));
+  color: var(--text, #e6edf3);
+}
+html.nightmode .guides-chip {
+  background: var(--surface, #161b22);
+  border-color: var(--border, rgba(255,255,255,.08));
+  color: var(--text-secondary, #b1bac4);
+}
+html.nightmode .guides-chip:hover {
+  border-color: var(--accent, #818cf8);
+  color: var(--accent, #818cf8);
+}
+html.nightmode .guides-chip.is-active {
+  background: var(--accent, #818cf8);
+  color: #fff;
+  border-color: var(--accent, #818cf8);
+}
+html.nightmode .guides-accordion-list .guide-accordion__toggle {
+  background: var(--surface, #161b22);
+  border-color: var(--border, rgba(255,255,255,.08));
+  color: var(--text, #e6edf3);
+}
+html.nightmode .guide-accordion__toggle {
+  color: var(--text, #e6edf3);
+  border-top-color: var(--border, rgba(255,255,255,.08));
+}
+html.nightmode .guide-accordion__body {
+  color: var(--text-secondary, #b1bac4);
+}
+html.nightmode .guides-badge--soon {
+  background: var(--warn-bg, rgba(210,153,34,.12));
+  color: var(--warn-text, #d29922);
+  border-color: var(--warn-border, rgba(210,153,34,.3));
+}
+
+/* ============================================================
+   6. portal_components.css — Pagination
+   ============================================================ */
+html.nightmode .table-pagination {
+  border-top-color: var(--border, rgba(255,255,255,.08));
+  color: var(--text-muted, #8b949e);
+}
+
+/* ============================================================
+   7. portal.css — Inline alerts (.inline-alert, .fiel-alert)
+   ============================================================ */
+html.nightmode .fiel-alert {
+  background: var(--danger-bg, rgba(248,81,73,.12));
+  border-color: var(--danger-border, rgba(248,81,73,.3));
+  color: var(--danger-text, #f85149);
+}
+html.nightmode .fiel-alert__icon {
+  background: rgba(248,81,73,.15);
+  color: var(--danger, #f85149);
+}
+html.nightmode .fiel-alert__action {
+  background: rgba(248,81,73,.15);
+  color: var(--danger-text, #f85149);
+}
+html.nightmode .fiel-alert__action:hover {
+  background: rgba(248,81,73,.25);
+}
+
+html.nightmode .inline-alert--success {
+  background: var(--success-bg, rgba(63,185,80,.12));
+  border-color: var(--success-border, rgba(63,185,80,.3));
+  color: var(--success-text, #3fb950);
+}
+html.nightmode .inline-alert--success .inline-alert__icon {
+  background: rgba(63,185,80,.15);
+  color: var(--success-text, #3fb950);
+}
+html.nightmode .inline-alert--warning {
+  background: var(--warn-bg, rgba(210,153,34,.12));
+  border-color: var(--warn-border, rgba(210,153,34,.3));
+  color: var(--warn-text, #d29922);
+}
+html.nightmode .inline-alert--warning .inline-alert__icon {
+  background: rgba(210,153,34,.15);
+  color: var(--warn-text, #d29922);
+}
+html.nightmode .inline-alert--info {
+  background: var(--info-bg, rgba(88,166,255,.12));
+  border-color: var(--info-border, rgba(88,166,255,.3));
+  color: var(--info-text, #58a6ff);
+}
+html.nightmode .inline-alert--info .inline-alert__icon {
+  background: rgba(88,166,255,.15);
+  color: var(--info-text, #58a6ff);
+}
+
+/* ============================================================
+   8. portal.css — User menu plan badge
+   ============================================================ */
+html.nightmode .user-menu__plan-badge--trial {
+  background: rgba(210,153,34,.15);
+  color: var(--warn-text, #d29922);
+}
+html.nightmode .user-menu__plan-badge--paid {
+  background: rgba(129,140,248,.15);
+  color: var(--accent, #818cf8);
+}
+
+/* ============================================================
+   9. portal.css — Breadcrumb
+   ============================================================ */
+html.nightmode .portal-breadcrumb {
+  color: var(--text-muted, #8b949e);
+}
+html.nightmode .portal-breadcrumb a {
+  color: var(--text-secondary, #b1bac4);
+}
+html.nightmode .portal-breadcrumb a:hover {
+  color: var(--accent, #818cf8);
+}
+
+/* ============================================================
+   10. components.css — Form inputs
+   ============================================================ */
+html.nightmode .input,
+html.nightmode .form-input,
+html.nightmode .ui-input,
+html.nightmode select.input,
+html.nightmode textarea.input {
+  background: var(--surface-2, #21262d);
+  border-color: var(--border-strong, rgba(255,255,255,.14));
+  color: var(--text, #e6edf3);
+}
+html.nightmode .input:focus,
+html.nightmode .form-input:focus,
+html.nightmode .ui-input:focus {
+  border-color: var(--accent, #818cf8);
+  box-shadow: 0 0 0 3px rgba(129,140,248,.2);
+}
+html.nightmode .input::placeholder,
+html.nightmode .form-input::placeholder,
+html.nightmode .ui-input::placeholder {
+  color: var(--text-muted, #8b949e);
+}
+
+/* ============================================================
+   11. components.css — Confirm modal
+   ============================================================ */
+html.nightmode .confirm-modal__card {
+  background: var(--surface, #161b22);
+  box-shadow: 0 20px 50px rgba(0,0,0,.5);
+}
+html.nightmode .confirm-modal__title {
+  color: var(--text, #e6edf3);
+}
+html.nightmode .confirm-modal__message {
+  color: var(--text-secondary, #b1bac4);
+}
+html.nightmode .confirm-modal__btn--cancel {
+  background: var(--surface-3, #30363d);
+  color: var(--text, #e6edf3);
+}
+html.nightmode .confirm-modal__btn--cancel:hover {
+  background: var(--surface-2, #21262d);
+}
+
+/* ============================================================
+   12. components.css — Success overlay
+   ============================================================ */
+html.nightmode .success-overlay__card {
+  background: var(--surface, #161b22);
+  box-shadow: 0 20px 50px rgba(0,0,0,.5);
+}
+html.nightmode .success-overlay__title {
+  color: var(--text, #e6edf3);
+}
+html.nightmode .success-overlay__message {
+  color: var(--text-secondary, #b1bac4);
+}
+
+/* ============================================================
+   13. components.css — Demo banner
+   ============================================================ */
+html.nightmode .demo-banner {
+  background: rgba(88,166,255,.1);
+  border-color: rgba(88,166,255,.2);
+}
+html.nightmode .demo-banner__text {
+  color: var(--info-text, #58a6ff);
+}
+html.nightmode .demo-banner__link {
+  color: var(--info, #58a6ff);
+}
+
+/* ============================================================
+   14. tooltips.css — Help tooltip trigger & bubble
+   ============================================================ */
+html.nightmode .help-tooltip__trigger {
+  background: var(--surface-2, #21262d);
+  border-color: var(--border, rgba(255,255,255,.08));
+  color: var(--text-muted, #8b949e);
+}
+html.nightmode .help-tooltip__bubble {
+  background: var(--surface-3, #30363d);
+  color: var(--text, #e6edf3);
+  border-color: var(--border-strong, rgba(255,255,255,.14));
+}
+html.nightmode .help-tooltip__bubble::before {
+  border-bottom-color: var(--border-strong, rgba(255,255,255,.14));
+}
+html.nightmode .help-tooltip__bubble::after {
+  border-bottom-color: var(--surface-3, #30363d);
+}
+
+/* ============================================================
+   15. portal.css — Settings tabs
+   ============================================================ */
+html.nightmode .settings-tabs {
+  border-bottom-color: var(--border, rgba(255,255,255,.08));
+}
+html.nightmode .settings-tab {
+  color: var(--text-muted, #8b949e);
+}
+html.nightmode .settings-tab:hover {
+  color: var(--text, #e6edf3);
+}
+html.nightmode .settings-tab.is-active {
+  color: var(--accent, #818cf8);
+  border-bottom-color: var(--accent, #818cf8);
+}
+
+/* ============================================================
+   16. portal_components.css — Section title, headings, labels
+   ============================================================ */
+html.nightmode .section-title {
+  color: var(--text, #e6edf3);
+}
+html.nightmode .portal label,
+html.nightmode .portal .label {
+  color: var(--label-color, #b1bac4);
+}
+
+/* ============================================================
+   17. portal_components.css — Quick-invoice form inputs
+   ============================================================ */
+html.nightmode .quick-invoice-form .input--full,
+html.nightmode .quick-choose-form .input--full {
+  background: var(--surface-2, #21262d);
+  border-color: var(--border-strong, rgba(255,255,255,.14));
+  color: var(--text, #e6edf3);
+}
+
+/* ============================================================
+   18. Template inline-style fixes — classes for dark-mode aware
+       status indicators (replaces hardcoded hex in templates)
+   ============================================================ */
+
+/* SAT status card: status dots & text */
+.sat-status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.sat-status-dot--ok { background: var(--success, #059669); }
+.sat-status-dot--warn { background: var(--warn, #d97706); }
+.sat-status-dot--error { background: var(--danger, #ef4444); }
+
+.sat-status-text--ok { color: var(--success-text, #065f46); font-weight: 600; }
+.sat-status-text--warn { color: var(--warn-text, #92400e); font-weight: 600; }
+.sat-status-text--error { color: var(--danger-text, #991b1b); font-weight: 600; }
+
+html.nightmode .sat-status-text--ok { color: var(--success-text, #3fb950); }
+html.nightmode .sat-status-text--warn { color: var(--warn-text, #d29922); }
+html.nightmode .sat-status-text--error { color: var(--danger-text, #f85149); }
+
+/* FIEL warning banner (replaces inline background/border/color) */
+.fiel-warning-banner {
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 14px;
+  line-height: 1.45;
+}
+.fiel-warning-banner--error {
+  background: var(--danger-bg, #fef2f2);
+  border: 1px solid var(--danger-border, #fecaca);
+  color: var(--danger-text, #991b1b);
+}
+.fiel-warning-banner--warn {
+  background: var(--warn-bg, #fffbeb);
+  border: 1px solid var(--warn-border, #fde68a);
+  color: var(--warn-text, #92400e);
+}
+html.nightmode .fiel-warning-banner--error {
+  background: var(--danger-bg, rgba(248,81,73,.12));
+  border-color: var(--danger-border, rgba(248,81,73,.3));
+  color: var(--danger-text, #f85149);
+}
+html.nightmode .fiel-warning-banner--warn {
+  background: var(--warn-bg, rgba(210,153,34,.12));
+  border-color: var(--warn-border, rgba(210,153,34,.3));
+  color: var(--warn-text, #d29922);
+}
+
+/* Month-close card (replaces inline background:#fff) */
+.nightmode-card {
+  background: var(--card-bg, #fff);
+  border: 1px solid var(--border, rgba(0,0,0,0.06));
+  border-radius: 14px;
+  padding: 14px;
+}
+html.nightmode .nightmode-card {
+  background: var(--surface, #161b22);
+  border-color: var(--border-strong, rgba(255,255,255,.14));
+}
+
+/* Breadcrumb logo text (replaces inline color:#0A0A0A) */
+html.nightmode .portal-breadcrumb__logo {
+  color: var(--text, #e6edf3);
+}
+
+/* ============================================================
+   19. Nomina pills with inline status colors
+   ============================================================ */
+.pill--vigente-inline {
+  border-color: var(--success-border, #a7f3d0);
+  background: var(--success-bg, #ecfdf5);
+}
+.pill--cancelada-inline {
+  border-color: var(--danger-border, #fecaca);
+  background: var(--danger-bg, #fef2f2);
+}
+html.nightmode .pill--vigente-inline {
+  border-color: var(--success-border, rgba(63,185,80,.3));
+  background: var(--success-bg, rgba(63,185,80,.12));
+}
+html.nightmode .pill--cancelada-inline {
+  border-color: var(--danger-border, rgba(248,81,73,.3));
+  background: var(--danger-bg, rgba(248,81,73,.12));
+}
+
+/* ============================================================
+   20. portal.css — Actions card grid items (home page)
+   ============================================================ */
+html.nightmode .actions-card__grid-item {
+  color: var(--text, #e6edf3);
+}
+html.nightmode .actions-card__grid-item:hover {
+  background: var(--surface-2, #21262d);
+}
+
+/* ============================================================
+   21. Onboarding wizard (onboarding.css)
+   ============================================================ */
+html.nightmode .onboarding-card {
+  background: var(--surface, #161b22);
+  border-color: var(--border-strong, rgba(255,255,255,.14));
+}
+html.nightmode .onboarding-step__title {
+  color: var(--text, #e6edf3);
+}
+html.nightmode .onboarding-step__desc {
+  color: var(--text-secondary, #b1bac4);
+}
+html.nightmode .onboarding-stepper__label {
+  color: var(--text-muted, #8b949e);
+}
+
+/* ============================================================
+   22. Muted text color override
+   ============================================================ */
+html.nightmode .muted {
+  color: var(--text-muted, #8b949e);
+}
+
+/* ============================================================
+   23. Cards with table shadows
+   ============================================================ */
+html.nightmode .card:has(.table-wrap),
+html.nightmode .card--invoice-list {
+  box-shadow: 0 1px 3px rgba(0,0,0,.2), 0 1px 2px rgba(0,0,0,.15);
+}
+html.nightmode .card:has(.table-wrap):hover,
+html.nightmode .card--invoice-list:hover {
+  box-shadow: 0 2px 8px rgba(0,0,0,.3), 0 1px 3px rgba(0,0,0,.2);
+}

@@ -1,7 +1,7 @@
 {# Breadcrumb del portal. Requiere: active_page (del contexto de base_portal). #}
 <nav class="portal-topbar__breadcrumb" aria-label="Breadcrumb">
   <a href="/" class="portal-topbar__brand" aria-label="Ir a la página principal de Contaneta"
-     style="display:inline-flex;align-items:baseline;color:#0A0A0A;text-decoration:none;font-weight:500;font-size:20px;letter-spacing:-0.5px;line-height:1;">contaneta<span style="color:#6366F1;">.</span></a>
+     style="display:inline-flex;align-items:baseline;color:var(--text, #0A0A0A);text-decoration:none;font-weight:500;font-size:20px;letter-spacing:-0.5px;line-height:1;" class="portal-breadcrumb__logo">contaneta<span style="color:var(--accent, #6366F1);">.</span></a>
   {% if active_page == 'issued' %}
     <span class="portal-topbar__breadcrumb-sep" aria-hidden="true">›</span>
     <span class="portal-topbar__breadcrumb-item portal-topbar__breadcrumb-item--current">Emitidas</span>
