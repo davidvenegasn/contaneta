@@ -409,6 +409,7 @@
       if (r.ok && (!list || list.length === 0) && (totalFromApi === undefined || totalFromApi === 0)) {
         allRows = [];
         totalFromApi = 0;
+        setCount(0);
         if (quotLoadErrorEl) quotLoadErrorEl.hidden = true;
         tableWrap.hidden = true;
         emptyEl.hidden = false;
@@ -795,8 +796,8 @@
     });
   }
 
-  openBtn.addEventListener('click', openModal);
-  emptyBtn.addEventListener('click', openModal);
+  if (openBtn) openBtn.addEventListener('click', openModal);
+  if (emptyBtn) emptyBtn.addEventListener('click', openModal);
 
   document.addEventListener('click', async function(e){
     const copyBtn = e.target && e.target.closest ? e.target.closest('[data-copy-link]') : null;

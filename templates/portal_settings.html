@@ -215,25 +215,13 @@
   tabs.forEach(function(tab) {
     tab.addEventListener('click', function() {
       var target = tab.getAttribute('data-tab');
-      tabs.forEach(function(t) {
-        t.classList.remove('is-active');
-        t.style.borderBottomColor = 'transparent';
-        t.style.color = 'var(--muted, #6b7280)';
-      });
+      tabs.forEach(function(t) { t.classList.remove('is-active'); });
       tab.classList.add('is-active');
-      tab.style.borderBottomColor = 'var(--accent, #6366f1)';
-      tab.style.color = 'var(--text, #111827)';
       panels.forEach(function(p) { p.hidden = true; });
       var panel = document.getElementById('panel-' + target);
       if (panel) panel.hidden = false;
     });
   });
-  // Activate first tab styling
-  var first = document.querySelector('.settings-tab.is-active');
-  if (first) {
-    first.style.borderBottomColor = 'var(--accent, #6366f1)';
-    first.style.color = 'var(--text, #111827)';
-  }
 })();
 </script>
 {% endblock %}

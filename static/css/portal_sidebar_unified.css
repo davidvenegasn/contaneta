@@ -358,6 +358,17 @@ nav.psb {
 }
 
 /* Night mode */
+html.nightmode .portal-sidebar-unified,
+html.nightmode nav.psb {
+  background: var(--surface, #161b22);
+  color: var(--text, #e6edf3);
+}
+
+html.nightmode .psb-brand-row__drawer,
+html.nightmode .psb-create-row__drawer {
+  color: var(--text, #e6edf3);
+}
+
 html.nightmode .psb-nav-link {
   color: var(--text, #e6edf3);
 }

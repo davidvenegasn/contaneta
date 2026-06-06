@@ -500,7 +500,9 @@
         b.innerHTML =
           '<div class="qi-picker-item__title">' + escHtml(title) + '</div>' +
           (sub ? ('<div class="qi-picker-item__sub">' + escHtml(sub) + '</div>') : '');
-        b.addEventListener('click', function () {
+        b.addEventListener('click', function (e) {
+          e.preventDefault();
+          e.stopPropagation();
           if (isCustomer) setSelectedCustomer(it);
           else setSelectedProduct(it);
           close();

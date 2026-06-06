@@ -367,6 +367,8 @@
 
   function refreshBulkCount() {
     if (bulkCountText) bulkCountText.textContent = selected.size ? (selected.size + ' seleccionados') : '';
+    if (bulkInvoiceBtn) bulkInvoiceBtn.disabled = !selected.size;
+    if (bulkDeleteBtn) bulkDeleteBtn.disabled = !selected.size;
   }
 
   if (bulkToggleBtn) bulkToggleBtn.addEventListener('click', function () {

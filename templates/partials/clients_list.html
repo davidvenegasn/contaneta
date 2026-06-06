@@ -405,6 +405,7 @@
   }
   function refreshBulkCount() {
     if (bulkCountText) bulkCountText.textContent = selected.size ? (selected.size + ' seleccionados') : '';
+    if (bulkOpenIssueBtn) bulkOpenIssueBtn.disabled = !selected.size;
   }
   if (bulkToggleBtn) bulkToggleBtn.addEventListener('click', function () { setBulkMode(!bulkMode); });
   if (bulkCancelBtn) bulkCancelBtn.addEventListener('click', function () { setBulkMode(false); });
