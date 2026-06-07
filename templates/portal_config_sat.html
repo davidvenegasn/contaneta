@@ -284,6 +284,11 @@
       .then(function(r) { return r.json(); })
       .then(function(data) {
         showResult(data.validation_ok, data.message || (data.validation_ok ? 'FIEL válida.' : 'Error.'));
+        if (statusBadgeSubmit) {
+          statusBadgeSubmit.innerHTML = data.validation_ok
+            ? '<span class="fiel-status-badge fiel-status-badge--ok">Válida ✅</span>'
+            : '<span class="fiel-status-badge fiel-status-badge--error">Error</span>';
+        }
         if (data.validation_ok && data.cert_info && data.cert_info.rfc) {
           var modal = document.getElementById('historyChooserModal');
           if (modal) {
@@ -307,7 +312,10 @@
           }
         }
       })
-      .catch(function() { showResult(false, 'Error de conexión. Revisa tu red e intenta de nuevo.'); })
+      .catch(function() {
+        showResult(false, 'Error de conexión. Revisa tu red e intenta de nuevo.');
+        if (statusBadgeSubmit) statusBadgeSubmit.innerHTML = '<span class="fiel-status-badge fiel-status-badge--error">Error</span>';
+      })
       .finally(function() {
         form.setAttribute('data-state', 'idle');
         form.classList.remove('fiel-form--validating');
