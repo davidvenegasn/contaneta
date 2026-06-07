@@ -106,6 +106,47 @@ def update_legal_info(
     return r.json()
 
 
+def sign_manifesto(
+    org_id: str,
+    *,
+    cer_bytes: bytes,
+    key_bytes: bytes,
+    password: str,
+) -> dict:
+    """PUT /v2/organizations/{id}/fiel — sign carta manifesto headlessly.
+
+    Undocumented endpoint discovered empirically on 2026-06-06: Facturapi
+    accepts the FIEL (.cer + .key + password) by API and signs the carta
+    manifesto with the SAT on behalf of the org. No iframe, no redirect.
+    Side effect: sets the org's tax_id to the FIEL's RFC.
+
+    The endpoint is not in their public docs and Fin (their support AI) said
+    no headless option existed — but PUT /organizations/{id}/fiel does exist
+    and works with status 200 on a valid password.
+    """
+    if not org_id:
+        raise FacturapiOrgsError(0, "org_id required")
+    if not cer_bytes or not key_bytes:
+        raise FacturapiOrgsError(0, "FIEL cer/key bytes required")
+    if not password:
+        raise FacturapiOrgsError(0, "FIEL password required")
+    files = {
+        "cer": ("fiel.cer", cer_bytes, "application/octet-stream"),
+        "key": ("fiel.key", key_bytes, "application/octet-stream"),
+    }
+    data = {"password": password}
+    r = requests.put(
+        f"{BASE_URL}/organizations/{org_id}/fiel",
+        files=files,
+        data=data,
+        headers=_headers_multipart(),
+        timeout=120,
+    )
+    if r.status_code >= 400:
+        raise FacturapiOrgsError(r.status_code, r.text[:500])
+    return r.json()
+
+
 def upload_csd(
     org_id: str,
     *,

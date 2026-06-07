@@ -92,3 +92,39 @@ def test_user_key_raises_when_env_unset(monkeypatch):
     monkeypatch.delenv("FACTURAPI_SECRET_KEY", raising=False)
     with pytest.raises(fpi_orgs.FacturapiOrgsError):
         fpi_orgs._user_key()
+
+
+def test_sign_manifesto_hits_fiel_endpoint():
+    """sign_manifesto must PUT to /organizations/{id}/fiel with multipart FIEL bytes."""
+    with patch("services.facturapi.orgs.requests.put") as p:
+        p.return_value = _mock_response(200, {"id": "org_xyz", "legal": {"tax_id": "VEND980918UR1"}})
+        result = fpi_orgs.sign_manifesto(
+            "org_xyz",
+            cer_bytes=b"x" * 200,
+            key_bytes=b"y" * 200,
+            password="hunter2",
+        )
+        assert result["id"] == "org_xyz"
+        args, kwargs = p.call_args
+        assert args[0].endswith("/organizations/org_xyz/fiel")
+        assert "files" in kwargs
+        assert kwargs["data"]["password"] == "hunter2"
+
+
+def test_sign_manifesto_raises_on_bad_password():
+    with patch("services.facturapi.orgs.requests.put") as p:
+        p.return_value = _mock_response(400, text='{"message":"La contraseña es incorrecta"}')
+        with pytest.raises(fpi_orgs.FacturapiOrgsError) as exc_info:
+            fpi_orgs.sign_manifesto(
+                "org_xyz", cer_bytes=b"x" * 200, key_bytes=b"y" * 200, password="wrong",
+            )
+        assert exc_info.value.status == 400
+
+
+def test_sign_manifesto_validates_inputs():
+    with pytest.raises(fpi_orgs.FacturapiOrgsError):
+        fpi_orgs.sign_manifesto("", cer_bytes=b"x", key_bytes=b"y", password="p")
+    with pytest.raises(fpi_orgs.FacturapiOrgsError):
+        fpi_orgs.sign_manifesto("org_xyz", cer_bytes=b"", key_bytes=b"y", password="p")
+    with pytest.raises(fpi_orgs.FacturapiOrgsError):
+        fpi_orgs.sign_manifesto("org_xyz", cer_bytes=b"x", key_bytes=b"y", password="")

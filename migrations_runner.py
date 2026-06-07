@@ -582,6 +582,9 @@ def apply_migrations(
                     elif version == "059":
                         _safe_add_column(conn, "issuers", "facturapi_provisioned_at", "TEXT")
                         _safe_add_column(conn, "issuers", "manifest_signed_at", "TEXT")
+                    elif version == "060":
+                        _safe_add_column(conn, "issuers", "csd_uploaded_at", "TEXT")
+                        _safe_add_column(conn, "issuers", "onboarding_completed_at", "TEXT")
                     else:
                         with open(filepath, "r", encoding="utf-8") as f:
                             sql = f.read()

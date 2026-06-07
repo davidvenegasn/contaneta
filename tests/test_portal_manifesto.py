@@ -1,4 +1,4 @@
-"""Tests for the embedded manifesto page + status endpoint + CSD upload."""
+"""Tests for the unified onboarding page + status + CSD upload + onboard endpoints."""
 import io
 import os
 import sys
@@ -11,11 +11,11 @@ sys.path.insert(0, str(ROOT))
 
 _test_db = os.environ.get("APP_DB_PATH")
 if not _test_db:
-    _fd, _test_db = tempfile.mkstemp(suffix=".db", prefix="test_manifesto_")
+    _fd, _test_db = tempfile.mkstemp(suffix=".db", prefix="test_onboard_")
     os.close(_fd)
     os.environ["APP_DB_PATH"] = _test_db
 if not os.environ.get("SESSION_SECRET"):
-    os.environ["SESSION_SECRET"] = "test-secret-manifesto"
+    os.environ["SESSION_SECRET"] = "test-secret-onboard"
 os.environ.setdefault("FACTURAPI_SECRET_KEY", "sk_test_FAKE_FOR_UNIT_TESTS")
 
 from starlette.testclient import TestClient
@@ -31,7 +31,6 @@ client = TestClient(app, raise_server_exceptions=False)
 
 
 def _bootstrap_authed_issuer(rfc: str, razon_social: str = "Tenant Test SA") -> tuple[int, int]:
-    """Create user + issuer + membership, return (user_id, issuer_id)."""
     issuer_id, _ = issuers_service.create_issuer_with_token(
         rfc=rfc, razon_social=razon_social, regimen_fiscal="616"
     )
@@ -45,6 +44,9 @@ def _bootstrap_authed_issuer(rfc: str, razon_social: str = "Tenant Test SA") -> 
     return user["id"], issuer_id
 
 
+# ── Status endpoint ──────────────────────────────────────────────────────
+
+
 def test_status_returns_unprovisioned_when_org_id_missing():
     user_id, issuer_id = _bootstrap_authed_issuer("FFF010101FFF")
     cookies = make_session_cookie(issuer_id=issuer_id, user_id=user_id)
@@ -54,6 +56,8 @@ def test_status_returns_unprovisioned_when_org_id_missing():
     assert data["ok"] is True
     assert data["provisioned"] is False
     assert data["manifest_signed"] is False
+    assert data["csd_uploaded"] is False
+    assert data["onboarding_completed"] is False
 
 
 def test_status_returns_provisioned_when_org_id_set():
@@ -67,7 +71,6 @@ def test_status_returns_provisioned_when_org_id_set():
         conn.commit()
     finally:
         conn.close()
-
     cookies = make_session_cookie(issuer_id=issuer_id, user_id=user_id)
     r = client.get("/portal/api/facturapi/status", cookies=cookies)
     assert r.status_code == 200
@@ -95,40 +98,16 @@ def test_status_returns_manifest_signed_when_set():
     assert data["manifest_signed"] is True
 
 
-def test_manifesto_page_shows_provisioning_when_org_id_missing():
-    user_id, issuer_id = _bootstrap_authed_issuer("III010101III")
-    cookies = make_session_cookie(issuer_id=issuer_id, user_id=user_id)
-    r = client.get("/portal/setup/manifiesto", cookies=cookies)
-    assert r.status_code == 200
-    assert "Preparando tu cuenta" in r.text
-
-
-def test_manifesto_page_shows_iframe_when_org_ready():
-    user_id, issuer_id = _bootstrap_authed_issuer("JJJ010101JJJ")
-    conn = db()
-    try:
-        conn.execute(
-            "UPDATE issuers SET facturapi_org_id = 'org_ready_iframe' WHERE id = ?",
-            (issuer_id,),
-        )
-        conn.commit()
-    finally:
-        conn.close()
-    cookies = make_session_cookie(issuer_id=issuer_id, user_id=user_id)
-    r = client.get("/portal/setup/manifiesto", cookies=cookies)
-    assert r.status_code == 200
-    assert "Paso 1 — Sube tu CSD" in r.text
-    assert "embedded/manifiesto" in r.text
-    assert "org_ready_iframe" in r.text
-
-
-def test_manifesto_page_shows_done_when_signed():
-    user_id, issuer_id = _bootstrap_authed_issuer("KKK010101KKK")
+def test_status_returns_completed_when_all_set():
+    user_id, issuer_id = _bootstrap_authed_issuer("HHC010101HHC")
     conn = db()
     try:
         conn.execute(
             """UPDATE issuers
-               SET facturapi_org_id = 'org_done', manifest_signed_at = datetime('now')
+               SET facturapi_org_id = 'org_completed',
+                   manifest_signed_at = datetime('now'),
+                   csd_uploaded_at = datetime('now'),
+                   onboarding_completed_at = datetime('now')
                WHERE id = ?""",
             (issuer_id,),
         )
@@ -136,9 +115,74 @@ def test_manifesto_page_shows_done_when_signed():
     finally:
         conn.close()
     cookies = make_session_cookie(issuer_id=issuer_id, user_id=user_id)
-    r = client.get("/portal/setup/manifiesto", cookies=cookies)
+    r = client.get("/portal/api/facturapi/status", cookies=cookies)
+    data = r.json()
+    assert data["manifest_signed"] is True
+    assert data["csd_uploaded"] is True
+    assert data["onboarding_completed"] is True
+
+
+# ── Onboarding page (new URL) ────────────────────────────────────────────
+
+
+def test_onboarding_page_shows_provisioning_when_org_id_missing():
+    user_id, issuer_id = _bootstrap_authed_issuer("III010101III")
+    cookies = make_session_cookie(issuer_id=issuer_id, user_id=user_id)
+    r = client.get("/portal/setup/credenciales", cookies=cookies)
+    assert r.status_code == 200
+    assert "Preparando tu cuenta" in r.text
+
+
+def test_onboarding_page_shows_form_when_org_ready():
+    user_id, issuer_id = _bootstrap_authed_issuer("JJJ010101JJJ")
+    conn = db()
+    try:
+        conn.execute(
+            "UPDATE issuers SET facturapi_org_id = 'org_ready_form' WHERE id = ?",
+            (issuer_id,),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    cookies = make_session_cookie(issuer_id=issuer_id, user_id=user_id)
+    r = client.get("/portal/setup/credenciales", cookies=cookies)
+    assert r.status_code == 200
+    assert "Tu FIEL" in r.text
+    assert "Tu CSD" in r.text
+    assert "Conectar y empezar a facturar" in r.text
+
+
+def test_onboarding_page_shows_done_when_completed():
+    user_id, issuer_id = _bootstrap_authed_issuer("KKK010101KKK")
+    conn = db()
+    try:
+        conn.execute(
+            """UPDATE issuers
+               SET facturapi_org_id = 'org_done',
+                   manifest_signed_at = datetime('now'),
+                   csd_uploaded_at = datetime('now'),
+                   onboarding_completed_at = datetime('now')
+               WHERE id = ?""",
+            (issuer_id,),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    cookies = make_session_cookie(issuer_id=issuer_id, user_id=user_id)
+    r = client.get("/portal/setup/credenciales", cookies=cookies)
     assert r.status_code == 200
     assert "Listo para facturar" in r.text
+
+
+def test_legacy_manifiesto_url_redirects_to_credenciales():
+    user_id, issuer_id = _bootstrap_authed_issuer("LEG010101LEG")
+    cookies = make_session_cookie(issuer_id=issuer_id, user_id=user_id)
+    r = client.get("/portal/setup/manifiesto", cookies=cookies, follow_redirects=False)
+    assert r.status_code == 302
+    assert "/portal/setup/credenciales" in r.headers["location"]
+
+
+# ── Legacy upload-csd endpoint (preserved for compat) ─────────────────────
 
 
 def test_upload_csd_rejects_when_org_not_provisioned():
@@ -158,7 +202,7 @@ def test_upload_csd_rejects_when_org_not_provisioned():
     assert r.status_code == 409
 
 
-def test_upload_csd_forwards_to_facturapi_on_success():
+def test_upload_csd_marks_csd_uploaded_at_on_success():
     user_id, issuer_id = _bootstrap_authed_issuer("MMM010101MMM")
     conn = db()
     try:
@@ -185,19 +229,49 @@ def test_upload_csd_forwards_to_facturapi_on_success():
             },
             data={"password": "hunter2", "csrf_token": csrf},
         )
-        assert r.status_code == 200, r.text
-        assert r.json()["ok"] is True
-        mock_upload.assert_called_once()
-        kwargs = mock_upload.call_args.kwargs
-        assert kwargs["password"] == "hunter2"
+        assert r.status_code == 200
+
+    conn = db()
+    try:
+        row = conn.execute("SELECT csd_uploaded_at FROM issuers WHERE id = ?", (issuer_id,)).fetchone()
+        assert row["csd_uploaded_at"] is not None
+    finally:
+        conn.close()
 
 
-def test_upload_csd_surfaces_facturapi_error_message():
+# ── New unified onboard endpoint ─────────────────────────────────────────
+
+
+def _post_onboard(cookies, *, fiel_cer=b"c" * 200, fiel_key=b"k" * 200, fiel_pw="fielpw",
+                  csd_cer=b"c" * 200, csd_key=b"k" * 200, csd_pw="csdpw"):
+    from services.auth import csrf as csrf_service
+    csrf = csrf_service.generate_csrf_token()
+    return client.post(
+        "/portal/api/facturapi/onboard",
+        cookies=cookies,
+        files={
+            "fiel_cer": ("fiel.cer", fiel_cer, "application/octet-stream"),
+            "fiel_key": ("fiel.key", fiel_key, "application/octet-stream"),
+            "csd_cer": ("csd.cer", csd_cer, "application/octet-stream"),
+            "csd_key": ("csd.key", csd_key, "application/octet-stream"),
+        },
+        data={"fiel_password": fiel_pw, "csd_password": csd_pw, "csrf_token": csrf},
+    )
+
+
+def test_onboard_rejects_when_org_not_provisioned():
     user_id, issuer_id = _bootstrap_authed_issuer("NNN010101NNN")
+    cookies = make_session_cookie(issuer_id=issuer_id, user_id=user_id)
+    r = _post_onboard(cookies)
+    assert r.status_code == 409
+
+
+def test_onboard_signs_manifesto_then_uploads_csd_on_success():
+    user_id, issuer_id = _bootstrap_authed_issuer("OOO010101OOO")
     conn = db()
     try:
         conn.execute(
-            "UPDATE issuers SET facturapi_org_id = 'org_csd_bad' WHERE id = ?",
+            "UPDATE issuers SET facturapi_org_id = 'org_onboard_ok' WHERE id = ?",
             (issuer_id,),
         )
         conn.commit()
@@ -205,21 +279,90 @@ def test_upload_csd_surfaces_facturapi_error_message():
         conn.close()
 
     cookies = make_session_cookie(issuer_id=issuer_id, user_id=user_id)
-    from services.auth import csrf as csrf_service
-    csrf = csrf_service.generate_csrf_token()
 
-    with patch("routers.portal.facturapi_setup.fpi_orgs.upload_csd") as mock_upload:
-        mock_upload.side_effect = FacturapiOrgsError(400, "El certificado no es un CSD.")
-        r = client.post(
-            "/portal/api/facturapi/upload-csd",
-            cookies=cookies,
-            files={
-                "cer_file": ("bad.cer", b"c" * 200, "application/octet-stream"),
-                "key_file": ("bad.key", b"k" * 200, "application/octet-stream"),
-            },
-            data={"password": "pw", "csrf_token": csrf},
+    with patch("routers.portal.facturapi_setup.fpi_orgs.sign_manifesto") as mock_sign, \
+         patch("routers.portal.facturapi_setup.fpi_orgs.upload_csd") as mock_csd:
+        mock_sign.return_value = {"id": "org_onboard_ok"}
+        mock_csd.return_value = {"id": "org_onboard_ok", "is_production_ready": True}
+        r = _post_onboard(cookies)
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["ok"] is True
+        assert body["manifest_signed"] is True
+        assert body["csd_uploaded"] is True
+        assert body["onboarding_completed"] is True
+
+    conn = db()
+    try:
+        row = conn.execute(
+            "SELECT manifest_signed_at, csd_uploaded_at, onboarding_completed_at FROM issuers WHERE id = ?",
+            (issuer_id,),
+        ).fetchone()
+        assert row["manifest_signed_at"] is not None
+        assert row["csd_uploaded_at"] is not None
+        assert row["onboarding_completed_at"] is not None
+    finally:
+        conn.close()
+
+
+def test_onboard_returns_manifesto_error_and_skips_csd():
+    user_id, issuer_id = _bootstrap_authed_issuer("PPP010101PPP")
+    conn = db()
+    try:
+        conn.execute(
+            "UPDATE issuers SET facturapi_org_id = 'org_onboard_fail' WHERE id = ?",
+            (issuer_id,),
         )
+        conn.commit()
+    finally:
+        conn.close()
+
+    cookies = make_session_cookie(issuer_id=issuer_id, user_id=user_id)
+
+    with patch("routers.portal.facturapi_setup.fpi_orgs.sign_manifesto") as mock_sign, \
+         patch("routers.portal.facturapi_setup.fpi_orgs.upload_csd") as mock_csd:
+        mock_sign.side_effect = FacturapiOrgsError(400, "La contraseña es incorrecta")
+        r = _post_onboard(cookies)
         assert r.status_code == 400
         body = r.json()
         assert body["ok"] is False
-        assert "CSD" in body["error"]["message"]
+        assert body["step"] == "manifesto"
+        assert "contraseña" in body["error"]["message"].lower()
+        mock_csd.assert_not_called()  # CSD must NOT be attempted if manifesto failed
+
+
+def test_onboard_csd_error_after_manifesto_success_keeps_partial_state():
+    user_id, issuer_id = _bootstrap_authed_issuer("QQQ010101QQQ")
+    conn = db()
+    try:
+        conn.execute(
+            "UPDATE issuers SET facturapi_org_id = 'org_partial' WHERE id = ?",
+            (issuer_id,),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    cookies = make_session_cookie(issuer_id=issuer_id, user_id=user_id)
+
+    with patch("routers.portal.facturapi_setup.fpi_orgs.sign_manifesto") as mock_sign, \
+         patch("routers.portal.facturapi_setup.fpi_orgs.upload_csd") as mock_csd:
+        mock_sign.return_value = {"id": "org_partial"}
+        mock_csd.side_effect = FacturapiOrgsError(400, "El certificado no es un CSD.")
+        r = _post_onboard(cookies)
+        assert r.status_code == 400
+        body = r.json()
+        assert body["step"] == "csd"
+        assert body["manifest_signed"] is True
+
+    conn = db()
+    try:
+        row = conn.execute(
+            "SELECT manifest_signed_at, csd_uploaded_at, onboarding_completed_at FROM issuers WHERE id = ?",
+            (issuer_id,),
+        ).fetchone()
+        assert row["manifest_signed_at"] is not None
+        assert row["csd_uploaded_at"] is None  # not uploaded
+        assert row["onboarding_completed_at"] is None
+    finally:
+        conn.close()
