@@ -9,6 +9,38 @@
  */
 
 /* ============================================================
+   ROOT CAUSE FIX: portal_dashboard_v2.css — .pv2 tokens
+   portal_dashboard_v2.js adds .pv2 to <body> on ALL pages,
+   which sets background: var(--pv2-bg) (#f7f5f1).
+   html.nightmode overrides --bg but NOT --pv2-bg,
+   so the body stays light. This block fixes it.
+   ============================================================ */
+html.nightmode .pv2 {
+  --pv2-bg: #0d1117;
+  --pv2-surface: #161b22;
+  --pv2-surface-2: #1c2128;
+  --pv2-surface-3: #21262d;
+  --pv2-text: #e6edf3;
+  --pv2-text-2: #b1bac4;
+  --pv2-text-3: #8b949e;
+  --pv2-border: rgba(255,255,255,0.08);
+  --pv2-border-2: rgba(255,255,255,0.14);
+  --pv2-primary: #ffffff;
+  --pv2-primary-contrast: #0d1117;
+  --pv2-indigo: #a78bfa;
+  --pv2-indigo-soft: rgba(167,139,250,0.14);
+  --pv2-red: #f87171;
+  --pv2-red-soft: rgba(248,113,113,0.12);
+  --pv2-green: #34d399;
+  --pv2-green-soft: rgba(52,211,153,0.12);
+  --pv2-amber: #fbbf24;
+  --pv2-amber-soft: rgba(251,191,36,0.12);
+  --pv2-pos-text: #34d399;
+  --pv2-neg-text: #f87171;
+  --pv2-hover: rgba(255,255,255,0.06);
+}
+
+/* ============================================================
    1. portal_shell.css — Modals
    ============================================================ */
 html.nightmode .modal__backdrop {
@@ -30,6 +62,16 @@ html.nightmode .modal__panel .modal__title {
 }
 html.nightmode .modal__panel .modal__subtitle {
   color: var(--text-muted, #8b949e);
+}
+
+/* Sidebar collapse button (portal_shell.css: background:#fff) */
+html.nightmode .sidebar-collapse {
+  background: var(--surface-2, #21262d);
+  border-color: var(--border, rgba(255,255,255,.08));
+  color: var(--text, #e6edf3);
+}
+html.nightmode .sidebar-collapse:hover {
+  background: var(--surface-3, #30363d);
 }
 
 /* ============================================================
@@ -213,7 +255,7 @@ html.nightmode .portal-breadcrumb a:hover {
 }
 
 /* ============================================================
-   10. components.css — Form inputs
+   10. components.css — Form inputs (class-based)
    ============================================================ */
 html.nightmode .input,
 html.nightmode .form-input,
@@ -288,21 +330,16 @@ html.nightmode .demo-banner__link {
 /* ============================================================
    14. tooltips.css — Help tooltip trigger & bubble
    ============================================================ */
-html.nightmode .help-tooltip__trigger {
+html.nightmode .help-tooltip {
   background: var(--surface-2, #21262d);
   border-color: var(--border, rgba(255,255,255,.08));
   color: var(--text-muted, #8b949e);
 }
-html.nightmode .help-tooltip__bubble {
-  background: var(--surface-3, #30363d);
-  color: var(--text, #e6edf3);
-  border-color: var(--border-strong, rgba(255,255,255,.14));
-}
-html.nightmode .help-tooltip__bubble::before {
-  border-bottom-color: var(--border-strong, rgba(255,255,255,.14));
-}
-html.nightmode .help-tooltip__bubble::after {
-  border-bottom-color: var(--surface-3, #30363d);
+html.nightmode .help-tooltip:hover,
+html.nightmode .help-tooltip:focus-visible {
+  background: rgba(129,140,248,.12);
+  border-color: rgba(129,140,248,.3);
+  color: var(--accent, #818cf8);
 }
 
 /* ============================================================
@@ -477,4 +514,100 @@ html.nightmode .card--invoice-list {
 html.nightmode .card:has(.table-wrap):hover,
 html.nightmode .card--invoice-list:hover {
   box-shadow: 0 2px 8px rgba(0,0,0,.3), 0 1px 3px rgba(0,0,0,.2);
+}
+
+/* ============================================================
+   24. form.css — Concept block & remove button
+   ============================================================ */
+html.nightmode .concept-block__inner {
+  background: var(--surface, #161b22);
+  border-color: var(--border, rgba(255,255,255,.08));
+}
+html.nightmode .concept-block__inner:hover {
+  border-color: var(--border-strong, rgba(255,255,255,.14));
+  box-shadow: 0 10px 30px rgba(0,0,0,.35);
+}
+html.nightmode .btn-remove-concept {
+  background: var(--surface, #161b22);
+  border-color: var(--border, rgba(255,255,255,.08));
+  color: var(--text-muted, #8b949e);
+}
+html.nightmode .btn-remove-concept:hover {
+  border-color: var(--danger-border, rgba(248,81,73,.3));
+  background: var(--danger-bg, rgba(248,81,73,.12));
+  color: var(--danger-text, #f85149);
+}
+
+/* ============================================================
+   25. movement-modal.css — Error state & activity badges
+   ============================================================ */
+html.nightmode .movement-modal__error {
+  background: var(--danger-bg, rgba(248,81,73,.12));
+  border-top-color: var(--danger-border, rgba(248,81,73,.3));
+  color: var(--danger-text, #f85149);
+}
+html.nightmode .activity-modal__icon--issued {
+  background: rgba(129,140,248,.12);
+  color: var(--accent, #818cf8);
+}
+html.nightmode .activity-modal__icon--received {
+  background: rgba(63,185,80,.12);
+  color: var(--success, #3fb950);
+}
+html.nightmode .activity-modal__badge--issued {
+  background: rgba(129,140,248,.12);
+  color: var(--accent, #818cf8);
+}
+html.nightmode .activity-modal__badge--received {
+  background: rgba(63,185,80,.12);
+  color: var(--success, #3fb950);
+}
+html.nightmode .activity-modal__item:hover {
+  background: rgba(255,255,255,.04);
+}
+
+/* Invoices table badges (movement-modal.css) */
+html.nightmode .invoices-table .badge--ingreso {
+  background: rgba(63,185,80,.12);
+  color: var(--success, #3fb950);
+}
+html.nightmode .invoices-table .badge--gasto {
+  background: rgba(248,81,73,.12);
+  color: var(--danger, #f85149);
+}
+html.nightmode .invoices-table tr:hover td {
+  background: rgba(255,255,255,.04);
+}
+
+/* ============================================================
+   26. portal_dashboard_v2.css — Dashboard v2 components
+   ============================================================ */
+html.nightmode .pv2 .pv2-balance {
+  background: var(--pv2-surface);
+  border-color: var(--pv2-border);
+}
+html.nightmode .pv2-theme-toggle {
+  background: var(--surface-2, #21262d);
+  border-color: var(--border, rgba(255,255,255,.08));
+  color: var(--text, #e6edf3);
+}
+
+/* ============================================================
+   27. portal_sidebar_unified.css — Drawer link icon color
+   ============================================================ */
+html.nightmode .drawer-link__icon {
+  color: var(--text-muted, #8b949e);
+}
+html.nightmode .drawer-link:hover .drawer-link__icon {
+  color: var(--text, #e6edf3);
+}
+html.nightmode .psb-dual .drawer-link {
+  color: var(--text, #e6edf3);
+}
+
+/* ============================================================
+   28. portal_sidebar_unified.css — Nav link hover
+   ============================================================ */
+html.nightmode .psb-nav-link {
+  color: var(--text, #e6edf3);
 }
