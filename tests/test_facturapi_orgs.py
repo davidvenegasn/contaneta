@@ -128,3 +128,37 @@ def test_sign_manifesto_validates_inputs():
         fpi_orgs.sign_manifesto("org_xyz", cer_bytes=b"", key_bytes=b"y", password="p")
     with pytest.raises(fpi_orgs.FacturapiOrgsError):
         fpi_orgs.sign_manifesto("org_xyz", cer_bytes=b"x", key_bytes=b"y", password="")
+
+
+def test_get_org_api_key_test_mode():
+    """get_org_api_key should GET /apikeys/test and return the value."""
+    with patch("services.facturapi.orgs.requests.get") as p:
+        p.return_value = _mock_response(200, {"value": "sk_test_org_key_123"})
+        key = fpi_orgs.get_org_api_key("org_abc", mode="test")
+        assert key == "sk_test_org_key_123"
+        args, _ = p.call_args
+        assert args[0].endswith("/organizations/org_abc/apikeys/test")
+
+
+def test_get_org_api_key_live_mode_returns_first_from_list():
+    """Live mode returns a list; should extract first item's value."""
+    with patch("services.facturapi.orgs.requests.get") as p:
+        p.return_value = _mock_response(200, json_data=None)
+        p.return_value.json.return_value = [{"value": "sk_live_key_1"}, {"value": "sk_live_key_2"}]
+        key = fpi_orgs.get_org_api_key("org_abc", mode="live")
+        assert key == "sk_live_key_1"
+
+
+def test_get_org_api_key_raises_on_404():
+    """Should raise FacturapiOrgsError on 404."""
+    with patch("services.facturapi.orgs.requests.get") as p:
+        p.return_value = _mock_response(404, text="Not Found")
+        with pytest.raises(fpi_orgs.FacturapiOrgsError) as exc_info:
+            fpi_orgs.get_org_api_key("org_missing", mode="test")
+        assert exc_info.value.status == 404
+
+
+def test_get_org_api_key_invalid_mode():
+    """Invalid mode should raise immediately."""
+    with pytest.raises(fpi_orgs.FacturapiOrgsError):
+        fpi_orgs.get_org_api_key("org_abc", mode="invalid")

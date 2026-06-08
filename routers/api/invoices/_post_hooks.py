@@ -32,7 +32,7 @@ def save_xml_and_register_cfdi(
     """Download XML from Facturapi, save to storage, and register in sat_cfdi."""
     try:
         from facturapi_client import download_invoice
-        xml_bytes = download_invoice(issuer["facturapi_org_id"], fact_id, "xml")
+        xml_bytes = download_invoice(issuer["id"], issuer["facturapi_org_id"], fact_id, "xml")
         if isinstance(xml_bytes, str):
             xml_bytes = xml_bytes.encode("utf-8")
         if not xml_bytes:
@@ -141,7 +141,7 @@ def process_replacement_cancel(
                 orig = dict(orig)
                 orig_facturapi_id = orig.get("facturapi_invoice_id")
                 if orig_facturapi_id and org_id:
-                    fa_result = facturapi_cancel(org_id, orig_facturapi_id, "01")
+                    fa_result = facturapi_cancel(issuer_id, org_id, orig_facturapi_id, "01")
                     fa_status = (fa_result.get("status") or "").lower()
                     fa_cs = (fa_result.get("cancellation_status") or "").lower()
                     c_status = "accepted" if fa_status == "canceled" else ("pending" if fa_cs == "pending" else "accepted")

@@ -226,7 +226,7 @@ def get_invoicing_router(templates):
                     entity_id=invoice_id_clean,
                 )
                 raise HTTPException(status_code=404, detail="Factura no encontrada")
-            blob = download_invoice(issuer["facturapi_org_id"], invoice_id_clean, fmt)
+            blob = download_invoice(issuer["id"], issuer["facturapi_org_id"], invoice_id_clean, fmt)
             file_access_log.log_file_access(
                 request=request,
                 action=f"download_facturapi_{fmt}",
@@ -384,7 +384,7 @@ def _submit_impl(templates, request: Request, issuer: dict, form):
 
     if issuer.get("facturapi_org_id") in (None, "", 0) or issuer.get("id") == -1:
         raise ValueError("DEV_MODE activo: token de prueba. Configura un token real/issuer para timbrar.")
-    invoice = create_invoice(issuer["facturapi_org_id"], payload)
+    invoice = create_invoice(issuer["id"], issuer["facturapi_org_id"], payload)
     fact_id = invoice.get("id")
     uuid = invoice.get("uuid")
     total = invoice.get("total")

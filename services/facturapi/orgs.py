@@ -182,6 +182,36 @@ def upload_csd(
     return r.json()
 
 
+def get_org_api_key(org_id: str, *, mode: str = "test") -> str:
+    """GET /v2/organizations/{id}/apikeys/{mode} — retrieve the org's API key.
+
+    Args:
+        org_id: Facturapi organization ID.
+        mode: 'test' or 'live'.
+
+    Returns:
+        Raw key string (sk_test_... or sk_live_...).
+    """
+    if mode not in ("test", "live"):
+        raise FacturapiOrgsError(0, "mode must be 'test' or 'live'")
+    if not org_id:
+        raise FacturapiOrgsError(0, "org_id required")
+    r = requests.get(
+        f"{BASE_URL}/organizations/{org_id}/apikeys/{mode}",
+        headers=_headers_json(),
+        timeout=DEFAULT_TIMEOUT,
+    )
+    if r.status_code >= 400:
+        raise FacturapiOrgsError(r.status_code, r.text[:500])
+    body = r.json()
+    # Live returns a list of dicts; test returns a single dict. Normalize.
+    if isinstance(body, list):
+        if not body:
+            raise FacturapiOrgsError(404, "No API keys returned")
+        return str(body[0].get("value") or body[0].get("key") or "").strip()
+    return str(body.get("value") or body.get("key") or "").strip()
+
+
 def get_organization(org_id: str) -> dict:
     """GET /v2/organizations/{id} — read current state of an organization."""
     if not org_id:

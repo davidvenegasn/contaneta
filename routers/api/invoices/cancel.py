@@ -62,7 +62,7 @@ def register_invoices_cancel_routes(router):
             raise HTTPException(status_code=400, detail="Configuracion de facturacion no disponible.")
 
         try:
-            result = facturapi_cancel(org_id, facturapi_id, motive)
+            result = facturapi_cancel(issuer_id, org_id, facturapi_id, motive)
         except FacturapiError as fe:
             logger.warning("api_invoices_cancel FacturapiError: issuer_id=%s uuid=%s %s", issuer_id, uuid_clean, fe)
             raise HTTPException(status_code=400, detail=f"Error al cancelar en FacturAPI: {fe}")

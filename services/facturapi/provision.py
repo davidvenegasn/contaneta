@@ -79,5 +79,17 @@ def handle_facturapi_provision_org(job: dict, _ctx: Any) -> dict:
         raise fpi_orgs.FacturapiOrgsError(0, f"create_organization returned no id: {result!r}")
 
     _save_org_id(issuer_id, org_id)
+
+    # Pre-fetch the org's test API key so emission is ready immediately.
+    try:
+        from services.facturapi.api_keys import save_org_keys
+        test_key = fpi_orgs.get_org_api_key(org_id, mode="test")
+        if test_key:
+            save_org_keys(issuer_id, test_key=test_key)
+            logger.info("Pre-fetched test API key for issuer=%s org=%s", issuer_id, org_id)
+    except Exception as e:
+        # Non-blocking — facturapi_client._resolve_org_key can still fetch on demand.
+        logger.warning("Could not pre-fetch test API key for org %s: %s", org_id, e)
+
     logger.info("facturapi_provision_org issuer=%s org_id=%s", issuer_id, org_id)
     return {"org_id": org_id, "issuer_id": issuer_id}

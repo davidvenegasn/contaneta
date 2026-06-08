@@ -55,12 +55,18 @@ def test_should_skip_when_issuer_already_provisioned():
 
 def test_should_persist_org_id_on_success():
     issuer_id = _make_issuer("BBB010101BBB", "New Tenant SA")
-    with patch("services.facturapi.provision.fpi_orgs.create_organization") as mock_create:
+    with patch("services.facturapi.provision.fpi_orgs.create_organization") as mock_create, \
+         patch("services.facturapi.provision.fpi_orgs.get_org_api_key") as mock_get_key, \
+         patch("services.facturapi.api_keys.save_org_keys") as mock_save_keys:
         mock_create.return_value = {"id": "org_new_42", "name": "New Tenant SA"}
+        mock_get_key.return_value = "sk_test_prefetched"
         result = fpi_provision.handle_facturapi_provision_org(
             {"issuer_id": issuer_id, "name": "facturapi_provision_org"}, None
         )
         assert result["org_id"] == "org_new_42"
+        # Verify pre-fetch was attempted
+        mock_get_key.assert_called_once_with("org_new_42", mode="test")
+        mock_save_keys.assert_called_once_with(issuer_id, test_key="sk_test_prefetched")
 
     conn = db()
     try:

@@ -585,6 +585,12 @@ def apply_migrations(
                     elif version == "060":
                         _safe_add_column(conn, "issuers", "csd_uploaded_at", "TEXT")
                         _safe_add_column(conn, "issuers", "onboarding_completed_at", "TEXT")
+                    elif version == "061":
+                        _safe_add_column(conn, "sat_credentials", "ciec_password_encrypted", "TEXT")
+                    elif version == "062":
+                        _safe_add_column(conn, "issuers", "facturapi_test_key_encrypted", "TEXT")
+                        _safe_add_column(conn, "issuers", "facturapi_live_key_encrypted", "TEXT")
+                        _safe_add_column(conn, "issuers", "facturapi_keys_fetched_at", "TEXT")
                     else:
                         with open(filepath, "r", encoding="utf-8") as f:
                             sql = f.read()

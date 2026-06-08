@@ -154,7 +154,7 @@ def register_invoices_quick_routes(router):
             logger.warning("api_invoices_quick insert: %s", e, exc_info=True)
             raise HTTPException(status_code=500, detail="Error al registrar la factura.")
         try:
-            invoice = create_invoice(issuer["facturapi_org_id"], payload_fact)
+            invoice = create_invoice(issuer["id"], issuer["facturapi_org_id"], payload_fact)
         except FacturapiError as fe:
             conn.close()
             logger.warning("api invoices quick FacturapiError: issuer_id=%s %s", issuer.get("id"), fe, exc_info=True)
