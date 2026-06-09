@@ -65,27 +65,103 @@ def get_invoicing_router(templates):
         receiver_is_pm: str = Form(""),
         issuer_tax_system: str = Form(""),
     ):
+        # Detect whether the caller wants JSON (sleek in-portal modal) or HTML
+        # (fallback for non-JS submits). Either way, the error is shown INSIDE
+        # the portal layout — never as a bare HTML page.
+        wants_json = "application/json" in (request.headers.get("Accept") or "").lower()
+
+        def _err_response(status: int, title: str, message: str, extra: dict | None = None):
+            from fastapi.responses import JSONResponse
+            if wants_json:
+                body = {"ok": False, "error": {"title": title, "message": message}}
+                if extra:
+                    body["error"].update(extra)
+                return JSONResponse(status_code=status, content=body)
+            # HTML fallback: render inside portal layout (never bare h3+p).
+            try:
+                from routers.portal._helpers import render_portal
+                return render_portal(
+                    templates,
+                    request,
+                    issuer=issuer,
+                    template_name="components/portal_error_inline.html",
+                    active_page=None,
+                    title=title,
+                    error_title=title,
+                    error_message=message,
+                    back_url="/portal/create",
+                    back_label="Volver a nueva factura",
+                    status_code=status,
+                )
+            except Exception:
+                # Last-resort fallback if template render fails; still inside portal styles.
+                return HTMLResponse(
+                    f'<!doctype html><html><head><link rel="stylesheet" href="/static/css/portal.css">'
+                    f'<title>{title}</title></head><body class="portal" style="padding:40px;">'
+                    f'<div class="card" style="max-width:520px;margin:auto;padding:24px;">'
+                    f'<h3 style="margin:0 0 8px;">{title}</h3>'
+                    f'<p style="color:var(--muted);margin:0 0 16px;">{message}</p>'
+                    f'<a href="/portal/create" class="btn-primary" style="text-decoration:none;">Volver</a>'
+                    f'</div></body></html>',
+                    status_code=status,
+                )
+
         try:
             form = await request.form()
             csrf_token = form.get("csrf_token") if isinstance(form.get("csrf_token"), str) else None
             token_val = (csrf_token or request.headers.get("X-CSRF-Token") or "").strip()
             if not csrf_service.verify_csrf_token(token_val):
-                return HTMLResponse("<h3>Error</h3><p>Token de seguridad inválido o expirado. Recarga la página e intenta de nuevo.</p>", status_code=400)
+                return _err_response(400, "Sesión expirada",
+                                     "Tu token de seguridad expiró. Recarga la página e intenta de nuevo.")
             return _submit_impl(templates, request, issuer, form)
         except HTTPException:
             raise
         except FacturapiError as fe:
             logger.warning("FacturapiError: issuer_id=%s %s", issuer.get("id"), fe)
-            return HTMLResponse(
-                "<h3>Error al timbrar</h3><p>No pudimos completar la facturación. Revisa los datos e intenta de nuevo.</p>",
-                status_code=502,
-            )
-        except Exception:
+            # Try to surface Facturapi's actual message — much more actionable than a generic one.
+            import re, json as _json
+            raw = str(fe)
+            facturapi_message = "No pudimos completar la facturación. Revisa los datos e intenta de nuevo."
+            m = re.search(r"\{.*\}", raw)
+            if m:
+                try:
+                    parsed = _json.loads(m.group(0))
+                    facturapi_message = parsed.get("message") or facturapi_message
+                except Exception:
+                    pass
+            return _err_response(502, "Error al timbrar", facturapi_message,
+                                 extra={"source": "facturapi"})
+        except ValueError as ve:
+            return _err_response(400, "Datos incompletos", str(ve))
+        except Exception as e:
             logger.exception("invoicing submit: issuer_id=%s", issuer.get("id"))
-            return HTMLResponse(
-                "<h3>Error</h3><p>No pudimos completar la acción. Intenta de nuevo.</p>",
-                status_code=500,
-            )
+            return _err_response(500, "Error inesperado",
+                                 "No pudimos completar la acción. Intenta de nuevo en unos segundos.")
+
+    def _fallback_download_from_facturapi(issuer: dict, uuid_clean: str, fmt: str) -> bytes | None:
+        """When sat_cfdi has no local XML (e.g. fresh TEST emission, no SAT sync
+        yet), look up the CFDI by uuid in the local invoices table and pull the
+        file directly from Facturapi using its facturapi_invoice_id.
+        Returns the file bytes on success, None if no Facturapi reference exists.
+        """
+        if not issuer.get("facturapi_org_id"):
+            return None
+        conn = db()
+        try:
+            row = conn.execute(
+                "SELECT facturapi_invoice_id FROM invoices WHERE issuer_id = ? AND LOWER(TRIM(uuid)) = LOWER(?) AND facturapi_invoice_id IS NOT NULL AND facturapi_invoice_id != '' LIMIT 1",
+                (issuer["id"], uuid_clean),
+            ).fetchone()
+        finally:
+            conn.close()
+        if not row:
+            return None
+        fact_id = row["facturapi_invoice_id"] if hasattr(row, "keys") else row[0]
+        try:
+            return download_invoice(issuer["id"], issuer["facturapi_org_id"], fact_id, fmt)
+        except FacturapiError:
+            logger.exception("Facturapi download fallback failed: uuid=%s fmt=%s", uuid_clean[:36], fmt)
+            return None
 
     @router.get("/download/xml/{uuid}")
     def download_xml(request: Request, uuid: str, issuer: dict = Depends(get_portal_issuer)):
@@ -100,6 +176,15 @@ def get_invoicing_router(templates):
             ).fetchone()
             conn.close()
             if not row or not row["xml_path"]:
+                # Fallback: not yet in local sat_cfdi (e.g. test emission, sync didn't run).
+                # Pull XML directly from Facturapi using the invoice's facturapi_invoice_id.
+                blob = _fallback_download_from_facturapi(issuer, uuid_clean, "xml")
+                if blob:
+                    return Response(
+                        content=blob,
+                        media_type="application/xml",
+                        headers={"Content-Disposition": f'attachment; filename="{uuid_clean}.xml"'},
+                    )
                 raise HTTPException(status_code=404, detail="XML no encontrado para este UUID")
             abs_path = _safe_abs_path(row["xml_path"])
             if not os.path.exists(abs_path):
@@ -149,6 +234,17 @@ def get_invoicing_router(templates):
             ).fetchone()
             conn.close()
             if not row or not row["xml_path"]:
+                # Fallback: pull PDF directly from Facturapi when local sat_cfdi
+                # is not yet populated (e.g. fresh emission in TEST sandbox).
+                blob = _fallback_download_from_facturapi(issuer, uuid_clean, "pdf")
+                if blob:
+                    disposition = "attachment" if dl else "inline"
+                    filename = f"cfdi-{uuid_clean[:8]}.pdf"
+                    return Response(
+                        content=blob,
+                        media_type="application/pdf",
+                        headers={"Content-Disposition": f'{disposition}; filename="{filename}"'},
+                    )
                 raise HTTPException(status_code=404, detail="XML no encontrado; no se puede generar PDF")
             abs_path = _safe_abs_path(row["xml_path"])
             if not os.path.exists(abs_path):
@@ -382,6 +478,28 @@ def _submit_impl(templates, request: Request, issuer: dict, form):
         validate_receiver=(tipo_comprobante != "P"),
     )
 
+    # Receptor-type aware tweaks: inject `global` block for "Público en general" sales.
+    # Facturapi expects the field literally named `global` (verified empirically).
+    receptor_type = (form.get("receptor_type") or "normal").strip()
+    if receptor_type == "publico_general" and customer_rfc.upper() == "XAXX010101000":
+        try:
+            year_int = int((form.get("global_year") or "2026").strip())
+        except (TypeError, ValueError):
+            year_int = 2026
+        # Periodicity comes as SAT numeric code (01..05). Map to Facturapi's
+        # accepted vocabulary if it requires words; otherwise pass numeric.
+        SAT_PERIODICITY = {
+            "01": "day", "02": "week", "03": "fortnight",
+            "04": "month", "05": "two_months",
+        }
+        per_raw = (form.get("global_periodicity") or "04").strip()
+        per_value = SAT_PERIODICITY.get(per_raw, per_raw)
+        payload["global"] = {
+            "periodicity": per_value,
+            "months": (form.get("global_month") or "01").strip(),
+            "year": year_int,
+        }
+
     if issuer.get("facturapi_org_id") in (None, "", 0) or issuer.get("id") == -1:
         raise ValueError("DEV_MODE activo: token de prueba. Configura un token real/issuer para timbrar.")
     invoice = create_invoice(issuer["id"], issuer["facturapi_org_id"], payload)
@@ -393,6 +511,26 @@ def _submit_impl(templates, request: Request, issuer: dict, form):
         conn, invoice_local_id, issuer["id"],
         facturapi_id=fact_id, uuid=uuid, total=total,
     )
+    # Mirror to sat_cfdi so it shows up immediately in /portal/issued
+    # without waiting for the next SAT sync cron.
+    if uuid:
+        invoices_engine.mirror_emitted_to_sat_cfdi(
+            conn, issuer["id"],
+            uuid=uuid,
+            issuer_rfc=issuer.get("rfc") or "",
+            issuer_legal_name=issuer.get("alias") or issuer.get("legal_name") or "",
+            customer_rfc=customer_rfc.upper(),
+            customer_legal_name=customer_legal_name,
+            total=total,
+            currency=currency.upper(),
+            tipo_comprobante=tipo_comprobante,
+            series=serie or None,
+            folio_number=folio_number,
+            payment_form=payment_form,
+            payment_method=payment_method,
+            cfdi_use=cfdi_use_val,
+            issue_date=issue_date or None,
+        )
     if tipo_comprobante == "P" and payments_payload and table_exists(conn, "payment_relations"):
         try:
             for p in payments_payload:

@@ -780,8 +780,16 @@
     var copyLink = opts && opts.copyLink;
     var copyLabel = (opts && opts.copyLabel) || 'Copiar link';
     var autoDismiss = opts && Number.isFinite(opts.autoDismiss) ? opts.autoDismiss : 0;
+    var variant = (opts && opts.variant) || 'success';
 
-    var checkmarkSvg = '<svg viewBox="0 0 72 72" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path class="success-overlay__check" d="M14 38l14 14 30-30" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    // Icon varies by variant: success = check, error = X. CSS color class handles tint.
+    var iconSvg = (variant === 'error')
+      ? '<svg viewBox="0 0 72 72" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M22 22l28 28M50 22L22 50" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+      : '<svg viewBox="0 0 72 72" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path class="success-overlay__check" d="M14 38l14 14 30-30" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    container.classList.toggle('success-overlay--error', variant === 'error');
+    // Preserve scroll position — body.no-scroll uses position:fixed which would
+    // otherwise jump the page to the top. Save now, restore on close.
+    container._savedScrollY = window.scrollY || window.pageYOffset || 0;
 
     var actionsHtml = '';
     if (copyLink) {
@@ -796,7 +804,7 @@
     });
 
     container.innerHTML = '<div class="success-overlay__backdrop" data-close-overlay></div><div class="success-overlay__card">' +
-      '<div class="success-overlay__icon">' + checkmarkSvg + '</div>' +
+      '<div class="success-overlay__icon">' + iconSvg + '</div>' +
       '<h2 id="successOverlayTitle" class="success-overlay__title">' + escapeHtml(title) + '</h2>' +
       (message ? '<p class="success-overlay__message">' + escapeHtml(message) + '</p>' : '') +
       '<div class="success-overlay__actions">' + actionsHtml + '</div></div>';
@@ -804,6 +812,7 @@
     var close = function () {
       container.hidden = true;
       container.removeAttribute('aria-labelledby');
+      container.classList.remove('success-overlay--error');
       container._close = null;
       if (container._autoDismissTimer) {
         clearTimeout(container._autoDismissTimer);
@@ -811,6 +820,11 @@
       }
       document.removeEventListener('keydown', closeOnEscape);
       document.body.classList.remove('no-scroll');
+      // Restore scroll position (counters body.no-scroll position:fixed jumping to top).
+      if (typeof container._savedScrollY === 'number') {
+        window.scrollTo(0, container._savedScrollY);
+        container._savedScrollY = null;
+      }
     };
     container._close = close;
     var closeOnEscape = function (e) {

@@ -91,8 +91,21 @@
     }
   }
 
-  function onPointerEnter(e) {
-    var anchor = e.target.closest('a[href]');
+  function findAnchor(target) {
+    // e.target may be a Text node, Document, window, OR an SVG element inside
+    // an anchor. Walk up manually to handle all cases robustly.
+    var node = target;
+    while (node) {
+      if (node.nodeType === 1 && node.tagName && node.tagName.toUpperCase() === 'A' && node.getAttribute && node.getAttribute('href')) {
+        return node;
+      }
+      node = node.parentNode || node.parentElement || null;
+    }
+    return null;
+  }
+
+  function onPointerOver(e) {
+    var anchor = findAnchor(e.target);
     if (!anchor || !shouldPreload(anchor)) return;
 
     var href = anchor.href;
@@ -106,8 +119,8 @@
     }, DEBOUNCE_MS);
   }
 
-  function onPointerLeave(e) {
-    var anchor = e.target.closest('a[href]');
+  function onPointerOut(e) {
+    var anchor = findAnchor(e.target);
     if (!anchor) return;
     if (anchor.href === pendingHref) {
       clearPending();
@@ -115,14 +128,84 @@
   }
 
   function onTouchStart(e) {
-    var anchor = e.target.closest('a[href]');
+    var anchor = findAnchor(e.target);
     if (!anchor || !shouldPreload(anchor)) return;
-    // Touchstart: prefetch immediately (no debounce — touch implies intent)
     prefetch(anchor.href);
   }
 
-  // ── Bind via event delegation on document ──
-  document.addEventListener('pointerenter', onPointerEnter, true);
-  document.addEventListener('pointerleave', onPointerLeave, true);
-  document.addEventListener('touchstart', onTouchStart, { passive: true, capture: true });
+  // Click en el link de la página actual → no recargar. Usamos propiedades
+  // directas del HTMLAnchorElement (no URL constructor) que el browser ya
+  // resolvió. Match por pathname únicamente: si ya estás en /portal/facturas
+  // y haces click en el link de Facturas (con o sin ?ym), no recargar.
+  function isSamePageNav(anchor) {
+    if (!anchor) return false;
+    // anchor.host / anchor.pathname son propiedades del HTMLAnchorElement,
+    // ya parseadas por el browser. Funcionan para clicks en SVG dentro del <a>.
+    if (anchor.host !== location.host) return false;
+    if (anchor.pathname !== location.pathname) return false;
+    // Hash distinto = scroll a anchor diferente, permitir
+    if (anchor.hash && anchor.hash !== location.hash) return false;
+    return true;
+  }
+
+  function onClickIntercept(e) {
+    if (e.defaultPrevented) return;
+    if (e.button !== 0) return;
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    var anchor = findAnchor(e.target);
+    if (!anchor) return;
+    if (anchor.target && anchor.target !== '_self') return;
+    if (!isSamePageNav(anchor)) return;
+    e.preventDefault();
+    e.stopPropagation();
+  }
+
+  // ── Rewrite sidebar/topbar links to monthPaths so they include stored YM ──
+  // Without this, clicking a link to /portal/home triggers the early-head
+  // script's location.replace() to inject ?ym=..., causing a double navigation
+  // that breaks View Transitions and flashes the screen black.
+  var MONTH_PATHS = [
+    '/portal/home', '/portal/facturas', '/portal/movimientos',
+    '/portal/bank/movements', '/portal/invoices-ext',
+    '/portal/invoices/nomina', '/portal/month-close', '/portal/estados-financieros',
+  ];
+
+  function storedYm() {
+    try {
+      var m = document.querySelector('meta[name="portal-issuer-id"]');
+      var id = m && m.getAttribute('content');
+      var key = 'portal_selected_ym_' + (id || '0');
+      var v = localStorage.getItem(key) || '';
+      if (/^\d{4}-(0[1-9]|1[0-2])$/.test(v) || /^\d{4}$/.test(v)) return v;
+    } catch (_) {}
+    return '';
+  }
+
+  function injectYmIntoLinks() {
+    var ym = storedYm();
+    if (!ym) return;
+    var anchors = document.querySelectorAll('a[href^="/portal/"]');
+    for (var i = 0; i < anchors.length; i++) {
+      var a = anchors[i];
+      if (a.hasAttribute('data-no-ym-inject')) continue;
+      var url;
+      try { url = new URL(a.href); } catch (_) { continue; }
+      if (MONTH_PATHS.indexOf(url.pathname) < 0) continue;
+      if (url.searchParams.has('ym')) continue;
+      url.searchParams.set('ym', ym);
+      a.href = url.pathname + url.search + url.hash;
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', injectYmIntoLinks);
+  } else {
+    injectYmIntoLinks();
+  }
+
+  // ── Bind via event delegation on document (pointerover/out bubble naturally) ──
+  document.addEventListener('pointerover', onPointerOver);
+  document.addEventListener('pointerout', onPointerOut);
+  document.addEventListener('touchstart', onTouchStart, { passive: true });
+  document.addEventListener('click', onClickIntercept, true);
 })();

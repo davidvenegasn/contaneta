@@ -66,6 +66,41 @@ def _mark_manifest_signed(issuer_id: int) -> None:
         conn.close()
 
 
+def _save_ciec_password(issuer_id: int, ciec_password: str) -> None:
+    """Encrypt and persist the CIEC (SAT portal password) on sat_credentials.
+
+    INSERT-or-UPDATE so that uploading CIEC works whether or not the issuer
+    has previously uploaded a FIEL via /portal/config/sat. The encryption is
+    per-issuer (services.sat.crypto_at_rest), the same scheme used for FIEL
+    passwords elsewhere in the codebase.
+    """
+    from services.sat.crypto_at_rest import encrypt_text
+    enc = encrypt_text(issuer_id=int(issuer_id), plaintext=ciec_password)
+    conn = db()
+    try:
+        existing = conn.execute(
+            "SELECT id FROM sat_credentials WHERE issuer_id = ? LIMIT 1",
+            (issuer_id,),
+        ).fetchone()
+        if existing:
+            conn.execute(
+                "UPDATE sat_credentials SET ciec_password_encrypted = ?, updated_at = datetime('now') WHERE issuer_id = ?",
+                (enc, issuer_id),
+            )
+        else:
+            # Bare row with just CIEC; FIEL fields stay empty until the user
+            # uploads them via the existing /portal/config/sat flow.
+            conn.execute(
+                """INSERT INTO sat_credentials
+                   (issuer_id, fiel_cer_path, fiel_key_path, fiel_key_password, ciec_password_encrypted)
+                   VALUES (?, '', '', '', ?)""",
+                (issuer_id, enc),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def _maybe_complete_onboarding(issuer_id: int) -> None:
     """If both CSD and manifest are done, stamp onboarding_completed_at."""
     conn = db()
@@ -122,6 +157,32 @@ def _read_issuer_facturapi_state(issuer_id: int) -> dict:
     return dict(row) if hasattr(row, "keys") else dict(zip(row.keys(), row))
 
 
+def _ensure_state_with_org(issuer_id: int) -> dict:
+    """Read state and, if `facturapi_org_id` is missing, provision it synchronously.
+
+    This makes the Facturapi onboarding transparent to the user — they never see
+    "still being created" because the org is created on-demand the first time
+    they hit a flow that needs it. Idempotent; subsequent calls are free.
+
+    Returns the state dict (with `facturapi_org_id` populated if provision
+    succeeded, or None if Facturapi was unreachable — caller decides how to
+    handle that case).
+    """
+    state = _read_issuer_facturapi_state(issuer_id)
+    if state.get("facturapi_org_id"):
+        return state
+    try:
+        from services.facturapi.provision import ensure_provisioned
+        ensure_provisioned(issuer_id)
+        # Re-read after provisioning so caller sees the updated state
+        return _read_issuer_facturapi_state(issuer_id)
+    except Exception as e:
+        logger.warning(
+            "On-demand provision failed for issuer=%s: %s", issuer_id, e
+        )
+        return state
+
+
 def register_facturapi_setup_routes(router, templates):
 
     @router.get("/setup/credenciales")
@@ -129,7 +190,9 @@ def register_facturapi_setup_routes(router, templates):
         request: Request,
         issuer: dict = Depends(get_portal_issuer),
     ):
-        state = _read_issuer_facturapi_state(issuer["id"])
+        # On-demand provision: the onboarding screen renders with the org
+        # already created, no "still being created" message ever shown.
+        state = _ensure_state_with_org(issuer["id"])
         return render_portal(
             templates,
             request,
@@ -154,7 +217,9 @@ def register_facturapi_setup_routes(router, templates):
         request: Request,
         issuer: dict = Depends(get_portal_issuer),
     ):
-        state = _read_issuer_facturapi_state(issuer["id"])
+        # On-demand provision so the user never sees the "still being created"
+        # state — by the time they hit settings, the org exists.
+        state = _ensure_state_with_org(issuer["id"])
         return {
             "ok": True,
             "provisioned": bool(state.get("facturapi_org_id")),
@@ -177,11 +242,15 @@ def register_facturapi_setup_routes(router, templates):
         csd_key: UploadFile = File(...),
         csd_password: str = Form(...),
         csrf_token: str = Form(...),
+        ciec_password: str = Form(""),
+        fiscal_zip: str = Form(""),
         issuer: dict = Depends(get_portal_issuer),
     ):
-        """Unified onboarding: FIEL + CSD in one shot.
+        """Unified onboarding: FIEL + CSD + CP fiscal in one shot.
 
         Backend orchestrates:
+          0) save fiscal_zip + push legal info to Facturapi (sets RFC/régimen/CP
+             so the org leaves "test generic" and becomes live-ready)
           1) sign manifesto via PUT /v2/organizations/{id}/fiel (headless)
           2) upload CSD via PUT /v2/organizations/{id}/certificate
           3) update DB timestamps
@@ -192,13 +261,33 @@ def register_facturapi_setup_routes(router, templates):
         if not csrf_service.verify_csrf_token((csrf_token or "").strip()):
             raise HTTPException(status_code=400, detail="CSRF inválido")
 
-        state = _read_issuer_facturapi_state(issuer["id"])
+        state = _ensure_state_with_org(issuer["id"])
         org_id = state.get("facturapi_org_id")
         if not org_id:
             raise HTTPException(
-                status_code=409,
-                detail="Tu organización en Facturapi aún se está creando. Intenta de nuevo en unos segundos.",
+                status_code=502,
+                detail="No pudimos preparar tu organización en Facturapi. Revisa tu conexión e intenta de nuevo en unos minutos.",
             )
+
+        # Step 0: persist fiscal_zip and push legal info to Facturapi
+        fiscal_zip = (fiscal_zip or "").strip()
+        if fiscal_zip:
+            if not fiscal_zip.isdigit() or len(fiscal_zip) != 5:
+                raise HTTPException(status_code=400, detail="CP fiscal debe ser de 5 dígitos")
+            conn = db()
+            try:
+                conn.execute(
+                    "UPDATE issuers SET fiscal_zip = ?, updated_at = datetime('now') WHERE id = ?",
+                    (fiscal_zip, issuer["id"]),
+                )
+                conn.commit()
+            finally:
+                conn.close()
+        try:
+            from services.facturapi.provision import push_legal_info_to_facturapi
+            push_legal_info_to_facturapi(issuer["id"])
+        except Exception as e:
+            logger.warning("push_legal_info failed for issuer=%s: %s", issuer["id"], e)
 
         fiel_cer_bytes = await fiel_cer.read()
         fiel_key_bytes = await fiel_key.read()
@@ -267,11 +356,22 @@ def register_facturapi_setup_routes(router, templates):
         else:
             csd_uploaded = True
 
+        # Optional CIEC — saves encrypted for future SAT portal features.
+        # Doesn't block onboarding if it fails (best-effort).
+        ciec_saved = False
+        if (ciec_password or "").strip():
+            try:
+                _save_ciec_password(issuer["id"], ciec_password.strip())
+                ciec_saved = True
+            except Exception as e:
+                logger.warning("CIEC save failed for issuer=%s: %s", issuer["id"], e)
+
         _maybe_complete_onboarding(issuer["id"])
         return {
             "ok": True,
             "manifest_signed": manifest_signed,
             "csd_uploaded": csd_uploaded,
+            "ciec_saved": ciec_saved,
             "onboarding_completed": manifest_signed and csd_uploaded,
         }
 
@@ -287,12 +387,12 @@ def register_facturapi_setup_routes(router, templates):
         if not csrf_service.verify_csrf_token((csrf_token or "").strip()):
             raise HTTPException(status_code=400, detail="CSRF inválido")
 
-        state = _read_issuer_facturapi_state(issuer["id"])
+        state = _ensure_state_with_org(issuer["id"])
         org_id = state.get("facturapi_org_id")
         if not org_id:
             raise HTTPException(
-                status_code=409,
-                detail="Tu organización en Facturapi aún se está creando. Intenta de nuevo en unos segundos.",
+                status_code=502,
+                detail="No pudimos preparar tu organización en Facturapi. Revisa tu conexión e intenta de nuevo en unos minutos.",
             )
 
         for upload in (cer_file, key_file):
@@ -333,6 +433,116 @@ def register_facturapi_setup_routes(router, templates):
         _mark_csd_uploaded(issuer["id"])
         _maybe_complete_onboarding(issuer["id"])
         return {"ok": True, "organization": result}
+
+    @router.post("/api/facturapi/upload-fiel")
+    async def portal_facturapi_upload_fiel(
+        request: Request,
+        cer_file: UploadFile = File(...),
+        key_file: UploadFile = File(...),
+        password: str = Form(...),
+        csrf_token: str = Form(...),
+        issuer: dict = Depends(get_portal_issuer),
+    ):
+        """Upload FIEL alone: signs the manifesto via the headless endpoint.
+
+        Used by the per-card UI in /portal/settings. The unified /onboard
+        endpoint still does FIEL+CSD together for the wizard flow.
+        """
+        if not csrf_service.verify_csrf_token((csrf_token or "").strip()):
+            raise HTTPException(status_code=400, detail="CSRF inválido")
+        state = _ensure_state_with_org(issuer["id"])
+        org_id = state.get("facturapi_org_id")
+        if not org_id:
+            raise HTTPException(
+                status_code=502,
+                detail="No pudimos preparar tu organización en Facturapi. Revisa tu conexión e intenta de nuevo en unos minutos.",
+            )
+        cer_bytes = await cer_file.read()
+        key_bytes = await key_file.read()
+        _validate_cert_pair_upload(cer_file, key_file, label="FIEL",
+                                   cer_bytes=cer_bytes, key_bytes=key_bytes)
+        password = (password or "").strip()
+        if not password:
+            raise HTTPException(status_code=400, detail="Contraseña requerida")
+        try:
+            fpi_orgs.sign_manifesto(
+                org_id, cer_bytes=cer_bytes, key_bytes=key_bytes, password=password,
+            )
+        except fpi_orgs.FacturapiOrgsError as e:
+            logger.warning("FIEL upload failed issuer=%s: %s", issuer["id"], e)
+            return JSONResponse(
+                status_code=400 if e.status in (400, 422) else 502,
+                content={"ok": False, "error": {"code": "FIEL_UPLOAD_FAILED", "message": e.body}},
+            )
+        _mark_manifest_signed(issuer["id"])
+        _maybe_complete_onboarding(issuer["id"])
+        return {"ok": True}
+
+    @router.post("/api/facturapi/save-ciec")
+    def portal_facturapi_save_ciec(
+        request: Request,
+        ciec_password: str = Form(...),
+        csrf_token: str = Form(...),
+        issuer: dict = Depends(get_portal_issuer),
+    ):
+        """Save CIEC (SAT portal password) encrypted at rest."""
+        if not csrf_service.verify_csrf_token((csrf_token or "").strip()):
+            raise HTTPException(status_code=400, detail="CSRF inválido")
+        ciec_password = (ciec_password or "").strip()
+        if not ciec_password:
+            raise HTTPException(status_code=400, detail="Contraseña requerida")
+        try:
+            _save_ciec_password(issuer["id"], ciec_password)
+        except Exception as e:
+            logger.exception("CIEC save failed issuer=%s: %s", issuer["id"], e)
+            return JSONResponse(
+                status_code=500,
+                content={"ok": False, "error": {"code": "CIEC_SAVE_FAILED", "message": str(e)}},
+            )
+        return {"ok": True}
+
+    @router.get("/api/facturapi/refresh-manifesto-status")
+    def portal_facturapi_refresh_manifesto_status(
+        request: Request,
+        issuer: dict = Depends(get_portal_issuer),
+    ):
+        """Poll Facturapi for current org state and mark manifest_signed_at in
+        DB if the manifesto step is no longer pending. Frontend calls this
+        every few seconds while the embedded Facturapi iframe is open.
+
+        The manifesto signing is the only step we can't do programmatically —
+        per Facturapi support, it's only available via their dashboard or the
+        embedded iframe at https://www.facturapi.io/embedded/manifiesto.
+        We detect completion by re-fetching org state.
+        """
+        state = _read_issuer_facturapi_state(issuer["id"])
+        org_id = (state.get("facturapi_org_id") or "").strip()
+        if not org_id:
+            return {"ok": False, "error": "no_org"}
+
+        try:
+            org_data = fpi_orgs.get_organization(org_id)
+        except Exception as e:
+            logger.warning("refresh-manifesto-status: get_org failed issuer=%s: %s", issuer["id"], e)
+            return {"ok": False, "error": "facturapi_unreachable"}
+
+        pending_types = {s.get("type") for s in (org_data.get("pending_steps") or []) if isinstance(s, dict)}
+        manifesto_pending = "manifiesto" in pending_types or "manifesto" in pending_types
+
+        was_already_marked = bool(state.get("manifest_signed_at"))
+        if not manifesto_pending and not was_already_marked:
+            _mark_manifest_signed(issuer["id"])
+            _maybe_complete_onboarding(issuer["id"])
+            logger.info("Manifesto detected as signed for issuer=%s org=%s", issuer["id"], org_id)
+            was_already_marked = True
+
+        return {
+            "ok": True,
+            "manifesto_signed": (not manifesto_pending),
+            "marked_in_db": was_already_marked,
+            "pending_steps": sorted(pending_types),
+            "is_production_ready": bool(org_data.get("is_production_ready")),
+        }
 
     @router.post("/api/facturapi/retry-provision")
     def portal_facturapi_retry_provision(

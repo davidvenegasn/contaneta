@@ -398,3 +398,72 @@ def update_invoice_stamp(
         (facturapi_id, uuid, total, invoice_local_id, issuer_id),
     )
     conn.commit()
+
+
+def mirror_emitted_to_sat_cfdi(
+    conn,
+    issuer_id: int,
+    *,
+    uuid: str,
+    issuer_rfc: str,
+    issuer_legal_name: str,
+    customer_rfc: str,
+    customer_legal_name: str,
+    total: float | None,
+    currency: str,
+    tipo_comprobante: str,
+    series: str | None,
+    folio_number: int | None,
+    payment_form: str | None,
+    payment_method: str | None,
+    cfdi_use: str | None,
+    issue_date: str | None,
+) -> None:
+    """Insert a row into sat_cfdi for a freshly-emitted CFDI so it shows up
+    immediately in the portal's "Emitidas" listing — without waiting for the
+    next SAT sync (which is the slow cron-driven path that populates the rest
+    of the data later).
+
+    INSERT OR IGNORE on uuid so:
+      - If the SAT sync already ran, we don't overwrite its richer data.
+      - If our mirror ran first, the sync can later UPDATE us if needed.
+    """
+    if not uuid:
+        return
+    try:
+        conn.execute(
+            """INSERT OR IGNORE INTO sat_cfdi (
+                issuer_id, direction, uuid, status, fecha_emision,
+                rfc_emisor, nombre_emisor, rfc_receptor, nombre_receptor,
+                total, moneda, tipo_comprobante,
+                serie, folio, forma_pago, metodo_pago, uso_cfdi,
+                created_at, updated_at
+            ) VALUES (
+                ?, 'issued', UPPER(TRIM(?)), '1', COALESCE(?, datetime('now')),
+                ?, ?, ?, ?,
+                ?, ?, ?,
+                ?, ?, ?, ?, ?,
+                datetime('now'), datetime('now')
+            )""",
+            (
+                int(issuer_id),
+                uuid,
+                issue_date,
+                (issuer_rfc or "").upper(),
+                issuer_legal_name or "",
+                (customer_rfc or "").upper(),
+                customer_legal_name or "",
+                float(total) if total is not None else None,
+                (currency or "MXN").upper(),
+                tipo_comprobante or "I",
+                series or None,
+                str(folio_number) if folio_number is not None else None,
+                payment_form or None,
+                payment_method or None,
+                cfdi_use or None,
+            ),
+        )
+        conn.commit()
+    except Exception:
+        # Best-effort mirror — never block the emission flow if this fails.
+        logger.exception("mirror_emitted_to_sat_cfdi failed for uuid=%s", uuid[:36])

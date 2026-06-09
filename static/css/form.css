@@ -184,11 +184,18 @@ input, select, textarea{
   font-size: var(--text-base);
   font-family: var(--font-family);
   line-height: 1.35;
-  background: #fff;
+  background: var(--surface, #fff);
+  color: var(--text, #0a0a0a);
   min-height: 36px;
   height: 36px;
   box-sizing: border-box;
   transition: box-shadow var(--motion-micro, 150ms) ease, border-color var(--motion-micro, 150ms) ease;
+}
+html.nightmode input,
+html.nightmode select,
+html.nightmode textarea {
+  background: var(--surface-1, #161b22);
+  color: var(--text, #c9d1d9);
 }
 textarea{
   padding: 8px 12px;
@@ -213,6 +220,36 @@ input:focus, select:focus, textarea:focus{
 }
 
 input::placeholder, textarea::placeholder{ color:#94a3b8; }
+
+/* Override Chrome/Edge/Safari autofill: por defecto el browser pinta los
+   inputs auto-completados con su propio fondo lavanda/azul Y fuerza el color
+   del texto al claro, lo que rompe contraste. Forzamos el fondo y el color
+   con un trick: box-shadow inset grueso simula el fondo, y -webkit-text-fill-color
+   gana sobre el color del browser. Cubre nightmode también. */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active,
+textarea:-webkit-autofill,
+select:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0 1000px var(--surface, #fff) inset !important;
+  box-shadow: 0 0 0 1000px var(--surface, #fff) inset !important;
+  -webkit-text-fill-color: var(--text, #0a0a0a) !important;
+  caret-color: var(--text, #0a0a0a);
+  transition: background-color 9999s ease-in-out 0s;
+}
+
+html.nightmode input:-webkit-autofill,
+html.nightmode input:-webkit-autofill:hover,
+html.nightmode input:-webkit-autofill:focus,
+html.nightmode input:-webkit-autofill:active,
+html.nightmode textarea:-webkit-autofill,
+html.nightmode select:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0 1000px var(--surface-1, #161b22) inset !important;
+  box-shadow: 0 0 0 1000px var(--surface-1, #161b22) inset !important;
+  -webkit-text-fill-color: var(--text, #c9d1d9) !important;
+  caret-color: var(--text, #c9d1d9);
+}
 
 .card{
   background: var(--card-bg);

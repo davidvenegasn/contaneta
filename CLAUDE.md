@@ -295,6 +295,32 @@ SQLite (invoicing.db) + catalogs (catalogs.db)
 - Use custom exceptions inheriting from `AppError` for business errors.
 - Log significant events with `logging.getLogger(__name__)`.
 
+## Never show generic error pages to portal users
+
+The portal user must NEVER be dumped to a bare `<h3>` + `<p>`, plaintext error,
+FastAPI default exception page, or unstyled response. Every error path must
+end in either:
+
+1. **Sleek in-portal feedback**: toast (`window.portalToast`), inline banner,
+   or modal (`window.uiSuccessOverlay({ variant: 'error' })`). Use this for
+   any JS-driven submit/fetch flow.
+2. **Portal-layout error page**: server-rendered template that extends
+   `base_portal.html` so sidebar+topbar+styles are intact. Use
+   `templates/components/portal_error_inline.html` as the standard partial.
+
+Concrete rules for any new endpoint or error handler:
+- For POST handlers that respond to forms: detect `Accept: application/json`.
+  If present, return structured JSON (`{ok: false, error: {title, message}}`)
+  for the client to render in a modal/toast. If absent, render the portal-
+  layout error template — never `HTMLResponse(f"<h3>...")`.
+- For unhandled exceptions in `app.py`: route through the friendly error
+  handler (Fase 4 of polish job). Production must NOT show tracebacks.
+- For external API failures (Facturapi, Stripe, Banxico, SAT): surface the
+  *upstream message* via the sleek modal/toast, not a generic "algo salió mal".
+- If you find an endpoint returning bare HTML/plaintext errors during work
+  on something else, fix it (this is one of the rare scope-creep exceptions:
+  generic error pages are user-trust-breaking and never acceptable).
+
 ## No silent improvisation
 
 When implementing changes:

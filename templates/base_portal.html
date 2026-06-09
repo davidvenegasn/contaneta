@@ -6,35 +6,22 @@
     <meta name="csrf-token" content="{{ csrf_token|default('') }}" />
     <meta name="portal-issuer-id" content="{{ portal_issuer_id|default(0) }}" />
     <meta name="theme-color" content="#ffffff" />
-    <meta name="color-scheme" content="light dark" />
     <style>
       /* Background base inline ANTES de cualquier CSS externo. Garantiza que
          el primer paint del browser use el color correcto del tema, evitando
          el flash blanco entre que el HTML se parsea y los CSS externos
-         terminan de aplicar. */
-      html { background: #fafafa; color: #0a0a0a; }
-      html.nightmode { background: #0d1117; color: #c9d1d9; }
-      /* Esconde el body hasta que las fuentes estén listas (timeout 200ms).
-         Evita el FOUT visible (system font → Inter swap) que se ve como
-         cambio de color/peso del texto al navegar. */
-      html:not(.fonts-ready) body { visibility: hidden; }
-      html.fonts-ready body { visibility: visible; }
+         terminan de aplicar. (El font swap ya está prevenido por
+         `display=optional` en la URL de Google Fonts más abajo, así que no
+         necesitamos visibility:hidden.)
+
+         CRÍTICO: color-scheme tiene que ser EXPLÍCITO por tema, no `light dark`.
+         Cuando se declara ambos, el browser usa sus estilos default OSCUROS
+         para inputs/scrollbars si el OS está en dark mode — eso provocaba
+         texto blanco invisible sobre el fondo blanco de los inputs cuando
+         macOS estaba en dark mode pero ContaNeta en light. */
+      html { background: #fafafa; color: #0a0a0a; color-scheme: light; }
+      html.nightmode { background: #0d1117; color: #c9d1d9; color-scheme: dark; }
     </style>
-    <script>
-      // Marca fonts-ready cuando Inter cargue, o después de 200ms (lo que pase
-      // primero). Evita esperar indefinidamente si la red está lenta.
-      (function () {
-        var doc = document.documentElement;
-        var done = false;
-        function ready() { if (done) return; done = true; doc.classList.add('fonts-ready'); }
-        try {
-          if (document.fonts && document.fonts.ready) {
-            document.fonts.ready.then(ready);
-          }
-        } catch (_) {}
-        setTimeout(ready, 200);
-      })();
-    </script>
     <script>
 (function () {
   try {
@@ -101,6 +88,7 @@
     <link rel="stylesheet" href="/static/css/responsive.css">
     <link rel="stylesheet" href="/static/css/portal_dark_overrides.css">
     <script defer src="/static/js/portal_preload.js"></script>
+    <script defer src="/static/js/portal_uppercase.js"></script>
     <script defer src="/static/js/portal_progress.js"></script>
     <script defer src="/static/js/portal_button_loading.js"></script>
     <script defer src="/static/js/portal_relative_dates.js"></script>

@@ -693,9 +693,10 @@ async def security_headers_middleware(request: Request, call_next):
             "script-src 'self' 'unsafe-inline' https://js.stripe.com; "
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
             "font-src 'self' https://fonts.gstatic.com; "
-            "frame-src 'self' blob: https://js.stripe.com https://hooks.stripe.com; "
-            "img-src 'self' data:; "
-            "connect-src 'self' https://api.stripe.com;"
+            "frame-src 'self' blob: https://js.stripe.com https://hooks.stripe.com "
+            "https://www.facturapi.io https://dashboard.facturapi.io; "
+            "img-src 'self' data: https://storage.googleapis.com; "
+            "connect-src 'self' https://api.stripe.com https://www.facturapi.io;"
         )
         response.headers["Content-Security-Policy"] = csp
     return response

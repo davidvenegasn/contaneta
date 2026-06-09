@@ -10,7 +10,7 @@
     </a>
     <div>
       <h1 class="app-title">Configurar facturación</h1>
-      <p class="app-subtitle muted">Sube tu FIEL y tu CSD una sola vez. Nos encargamos del resto.</p>
+      <p class="app-subtitle muted">Sube tus credenciales del SAT una sola vez. Nos encargamos del resto.</p>
     </div>
   </div>
 </header>
@@ -36,7 +36,37 @@
     <p>Tu FIEL está conectada, tu manifesto firmado y tu CSD activo.</p>
     <div class="u-mt-12">
       <a href="/portal/home" class="btn btn--primary">Ir al inicio</a>
-      <a href="/invoicing/new" class="btn btn--ghost">Emitir mi primera factura</a>
+      <a href="/portal/create" class="btn btn--ghost">Emitir mi primera factura</a>
+    </div>
+  </div>
+
+  {# State: CSD uploaded but manifesto not yet signed → embedded iframe #}
+  {% elif csd_uploaded_at and not manifest_signed_at %}
+  <div class="card u-mb-14" id="stateManifesto">
+    <h2 class="card__title">Último paso — Firma tu carta manifiesto</h2>
+    <p class="muted u-mb-12">
+      Es un trámite legal requerido por el SAT que permite a ContaNeta timbrar
+      tus facturas. Sube tu FIEL en el recuadro siguiente; el SAT recibe la firma
+      directamente — tu e.firma <strong>no se almacena en ningún servidor</strong>.
+    </p>
+    <div id="manifestoIframeWrap" style="width:100%;border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--surface);min-height:600px;">
+      <iframe
+        src="https://www.facturapi.io/embedded/manifiesto"
+        style="width:100%;height:680px;border:0;display:block;background:#fff;"
+        title="Firmar carta manifiesto Facturapi"
+        allow="clipboard-write">
+      </iframe>
+    </div>
+    <div id="manifestoStatus" class="u-mt-12 muted" style="font-size:14px;" role="status" aria-live="polite">
+      Esperando que firmes el manifesto…
+    </div>
+    <div class="u-mt-12" style="display:flex;gap:10px;align-items:center;">
+      <button type="button" class="btn btn--ghost btn--sm" id="manifestoCheckBtn">
+        Ya firmé — verificar ahora
+      </button>
+      <span class="muted" style="font-size:12px;">
+        Verificamos automáticamente cada 5 segundos.
+      </span>
     </div>
   </div>
 
@@ -45,13 +75,29 @@
   <form id="onboardForm" method="post" action="/portal/api/facturapi/onboard" enctype="multipart/form-data" class="u-mb-14">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
+    {# ── Datos fiscales (CP) ──────────────────────────────────────── #}
+    <div class="card u-mb-14">
+      <h2 class="card__title">Código postal fiscal</h2>
+      <p class="muted u-mb-12">
+        <strong>El CP que tienes registrado ante el SAT.</strong>
+        Está en tu Constancia de Situación Fiscal. SAT lo valida exactamente contra sus registros.
+      </p>
+      <div class="form-row">
+        <label for="fiscal_zip">CP fiscal (5 dígitos)</label>
+        <input id="fiscal_zip" type="text" name="fiscal_zip" inputmode="numeric" pattern="\d{5}" maxlength="5" autocomplete="off" placeholder="64000" required>
+      </div>
+    </div>
+
     {# ── FIEL section ─────────────────────────────────────────────── #}
     <div class="card u-mb-14">
-      <h2 class="card__title">Tu FIEL (e.firma)</h2>
-      <p class="muted u-mb-12">Para firmar el manifesto del SAT. Usamos los mismos archivos que tú usas en sat.gob.mx.</p>
+      <h2 class="card__title">FIEL · e.firma</h2>
+      <p class="muted u-mb-12">
+        <strong>Permite descargar tus facturas del SAT automáticamente y firmar tu carta manifiesto.</strong>
+        Son los mismos archivos que usas para entrar a sat.gob.mx.
+      </p>
 
       {% if manifest_signed_at %}
-        <p style="color:var(--success, #16a34a);">✓ Manifesto firmado el {{ manifest_signed_at }}</p>
+        <p style="color:var(--success, #16a34a);">✓ FIEL conectada y manifesto firmado el {{ manifest_signed_at }}</p>
       {% else %}
         <div class="form-row">
           <label for="fiel_cer">Certificado FIEL (.cer)</label>
@@ -72,8 +118,11 @@
 
     {# ── CSD section ──────────────────────────────────────────────── #}
     <div class="card u-mb-14">
-      <h2 class="card__title">Tu CSD (Sello Digital)</h2>
-      <p class="muted u-mb-12">Para sellar cada factura que emitas.</p>
+      <h2 class="card__title">CSD · Sello Digital</h2>
+      <p class="muted u-mb-12">
+        <strong>Permite emitir facturas desde la plataforma.</strong>
+        Cada CFDI que crees lleva tu sello digital para que el SAT lo reciba como válido.
+      </p>
 
       {% if csd_uploaded_at %}
         <p style="color:var(--success, #16a34a);">✓ CSD cargado el {{ csd_uploaded_at }}</p>
@@ -94,6 +143,20 @@
       {% endif %}
     </div>
 
+    {# ── CIEC section (optional) ──────────────────────────────────── #}
+    <div class="card u-mb-14">
+      <h2 class="card__title">CIEC · Contraseña del SAT <span class="muted" style="font-weight:400;font-size:.85em;">(opcional)</span></h2>
+      <p class="muted u-mb-12">
+        <strong>Permite consultar tu estatus y trámites en el portal del SAT directamente desde ContaNeta.</strong>
+        Es la contraseña que usas en sat.gob.mx con tu RFC. Si no la tienes a la mano, déjala vacía y la agregas después.
+      </p>
+
+      <div class="form-row">
+        <label for="ciec_password">Contraseña SAT (RFC + contraseña)</label>
+        <input id="ciec_password" type="password" name="ciec_password" autocomplete="off" placeholder="Déjala vacía si no la tienes a la mano">
+      </div>
+    </div>
+
     <div class="form-row" style="display:flex;align-items:center;gap:12px;">
       <button type="submit" class="btn btn--primary" id="onboardSubmitBtn">Conectar y empezar a facturar</button>
       <span id="onboardSpinner" hidden class="muted">Procesando…</span>
@@ -111,7 +174,6 @@
   var orgId = root.dataset.orgId || '';
   var completed = root.dataset.completed === '1';
 
-  // Poll status if org not yet provisioned or completion pending — reload when changes.
   if (!orgId || !completed) {
     setInterval(function () {
       fetch('/portal/api/facturapi/status', { credentials: 'same-origin' })
@@ -128,7 +190,53 @@
     }, 4000);
   }
 
-  // Onboarding form: send everything together, surface step-specific errors.
+  // ── Manifesto polling ──
+  // While the embedded Facturapi iframe is visible (CSD uploaded but manifesto
+  // not yet signed in our DB), poll the refresh endpoint every 5s. As soon as
+  // Facturapi confirms the manifesto is signed, reload the page → user lands
+  // on the "done" state.
+  var manifestoState = document.getElementById('stateManifesto');
+  if (manifestoState) {
+    var statusEl = document.getElementById('manifestoStatus');
+    var checkBtn = document.getElementById('manifestoCheckBtn');
+    var checking = false;
+
+    function checkManifesto(silent) {
+      if (checking) return;
+      checking = true;
+      if (!silent && statusEl) statusEl.textContent = 'Verificando con Facturapi…';
+      fetch('/portal/api/facturapi/refresh-manifesto-status', { credentials: 'same-origin' })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          checking = false;
+          if (!data || data.ok !== true) {
+            if (!silent && statusEl) statusEl.textContent = 'No pudimos contactar a Facturapi. Reintentando…';
+            return;
+          }
+          if (data.manifesto_signed) {
+            if (statusEl) {
+              statusEl.style.color = 'var(--success, #16a34a)';
+              statusEl.textContent = '✓ Manifesto firmado. Cargando…';
+            }
+            setTimeout(function () { window.location.reload(); }, 800);
+          } else if (!silent && statusEl) {
+            statusEl.textContent = 'Esperando que firmes el manifesto…';
+          }
+        })
+        .catch(function () {
+          checking = false;
+          if (!silent && statusEl) statusEl.textContent = 'Reintentando…';
+        });
+    }
+
+    if (checkBtn) {
+      checkBtn.addEventListener('click', function () { checkManifesto(false); });
+    }
+    setInterval(function () { checkManifesto(true); }, 5000);
+    // Initial check after 2s in case user already signed before page loaded
+    setTimeout(function () { checkManifesto(true); }, 2000);
+  }
+
   var form = document.getElementById('onboardForm');
   if (form) {
     var feedback = document.getElementById('onboardFeedback');

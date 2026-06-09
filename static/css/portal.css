@@ -1054,42 +1054,33 @@ body.no-scroll, body.scroll-locked, body.quick-invoice-modal-open{
   gap:12px;
 }
 
-/* ===== Micro-animations (P48: --motion-micro). Respetan prefers-reduced-motion. ===== */
-@media (prefers-reduced-motion: no-preference) {
-  .fade-in {
-    animation: fadeSlideIn var(--motion-micro, 150ms) var(--ease-out, ease) forwards;
-  }
-  .fade-in--1 { animation-delay: 30ms; }
-  .fade-in--2 { animation-delay: 60ms; }
-  .fade-in--3 { animation-delay: 90ms; }
-  .fade-in--4 { animation-delay: 120ms; }
-  .fade-in--5 { animation-delay: 150ms; }
-  .fade-in--6 { animation-delay: 180ms; }
-  .fade-in--7 { animation-delay: 210ms; }
-  .fade-in--8 { animation-delay: 240ms; }
+/* ===== Micro-animations.
+   Desactivadas globalmente: el stagger de entrada (fade-in--1..8 con delays de
+   30-240ms y card-stagger 0/60/120/180) reproducía la animación en cada
+   navegación, lo que se sentía como "parpadeo" del contenido — todo aparecía
+   de forma escalonada en home y otras páginas con .fade-in. Ahora el
+   contenido aparece de golpe, consistente con la navegación nativa del
+   browser. Las animaciones `scale-in` y `slide-in-right` se mantienen para
+   modales/drawers que SÍ son disparadas por interacción del usuario. ===== */
+.fade-in,
+.fade-in--1, .fade-in--2, .fade-in--3, .fade-in--4,
+.fade-in--5, .fade-in--6, .fade-in--7, .fade-in--8,
+.card-stagger > .card,
+.card-stagger > .ui-card {
+  animation: none !important;
+  opacity: 1;
+  transform: none;
+}
 
-  /* Component entrance: scale in */
+@media (prefers-reduced-motion: no-preference) {
+  /* Component entrance: scale in (sólo en modales/drawers, disparado por interacción) */
   .scale-in {
     animation: scaleIn var(--motion-modal, 200ms) var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)) forwards;
   }
 
-  /* Component entrance: slide in from right */
+  /* Component entrance: slide in from right (sólo en drawers laterales) */
   .slide-in-right {
     animation: slideInRight var(--motion-modal, 200ms) var(--ease-out, ease) forwards;
-  }
-
-  /* Card entrance stagger on page load */
-  .card-stagger > .card:nth-child(1),
-  .card-stagger > .ui-card:nth-child(1) { animation-delay: 0ms; }
-  .card-stagger > .card:nth-child(2),
-  .card-stagger > .ui-card:nth-child(2) { animation-delay: 60ms; }
-  .card-stagger > .card:nth-child(3),
-  .card-stagger > .ui-card:nth-child(3) { animation-delay: 120ms; }
-  .card-stagger > .card:nth-child(4),
-  .card-stagger > .ui-card:nth-child(4) { animation-delay: 180ms; }
-  .card-stagger > .card,
-  .card-stagger > .ui-card {
-    animation: fadeSlideIn var(--motion-modal, 200ms) var(--ease-out, ease) both;
   }
 }
 
@@ -7195,6 +7186,34 @@ input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):valid:not(
 }
 .input--error { border-color: var(--danger, #ef4444) !important; }
 .input--valid { border-color: var(--success, #22c55e) !important; }
+
+/* ===== Autofill override (Chrome/Edge/Safari) =====
+   Chrome pinta los inputs auto-completados con fondo lavanda y texto blanco
+   por defecto, lo que rompe el contraste sobre fondos claros. Forzamos fondo
+   limpio + color del tema para que se vean iguales que un input "vacío". */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active,
+textarea:-webkit-autofill,
+select:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0 1000px var(--surface, #fff) inset !important;
+  box-shadow: 0 0 0 1000px var(--surface, #fff) inset !important;
+  -webkit-text-fill-color: var(--text, #0a0a0a) !important;
+  caret-color: var(--text, #0a0a0a);
+  transition: background-color 9999s ease-in-out 0s;
+}
+html.nightmode input:-webkit-autofill,
+html.nightmode input:-webkit-autofill:hover,
+html.nightmode input:-webkit-autofill:focus,
+html.nightmode input:-webkit-autofill:active,
+html.nightmode textarea:-webkit-autofill,
+html.nightmode select:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0 1000px var(--surface-1, #161b22) inset !important;
+  box-shadow: 0 0 0 1000px var(--surface-1, #161b22) inset !important;
+  -webkit-text-fill-color: var(--text, #c9d1d9) !important;
+  caret-color: var(--text, #c9d1d9);
+}
 
 /* ===== Quick invoice card highlight ===== */
 .quick-invoice-card {

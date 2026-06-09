@@ -1187,7 +1187,7 @@
           bars += '<rect x="' + (x + barW + 2) + '" y="' + (h - hG) + '" width="' + barW + '" height="' + hG + '" rx="3" fill="#ef4444" opacity="0.75" data-type="gastos" data-label="' + label + '" data-val="' + fmtG + '" data-val2="' + fmtI + '"></rect>';
           bars += '<text x="' + (x + groupW / 2) + '" y="' + (h + 14) + '" text-anchor="middle" font-size="11" fill="var(--text-muted, #94a3b8)">' + label + '</text>';
         });
-        container.innerHTML = '<svg width="100%" height="' + (h + 20) + '" viewBox="0 0 ' + totalW + ' ' + (h + 20) + '" preserveAspectRatio="xMidYEnd meet">' + bars + '</svg>';
+        container.innerHTML = '<svg width="100%" height="' + (h + 20) + '" viewBox="0 0 ' + totalW + ' ' + (h + 20) + '" preserveAspectRatio="xMidYMax meet">' + bars + '</svg>';
 
         /* — Attach hover events — */
         container.querySelectorAll('rect[data-type]').forEach(function(rect) {

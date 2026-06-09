@@ -207,23 +207,30 @@ def create_issuer_with_token(
     finally:
         conn.close()
 
-    # Enqueue Facturapi org provisioning out-of-band. Signup must not block on
-    # Facturapi availability. If FACTURAPI_SECRET_KEY is unset the job will
-    # fail and stay queued for retry — no impact on the signup response.
+    # Provision Facturapi org synchronously so the user lands on the portal
+    # with everything ready (no "still being created" message). Adds ~1-2s to
+    # signup, but means CSD upload + emission work immediately. If Facturapi
+    # is down or unreachable, fall back to the job queue so the org gets
+    # created when service returns.
+    import logging
+    log = logging.getLogger(__name__)
     try:
-        from services import jobs as jobs_service
-        jobs_service.enqueue_job(
-            name="facturapi_provision_org",
-            issuer_id=issuer_id,
-            payload={"reason": "signup"},
-            max_attempts=5,
+        from services.facturapi.provision import ensure_provisioned
+        ensure_provisioned(issuer_id)
+    except Exception as e:
+        log.warning(
+            "Sync provision failed for issuer_id=%s (%s); falling back to job queue",
+            issuer_id, e,
         )
-    except Exception:
-        # Never let job enqueueing break signup. The org can be backfilled
-        # later by re-enqueueing manually.
-        import logging
-        logging.getLogger(__name__).exception(
-            "Failed to enqueue facturapi_provision_org for issuer_id=%s", issuer_id
-        )
+        try:
+            from services import jobs as jobs_service
+            jobs_service.enqueue_job(
+                name="facturapi_provision_org",
+                issuer_id=issuer_id,
+                payload={"reason": "signup_fallback"},
+                max_attempts=5,
+            )
+        except Exception:
+            log.exception("Failed to enqueue facturapi_provision_org fallback for issuer_id=%s", issuer_id)
 
     return (issuer_id, token)

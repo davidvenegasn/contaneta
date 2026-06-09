@@ -3,6 +3,22 @@ import re
 from typing import List
 
 
+def _sanitize_sat_code(raw: str) -> str:
+    """Strip everything except the first alphanumeric token.
+
+    The datalist autocomplete in the invoice form lets the user pick an
+    option whose label is "84111506 — Servicios contables", which sets
+    the input value to the whole label string. Facturapi rejects anything
+    non-alphanumeric in product_key / unit_key. SAT codes are short
+    alphanumeric tokens (typically 8 digits for ProdServ, 1-3 chars for
+    Unidad), so taking the first token is correct and robust.
+    """
+    if not raw:
+        return ""
+    m = re.match(r"\s*([A-Za-z0-9]+)", str(raw))
+    return m.group(1) if m else ""
+
+
 def parse_items_from_form(form) -> List[dict]:
     items: List[dict] = []
     idxs = set()
@@ -14,10 +30,10 @@ def parse_items_from_form(form) -> List[dict]:
     for i in sorted(idxs):
         qty = (form.get(f"qty_{i}") or "").strip()
         desc = (form.get(f"desc_{i}") or "").strip()
-        key = (form.get(f"key_{i}") or "").strip()
+        key = _sanitize_sat_code(form.get(f"key_{i}") or "")
         price = (form.get(f"price_{i}") or "").strip()
         iva = (form.get(f"iva_{i}") or "0.16").strip()
-        unit = (form.get(f"unit_{i}") or "").strip()
+        unit = _sanitize_sat_code(form.get(f"unit_{i}") or "")
         disc_pct = (form.get(f"disc_{i}") or "").strip()
         isr_ret = (form.get(f"isr_ret_{i}") or "0").strip()
         iva_ret = (form.get(f"iva_ret_{i}") or "0").strip()

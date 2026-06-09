@@ -147,8 +147,9 @@ def test_onboarding_page_shows_form_when_org_ready():
     cookies = make_session_cookie(issuer_id=issuer_id, user_id=user_id)
     r = client.get("/portal/setup/credenciales", cookies=cookies)
     assert r.status_code == 200
-    assert "Tu FIEL" in r.text
-    assert "Tu CSD" in r.text
+    assert "FIEL" in r.text
+    assert "CSD" in r.text
+    assert "CIEC" in r.text  # new optional section
     assert "Conectar y empezar a facturar" in r.text
 
 
@@ -329,6 +330,135 @@ def test_onboard_returns_manifesto_error_and_skips_csd():
         assert body["step"] == "manifesto"
         assert "contraseña" in body["error"]["message"].lower()
         mock_csd.assert_not_called()  # CSD must NOT be attempted if manifesto failed
+
+
+def test_upload_fiel_alone_signs_manifesto():
+    """Per-card endpoint: FIEL upload signs manifesto via headless endpoint."""
+    user_id, issuer_id = _bootstrap_authed_issuer("FFL010101FFL")
+    conn = db()
+    try:
+        conn.execute(
+            "UPDATE issuers SET facturapi_org_id = 'org_fiel_only' WHERE id = ?",
+            (issuer_id,),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    cookies = make_session_cookie(issuer_id=issuer_id, user_id=user_id)
+    from services.auth import csrf as csrf_service
+    csrf = csrf_service.generate_csrf_token()
+
+    with patch("routers.portal.facturapi_setup.fpi_orgs.sign_manifesto") as mock_sign:
+        mock_sign.return_value = {"id": "org_fiel_only"}
+        r = client.post(
+            "/portal/api/facturapi/upload-fiel",
+            cookies=cookies,
+            files={
+                "cer_file": ("fiel.cer", b"c" * 200, "application/octet-stream"),
+                "key_file": ("fiel.key", b"k" * 200, "application/octet-stream"),
+            },
+            data={"password": "fpw", "csrf_token": csrf},
+        )
+        assert r.status_code == 200
+        body = r.json()
+        assert body["ok"] is True
+
+    conn = db()
+    try:
+        row = conn.execute(
+            "SELECT manifest_signed_at FROM issuers WHERE id = ?",
+            (issuer_id,),
+        ).fetchone()
+        assert row["manifest_signed_at"] is not None
+    finally:
+        conn.close()
+
+
+def test_save_ciec_alone_persists_encrypted():
+    """Per-card endpoint: CIEC password gets persisted encrypted."""
+    user_id, issuer_id = _bootstrap_authed_issuer("CIC010101CIC")
+    cookies = make_session_cookie(issuer_id=issuer_id, user_id=user_id)
+    from services.auth import csrf as csrf_service
+    csrf = csrf_service.generate_csrf_token()
+
+    r = client.post(
+        "/portal/api/facturapi/save-ciec",
+        cookies=cookies,
+        data={"ciec_password": "CiecSecret2026!", "csrf_token": csrf},
+    )
+    assert r.status_code == 200
+    assert r.json()["ok"] is True
+
+    conn = db()
+    try:
+        row = conn.execute(
+            "SELECT ciec_password_encrypted FROM sat_credentials WHERE issuer_id = ?",
+            (issuer_id,),
+        ).fetchone()
+        assert row is not None
+        assert row["ciec_password_encrypted"].startswith("enc:")
+        assert "CiecSecret2026" not in row["ciec_password_encrypted"]
+    finally:
+        conn.close()
+
+
+def test_onboard_saves_ciec_when_provided():
+    """Optional CIEC field should be encrypted and persisted to sat_credentials."""
+    user_id, issuer_id = _bootstrap_authed_issuer("RRR010101RRR")
+    conn = db()
+    try:
+        conn.execute(
+            "UPDATE issuers SET facturapi_org_id = 'org_ciec' WHERE id = ?",
+            (issuer_id,),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    cookies = make_session_cookie(issuer_id=issuer_id, user_id=user_id)
+    from services.auth import csrf as csrf_service
+    csrf = csrf_service.generate_csrf_token()
+
+    with patch("routers.portal.facturapi_setup.fpi_orgs.sign_manifesto") as mock_sign, \
+         patch("routers.portal.facturapi_setup.fpi_orgs.upload_csd") as mock_csd:
+        mock_sign.return_value = {"id": "org_ciec"}
+        mock_csd.return_value = {"id": "org_ciec"}
+        r = client.post(
+            "/portal/api/facturapi/onboard",
+            cookies=cookies,
+            files={
+                "fiel_cer": ("fiel.cer", b"c" * 200, "application/octet-stream"),
+                "fiel_key": ("fiel.key", b"k" * 200, "application/octet-stream"),
+                "csd_cer": ("csd.cer", b"c" * 200, "application/octet-stream"),
+                "csd_key": ("csd.key", b"k" * 200, "application/octet-stream"),
+            },
+            data={
+                "fiel_password": "fpw",
+                "csd_password": "cpw",
+                "ciec_password": "MyCIECSecret2026!",
+                "csrf_token": csrf,
+            },
+        )
+        assert r.status_code == 200
+        body = r.json()
+        assert body["ciec_saved"] is True
+
+    conn = db()
+    try:
+        row = conn.execute(
+            "SELECT ciec_password_encrypted FROM sat_credentials WHERE issuer_id = ?",
+            (issuer_id,),
+        ).fetchone()
+        assert row is not None
+        enc = row["ciec_password_encrypted"]
+        assert enc, "CIEC password not persisted"
+        # Encrypted blobs from crypto_at_rest.encrypt_text are prefixed with 'enc:'
+        assert enc.startswith("enc:"), f"expected 'enc:' prefix, got {enc[:20]!r}"
+        # And of course must NOT contain the plaintext
+        assert "MyCIECSecret2026" not in enc
+    finally:
+        conn.close()
 
 
 def test_onboard_csd_error_after_manifesto_success_keeps_partial_state():

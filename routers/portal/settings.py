@@ -47,6 +47,37 @@ def register_settings_routes(router, templates):
         if sat_status["configured"]:
             from services.sat.sat_credentials_secure import extract_fiel_subject
             fiel_data = extract_fiel_subject(issuer_id)
+
+        # Facturapi lifecycle state for the 3-card credentials view.
+        facturapi_state: dict = {
+            "org_id": None,
+            "provisioned_at": None,
+            "manifest_signed_at": None,
+            "csd_uploaded_at": None,
+            "onboarding_completed_at": None,
+            "ciec_configured": False,
+        }
+        fpi_rows = db_rows(
+            """SELECT facturapi_org_id, facturapi_provisioned_at,
+                      manifest_signed_at, csd_uploaded_at, onboarding_completed_at
+               FROM issuers WHERE id = ? LIMIT 1""",
+            (issuer_id,),
+        )
+        if fpi_rows:
+            r = fpi_rows[0]
+            facturapi_state.update({
+                "org_id": r.get("facturapi_org_id"),
+                "provisioned_at": r.get("facturapi_provisioned_at"),
+                "manifest_signed_at": r.get("manifest_signed_at"),
+                "csd_uploaded_at": r.get("csd_uploaded_at"),
+                "onboarding_completed_at": r.get("onboarding_completed_at"),
+            })
+        ciec_rows = db_rows(
+            "SELECT ciec_password_encrypted FROM sat_credentials WHERE issuer_id = ? LIMIT 1",
+            (issuer_id,),
+        )
+        if ciec_rows and ciec_rows[0].get("ciec_password_encrypted"):
+            facturapi_state["ciec_configured"] = True
         # Check for pending deletion request
         deletion_pending = None
         if user_id:
@@ -70,6 +101,7 @@ def register_settings_routes(router, templates):
                 "error_msg": error,
                 "sat_status": sat_status,
                 "fiel_data": fiel_data,
+                "facturapi_state": facturapi_state,
                 "deletion_pending": deletion_pending,
             },
         )

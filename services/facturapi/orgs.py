@@ -83,12 +83,19 @@ def update_legal_info(
     tax_system: str | None = None,
     zip_code: str | None = None,
 ) -> dict:
-    """PUT /v2/organizations/{id}/legal — update fiscal data after CSD sets RFC."""
+    """PUT /v2/organizations/{id}/legal — update fiscal data after CSD sets RFC.
+
+    Facturapi v2 requires BOTH `name` (display) and `legal_name` (CFDI). We
+    send the same value for both — the org's display name and the legal name
+    that goes on every CFDI should match the razón social registered in SAT.
+    """
     if not org_id:
         raise FacturapiOrgsError(0, "org_id required")
     body: dict = {}
     if legal_name:
-        body["legal_name"] = str(legal_name).strip()[:200]
+        clean = str(legal_name).strip()[:200]
+        body["name"] = clean
+        body["legal_name"] = clean
     if tax_system:
         body["tax_system"] = str(tax_system).strip()
     if zip_code:
@@ -204,12 +211,46 @@ def get_org_api_key(org_id: str, *, mode: str = "test") -> str:
     if r.status_code >= 400:
         raise FacturapiOrgsError(r.status_code, r.text[:500])
     body = r.json()
-    # Live returns a list of dicts; test returns a single dict. Normalize.
+    # Facturapi returns the key in different shapes depending on mode:
+    #   - test mode: plain JSON string (e.g. "sk_test_abc...")
+    #   - live mode: list of dicts (or sometimes a single dict)
+    if isinstance(body, str):
+        return body.strip()
     if isinstance(body, list):
         if not body:
             raise FacturapiOrgsError(404, "No API keys returned")
-        return str(body[0].get("value") or body[0].get("key") or "").strip()
-    return str(body.get("value") or body.get("key") or "").strip()
+        first = body[0]
+        if isinstance(first, str):
+            return first.strip()
+        return str(first.get("value") or first.get("key") or "").strip()
+    if isinstance(body, dict):
+        return str(body.get("value") or body.get("key") or "").strip()
+    raise FacturapiOrgsError(0, f"Unexpected apikeys response shape: {type(body).__name__}")
+
+
+def renew_org_api_key(org_id: str, *, mode: str = "test") -> str:
+    """PUT /v2/organizations/{id}/apikeys/{mode} — generate/renew the org's API key.
+
+    Used when GET returned empty (e.g. live keys not yet created). Facturapi
+    generates a new key and returns its plain value.
+    """
+    if mode not in ("test", "live"):
+        raise FacturapiOrgsError(0, "mode must be 'test' or 'live'")
+    if not org_id:
+        raise FacturapiOrgsError(0, "org_id required")
+    r = requests.put(
+        f"{BASE_URL}/organizations/{org_id}/apikeys/{mode}",
+        headers=_headers_json(),
+        timeout=DEFAULT_TIMEOUT,
+    )
+    if r.status_code >= 400:
+        raise FacturapiOrgsError(r.status_code, r.text[:500])
+    body = r.json()
+    if isinstance(body, str):
+        return body.strip()
+    if isinstance(body, dict):
+        return str(body.get("value") or body.get("key") or "").strip()
+    raise FacturapiOrgsError(0, f"Unexpected renew apikey response shape: {type(body).__name__}")
 
 
 def get_organization(org_id: str) -> dict:

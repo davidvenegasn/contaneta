@@ -21,18 +21,82 @@
   var hidden = document.getElementById('submitInvoiceHidden');
   if (!btn || !hidden) return;
 
-  btn.addEventListener('click', function(){
+  btn.addEventListener('click', async function(){
     if (btn.classList.contains('btn-loading')) return;
     var total = document.getElementById('action_total_text');
     var amount = total ? total.textContent.trim() : '';
     if (!amount || amount === '—' || amount === '$0.00') {
-      alert('Agrega al menos un concepto antes de emitir.');
+      if (window.portalToast) {
+        window.portalToast({ type: 'warn', title: 'Falta información',
+          message: 'Agrega al menos un concepto antes de emitir.' });
+      }
       return;
     }
-    if (!confirm('¿Emitir factura por ' + amount + '? Esta acción no se puede deshacer.')) return;
+    // Sleek in-portal modal (uiConfirm) instead of browser confirm()
+    if (window.uiConfirm) {
+      var ok = await window.uiConfirm({
+        title: 'Emitir factura',
+        message: '¿Emitir factura por ' + amount + '? Esta acción no se puede deshacer.',
+        confirmText: 'Emitir',
+        cancelText: 'Cancelar',
+      });
+      if (!ok) return;
+    }
     btn.classList.add('btn-loading');
     btn.textContent = 'Emitiendo…';
-    hidden.click();
+
+    // Intercept native form submit with fetch so we can show a sleek error
+    // modal instead of a generic error page when Facturapi rejects timbrado.
+    var form = hidden.closest('form');
+    if (!form) { hidden.click(); return; }
+    var fd = new FormData(form);
+    try {
+      var r = await fetch(form.action || '/invoicing/submit', {
+        method: 'POST',
+        body: fd,
+        credentials: 'same-origin',
+        headers: { 'Accept': 'application/json' },
+      });
+      if (r.ok) {
+        // Success: server may have redirected to a result page; honor that
+        // by reading the Location header if present, else use the response HTML.
+        var loc = r.headers.get('Location');
+        if (loc) { window.location.href = loc; return; }
+        // Otherwise replace document with the server-rendered result.
+        var html = await r.text();
+        document.open(); document.write(html); document.close();
+        return;
+      }
+      // Error path: parse JSON, show sleek modal with Facturapi's actual message.
+      var data = null;
+      try { data = await r.json(); } catch (_) {}
+      var title = (data && data.error && data.error.title) || 'Error al emitir';
+      var msg = (data && data.error && data.error.message) ||
+                'No pudimos completar la facturación. Revisa los datos e intenta de nuevo.';
+      btn.classList.remove('btn-loading');
+      btn.textContent = 'Emitir factura';
+      if (window.uiSuccessOverlay) {
+        window.uiSuccessOverlay({
+          title: title,
+          message: msg,
+          variant: 'error',
+          actions: [{ label: 'Entendido', onClick: function () {
+            if (window.uiSuccessOverlayClose) window.uiSuccessOverlayClose();
+          }}],
+        });
+      } else if (window.portalToast) {
+        window.portalToast({ type: 'error', title: title, message: msg });
+      } else {
+        alert(title + '\n\n' + msg);
+      }
+    } catch (e) {
+      btn.classList.remove('btn-loading');
+      btn.textContent = 'Emitir factura';
+      if (window.portalToast) {
+        window.portalToast({ type: 'error', title: 'Error de red',
+          message: 'No se pudo conectar al servidor. Intenta de nuevo.' });
+      }
+    }
   });
 })();
 </script>
