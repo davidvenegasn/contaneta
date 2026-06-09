@@ -1111,7 +1111,7 @@ input[type="checkbox"] {
   min-width: 20px;
   min-height: 20px;
   border-radius: 4px;
-  border: 1.5px solid #d1d5db;
+  border: 1.5px solid var(--border-strong);
   accent-color: var(--primary);
   cursor: pointer;
 }
@@ -1230,7 +1230,7 @@ input:focus, select:focus, textarea:focus{
   min-width: 20px;
   min-height: 20px;
   border-radius: 4px;
-  border: 1.5px solid #d1d5db;
+  border: 1.5px solid var(--border-strong);
   accent-color: var(--primary, #6366f1);
   cursor: pointer;
   transform: translateY(0.5px);
@@ -1323,7 +1323,7 @@ input:focus, select:focus, textarea:focus{
   min-width: 20px;
   min-height: 20px;
   border-radius: 4px;
-  border: 1.5px solid #d1d5db;
+  border: 1.5px solid var(--border-strong);
   accent-color: var(--primary, #6366f1);
   cursor: pointer;
   transform: translateY(0.5px);

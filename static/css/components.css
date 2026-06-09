@@ -11,8 +11,8 @@
 .portal input:focus-visible,
 .portal select:focus-visible,
 .portal textarea:focus-visible {
-  outline: none;
-  box-shadow: var(--shadow-focus);
+  outline: var(--focus-ring, 2px solid var(--accent));
+  outline-offset: var(--focus-ring-offset, 2px);
 }
 
 .portal button:focus:not(:focus-visible),
@@ -59,8 +59,8 @@ button.btn {
 .ui-btn:focus-visible,
 .btn:focus-visible,
 button.btn:focus-visible {
-  outline: none;
-  box-shadow: var(--shadow-focus);
+  outline: var(--focus-ring, 2px solid var(--accent));
+  outline-offset: var(--focus-ring-offset, 2px);
 }
 
 .ui-btn:hover,
@@ -129,7 +129,8 @@ button.btn:active {
 .ui-btn--secondary:focus-visible,
 .btn--secondary:focus-visible,
 .btn-secondary:focus-visible {
-  box-shadow: var(--shadow-focus);
+  outline: var(--focus-ring, 2px solid var(--accent));
+  outline-offset: var(--focus-ring-offset, 2px);
 }
 
 .ui-btn--ghost,
@@ -145,6 +146,12 @@ button.btn:active {
 .btn-ghost:hover {
   background: var(--surface-hover);
   border-color: var(--border-strong);
+}
+
+.ui-btn--ghost:active,
+.btn--ghost:active,
+.btn-ghost:active {
+  transform: scale(.97);
 }
 
 .ui-btn--danger,
@@ -279,7 +286,7 @@ button.btn-sm {
   background: var(--surface);
   color: var(--text);
   cursor: pointer;
-  transition: background var(--motion-micro, 150ms) ease, border-color var(--motion-micro, 150ms) ease, box-shadow var(--motion-micro, 150ms) ease;
+  transition: background var(--motion-micro, 150ms) ease, border-color var(--motion-micro, 150ms) ease, box-shadow var(--motion-micro, 150ms) ease, transform 80ms ease;
 }
 
 .icon-btn:hover {
@@ -287,9 +294,13 @@ button.btn-sm {
   border-color: var(--border-strong);
 }
 
+.icon-btn:active {
+  transform: scale(.97);
+}
+
 .icon-btn:focus-visible {
-  outline: none;
-  box-shadow: var(--shadow-focus);
+  outline: var(--focus-ring, 2px solid var(--accent));
+  outline-offset: var(--focus-ring-offset, 2px);
 }
 
 /* Compat: card-title-row existente en templates */
@@ -915,6 +926,31 @@ html.nightmode .table-wrap::after {
   color: var(--success, #22c55e);
 }
 
+/* Error variant: red X icon + tinted halo. Used for emission failures and
+   other actionable errors that need a visible, dismissable modal. */
+.success-overlay--error .success-overlay__icon {
+  color: var(--danger, #ef4444);
+  background: var(--danger-bg, rgba(239, 68, 68, 0.10));
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  width: 80px;
+  height: 80px;
+  box-sizing: border-box;
+}
+.success-overlay--error .success-overlay__title {
+  color: var(--danger, #ef4444);
+}
+html.nightmode .success-overlay--error .success-overlay__icon {
+  background: rgba(248, 113, 113, 0.14);
+  color: #f87171;
+}
+html.nightmode .success-overlay--error .success-overlay__title {
+  color: #f87171;
+}
+
 .success-overlay__icon svg {
   width: 100%;
   height: 100%;
@@ -1110,13 +1146,13 @@ html.nightmode .table-wrap::after {
 .dev-debug-panel { position: fixed; bottom: 16px; left: 16px; z-index: var(--z-debug, 500); font-family: ui-sans-serif, system-ui, sans-serif; font-size: var(--text-2xs); }
 .dev-debug-panel__toggle { padding: 10px 14px; background: #1e293b; color: #e2e8f0; border: none; border-radius: 10px; cursor: pointer; font-weight: var(--fw-semibold); box-shadow: 0 4px 12px rgba(0,0,0,.2); }
 .dev-debug-panel__toggle:hover { background: #334155; }
-.dev-debug-panel__list { margin-top: var(--space-2); max-width: 440px; max-height: 360px; overflow: auto; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,.15); padding: 14px; }
+.dev-debug-panel__list { margin-top: var(--space-2); max-width: 440px; max-height: 360px; overflow: auto; background: #fff; border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,.15); padding: 14px; }
 .dev-debug-panel__head { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-2); font-weight: var(--fw-semibold); font-size: var(--fs-xs); }
 .dev-debug-panel__hint { margin: 0 0 12px; font-size: var(--text-micro); line-height: 1.4; }
-.dev-debug-panel__clear { padding: 6px 10px; font-size: var(--text-2xs); background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 8px; cursor: pointer; font-weight: var(--fw-medium); }
+.dev-debug-panel__clear { padding: 6px 10px; font-size: var(--text-2xs); background: #f1f5f9; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; font-weight: var(--fw-medium); }
 .dev-debug-panel__clear:hover { background: #e2e8f0; }
 .dev-debug-panel__items { list-style: none; margin: 0; padding: 0; }
-.dev-debug-panel__item { padding: 12px 0; border-bottom: 1px solid #f1f5f9; }
+.dev-debug-panel__item { padding: 12px 0; border-bottom: 1px solid var(--border); }
 .dev-debug-panel__item:last-child { border-bottom: none; }
 .dev-debug-panel__endpoint { word-break: break-all; color: #0f172a; font-weight: var(--fw-semibold); font-size: var(--fs-xs); }
 .dev-debug-panel__meta { margin-top: 6px; color: #64748b; font-size: var(--text-2xs); display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }

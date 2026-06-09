@@ -52,9 +52,6 @@ body{
 /* Global transitions: smooth color on links */
 a { transition: color var(--motion-fast, 100ms) ease; }
 
-/* Capas modularizadas (ver docs/CSS_ARCHITECTURE.md) */
-@import "portal_pages.css";
-
 /* Respaldo: sidebar oculto por defecto (no en topbar); solo visible al abrir menú */
 .sidebar{ transform: translateX(-105%); visibility: hidden; }
 body.sidebar-open .sidebar{ transform: translateX(0); visibility: visible; }
@@ -274,6 +271,12 @@ body.sidebar-open .sidebar{ transform: translateX(0); visibility: visible; }
   transform: translateX(0);
 }
 .portal-drawer__brand--wordmark:hover { opacity: 0.7 !important; }
+
+/* Suprime el replay del wordmark al cargar página con drawer-open ya activo
+   (navegación entre páginas). Solo se anima cuando el usuario hace toggle real. */
+.portal-shell-wrap.drawer-instant .portal-drawer__brand--wordmark {
+  transition: none !important;
+}
 
 /* Respeta prefers-reduced-motion */
 @media (prefers-reduced-motion: reduce) {
@@ -2988,7 +2991,7 @@ body.month-picker-open .portal-shell {
   align-items: center;
   padding: 8px 14px;
   border-radius: 8px;
-  border: 1.5px solid #e5e7eb;
+  border: 1.5px solid var(--border-strong);
   background: var(--surface);
   color: var(--text);
   font-size: var(--text-base);
@@ -2999,8 +3002,8 @@ body.month-picker-open .portal-shell {
 }
 
 .month-picker__trigger:hover {
-  border-color: #d1d5db;
-  background: #f9fafb;
+  border-color: var(--primary);
+  background: var(--surface-hover);
 }
 
 .month-picker__trigger-icon {
@@ -3011,7 +3014,7 @@ body.month-picker-open .portal-shell {
   height: 40px;
   padding: 0;
   border-radius: 8px;
-  border: 1.5px solid #e5e7eb;
+  border: 1.5px solid var(--border-strong);
   background: var(--surface);
   color: var(--text);
   cursor: pointer;
@@ -3019,8 +3022,8 @@ body.month-picker-open .portal-shell {
 }
 
 .month-picker__trigger-icon:hover {
-  border-color: #d1d5db;
-  background: #f9fafb;
+  border-color: var(--primary);
+  background: var(--surface-hover);
 }
 
 .month-picker__trigger-icon .icon,
@@ -3642,7 +3645,10 @@ body.month-picker-open .portal-shell {
 
 /* Fintech: tabular-nums for all monetary/numeric values */
 .bank-monto-ingreso, .bank-monto-gasto, .bank-monto-traspaso,
-td[class*="monto"], .metric-value, .ui-kpi-card__value {
+td[class*="monto"], .metric-value, .ui-kpi-card__value,
+.provider-invoice-card__total, .invoice-card-mobile__total,
+.cfdi-detail-total, .action-total,
+.quick-invoice-modal__total-row {
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";
 }
@@ -3694,12 +3700,9 @@ td[class*="monto"], .metric-value, .ui-kpi-card__value {
   animation: scaleIn var(--anim-duration-fast, 200ms) var(--ease-spring) both;
 }
 
-/* Staggered card entry: each card delays slightly */
-.metric-card { animation: fadeUp var(--anim-duration-fast, 200ms) var(--ease-out) both; }
-.metric-card:nth-child(1) { animation-delay: 0ms; }
-.metric-card:nth-child(2) { animation-delay: 60ms; }
-.metric-card:nth-child(3) { animation-delay: 120ms; }
-.metric-card:nth-child(4) { animation-delay: 180ms; }
+/* Sin stagger: las cards aparecen todas a la vez para que el contenido se
+   sienta sólido al cargar, no goteando elemento por elemento. */
+.metric-card { animation: none; }
 
 @media (prefers-reduced-motion: reduce) {
   @keyframes fadeUp   { from, to { opacity: 1; transform: none; } }
@@ -4589,10 +4592,11 @@ html.nightmode .cust-sub {
   flex-direction: column;
   gap: var(--space-3);
   flex-shrink: 0;
-  transition: box-shadow var(--motion-micro, 150ms) ease, border-color var(--motion-micro, 150ms) ease;
+  transition: box-shadow var(--motion-micro, 150ms) ease, border-color var(--motion-micro, 150ms) ease, transform var(--motion-micro, 150ms) ease;
 }
 .provider-invoice-card:hover {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transform: translateY(-1px);
 }
 .provider-invoice-card.provider-invoice-card--vigente {
   border-left-color: var(--success, #22c55e);
@@ -8620,28 +8624,10 @@ html.nightmode .bank-category-popover__item:hover {
   }
 }
 
-/* ── 17. View Transitions API — cross-page fade ── */
-@view-transition { navigation: auto; }
-
-@keyframes portal-vt-fade-out {
-  from { opacity: 1; }
-  to   { opacity: 0; }
-}
-@keyframes portal-vt-fade-in {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-
-::view-transition-old(root) {
-  animation: portal-vt-fade-out 140ms cubic-bezier(.4,0,1,1) both;
-}
-::view-transition-new(root) {
-  animation: portal-vt-fade-in 180ms cubic-bezier(0,0,.2,1) 60ms both;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  ::view-transition-old(root),
-  ::view-transition-new(root) {
-    animation: none !important;
-  }
-}
+/* ── 17. (View Transitions removidas)
+   Las View Transitions cross-document, aún configuradas con cuidado
+   (fade-out-only, mix-blend-mode normal, view-transition-name en chrome),
+   seguían produciendo artefactos visibles: morph sutil de SVGs, cambios de
+   color por compositing intermedio, brinquitos del highlight activo. Con
+   prefetch en hover + injection de ?ym en hrefs + head-script para drawer
+   state, la navegación nativa del browser ya es suave y consistente. */
