@@ -45,7 +45,7 @@
   <div class="card p-20">
     <h2 class="u-m0 u-mb-3 u-text-base">Perfil de usuario</h2>
     <p class="muted u-text-sm" style="margin:0 0 16px;">Actualiza tu nombre y correo electrónico.</p>
-    <form method="post" action="/portal/settings/profile" autocomplete="off">
+    <form method="post" action="/portal/settings/profile" autocomplete="off" data-loading-submit="Guardando…">
       <input type="hidden" name="csrf_token" value="{{ csrf_token or '' }}" />
       <div style="display:flex; flex-direction:column; gap:14px; max-width:400px;">
         <div>
@@ -69,7 +69,7 @@
   <div class="card p-20">
     <h2 class="u-m0 u-mb-3 u-text-base">Cambiar contraseña</h2>
     <p class="muted u-text-sm" style="margin:0 0 16px;">Ingresa tu contraseña actual y la nueva contraseña.</p>
-    <form method="post" action="/portal/settings/password" autocomplete="off">
+    <form method="post" action="/portal/settings/password" autocomplete="off" data-loading-submit="Guardando…">
       <input type="hidden" name="csrf_token" value="{{ csrf_token or '' }}" />
       <div style="display:flex; flex-direction:column; gap:14px; max-width:400px;">
         <div>
@@ -118,7 +118,7 @@
     </dl>
 
     {% if membership_role in ('owner', 'admin') %}
-    <form method="post" action="/portal/settings/issuer" autocomplete="off">
+    <form method="post" action="/portal/settings/issuer" autocomplete="off" data-loading-submit="Guardando…">
       <input type="hidden" name="csrf_token" value="{{ csrf_token or '' }}" />
       <div style="display:flex; flex-direction:column; gap:14px; max-width:400px;">
         <div>
@@ -162,49 +162,120 @@
   </div>
 </div>
 
-{# ── SAT (sellos / FIEL) section ── #}
+{# ── Mis credenciales (Konta-style 3-card layout) ── #}
 <div class="settings-panel" id="panel-sat" hidden>
-  <div class="card p-20">
-    <h2 class="u-m0 u-mb-3 u-text-base">Sellos SAT (FIEL)</h2>
-    <p class="muted u-text-sm" style="margin:0 0 16px;">Credenciales para sincronizar tus facturas con el SAT.</p>
+  {% set _sat = sat_status|default({'configured': false, 'validated': false}) %}
+  {% set _fiel = fiel_data|default({}) %}
+  {% set _fpi = facturapi_state|default({}) %}
 
-    {% set _sat = sat_status|default({'configured': false, 'validated': false}) %}
-    <dl class="datos-fiscales-list" style="margin-bottom:16px;">
-      <div class="datos-fiscales-row" style="display:flex; gap:8px; padding:6px 0;">
-        <dt style="font-size:13px; font-weight:500; min-width:160px; color:var(--muted, #6b7280);">Estado</dt>
-        <dd style="margin:0; font-size:14px;">
-          {% if _sat.validated %}
-            <span style="color:var(--success, #22c55e); font-weight:600;">✓ Configurada y validada</span>
-          {% elif _sat.configured %}
-            <span style="color:var(--warn, #f59e0b); font-weight:600;">⚠ Cargada, pendiente de validar</span>
-          {% else %}
-            <span style="color:var(--muted, #6b7280);">Sin configurar</span>
-          {% endif %}
-        </dd>
+  <p class="muted u-text-sm" style="margin:0 0 16px;">
+    Sube tus credenciales del SAT una sola vez. Cada una habilita una funcionalidad distinta.
+  </p>
+
+  <div class="creds-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;">
+
+    {# ── FIEL card ── #}
+    <div class="card p-20 creds-card" data-cred="fiel">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+        {% if _sat.validated or _fpi.manifest_signed_at %}
+          <span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;border:2px solid var(--success, #22c55e);color:var(--success, #22c55e);">✓</span>
+        {% else %}
+          <span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;border:2px solid var(--muted, #d1d5db);color:var(--muted, #9ca3af);">○</span>
+        {% endif %}
+        <h3 class="u-m0 u-text-base">FIEL · e.firma</h3>
       </div>
-      {% set _fiel = fiel_data|default({}) %}
+      <p class="muted u-text-sm" style="margin:0 0 12px;">
+        Permite descargar tus facturas del SAT y firmar tu carta manifiesto.
+      </p>
       {% if _fiel.days_until_expiry is defined %}
-      <div class="datos-fiscales-row" style="display:flex; gap:8px; padding:6px 0;">
-        <dt style="font-size:13px; font-weight:500; min-width:160px; color:var(--muted, #6b7280);">Vigencia FIEL</dt>
-        <dd style="margin:0; font-size:14px;">
-          {% if _fiel.days_until_expiry > 90 %}
-            <span class="badge badge--success">Válida hasta {{ _fiel.expires_at[:10] }} ({{ _fiel.days_until_expiry }} días)</span>
-          {% elif _fiel.days_until_expiry > 30 %}
-            <span class="badge badge--warn">Expira pronto: {{ _fiel.days_until_expiry }} días — Renueva con anticipación</span>
+        <p class="u-text-sm" style="margin:0 0 6px;"><strong>RFC:</strong> {{ issuer_rfc }}</p>
+        <p class="u-text-sm" style="margin:0 0 6px;"><strong>Vigencia:</strong>
+          {% if _fiel.days_until_expiry > 30 %}
+            <span style="color:var(--success, #22c55e);">{{ _fiel.expires_at[:10] }} ({{ _fiel.days_until_expiry }} días)</span>
           {% elif _fiel.days_until_expiry > 0 %}
-            <span class="badge badge--danger">Expira en {{ _fiel.days_until_expiry }} días — Renueva YA en sat.gob.mx</span>
+            <span style="color:var(--warn, #f59e0b);">Expira en {{ _fiel.days_until_expiry }} días</span>
           {% else %}
-            <span class="badge badge--danger">EXPIRADA hace {{ (-_fiel.days_until_expiry)|int }} días — no puedes emitir facturas</span>
+            <span style="color:var(--danger, #ef4444);">EXPIRADA hace {{ (-_fiel.days_until_expiry)|int }} días</span>
           {% endif %}
-        </dd>
-      </div>
+        </p>
       {% endif %}
-    </dl>
+      {% if _fpi.manifest_signed_at %}
+        <p class="u-text-sm" style="margin:0 0 12px;"><strong>Manifesto:</strong> ✓ firmado {{ _fpi.manifest_signed_at[:10] }}</p>
+      {% endif %}
+      <button type="button" class="btn btn--ghost btn--sm creds-toggle" data-target="form-fiel" style="margin-top:8px;">
+        {% if _sat.configured or _fpi.manifest_signed_at %}Cambiar FIEL{% else %}Configurar FIEL{% endif %}
+      </button>
+      <form id="form-fiel" class="creds-form" hidden enctype="multipart/form-data" data-endpoint="/portal/api/facturapi/upload-fiel" style="margin-top:12px;border-top:1px solid var(--border, #e5e7eb);padding-top:12px;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token or '' }}">
+        <div class="form-row"><label>Certificado FIEL (.cer)</label><input type="file" name="cer_file" accept=".cer" required></div>
+        <div class="form-row u-mt-8"><label>Llave FIEL (.key)</label><input type="file" name="key_file" accept=".key" required></div>
+        <div class="form-row u-mt-8"><label>Contraseña FIEL</label><input type="password" name="password" autocomplete="off" required></div>
+        <div class="u-mt-12"><button type="submit" class="btn btn--primary btn--sm">Guardar FIEL</button></div>
+        <p class="creds-feedback muted u-text-sm u-mt-8" role="status" aria-live="polite"></p>
+      </form>
+    </div>
 
-    <a href="/portal/config/sat" class="btn btn--primary">
-      {% if _sat.configured %}Reconfigurar sellos SAT{% else %}Configurar sellos SAT{% endif %}
-    </a>
-    <p class="muted u-text-sm" style="margin-top:12px;">Necesitas tu certificado (.cer), clave privada (.key) y contraseña de FIEL.</p>
+    {# ── CSD card ── #}
+    <div class="card p-20 creds-card" data-cred="csd">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+        {% if _fpi.csd_uploaded_at %}
+          <span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;border:2px solid var(--success, #22c55e);color:var(--success, #22c55e);">✓</span>
+        {% else %}
+          <span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;border:2px solid var(--muted, #d1d5db);color:var(--muted, #9ca3af);">○</span>
+        {% endif %}
+        <h3 class="u-m0 u-text-base">CSD · Sello Digital</h3>
+      </div>
+      <p class="muted u-text-sm" style="margin:0 0 12px;">
+        Permite emitir facturas desde la plataforma.
+      </p>
+      {% if _fpi.csd_uploaded_at %}
+        <p class="u-text-sm" style="margin:0 0 6px;"><strong>Cargado:</strong> {{ _fpi.csd_uploaded_at[:10] }}</p>
+        <p class="u-text-sm muted" style="margin:0 0 12px;">Activo y listo para timbrar.</p>
+      {% else %}
+        <p class="u-text-sm" style="margin:0 0 12px;color:var(--muted, #6b7280);">Sin configurar — no puedes emitir facturas todavía.</p>
+      {% endif %}
+      <button type="button" class="btn btn--ghost btn--sm creds-toggle" data-target="form-csd" style="margin-top:8px;">
+        {% if _fpi.csd_uploaded_at %}Cambiar CSD{% else %}Configurar CSD{% endif %}
+      </button>
+      <form id="form-csd" class="creds-form" hidden enctype="multipart/form-data" data-endpoint="/portal/api/facturapi/upload-csd" style="margin-top:12px;border-top:1px solid var(--border, #e5e7eb);padding-top:12px;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token or '' }}">
+        <div class="form-row"><label>Certificado CSD (.cer)</label><input type="file" name="cer_file" accept=".cer" required></div>
+        <div class="form-row u-mt-8"><label>Llave CSD (.key)</label><input type="file" name="key_file" accept=".key" required></div>
+        <div class="form-row u-mt-8"><label>Contraseña CSD</label><input type="password" name="password" autocomplete="off" required></div>
+        <div class="u-mt-12"><button type="submit" class="btn btn--primary btn--sm">Guardar CSD</button></div>
+        <p class="creds-feedback muted u-text-sm u-mt-8" role="status" aria-live="polite"></p>
+      </form>
+    </div>
+
+    {# ── CIEC card ── #}
+    <div class="card p-20 creds-card" data-cred="ciec">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+        {% if _fpi.ciec_configured %}
+          <span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;border:2px solid var(--success, #22c55e);color:var(--success, #22c55e);">✓</span>
+        {% else %}
+          <span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;border:2px solid var(--muted, #d1d5db);color:var(--muted, #9ca3af);">○</span>
+        {% endif %}
+        <h3 class="u-m0 u-text-base">CIEC · Contraseña SAT <span class="muted" style="font-weight:400;font-size:.85em;">(opcional)</span></h3>
+      </div>
+      <p class="muted u-text-sm" style="margin:0 0 12px;">
+        Permite consultar tu estatus y trámites del portal SAT desde ContaNeta.
+      </p>
+      {% if _fpi.ciec_configured %}
+        <p class="u-text-sm" style="margin:0 0 12px;">✓ Configurada (guardada encriptada).</p>
+      {% else %}
+        <p class="u-text-sm muted" style="margin:0 0 12px;">No es obligatoria. Puedes agregarla después.</p>
+      {% endif %}
+      <button type="button" class="btn btn--ghost btn--sm creds-toggle" data-target="form-ciec" style="margin-top:8px;">
+        {% if _fpi.ciec_configured %}Cambiar CIEC{% else %}Configurar CIEC{% endif %}
+      </button>
+      <form id="form-ciec" class="creds-form" hidden data-endpoint="/portal/api/facturapi/save-ciec" style="margin-top:12px;border-top:1px solid var(--border, #e5e7eb);padding-top:12px;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token or '' }}">
+        <div class="form-row"><label>Contraseña SAT (CIEC)</label><input type="password" name="ciec_password" autocomplete="off" required></div>
+        <div class="u-mt-12"><button type="submit" class="btn btn--primary btn--sm">Guardar CIEC</button></div>
+        <p class="creds-feedback muted u-text-sm u-mt-8" role="status" aria-live="polite"></p>
+      </form>
+    </div>
+
   </div>
 </div>
 
@@ -212,14 +283,69 @@
 (function() {
   var tabs = document.querySelectorAll('.settings-tab');
   var panels = document.querySelectorAll('.settings-panel');
+
+  function activateTab(target) {
+    tabs.forEach(function(t) { t.classList.remove('is-active'); });
+    panels.forEach(function(p) { p.hidden = true; });
+    var matchingTab = document.querySelector('.settings-tab[data-tab="' + target + '"]');
+    var panel = document.getElementById('panel-' + target);
+    if (matchingTab) matchingTab.classList.add('is-active');
+    if (panel) panel.hidden = false;
+  }
+
+  // On load: honor URL hash (e.g. #sat) so reloads keep the user in place.
+  var initialHash = (window.location.hash || '').replace('#', '');
+  if (initialHash && document.getElementById('panel-' + initialHash)) {
+    activateTab(initialHash);
+  }
+
   tabs.forEach(function(tab) {
     tab.addEventListener('click', function() {
       var target = tab.getAttribute('data-tab');
-      tabs.forEach(function(t) { t.classList.remove('is-active'); });
-      tab.classList.add('is-active');
-      panels.forEach(function(p) { p.hidden = true; });
-      var panel = document.getElementById('panel-' + target);
-      if (panel) panel.hidden = false;
+      activateTab(target);
+      // Persist tab in URL hash so reloads stay on the same tab.
+      history.replaceState(null, '', '#' + target);
+    });
+  });
+
+  // Credentials cards: expand/collapse + per-credential submit
+  document.querySelectorAll('.creds-toggle').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var f = document.getElementById(btn.dataset.target);
+      if (f) f.hidden = !f.hidden;
+    });
+  });
+  document.querySelectorAll('.creds-form').forEach(function(form) {
+    var feedback = form.querySelector('.creds-feedback');
+    form.addEventListener('submit', function(e) {
+      e.preventDefault();
+      feedback.style.color = '';
+      feedback.textContent = 'Guardando…';
+      var endpoint = form.dataset.endpoint;
+      var fd = new FormData(form);
+      fetch(endpoint, { method: 'POST', body: fd, credentials: 'same-origin' })
+        .then(function(r) { return r.json().then(function(j) { return { status: r.status, body: j }; }); })
+        .then(function(res) {
+          var body = res.body || {};
+          if (body.ok) {
+            feedback.style.color = 'var(--success, #16a34a)';
+            feedback.textContent = '✓ Guardado correctamente. Actualizando vista…';
+            // Force the hash so reload keeps us on the Sellos SAT tab,
+            // and give the user 2 seconds to actually read the success.
+            setTimeout(function() {
+              window.location.hash = 'sat';
+              window.location.reload();
+            }, 2000);
+          } else {
+            feedback.style.color = 'var(--danger, #dc2626)';
+            var msg = (body.error && body.error.message) || body.detail || 'Error desconocido';
+            feedback.textContent = '✗ ' + msg;
+          }
+        })
+        .catch(function() {
+          feedback.style.color = 'var(--danger, #dc2626)';
+          feedback.textContent = 'Error de red. Intenta de nuevo.';
+        });
     });
   });
 })();
