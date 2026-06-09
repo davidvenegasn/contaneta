@@ -69,6 +69,7 @@
     <link rel="stylesheet" href="/static/css/animations.css">
     <link rel="stylesheet" href="/static/css/responsive.css">
     <link rel="stylesheet" href="/static/css/portal_dark_overrides.css">
+    <script defer src="/static/js/portal_preload.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
@@ -368,7 +369,7 @@
                 <span class="user-menu__plan-badge u-hidden" id="topbarPlanBadge" aria-hidden="true"></span>
               </a>
               <div class="user-menu__sep" aria-hidden="true"></div>
-              <form method="get" action="/logout" class="user-menu__logout-form user-menu__logout-form--prominent form-reset">
+              <form method="get" action="/logout" class="user-menu__logout-form user-menu__logout-form--prominent form-reset" data-no-preload>
                 <button type="submit" class="user-menu__item user-menu__item--logout" role="menuitem">Cerrar sesión</button>
               </form>
             </div>
