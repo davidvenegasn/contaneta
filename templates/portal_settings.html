@@ -45,7 +45,7 @@
   <div class="card p-20">
     <h2 class="u-m0 u-mb-3 u-text-base">Perfil de usuario</h2>
     <p class="muted u-text-sm" style="margin:0 0 16px;">Actualiza tu nombre y correo electrónico.</p>
-    <form method="post" action="/portal/settings/profile" autocomplete="off" data-loading-submit="Guardando…">
+    <form method="post" action="/portal/settings/profile" autocomplete="off" data-loading-submit="Guardando…" data-draft="settings-profile">
       <input type="hidden" name="csrf_token" value="{{ csrf_token or '' }}" />
       <div style="display:flex; flex-direction:column; gap:14px; max-width:400px;">
         <div>
@@ -118,7 +118,7 @@
     </dl>
 
     {% if membership_role in ('owner', 'admin') %}
-    <form method="post" action="/portal/settings/issuer" autocomplete="off" data-loading-submit="Guardando…">
+    <form method="post" action="/portal/settings/issuer" autocomplete="off" data-loading-submit="Guardando…" data-draft="settings-issuer">
       <input type="hidden" name="csrf_token" value="{{ csrf_token or '' }}" />
       <div style="display:flex; flex-direction:column; gap:14px; max-width:400px;">
         <div>
