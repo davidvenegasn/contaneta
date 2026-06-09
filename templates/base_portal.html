@@ -73,11 +73,9 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
     <!-- Guardrail: evitar CSS inline grande (mover a static/css/*.css) -->
-    <script src="https://unpkg.com/htmx.org@2.0.3" defer></script>
   </head>
 
-  <body class="portal" hx-boost="true" hx-target="#mainContent" hx-swap="innerHTML show:window:top swap:200ms settle:200ms" hx-indicator="#htmxProgressBar">
-    <div id="htmxProgressBar" class="htmx-progress-bar" aria-hidden="true"></div>
+  <body class="portal">
     <a href="#portalMain" class="skip-nav">Saltar al contenido</a>
 {% if dev_debug_panel|default(false) %}
 <script>
@@ -370,7 +368,7 @@
                 <span class="user-menu__plan-badge u-hidden" id="topbarPlanBadge" aria-hidden="true"></span>
               </a>
               <div class="user-menu__sep" aria-hidden="true"></div>
-              <form method="get" action="/logout" class="user-menu__logout-form user-menu__logout-form--prominent form-reset" hx-boost="false">
+              <form method="get" action="/logout" class="user-menu__logout-form user-menu__logout-form--prominent form-reset">
                 <button type="submit" class="user-menu__item user-menu__item--logout" role="menuitem">Cerrar sesión</button>
               </form>
             </div>
@@ -379,7 +377,6 @@
       </header>
 
       <main class="main" id="portalMain">
-        <div id="mainContent">
         <div id="pageContent" class="page-enter">
         <div class="main-inner page">
           {% if is_impersonating|default(false) %}
@@ -432,7 +429,6 @@
             <a href="/portal/guides" class="portal-footer__link">Guías</a>
           </footer>
           </div>
-        </div>
         </div>
         </div>
       </main>
@@ -2388,54 +2384,5 @@
 })();
 </script>
 {% endif %}
-
-    <!-- htmx: re-initialize inline scripts after content swap -->
-    <script>
-(function () {
-  // Clean up polling timers before content is swapped out
-  document.body.addEventListener('htmx:beforeSwap', function (evt) {
-    if (evt.detail && evt.detail.target && evt.detail.target.id === 'mainContent') {
-      // Clear any polling timers set by the outgoing page
-      if (window.__pollTimer) { clearInterval(window.__pollTimer); window.__pollTimer = null; }
-      if (window.__pollTimeout) { clearTimeout(window.__pollTimeout); window.__pollTimeout = null; }
-    }
-  });
-
-  // After new content is swapped in, re-execute inline scripts and emit event
-  document.body.addEventListener('htmx:afterSwap', function (evt) {
-    if (evt.detail && evt.detail.target && evt.detail.target.id === 'mainContent') {
-      var container = evt.detail.target;
-      // Re-execute inline <script> tags (htmx does not run them by default)
-      container.querySelectorAll('script').forEach(function (oldScript) {
-        var newScript = document.createElement('script');
-        Array.from(oldScript.attributes).forEach(function (attr) {
-          newScript.setAttribute(attr.name, attr.value);
-        });
-        newScript.textContent = oldScript.textContent;
-        oldScript.replaceWith(newScript);
-      });
-      // Move modals to body (same as DOMContentLoaded handler)
-      container.querySelectorAll('.modal, .form-modal, .quick-invoice-modal, .ui-overlay').forEach(function (el) {
-        if (el.parentNode && el.parentNode !== document.body) document.body.appendChild(el);
-      });
-      // Emit custom event for any persistent listeners
-      document.body.dispatchEvent(new CustomEvent('portal:pageReady'));
-    }
-  });
-
-  // Handle redirects from boosted form POSTs (302 → HX-Redirect)
-  document.body.addEventListener('htmx:beforeOnLoad', function (evt) {
-    var xhr = evt.detail.xhr;
-    if (xhr && xhr.getResponseHeader && xhr.getResponseHeader('HX-Redirect')) {
-      // htmx handles HX-Redirect natively, but ensure full page nav for auth redirects
-      var redir = xhr.getResponseHeader('HX-Redirect');
-      if (redir && (redir.startsWith('/login') || redir.startsWith('/choose-issuer') || redir.startsWith('/confirmar-perfil'))) {
-        evt.preventDefault();
-        window.location.href = redir;
-      }
-    }
-  });
-})();
-    </script>
   </body>
 </html>

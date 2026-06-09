@@ -624,26 +624,6 @@ _MAX_BODY_BYTES = int(os.environ.get("MAX_BODY_BYTES", str(100 * 1024 * 1024))) 
 
 
 @app.middleware("http")
-async def htmx_redirect_middleware(request: Request, call_next):
-    """Convert 302 redirects to HX-Redirect for htmx-boosted requests.
-
-    When hx-boost sends a form POST and the server returns a 302,
-    htmx needs an HX-Redirect header + 200 status to do a client-side
-    redirect instead of trying to swap the 302 body into the page.
-    """
-    response = await call_next(request)
-    if (
-        request.headers.get("HX-Request")
-        and response.status_code in (301, 302, 303, 307, 308)
-        and "location" in response.headers
-    ):
-        location = response.headers["location"]
-        response = Response(status_code=200)
-        response.headers["HX-Redirect"] = location
-    return response
-
-
-@app.middleware("http")
 async def body_size_limit_middleware(request: Request, call_next):
     """Reject requests with Content-Length exceeding MAX_BODY_BYTES."""
     cl = request.headers.get("content-length")
