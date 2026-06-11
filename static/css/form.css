@@ -260,6 +260,10 @@ html.nightmode select:-webkit-autofill {
   transition: box-shadow var(--motion-page, 180ms) ease, border-color var(--motion-page, 180ms) ease;
   overflow: hidden;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  align-self: stretch;
 }
 
 @media (prefers-reduced-motion: no-preference) {

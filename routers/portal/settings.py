@@ -185,10 +185,16 @@ def register_settings_routes(router, templates):
         request: Request,
         issuer: dict = Depends(get_portal_issuer),
         csrf_token: str = Form(""),
+        rfc: str = Form(""),
         razon_social: str = Form(""),
         regimen_fiscal: str = Form(""),
+        fiscal_zip: str = Form(""),
     ):
-        """Update issuer fiscal data (razon social and regimen fiscal)."""
+        """Update issuer fiscal data (RFC, razon social, regimen fiscal, CP fiscal).
+
+        After saving, automatically pushes the updated legal info to Facturapi
+        so the org no longer shows "Completa los datos fiscales" as pending.
+        """
         if not csrf_service.verify_csrf_token(csrf_token):
             raise HTTPException(status_code=403, detail="Token CSRF inválido o expirado")
         membership_role = getattr(request.state, "membership_role", "viewer")
@@ -201,19 +207,59 @@ def register_settings_routes(router, templates):
         if issuer_id <= 0:
             raise HTTPException(status_code=401, detail="Sesión inválida")
 
+        rfc_val = (rfc or "").strip().upper()
         razon_val = razon_social.strip()
         regimen_val = regimen_fiscal.strip()
+        zip_val = (fiscal_zip or "").strip()
+        # Basic RFC sanity check: 12-13 chars alphanumeric. Skip if empty (user
+        # left it blank — leave whatever DB has, including PENDIENTE placeholder).
+        if rfc_val and not (12 <= len(rfc_val) <= 13 and rfc_val.replace("Ñ", "N").isalnum()):
+            return RedirectResponse(
+                url="/portal/settings?error=RFC+inválido+(12-13+caracteres)",
+                status_code=302,
+            )
         if regimen_val and regimen_val not in REGIMEN_CODE_DESCRIPTIONS:
             return RedirectResponse(
                 url="/portal/settings?error=Régimen+fiscal+inválido",
                 status_code=302,
             )
+        if zip_val and (not zip_val.isdigit() or len(zip_val) != 5):
+            return RedirectResponse(
+                url="/portal/settings?error=CP+fiscal+debe+ser+de+5+dígitos",
+                status_code=302,
+            )
+
+        # Save RFC directly (the helper doesn't support RFC updates)
+        if rfc_val:
+            conn = db()
+            try:
+                conn.execute(
+                    "UPDATE issuers SET rfc=?, updated_at=datetime('now') WHERE id=?",
+                    (rfc_val, issuer_id),
+                )
+                conn.commit()
+            finally:
+                conn.close()
 
         issuers_service.update_issuer_profile(
             issuer_id,
             razon_social=razon_val if razon_val else None,
             regimen_fiscal=regimen_val if regimen_val else None,
+            fiscal_zip=zip_val if zip_val else None,
         )
+
+        # Sync to Facturapi so legal_info stays consistent across both DBs,
+        # then auto-promote to LIVE if all onboarding steps are now complete.
+        try:
+            from services.facturapi.provision import push_legal_info_to_facturapi, ensure_live_ready
+            push_legal_info_to_facturapi(issuer_id)
+            ensure_live_ready(issuer_id)
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(
+                "push_legal_info / ensure_live_ready failed for issuer=%s: %s", issuer_id, e
+            )
+
         return RedirectResponse(
             url="/portal/settings?success=Datos+fiscales+actualizados",
             status_code=302,

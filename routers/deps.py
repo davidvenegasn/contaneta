@@ -98,14 +98,12 @@ def get_portal_issuer(request: Request) -> dict:
                     request.state.is_impersonating = restore_issuer_id is not None
                     request.state.impersonation_restore_issuer_id = restore_issuer_id
                     request.state.issuer_is_placeholder = issuer.get("rfc") == "PENDIENTE"
-                    if (
-                        request.state.issuer_is_placeholder
-                        and request.cookies.get(cookie_demo) == "1"
-                    ):
-                        demo = issuers.get_demo_issuer()
-                        if demo:
-                            request.state.is_demo_view = True
-                            return demo
+                    # Demo view DEACTIVATED: la lógica anterior sustituía el
+                    # issuer real del usuario por uno demo cuando rfc era
+                    # PENDIENTE y tenía cookie demo activado. Eso confundía
+                    # al usuario nuevo (veía datos que parecían suyos sin
+                    # saber que era demo). Se rehará después con un onboarding
+                    # explícito de "explorar datos de ejemplo".
                     return issuer
             else:
                 request.state.issuer_id = issuer["id"]

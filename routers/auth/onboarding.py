@@ -155,21 +155,30 @@ def register_onboarding_routes(router, templates):
         user_id, issuer_id = session_data[0], session_data[1]
         rfc = (rfc or "").strip().upper()
         razon_social = (razon_social or "").strip()
+        regimen_clean = (regimen_fiscal or "").strip() or None
+        cp_clean = (cp or "").strip()
+        # CP fiscal validation: si lo ingresan, debe ser 5 dígitos. Pero NO es
+        # obligatorio aquí porque algunos leads aún no tienen sus datos SAT
+        # listos al hacer signup — los completarán después en /portal/settings.
+        if cp_clean and (not cp_clean.isdigit() or len(cp_clean) != 5):
+            return RedirectResponse(url="/onboarding?error=invalid_cp", status_code=302)
         if not rfc or not razon_social:
             return RedirectResponse(url="/onboarding?error=required", status_code=302)
         conn = db()
         try:
             if issuer_id and issuer_id > 0:
                 conn.execute(
-                    """UPDATE issuers SET rfc = ?, razon_social = ?, regimen_fiscal = ?, updated_at = datetime('now')
+                    """UPDATE issuers
+                       SET rfc = ?, razon_social = ?, regimen_fiscal = ?, fiscal_zip = ?,
+                           updated_at = datetime('now')
                        WHERE id = ?""",
-                    (rfc, razon_social, (regimen_fiscal or "").strip() or None, issuer_id),
+                    (rfc, razon_social, regimen_clean, cp_clean, issuer_id),
                 )
             else:
                 cur = conn.execute(
-                    """INSERT INTO issuers (rfc, razon_social, regimen_fiscal, active)
-                       VALUES (?, ?, ?, 1)""",
-                    (rfc, razon_social, (regimen_fiscal or "").strip() or None),
+                    """INSERT INTO issuers (rfc, razon_social, regimen_fiscal, fiscal_zip, active)
+                       VALUES (?, ?, ?, ?, 1)""",
+                    (rfc, razon_social, regimen_clean, cp_clean),
                 )
                 issuer_id = cur.lastrowid
                 if has_column(conn, "issuers", "trial_expires_at"):
@@ -185,6 +194,20 @@ def register_onboarding_routes(router, templates):
             conn.commit()
         finally:
             conn.close()
+
+        # Push completed legal info to Facturapi so the org leaves the
+        # "Completa los datos fiscales" pending state, then auto-promote to
+        # LIVE if all onboarding steps are now complete.
+        try:
+            from services.facturapi.provision import push_legal_info_to_facturapi, ensure_live_ready
+            push_legal_info_to_facturapi(issuer_id)
+            ensure_live_ready(issuer_id)
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(
+                "push_legal_info / ensure_live_ready failed for issuer=%s: %s", issuer_id, e
+            )
+
         # Redirect to step 2 (SAT setup) after saving fiscal data
         resp = RedirectResponse(url="/onboarding?step=2", status_code=302)
         resp.set_cookie(

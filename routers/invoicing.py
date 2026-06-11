@@ -268,9 +268,8 @@ def get_invoicing_router(templates):
                 entity="cfdi",
                 entity_id=uuid_clean[:36],
             )
-            from cfdi_pdf import build_pdf, parse_cfdi_xml
-            data = parse_cfdi_xml(abs_path)
-            pdf_bytes = build_pdf(data)
+            from services.pdf import render_cfdi_pdf
+            pdf_bytes = render_cfdi_pdf(abs_path)
             if not pdf_bytes:
                 raise HTTPException(status_code=500, detail="Error al generar PDF")
             filename = f"cfdi-{uuid_clean[:8]}.pdf"

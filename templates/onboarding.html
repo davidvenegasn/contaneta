@@ -94,10 +94,11 @@
           <option value="626" {{ 'selected' if rf == '626' }}>626 - Régimen Simplificado de Confianza</option>
         </select>
 
-        <label for="cp">Código postal (domicilio fiscal)</label>
+        <label for="cp">Código postal fiscal <span class="muted" style="font-weight:400;">(opcional)</span></label>
         <input type="text" name="cp" id="cp" placeholder="00000" maxlength="5"
-               value="{{ (issuer or {}).get('cp') or '' }}"
-               pattern="\d{5}" title="5 dígitos" />
+               value="{{ (issuer or {}).get('fiscal_zip') or (issuer or {}).get('cp') or '' }}"
+               pattern="\d{5}" title="5 dígitos" inputmode="numeric" />
+        <small class="muted" style="display:block;margin-top:4px;">Si lo tienes a la mano. Puedes agregarlo después en tu perfil.</small>
 
         <div class="checkbox-group">
           <label>

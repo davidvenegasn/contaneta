@@ -120,6 +120,7 @@ def register_register_routes(router, templates):
         request: Request,
         email: str = Form(...),
         password: str = Form(...),
+        phone: str | None = Form(None),
         rfc: str | None = Form(None),
         razon_social: str | None = Form(None),
         regimen_fiscal: str = Form("616"),
@@ -135,12 +136,19 @@ def register_register_routes(router, templates):
         email = sanitize_service.sanitize_email(email)
         if not email:
             return RedirectResponse(url="/signup?error=required", status_code=302)
+        # Phone is required for outreach/onboarding. Normalize to digits only.
+        phone_clean = "".join(ch for ch in (phone or "") if ch.isdigit())
+        if not phone_clean or len(phone_clean) < 10:
+            return RedirectResponse(url="/signup?error=phone_required", status_code=302)
         if not password or len(password) < 8:
             return RedirectResponse(url="/signup?error=password", status_code=302)
         pw_err = users.validate_password_strength(password)
         if pw_err:
             return RedirectResponse(url="/signup?error=password", status_code=302)
-        # RFC is optional — allow signup without fiscal data
+        # RFC + razón social + CP + régimen: TODOS opcionales en signup.
+        # Algunos leads no tienen sus datos SAT al día — los completan después
+        # en /portal/settings → tab "Datos fiscales". El push a Facturapi se
+        # hace automáticamente cuando completan esos campos.
         rfc = sanitize_service.sanitize_rfc(rfc) if rfc else None
         razon_social = (razon_social or "").strip()[:200] or None
         cp = sanitize_service.sanitize_cp(cp)
@@ -152,6 +160,7 @@ def register_register_routes(router, templates):
         try:
             user = users.create_user(
                 email=email,
+                phone=phone_clean,
                 password_hash=users.hash_password(password),
                 name=display_name,
             )

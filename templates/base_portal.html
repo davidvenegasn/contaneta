@@ -318,9 +318,11 @@
           </button>
           <!-- Issuer info -->
           <div class="portal-topbar__issuer">
-            <div class="portal-topbar__issuer-name">{{ issuer_alias or 'ContaNeta' }}</div>
-            {% if issuer_rfc %}
+            <div class="portal-topbar__issuer-name">{{ issuer_alias or 'Mi cuenta' }}</div>
+            {% if issuer_rfc and issuer_rfc != 'PENDIENTE' %}
             <div class="portal-topbar__issuer-rfc">{{ issuer_rfc }}</div>
+            {% elif issuer_rfc == 'PENDIENTE' %}
+            <div class="portal-topbar__issuer-rfc muted" style="opacity:.7;font-style:italic;">Sin RFC configurado</div>
             {% endif %}
           </div>
 
@@ -431,12 +433,10 @@
             </form>
           </div>
           {% endif %}
-          {% if is_demo_view %}
-          <div class="demo-banner" role="status">
-            <span class="demo-banner__text">Estás viendo el portal con datos de ejemplo.</span>
-            <a href="/portal/exit-demo-view" class="demo-banner__link">Volver a mi portal</a>
-          </div>
-          {% endif %}
+          {# Demo view banner removed — la implementación actual estaba muy mal
+             hecha (cambiaba de issuer sin claridad). Se rehará después con un
+             diseño explícito de "datos demo / cuenta de prueba". #}
+          {# {% if is_demo_view %} ... {% endif %} #}
           <!-- Banners persistentes: éxito / aviso / error (no se ocultan solos; usar toasts para feedback inmediato) -->
           <div id="portalBanners" class="portal-banners" aria-live="polite" aria-relevant="additions"></div>
           <!-- P25: contenedor único para toasts (success/error/info); máx 3 visibles; no usar en carga de listas -->

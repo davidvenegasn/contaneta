@@ -36,7 +36,8 @@ apt-get update -qq
 apt-get install -y -qq \
     python3 python3-pip python3-venv \
     php-cli php-curl php-xml php-mbstring php-sqlite3 \
-    sqlite3 unzip git curl ufw logrotate
+    sqlite3 unzip git curl ufw logrotate \
+    libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz0b libfontconfig1
 
 # ── 2) Install Caddy ──────────────────────────────────────────
 echo "--- [2/10] Caddy web server ---"

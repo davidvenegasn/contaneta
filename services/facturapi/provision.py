@@ -30,6 +30,71 @@ def _read_issuer(issuer_id: int) -> dict | None:
     return dict(row) if hasattr(row, "keys") else dict(zip(row.keys(), row))
 
 
+def ensure_live_ready(issuer_id: int) -> dict:
+    """Check if issuer's Facturapi org is production-ready and cache the LIVE
+    API key if so.
+
+    Called after any onboarding milestone (legal info save, FIEL sign, CSD
+    upload) — auto-promotes the org to LIVE as soon as Facturapi reports
+    `is_production_ready: True` and `pending_steps: []`.
+
+    Idempotent: if live key is already cached and fresh, returns immediately.
+
+    Returns dict with keys:
+      - `live_ready` (bool): is the org production-ready in Facturapi
+      - `live_key_cached` (bool): did we (just) save the live key to DB
+      - `pending_steps` (list[str]): remaining steps (if any)
+    """
+    issuer = _read_issuer(issuer_id)
+    if not issuer:
+        return {"live_ready": False, "live_key_cached": False, "error": "issuer not found"}
+    org_id = (issuer.get("facturapi_org_id") or "").strip()
+    if not org_id:
+        return {"live_ready": False, "live_key_cached": False, "error": "no org_id"}
+
+    try:
+        org_data = fpi_orgs.get_organization(org_id)
+    except Exception as e:
+        logger.warning("ensure_live_ready: get_organization failed issuer=%s: %s", issuer_id, e)
+        return {"live_ready": False, "live_key_cached": False, "error": "facturapi_unreachable"}
+
+    pending = [s.get("type", "") for s in (org_data.get("pending_steps") or []) if isinstance(s, dict)]
+    is_ready = bool(org_data.get("is_production_ready")) and not pending
+
+    if not is_ready:
+        return {"live_ready": False, "live_key_cached": False, "pending_steps": pending}
+
+    # Org is ready. Fetch + cache test/live keys if not already done.
+    try:
+        from services.facturapi.api_keys import save_org_keys
+        from database import db
+        conn = db()
+        try:
+            row = conn.execute(
+                "SELECT facturapi_live_key_encrypted FROM issuers WHERE id=?",
+                (issuer_id,),
+            ).fetchone()
+            already_have_live = bool(row and (dict(row).get("facturapi_live_key_encrypted") or "").strip())
+        finally:
+            conn.close()
+        if already_have_live:
+            return {"live_ready": True, "live_key_cached": False, "pending_steps": []}
+        test_key = fpi_orgs.get_org_api_key(org_id, mode="test")
+        # `renew` returns the full live key string. `get` for live only returns
+        # the first 12 chars (Facturapi only reveals full key once on creation).
+        live_key = fpi_orgs.renew_org_api_key(org_id, mode="live")
+        save_org_keys(
+            issuer_id,
+            test_key=test_key if isinstance(test_key, str) else None,
+            live_key=live_key if isinstance(live_key, str) else None,
+        )
+        logger.info("Cached LIVE key for issuer=%s org=%s", issuer_id, org_id)
+        return {"live_ready": True, "live_key_cached": True, "pending_steps": []}
+    except Exception as e:
+        logger.warning("ensure_live_ready: cache keys failed issuer=%s: %s", issuer_id, e)
+        return {"live_ready": True, "live_key_cached": False, "error": str(e)}
+
+
 def push_legal_info_to_facturapi(issuer_id: int) -> dict:
     """Sync the issuer's legal data (razon_social, regimen_fiscal, fiscal_zip)
     from our DB to Facturapi's org. Best-effort: skips fields that are missing

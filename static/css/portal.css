@@ -630,6 +630,14 @@ body.no-scroll, body.scroll-locked, body.quick-invoice-modal-open{
   box-shadow: var(--shadow-card, var(--shadow-sm));
   transition: box-shadow 180ms ease, transform 180ms ease, border-color 180ms ease;
   will-change: transform;
+  /* Display flex column + height 100% + align-self stretch: combinación que
+     garantiza que el card se estire al alto completo de su grid/flex cell
+     en TODOS los browsers, sin importar el contenido interno. Top y bottom
+     edges quedan alineados con sus vecinos en la misma fila. */
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  align-self: stretch;
 }
 
 .portal .card__body{
@@ -737,8 +745,64 @@ body.no-scroll, body.scroll-locked, body.quick-invoice-modal-open{
   padding: 20px;
   position: relative;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  height: 100%; /* uniformiza alturas dentro de un grid (igual que .card) */
+  align-self: stretch;
   transition: transform var(--motion-normal) var(--ease-out),
               box-shadow var(--motion-normal) var(--ease-out);
+}
+
+/* ── Grids de cards: alinear al top + alturas iguales ──
+   Cualquier contenedor con clase que termine en -grid (creds-grid,
+   metric-grid, dashboard-cards, etc.) que tenga cards dentro: fuerza
+   align-items: stretch para que cards estiren al alto del más alto, y
+   align-content: start para que las filas no se separen verticalmente. */
+[class$="-grid"]:has(> .card),
+[class$="-grid"]:has(> .metric-card),
+[class*="cards"]:has(> .card),
+[class*="cards"]:has(> .metric-card),
+.creds-grid,
+.metrics-grid,
+.dashboard-grid {
+  align-items: stretch;
+  align-content: start;
+}
+
+/* ── creds-grid: layout específico ──
+   Tres tarjetas (FIEL, CSD, CIEC) que deben verse 100% IDÉNTICAS en tamaño
+   y alineación. Estrategia:
+   1. Container flex con stretch (todos los cards al mismo alto)
+   2. Cada card es flex column con justify-content: space-between → ancla la
+      cabecera arriba y el botón abajo, sin importar el contenido del medio
+   3. Min-height fijo para evitar saltos en cards con contenido muy corto */
+.creds-grid {
+  display: flex !important;
+  flex-wrap: wrap;
+  align-items: stretch !important;
+  gap: 16px;
+}
+.creds-grid > .card,
+.creds-grid > .creds-card {
+  flex: 1 1 320px !important;
+  min-width: 0 !important;
+  min-height: 260px !important;
+  margin: 0 !important;
+  align-self: stretch !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+/* Empuja el botón "Cambiar X / Configurar X" al fondo de cada card */
+.creds-grid > .card > .creds-toggle,
+.creds-grid > .creds-card > .creds-toggle {
+  margin-top: auto !important;
+  align-self: flex-start;
+}
+/* El form expandible se queda al fondo después del botón (no afecta layout
+   colapsado porque tiene [hidden]) */
+.creds-grid > .card > .creds-form,
+.creds-grid > .creds-card > .creds-form {
+  margin-top: 0 !important;
 }
 
 /* Gradient top-bar on hover */

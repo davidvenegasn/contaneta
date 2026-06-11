@@ -36,8 +36,23 @@ run_timeout() {
 
 log "=== Inicio cron SAT sync ==="
 
-ISSUERS=$(sqlite3 -noheader "$PROJECT_DIR/invoicing.db" \
-  "SELECT issuer_id FROM sat_credentials GROUP BY issuer_id" 2>/dev/null || true)
+# Opcional: --issuer-id=N para procesar sólo ese issuer (usado en onboarding,
+# dispara la descarga inmediatamente al subir FIEL en vez de esperar al cron).
+# Sin argumento: procesa todos los issuers con sat_credentials (cron normal).
+TARGET_ISSUER=""
+for arg in "$@"; do
+  case "$arg" in
+    --issuer-id=*) TARGET_ISSUER="${arg#--issuer-id=}" ;;
+  esac
+done
+
+if [ -n "$TARGET_ISSUER" ]; then
+  ISSUERS="$TARGET_ISSUER"
+  log "Modo single-issuer: $TARGET_ISSUER"
+else
+  ISSUERS=$(sqlite3 -noheader "$PROJECT_DIR/invoicing.db" \
+    "SELECT issuer_id FROM sat_credentials GROUP BY issuer_id" 2>/dev/null || true)
+fi
 
 if [ -z "$ISSUERS" ]; then
   log "No hay issuers con sat_credentials."
@@ -63,13 +78,33 @@ for IID in $ISSUERS; do
   run_timeout 140 python3 scripts/run_php_with_fiel.py sat_sync/sync_xml.php "$IID" received --month="$YM_PREV" 2>/dev/null || true
 done
 
-# 3) VERIFY: descargar paquetes XML cuando el SAT los tenga listos
-log "Verify + download XML..."
-run_timeout 180 $PHP sat_sync/verify_requests.php --limit=20 2>/dev/null || true
+# 3) VERIFY: descargar paquetes XML cuando el SAT los tenga listos.
+# IMPORTANTE: verify_requests.php necesita acceder a los archivos .cer/.key del
+# FIEL. Como están encriptados en disco, hay que pasarlos vía env vars que el
+# wrapper de Python (decrypted_fiel_env) genera. Si llamamos al PHP
+# directamente (sin wrapper), explota con "Cannot parse X509 certificate".
+# Por eso loopeamos por issuer y desencriptamos por cada uno.
+log "Verify + download XML (per issuer)..."
+for IID in $ISSUERS; do
+  run_timeout 180 python3 scripts/run_php_with_fiel.py sat_sync/verify_requests.php "$IID" --issuer="$IID" --limit=10 2>/dev/null || true
+done
 
-# 4) PARSE: extraer subtotal, IVA, fecha, emisor/receptor del XML
-log "Parse XML..."
-$PHP sat_sync/parse_xml.php --limit=300 2>/dev/null || true
+# 4) PARSE: extraer subtotal, IVA, fecha, emisor/receptor del XML.
+# IMPORTANTE: si solo corremos --limit=300, los usuarios con cargas iniciales
+# grandes (>300 XMLs descargados en una pasada) quedan con CFDIs en estado
+# 'downloaded' pero sin fecha_emision/total — y el portal NO los muestra
+# porque filtra por mes (que requiere fecha_emision != NULL). Loopeamos
+# en batches hasta agotar la cola (con tope de seguridad de 10 rondas para
+# evitar loops infinitos por XMLs corruptos).
+log "Parse XML (loop hasta agotar)..."
+for round in 1 2 3 4 5 6 7 8 9 10; do
+  output=$($PHP sat_sync/parse_xml.php --limit=500 2>/dev/null || true)
+  echo "$output" | tail -1
+  # Si parseó menos de 500 → ya no hay más; salimos
+  if echo "$output" | grep -qE "Parseados: [0-4][0-9]{0,2} "; then
+    break
+  fi
+done
 
 # 4.5) BACKFILL CLIENTES: guardar clientes desde receptores de facturas emitidas (tabla clients)
 log "Backfill clientes desde facturas emitidas..."

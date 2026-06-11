@@ -42,11 +42,16 @@ def register_dashboard_routes(router, templates):
         """La ruta de login es /login, no /portal/login. Redirigir para evitar 404."""
         return RedirectResponse(url="/login", status_code=302)
 
+    # Demo view DEACTIVATED — la implementación previa cambiaba el issuer
+    # context sin claridad y el usuario terminaba viendo datos que parecían
+    # suyos sin saber que eran demo. Se rehará con un diseño explícito después.
+    # Mantenemos /exit-demo-view para limpiar cookies viejas de usuarios que
+    # las tengan persistidas, pero set-demo-view ya no permite entrar.
+
     @router.get("/set-demo-view", response_class=RedirectResponse)
     def portal_set_demo_view(request: Request, _: dict = Depends(get_portal_issuer)):
-        resp = RedirectResponse(url="/portal/home", status_code=302)
-        resp.set_cookie(COOKIE_DEMO_VIEW, "1", max_age=86400 * 7, path="/", samesite="lax")
-        return resp
+        # Demo mode disabled: ignore the activation attempt and just go home.
+        return RedirectResponse(url="/portal/home", status_code=302)
 
     @router.get("/exit-demo-view", response_class=RedirectResponse)
     def portal_exit_demo_view(request: Request):
@@ -153,8 +158,12 @@ def register_dashboard_routes(router, templates):
                 "count_products": prod_count[0]["n"] if prod_count else 0,
                 "has_any_issued": bool(any_issued),
             }
+            # Updated: link to the new unified Sellos SAT tab (settings) instead
+            # of the legacy /portal/config/sat. The new flow uploads FIEL once
+            # and handles SAT credentials + Facturapi manifesto + LIVE promotion
+            # in a single step.
             onboarding["steps"] = [
-                {"key": "fiel", "label": "Conecta tus credenciales SAT (FIEL)", "done": fiel_validated, "href": "/portal/config/sat"},
+                {"key": "fiel", "label": "Conecta tus credenciales SAT (FIEL)", "done": fiel_validated, "href": "/portal/settings#sat"},
             ]
             onboarding["completed"] = sum(1 for s in onboarding["steps"] if s["done"])
             onboarding["total"] = len(onboarding["steps"])

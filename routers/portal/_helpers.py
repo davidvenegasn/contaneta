@@ -174,6 +174,7 @@ def render_portal(
         "issuer_rfc": issuer.get("rfc", ""),
         "issuer_tax_system": issuer_tax_code,
         "issuer_regimen_label": regimen_label or "",
+        "issuer_fiscal_zip": issuer.get("fiscal_zip", "") or "",
         "active_page": active_page,
         "nav_is_active": _nav_is_active,
         "title": title,

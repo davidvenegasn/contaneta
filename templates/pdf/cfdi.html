@@ -1,0 +1,645 @@
+<!doctype html>
+{#
+  CFDI 4.0 — Representación impresa para ContaNeta.
+  Render: WeasyPrint v69.
+
+  Este template es una copia 1:1 del mockup original, con SOLO los siguientes
+  ajustes mínimos para que rendere igual en WeasyPrint:
+    1. @font-face local de Inter (WeasyPrint no descarga Google Fonts)
+    2. @page { size: Letter; margin: 0 } (sin esto WeasyPrint usa A4 default)
+    3. Receptor: grid con minmax() reemplazado por `display:table` (minmax no
+       se renderiza correctamente en WeasyPrint v69 — colapsa columnas)
+    4. Totales: flex space-between reemplazado por `display:table` (más fiable)
+    5. Brand-bottom: flex reemplazado por `display:table`
+    6. Sellos Anexo 20 (CFD + Cadena Original) en bloque microcopy al pie
+
+  Variables Jinja al final del archivo.
+#}
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<title>CFDI — {{ emisor.name }} — Folio {{ fiscal.uuid }}</title>
+<style>
+  @font-face {
+    font-family: 'Inter';
+    font-weight: 400; font-style: normal;
+    src: url('static/fonts/inter/Inter-Regular.woff2') format('woff2');
+  }
+  @font-face {
+    font-family: 'Inter';
+    font-weight: 500; font-style: normal;
+    src: url('static/fonts/inter/Inter-Medium.woff2') format('woff2');
+  }
+  @font-face {
+    font-family: 'Inter';
+    font-weight: 600; font-style: normal;
+    src: url('static/fonts/inter/Inter-SemiBold.woff2') format('woff2');
+  }
+  @font-face {
+    font-family: 'Inter';
+    font-weight: 700; font-style: normal;
+    src: url('static/fonts/inter/Inter-Bold.woff2') format('woff2');
+  }
+
+  @page { size: Letter; margin: 0; }
+
+  :root {
+    --primary: #6366f1;
+    --primary-hover: #4f46e5;
+    --primary-light: #eef2ff;
+    --text: #0f172a;
+    --text-secondary: #475569;
+    --text-muted: #64748b;
+    --bg: #fafafa;
+    --surface: #ffffff;
+    --surface-1: #fafafa;
+    --surface-2: #f1f3f5;
+    --border: rgba(15, 23, 42, 0.08);
+    --border-strong: rgba(15, 23, 42, 0.14);
+    --success: #16a34a;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+    color: var(--text);
+    background: #ffffff;
+    letter-spacing: -0.011em;
+  }
+  .page {
+    width: 8.5in;
+    min-height: 11in;
+    background: var(--surface);
+    padding: 48px 56px 36px;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+  }
+  .page__footer { margin-top: auto; }
+  .page::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, var(--primary) 0%, #a78bfa 100%);
+  }
+
+  /* ── HEADER ── */
+  .header {
+    display: grid;
+    grid-template-columns: 1.05fr 1fr;
+    gap: 32px;
+    padding-bottom: 26px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 24px;
+    align-items: start;
+  }
+  .header__left { padding-top: 2px; }
+  .doc-type {
+    display: inline-block;
+    padding: 3px 8px;
+    background: var(--primary-light);
+    color: var(--primary);
+    border-radius: 999px;
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 10px;
+  }
+  .emisor-name {
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: -0.018em;
+    line-height: 1.2;
+    color: var(--text);
+    margin-bottom: 10px;
+  }
+  .emisor-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 5px 16px;
+    font-size: 9.5px;
+  }
+  .emisor-cell dt {
+    font-size: 8px;
+    color: var(--text-muted);
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    margin-bottom: 1px;
+  }
+  .emisor-cell dd {
+    font-size: 9.5px;
+    color: var(--text);
+    font-weight: 500;
+    line-height: 1.35;
+  }
+  .emisor-cell dd.mono {
+    font-family: inherit;
+    font-size: 9px;
+    letter-spacing: -0.01em;
+  }
+
+  /* ── Fiscal data block ── */
+  .fiscal-info { padding-top: 2px; }
+  .fiscal-folio { margin-bottom: 8px; }
+  .fiscal-folio dt {
+    font-size: 8px;
+    color: var(--text-muted);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 2px;
+  }
+  .fiscal-folio dd {
+    font-family: inherit;
+    font-size: 9px;
+    color: var(--text);
+    font-weight: 500;
+    word-break: break-all;
+    line-height: 1.3;
+  }
+  .fiscal-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px 18px;
+    padding: 8px 0;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 8px;
+  }
+  .fiscal-cell dt {
+    font-size: 8px;
+    color: var(--text-muted);
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    margin-bottom: 1px;
+  }
+  .fiscal-cell dd {
+    font-size: 9px;
+    color: var(--text);
+    font-weight: 500;
+    line-height: 1.3;
+  }
+  .fiscal-cell dd.mono {
+    font-family: inherit;
+    font-size: 8.5px;
+    letter-spacing: -0.01em;
+  }
+  .fiscal-pago {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px 18px;
+  }
+
+  /* ── RECEPTOR — display:table porque minmax() colapsa en WeasyPrint ── */
+  .receptor {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--primary);
+    border-radius: 10px;
+    padding: 12px 18px 12px 18px;
+    margin-bottom: 22px;
+    display: table;
+    width: 100%;
+    table-layout: fixed;
+  }
+  .receptor__cell-wrap {
+    display: table-cell;
+    vertical-align: middle;
+    padding-right: 14px;
+  }
+  .receptor__cell-wrap:last-child { padding-right: 0; }
+  .receptor__cell-wrap.name { width: 36%; }
+  .receptor__cell-wrap.field { width: 16%; }
+  .receptor__label {
+    display: block;
+    font-size: 8px;
+    font-weight: 600;
+    color: var(--primary);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    line-height: 1;
+    margin-bottom: 3px;
+  }
+  .receptor__name {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text);
+    letter-spacing: -0.012em;
+    line-height: 1.2;
+  }
+  .receptor__cell dt {
+    font-size: 8px;
+    color: var(--text-muted);
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    line-height: 1.1;
+    margin-bottom: 2px;
+  }
+  .receptor__cell dd {
+    font-size: 9.5px;
+    color: var(--text);
+    font-weight: 500;
+    line-height: 1.25;
+  }
+  .receptor__cell dd.mono {
+    font-family: inherit;
+    font-size: 9px;
+    letter-spacing: -0.01em;
+  }
+
+  /* ── CONCEPTOS ── */
+  .section-label {
+    font-size: 9px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 10px;
+  }
+  .conceptos {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    margin-bottom: 22px;
+    font-size: 10.5px;
+  }
+  .conceptos thead th {
+    text-align: left;
+    padding: 8px 10px;
+    font-size: 9px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    border-bottom: 1.5px solid var(--border-strong);
+  }
+  .conceptos thead th.r { text-align: right; }
+  .conceptos thead th.c { text-align: center; }
+  .conceptos tbody td {
+    padding: 10px 10px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+    vertical-align: top;
+  }
+  .conceptos tbody td.r { text-align: right; }
+  .conceptos tbody td.c { text-align: center; }
+  .clave {
+    font-family: inherit;
+    font-size: 9.5px;
+    color: var(--text-secondary);
+  }
+  .desc-main { font-weight: 500; margin-bottom: 2px; }
+  .desc-sub { font-size: 9px; color: var(--text-muted); }
+
+  /* ── TOTALES — display:table en lugar de flex space-between ── */
+  .totales-wrap {
+    margin-bottom: 24px;
+    text-align: right;
+  }
+  .totales {
+    display: inline-block;
+    min-width: 260px;
+    text-align: left;
+    font-size: 10px;
+  }
+  .totales__row {
+    display: table;
+    width: 100%;
+    padding: 3px 0;
+    line-height: 1.4;
+  }
+  .totales__row .lbl {
+    display: table-cell;
+    text-align: left;
+    color: var(--text-secondary);
+  }
+  .totales__row .val {
+    display: table-cell;
+    text-align: right;
+    font-weight: 500;
+    color: var(--text);
+  }
+  .totales__row--neg .val { color: var(--text-secondary); }
+  .totales__row--sub {
+    padding: 4px 0 6px;
+    border-bottom: 1px dashed var(--border);
+    margin-bottom: 4px;
+  }
+  .totales__row--total {
+    border-top: 1.5px solid var(--border-strong);
+    margin-top: 4px;
+    padding-top: 8px;
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .totales__row--total .lbl { color: var(--text); font-weight: 700; }
+  .totales__row--total .val { color: var(--primary); font-weight: 700; }
+  .totales__importe-letra {
+    margin-top: 8px;
+    font-size: 9px;
+    color: var(--text-secondary);
+    line-height: 1.45;
+    text-align: right;
+  }
+  .totales__importe-letra strong { color: var(--text); }
+
+  /* ── SELLO + QR (idéntico al mockup: solo No. cert SAT + Sello SAT visible) ── */
+  .sello {
+    border-top: 1px solid var(--border);
+    padding-top: 16px;
+    display: table;
+    width: 100%;
+    table-layout: fixed;
+  }
+  .sello__block {
+    display: table-cell;
+    vertical-align: top;
+    font-size: 8.5px;
+    line-height: 1.4;
+    color: var(--text-secondary);
+    padding-right: 20px;
+  }
+  .sello__qr {
+    display: table-cell;
+    vertical-align: top;
+    width: 110px;
+  }
+  .sello__label {
+    font-size: 8px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 2px;
+    display: block;
+  }
+  .sello__value {
+    font-family: inherit;
+    font-size: 8.5px;
+    word-break: break-all;
+    color: var(--text);
+    line-height: 1.4;
+    margin-bottom: 6px;
+  }
+  .qr {
+    width: 100px;
+    height: 100px;
+    display: block;
+    margin: 0 auto;
+  }
+  .qr-label {
+    text-align: center;
+    font-size: 8px;
+    color: var(--text-muted);
+    margin-top: 4px;
+    line-height: 1.3;
+  }
+  .verify-link {
+    margin-top: 8px;
+    padding: 6px 10px;
+    background: var(--primary-light);
+    border-radius: 6px;
+    font-size: 8.5px;
+    color: var(--primary);
+  }
+
+  /* ── ANEXO 20 FOOTNOTE — Sello CFD + Cadena Original en microcopy
+       Estos campos son requeridos por Anexo 20 pero el mockup no los mostraba
+       visualmente. Los ponemos como nota al pie en 7pt para no romper el
+       layout y mantener cumplimiento legal. ── */
+  .anexo20 {
+    margin-top: 14px;
+    padding-top: 10px;
+    border-top: 1px dashed var(--border);
+    font-size: 7px;
+    color: var(--text-muted);
+    line-height: 1.35;
+    word-break: break-all;
+  }
+  .anexo20 strong { color: var(--text-secondary); font-weight: 600; }
+  .anexo20 .row { margin-bottom: 4px; }
+
+  /* ── BOTTOM brand ── */
+  .brand-bottom {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+    font-size: 8px;
+    color: var(--text-muted);
+    display: table;
+    width: 100%;
+  }
+  .brand-bottom__legend { display: table-cell; text-align: left; }
+  .brand-bottom__mark {
+    display: table-cell;
+    text-align: right;
+    font-weight: 500;
+    font-size: 9px;
+    color: var(--text-secondary);
+    letter-spacing: -0.02em;
+  }
+  .brand-bottom__mark .dot { color: var(--primary); }
+</style>
+</head>
+<body>
+
+<div class="page">
+
+  <div class="page__main">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header__left">
+      <span class="doc-type">{{ doc_type_label }}</span>
+      <h1 class="emisor-name">{{ emisor.name }}</h1>
+      <dl class="emisor-grid">
+        <div class="emisor-cell">
+          <dt>RFC</dt>
+          <dd class="mono">{{ emisor.rfc }}</dd>
+        </div>
+        <div class="emisor-cell">
+          <dt>Régimen fiscal</dt>
+          <dd>{{ emisor.regimen_fiscal }} — {{ emisor.regimen_fiscal_label }}</dd>
+        </div>
+        <div class="emisor-cell">
+          <dt>C.P. fiscal</dt>
+          <dd class="mono">{{ emisor.codigo_postal }}</dd>
+        </div>
+        <div class="emisor-cell">
+          <dt>Moneda</dt>
+          <dd>{{ emisor.moneda }}</dd>
+        </div>
+      </dl>
+    </div>
+
+    <div class="fiscal-info">
+      <dl class="fiscal-folio">
+        <dt>Folio Fiscal</dt>
+        <dd>{{ fiscal.uuid }}</dd>
+      </dl>
+
+      <dl class="fiscal-grid">
+        <div class="fiscal-cell">
+          <dt>Tipo de CFDI</dt>
+          <dd>{{ fiscal.tipo_comprobante }} ({{ fiscal.tipo_label }}) · v{{ fiscal.version }}</dd>
+        </div>
+        <div class="fiscal-cell">
+          <dt>Serie CSD emisor</dt>
+          <dd class="mono">{{ fiscal.no_certificado_emisor }}</dd>
+        </div>
+        <div class="fiscal-cell">
+          <dt>Fecha emisión</dt>
+          <dd class="mono">{{ fiscal.fecha_emision }}</dd>
+        </div>
+        <div class="fiscal-cell">
+          <dt>Certificación SAT</dt>
+          <dd class="mono">{{ fiscal.fecha_timbrado }}</dd>
+        </div>
+      </dl>
+
+      <dl class="fiscal-pago">
+        <div class="fiscal-cell">
+          <dt>Forma de pago</dt>
+          <dd>{{ fiscal.forma_pago }} · {{ fiscal.forma_pago_label }}</dd>
+        </div>
+        <div class="fiscal-cell">
+          <dt>Método de pago</dt>
+          <dd>{{ fiscal.metodo_pago }} · {{ fiscal.metodo_pago_label }}</dd>
+        </div>
+      </dl>
+    </div>
+  </div>
+
+  <!-- RECEPTOR -->
+  <div class="receptor">
+    <div class="receptor__cell-wrap name">
+      <span class="receptor__label">Receptor</span>
+      <div class="receptor__name">{{ receptor.name }}</div>
+    </div>
+    <div class="receptor__cell-wrap field">
+      <div class="receptor__cell">
+        <dt>RFC</dt>
+        <dd class="mono">{{ receptor.rfc }}</dd>
+      </div>
+    </div>
+    <div class="receptor__cell-wrap field">
+      <div class="receptor__cell">
+        <dt>Régimen</dt>
+        <dd>{{ receptor.regimen_fiscal }} — {{ receptor.regimen_fiscal_label }}</dd>
+      </div>
+    </div>
+    <div class="receptor__cell-wrap field">
+      <div class="receptor__cell">
+        <dt>C.P. fiscal</dt>
+        <dd class="mono">{{ receptor.codigo_postal }}</dd>
+      </div>
+    </div>
+    <div class="receptor__cell-wrap field">
+      <div class="receptor__cell">
+        <dt>Uso CFDI</dt>
+        <dd>{{ receptor.uso_cfdi }} — {{ receptor.uso_cfdi_label }}</dd>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONCEPTOS -->
+  <div class="section-label">Conceptos</div>
+  <table class="conceptos">
+    <thead>
+      <tr>
+        <th>Clave SAT</th>
+        <th>Descripción</th>
+        <th class="c">Cant.</th>
+        <th class="c">Unidad</th>
+        <th class="r">P. unit.</th>
+        <th class="r">Importe</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for c in conceptos %}
+      <tr>
+        <td><span class="clave">{{ c.clave_prod_serv }}</span></td>
+        <td>
+          <div class="desc-main">{{ c.descripcion }}</div>
+          {% if c.descripcion_extra %}<div class="desc-sub">{{ c.descripcion_extra }}</div>{% endif %}
+        </td>
+        <td class="c">{{ c.cantidad }}</td>
+        <td class="c"><span class="clave">{{ c.clave_unidad }}</span></td>
+        <td class="r">${{ c.valor_unitario }}</td>
+        <td class="r">${{ c.importe }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <!-- TOTALES -->
+  <div class="totales-wrap">
+    <div class="totales">
+      <div class="totales__row totales__row--sub">
+        <span class="lbl">Subtotal</span><span class="val">${{ totales.subtotal }}</span>
+      </div>
+      <div class="totales__row">
+        <span class="lbl">IVA trasladado 16%</span><span class="val">+${{ totales.iva_trasladado }}</span>
+      </div>
+      {% if totales.iva_retenido %}
+      <div class="totales__row totales__row--neg">
+        <span class="lbl">IVA retenido (2/3)</span><span class="val">−${{ totales.iva_retenido }}</span>
+      </div>
+      {% endif %}
+      {% if totales.isr_retenido %}
+      <div class="totales__row totales__row--neg">
+        <span class="lbl">ISR retenido (10%)</span><span class="val">−${{ totales.isr_retenido }}</span>
+      </div>
+      {% endif %}
+      <div class="totales__row totales__row--total">
+        <span class="lbl">Total</span><span class="val">${{ totales.total }} {{ totales.moneda }}</span>
+      </div>
+      <div class="totales__importe-letra">
+        <strong>Importe con letra:</strong> {{ totales.importe_letra }}
+      </div>
+    </div>
+  </div>
+
+  </div><!-- /page__main -->
+
+  <div class="page__footer">
+
+  <!-- SELLO + QR (visible, como mockup) -->
+  <div class="sello">
+    <div class="sello__block">
+      <span class="sello__label">No. certificado SAT</span>
+      <div class="sello__value">{{ sello.no_certificado_sat }}</div>
+
+      <span class="sello__label">Sello digital del SAT</span>
+      <div class="sello__value" style="font-size:9.5px;">{{ sello.sello_sat }}</div>
+
+      <div class="verify-link">Verifica en sat.gob.mx con el folio fiscal y el QR</div>
+    </div>
+
+    <div class="sello__qr">
+      <img class="qr" alt="QR de verificación SAT"
+           src="data:image/png;base64,{{ qr_b64 }}" />
+      <div class="qr-label">Verifica en<br>sat.gob.mx</div>
+    </div>
+  </div>
+
+  <!-- Anexo 20 footnote: Sello CFD del emisor + Cadena Original del TFD.
+       Cumplimiento legal, microcopy para no romper diseño. -->
+  <div class="anexo20">
+    <div class="row"><strong>Sello digital del CFDI (emisor):</strong> {{ sello.sello_cfd }}</div>
+    <div class="row"><strong>Cadena original del complemento de certificación digital del SAT:</strong> {{ sello.cadena_original_tfd }}</div>
+  </div>
+
+  <div class="brand-bottom">
+    <div class="brand-bottom__legend">Este documento es una representación impresa de un CFDI 4.0</div>
+    <div class="brand-bottom__mark">Generado con contaneta<span class="dot">.</span></div>
+  </div>
+
+  </div><!-- /page__footer -->
+
+</div>
+
+</body>
+</html>

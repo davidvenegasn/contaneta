@@ -10,6 +10,8 @@ pandas==3.0.1
 pdfplumber==0.11.9
 qrcode==8.2
 Pillow==12.1.1
+weasyprint==69.0
+num2words==0.5.14
 bcrypt==5.0.0
 httpx==0.28.1
 gunicorn==25.1.0

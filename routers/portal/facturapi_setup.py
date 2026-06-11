@@ -432,6 +432,17 @@ def register_facturapi_setup_routes(router, templates):
 
         _mark_csd_uploaded(issuer["id"])
         _maybe_complete_onboarding(issuer["id"])
+        # Re-push legal info + auto-promote to LIVE.
+        # CSD upload alone doesn't trigger Facturapi's "legal" pending step
+        # to clear — it's gated on having complete fiscal data pushed. We push
+        # here too in case the user filled fiscal data after we previously
+        # failed (e.g. razón social didn't match SAT until FIEL fixed it).
+        try:
+            from services.facturapi.provision import push_legal_info_to_facturapi, ensure_live_ready
+            push_legal_info_to_facturapi(issuer["id"])
+            ensure_live_ready(issuer["id"])
+        except Exception as e:
+            logger.warning("push_legal_info / ensure_live_ready after CSD failed issuer=%s: %s", issuer["id"], e)
         return {"ok": True, "organization": result}
 
     @router.post("/api/facturapi/upload-fiel")
@@ -450,13 +461,6 @@ def register_facturapi_setup_routes(router, templates):
         """
         if not csrf_service.verify_csrf_token((csrf_token or "").strip()):
             raise HTTPException(status_code=400, detail="CSRF inválido")
-        state = _ensure_state_with_org(issuer["id"])
-        org_id = state.get("facturapi_org_id")
-        if not org_id:
-            raise HTTPException(
-                status_code=502,
-                detail="No pudimos preparar tu organización en Facturapi. Revisa tu conexión e intenta de nuevo en unos minutos.",
-            )
         cer_bytes = await cer_file.read()
         key_bytes = await key_file.read()
         _validate_cert_pair_upload(cer_file, key_file, label="FIEL",
@@ -464,19 +468,188 @@ def register_facturapi_setup_routes(router, templates):
         password = (password or "").strip()
         if not password:
             raise HTTPException(status_code=400, detail="Contraseña requerida")
+
+        # Use the PUBLIC manifesto endpoint (discovered in iframe bundle) which
+        # actually signs the carta — the old `PUT /v2/organizations/{id}/fiel`
+        # only uploaded the cert but left pending_steps with 'manifiesto'.
+        # This endpoint identifies the org by the RFC inside the FIEL cert, so
+        # no org_id is needed.
         try:
-            fpi_orgs.sign_manifesto(
-                org_id, cer_bytes=cer_bytes, key_bytes=key_bytes, password=password,
+            result = fpi_orgs.sign_manifesto_public(
+                cer_bytes=cer_bytes, key_bytes=key_bytes, password=password,
             )
         except fpi_orgs.FacturapiOrgsError as e:
-            logger.warning("FIEL upload failed issuer=%s: %s", issuer["id"], e)
+            logger.warning("FIEL upload (sign manifesto) failed issuer=%s: %s", issuer["id"], e)
             return JSONResponse(
                 status_code=400 if e.status in (400, 422) else 502,
                 content={"ok": False, "error": {"code": "FIEL_UPLOAD_FAILED", "message": e.body}},
             )
+
+        tax_id_signed = (result.get("tax_id") or "").strip().upper()
+        issuer_rfc = (issuer.get("rfc") or "").strip().upper()
+        # If issuer's RFC is the signup placeholder (PENDIENTE / empty), this is
+        # their first FIEL upload — auto-fill the issuer's RFC + razón social
+        # from the cert. Otherwise, validate match as defense-in-depth.
+        is_placeholder = (not issuer_rfc) or issuer_rfc in ("PENDIENTE", "PENDING", "TBD")
+        if tax_id_signed and not is_placeholder and tax_id_signed != issuer_rfc:
+            logger.warning(
+                "FIEL upload: RFC mismatch issuer=%s expected=%s signed=%s",
+                issuer["id"], issuer_rfc, tax_id_signed,
+            )
+            return JSONResponse(
+                status_code=400,
+                content={"ok": False, "error": {
+                    "code": "RFC_MISMATCH",
+                    "message": f"La FIEL pertenece al RFC {tax_id_signed}, no a {issuer_rfc}.",
+                }},
+            )
+        # Always extract the FIEL's Common Name — it's the SAT-canonical legal
+        # name for that RFC (matches SAT records exactly, including paternal/
+        # maternal surnames). We use it as the source of truth for razón social
+        # because anything the user typed at signup is just their best guess.
+        # Facturapi later validates legal_name against SAT, so mismatches break
+        # `push_legal_info_to_facturapi` with "no coincide con el RFC registrado".
+        cert_name = ""
+        try:
+            from cryptography.x509 import load_der_x509_certificate
+            from cryptography.x509.oid import NameOID
+            cert = load_der_x509_certificate(cer_bytes)
+            for attr in cert.subject:
+                if attr.oid == NameOID.COMMON_NAME:
+                    cert_name = (attr.value or "").strip()
+                    break
+        except Exception:
+            pass
+
+        if tax_id_signed and (is_placeholder or cert_name):
+            try:
+                conn = db()
+                try:
+                    if is_placeholder and cert_name:
+                        # First FIEL: auto-fill RFC AND razón social
+                        conn.execute(
+                            "UPDATE issuers SET rfc=?, razon_social=?, updated_at=datetime('now') WHERE id=?",
+                            (tax_id_signed, cert_name, issuer["id"]),
+                        )
+                    elif is_placeholder:
+                        conn.execute(
+                            "UPDATE issuers SET rfc=?, updated_at=datetime('now') WHERE id=?",
+                            (tax_id_signed, issuer["id"]),
+                        )
+                    elif cert_name:
+                        # RFC already set, but ALWAYS override razón social with
+                        # the FIEL cert's name (SAT-canonical, prevents mismatch).
+                        conn.execute(
+                            "UPDATE issuers SET razon_social=?, updated_at=datetime('now') WHERE id=?",
+                            (cert_name, issuer["id"]),
+                        )
+                    conn.commit()
+                finally:
+                    conn.close()
+                logger.info("FIEL extract: issuer=%s rfc=%s name=%s placeholder=%s",
+                            issuer["id"], tax_id_signed, bool(cert_name), is_placeholder)
+            except Exception as e:
+                logger.warning("Failed to update issuer from FIEL: %s", e)
+
         _mark_manifest_signed(issuer["id"])
         _maybe_complete_onboarding(issuer["id"])
-        return {"ok": True}
+
+        # ── Save FIEL to sat_credentials so the SAT XML download flow can run ──
+        # Without this, the FIEL was being signed in Facturapi but never stored
+        # locally → the "Conecta tu cuenta con el SAT" onboarding banner stayed
+        # forever, AND the auto-download of last 3 months of CFDIs never started.
+        try:
+            import os
+            from services.sat.crypto_at_rest import encrypt_bytes, encrypt_text
+            from routers.portal.sat_config import (
+                _credentials_dir, _ensure_sat_credentials_validation_columns,
+                _run_fiel_validation,
+            )
+            cred_dir = _credentials_dir(issuer["id"])
+            cer_enc_path = os.path.join(cred_dir, "fiel.cer.enc")
+            key_enc_path = os.path.join(cred_dir, "fiel.key.enc")
+            rel_cer = f"storage/credentials/{issuer['id']}/fiel.cer.enc"
+            rel_key = f"storage/credentials/{issuer['id']}/fiel.key.enc"
+            cer_blob = encrypt_bytes(issuer_id=int(issuer["id"]), plaintext=cer_bytes, aad=b"fiel.cer")
+            key_blob = encrypt_bytes(issuer_id=int(issuer["id"]), plaintext=key_bytes, aad=b"fiel.key")
+            with open(cer_enc_path, "wb") as f:
+                f.write(cer_blob)
+            with open(key_enc_path, "wb") as f:
+                f.write(key_blob)
+            os.chmod(cer_enc_path, 0o600)
+            os.chmod(key_enc_path, 0o600)
+            password_enc = encrypt_text(issuer_id=int(issuer["id"]), plaintext=password)
+            conn = db()
+            try:
+                _ensure_sat_credentials_validation_columns(conn)
+                conn.execute(
+                    """INSERT INTO sat_credentials (issuer_id, fiel_cer_path, fiel_key_path, fiel_key_password, updated_at)
+                       VALUES (?, ?, ?, ?, datetime('now'))
+                       ON CONFLICT(issuer_id) DO UPDATE SET
+                           fiel_cer_path = excluded.fiel_cer_path,
+                           fiel_key_path = excluded.fiel_key_path,
+                           fiel_key_password = excluded.fiel_key_password,
+                           updated_at = datetime('now')""",
+                    (issuer["id"], rel_cer, rel_key, password_enc),
+                )
+                conn.commit()
+            finally:
+                conn.close()
+            # Validation sets validation_ok=1 → hides the onboarding banner
+            valid_ok, valid_msg = _run_fiel_validation(issuer["id"])
+            # Trigger the initial 3-month SAT download (issued + received)
+            if valid_ok:
+                try:
+                    from services.sat.sat_autosync import enqueue_onboarding_sync
+                    enqueue_onboarding_sync(issuer["id"])
+                    logger.info("Onboarding SAT sync enqueued for issuer=%s", issuer["id"])
+                except Exception as e:
+                    logger.warning("enqueue_onboarding_sync failed issuer=%s: %s", issuer["id"], e)
+
+                # Dispara el worker SAT en background SOLO para este issuer.
+                # El subprocess corre detached (no bloquea el response). El
+                # script con `--issuer-id=N` salta el loop sobre todos los
+                # tenants y procesa únicamente al recién onboardeado, lo que
+                # mantiene el costo del trigger O(1) sin importar cuántos
+                # otros usuarios tengamos. El cron normal (sin argumento)
+                # sigue corriendo cada 15 min para los demás.
+                try:
+                    import subprocess
+                    from pathlib import Path
+                    project_root = Path(__file__).resolve().parents[2]
+                    script_path = project_root / "sat_sync" / "cron_sat_sync.sh"
+                    log_path = project_root / "storage" / "logs" / f"sat_sync_onboarding_{issuer['id']}.log"
+                    log_path.parent.mkdir(parents=True, exist_ok=True)
+                    if script_path.exists():
+                        with open(log_path, "a") as logfp:
+                            subprocess.Popen(
+                                ["bash", str(script_path), f"--issuer-id={issuer['id']}"],
+                                stdout=logfp, stderr=subprocess.STDOUT,
+                                cwd=str(project_root),
+                                start_new_session=True,  # detach del proceso padre
+                            )
+                        logger.info("Background SAT sync started for issuer=%s (log=%s)", issuer["id"], log_path)
+                    else:
+                        logger.warning("SAT sync script not found at %s", script_path)
+                except Exception as e:
+                    logger.warning("Could not start background SAT sync for issuer=%s: %s", issuer["id"], e)
+        except Exception as e:
+            logger.warning("FIEL local save failed issuer=%s: %s", issuer["id"], e)
+        # ── end FIEL local save ──
+
+        # Re-push legal info to Facturapi AFTER the razón social was corrected
+        # from the FIEL cert. If the user had filled fiscal data earlier with a
+        # name that didn't match SAT, the previous push_legal_info failed
+        # silently and Facturapi kept its defaults (tax_system:601, zip:06010).
+        # Now with the cert-canonical name, the push succeeds and Facturapi
+        # gets the real fiscal data → pending_steps['legal'] clears.
+        try:
+            from services.facturapi.provision import push_legal_info_to_facturapi, ensure_live_ready
+            push_legal_info_to_facturapi(issuer["id"])
+            ensure_live_ready(issuer["id"])
+        except Exception as e:
+            logger.warning("push_legal_info / ensure_live_ready after FIEL failed issuer=%s: %s", issuer["id"], e)
+        return {"ok": True, "tax_id": tax_id_signed}
 
     @router.post("/api/facturapi/save-ciec")
     def portal_facturapi_save_ciec(
@@ -500,6 +673,71 @@ def register_facturapi_setup_routes(router, templates):
                 content={"ok": False, "error": {"code": "CIEC_SAVE_FAILED", "message": str(e)}},
             )
         return {"ok": True}
+
+    @router.post("/api/facturapi/sign-manifesto")
+    async def portal_facturapi_sign_manifesto(
+        request: Request,
+        cer_file: UploadFile = File(...),
+        key_file: UploadFile = File(...),
+        password: str = Form(...),
+        csrf_token: str = Form(...),
+        issuer: dict = Depends(get_portal_issuer),
+    ):
+        """Sign carta manifiesto using Facturapi's public endpoint.
+
+        Endpoint discovered in their iframe bundle: POST /web/manifiesto/firmar
+        (no Bearer auth — identifies org by RFC inside the FIEL cert).
+
+        This lets us replace the embedded iframe with our own simple form
+        (just .cer, .key, password) — no legal text shown, signing happens
+        server-side. The user uploads FIEL once and we use it for both:
+          - SAT XML downloads (existing flow, stored encrypted)
+          - Manifesto signing (this call, files NOT stored — passed through)
+        """
+        if not csrf_service.verify_csrf_token((csrf_token or "").strip()):
+            raise HTTPException(status_code=400, detail="CSRF inválido")
+
+        cer_bytes = await cer_file.read()
+        key_bytes = await key_file.read()
+        _validate_cert_pair_upload(cer_file, key_file, label="FIEL",
+                                   cer_bytes=cer_bytes, key_bytes=key_bytes)
+        password = (password or "").strip()
+        if not password:
+            raise HTTPException(status_code=400, detail="Contraseña requerida")
+
+        try:
+            result = fpi_orgs.sign_manifesto_public(
+                cer_bytes=cer_bytes,
+                key_bytes=key_bytes,
+                password=password,
+            )
+        except fpi_orgs.FacturapiOrgsError as e:
+            logger.warning("sign_manifesto_public failed issuer=%s: %s", issuer["id"], e)
+            return JSONResponse(
+                status_code=400 if e.status in (400, 422) else 502,
+                content={"ok": False, "error": {"code": "MANIFESTO_SIGN_FAILED", "message": e.body}},
+            )
+
+        # Verify RFC in response matches our issuer (defense-in-depth: user
+        # might upload someone else's FIEL by accident).
+        tax_id_signed = (result.get("tax_id") or "").strip().upper()
+        issuer_rfc = (issuer.get("rfc") or "").strip().upper()
+        if tax_id_signed and issuer_rfc and tax_id_signed != issuer_rfc:
+            logger.warning(
+                "Manifesto signed with mismatched RFC: issuer=%s expected=%s signed=%s",
+                issuer["id"], issuer_rfc, tax_id_signed,
+            )
+            return JSONResponse(
+                status_code=400,
+                content={"ok": False, "error": {
+                    "code": "RFC_MISMATCH",
+                    "message": f"La FIEL pertenece al RFC {tax_id_signed}, no a {issuer_rfc}. Sube la FIEL correcta.",
+                }},
+            )
+
+        _mark_manifest_signed(issuer["id"])
+        _maybe_complete_onboarding(issuer["id"])
+        return {"ok": True, "tax_id": tax_id_signed, "signed_at": result.get("result", {}).get("signed_at")}
 
     @router.get("/api/facturapi/refresh-manifesto-status")
     def portal_facturapi_refresh_manifesto_status(

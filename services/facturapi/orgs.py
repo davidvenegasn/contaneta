@@ -113,6 +113,47 @@ def update_legal_info(
     return r.json()
 
 
+def sign_manifesto_public(
+    *,
+    cer_bytes: bytes,
+    key_bytes: bytes,
+    password: str,
+) -> dict:
+    """POST https://www.facturapi.io/web/manifiesto/firmar — public endpoint.
+
+    Discovered by reverse-engineering Facturapi's embedded manifesto widget
+    (the bundle at /assets/entry-client-*.js referenced /web/manifiesto/firmar).
+    This is the SAME endpoint the iframe at /embedded/manifiesto uses.
+
+    Unlike `PUT /v2/organizations/{id}/fiel` (which only uploads the cert),
+    this endpoint actually SIGNS the carta manifiesto with SAT on behalf of
+    the org — clearing the `manifiesto` pending step. The org is identified
+    by the RFC encoded in the FIEL cert; no Bearer auth needed.
+
+    Returns:
+        {"ok": true, "tax_id": "...", "result": {"signature": true, "signed_at": "..."}}
+
+    Raises:
+        FacturapiOrgsError: on 4xx/5xx response.
+    """
+    if not cer_bytes or not key_bytes:
+        raise FacturapiOrgsError(0, "FIEL cer/key bytes required")
+    if not password:
+        raise FacturapiOrgsError(0, "FIEL password required")
+    r = requests.post(
+        "https://www.facturapi.io/web/manifiesto/firmar",
+        files={
+            "cer": ("fiel.cer", cer_bytes, "application/octet-stream"),
+            "key": ("fiel.key", key_bytes, "application/octet-stream"),
+        },
+        data={"key_password": password},
+        timeout=120,
+    )
+    if r.status_code >= 400:
+        raise FacturapiOrgsError(r.status_code, r.text[:500])
+    return r.json()
+
+
 def sign_manifesto(
     org_id: str,
     *,

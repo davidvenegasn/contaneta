@@ -43,25 +43,21 @@
   <div id="toastStack" class="toast-stack" aria-live="polite"></div>
   <div class="auth-card">
     <h1>Crear cuenta</h1>
-    <p class="muted">Regístrate con correo o teléfono, o usa Google/Facebook.</p>
+    <p class="muted">Sólo necesitamos tu correo y teléfono para empezar.</p>
     {% if error %}
       <p class="danger">{{ error }}</p>
     {% endif %}
     <form method="post" action="/signup" id="signup-form">
       <input type="hidden" name="csrf_token" value="{{ csrf_token or '' }}" />
-      <div class="auth-tabs">
-        <input type="radio" name="login_type" id="lt_email" value="email" {{ '' if prev_login_type == 'phone' else 'checked' }} />
-        <label for="lt_email">Correo</label>
-        <input type="radio" name="login_type" id="lt_phone" value="phone" {{ 'checked' if prev_login_type == 'phone' else '' }} />
-        <label for="lt_phone">Teléfono</label>
-      </div>
-      <div id="field-email" style="{{ 'display:none;' if prev_login_type == 'phone' else '' }}">
+      <input type="hidden" name="login_type" value="email" />
+      <div>
         <label for="email">Correo electrónico</label>
-        <input type="email" name="email" id="email" placeholder="tu@correo.com" autocomplete="email" value="{{ prev_email or '' }}" />
+        <input type="email" name="email" id="email" placeholder="tu@correo.com" autocomplete="email" value="{{ prev_email or '' }}" required />
       </div>
-      <div id="field-phone" style="{{ '' if prev_login_type == 'phone' else 'display:none;' }}">
+      <div>
         <label for="phone">Teléfono</label>
-        <input type="tel" name="phone" id="phone" placeholder="55 1234 5678" autocomplete="tel" value="{{ prev_phone or '' }}" />
+        <input type="tel" name="phone" id="phone" placeholder="55 1234 5678" autocomplete="tel" value="{{ prev_phone or '' }}" required pattern="[0-9 -]{10,}" minlength="10" />
+        <small class="muted" style="display:block;margin-top:4px;">Lo usamos para llamarte y ayudarte con tu onboarding.</small>
       </div>
       <label for="password">Contraseña</label>
       <input type="password" name="password" id="password" placeholder="Mínimo 8 caracteres" autocomplete="new-password" required />
@@ -95,15 +91,6 @@
     </div>
   </div>
   <script>
-    document.querySelectorAll('input[name="login_type"]').forEach(function(r) {
-      r.addEventListener('change', function() {
-        var isEmail = document.getElementById('lt_email').checked;
-        document.getElementById('field-email').style.display = isEmail ? 'block' : 'none';
-        document.getElementById('field-phone').style.display = isEmail ? 'none' : 'block';
-        document.getElementById('email').required = isEmail;
-        document.getElementById('phone').required = !isEmail;
-      });
-    });
     function showToast(msg, type) {
       type = type || 'danger';
       var stack = document.getElementById('toastStack');

@@ -107,26 +107,25 @@
       {% if _fiel %}<br>Los valores predeterminados se obtienen de tu certificado FIEL.{% endif %}
     </p>
 
-    <dl class="datos-fiscales-list" style="margin-bottom:16px;">
-      <div class="datos-fiscales-row" style="display:flex; gap:8px; padding:6px 0;">
-        <dt style="font-size:13px; font-weight:500; min-width:120px; color:var(--muted, #6b7280);">RFC</dt>
-        <dd style="margin:0; font-size:14px;">
-          {{ _rfc_default or '—' }}
-          {% if _from_fiel_rfc %}<span class="muted u-text-xs" style="margin-left:6px;">(del FIEL)</span>{% endif %}
-        </dd>
-      </div>
-    </dl>
-
     {% if membership_role in ('owner', 'admin') %}
     <form method="post" action="/portal/settings/issuer" autocomplete="off" data-loading-submit="Guardando…" data-draft="settings-issuer">
       <input type="hidden" name="csrf_token" value="{{ csrf_token or '' }}" />
       <div style="display:flex; flex-direction:column; gap:14px; max-width:400px;">
         <div>
+          <label for="settings-rfc" style="display:block; font-size:13px; font-weight:500; margin-bottom:4px;">
+            RFC
+            {% if _from_fiel_rfc %}<span class="muted u-text-xs" style="margin-left:6px;">(del FIEL)</span>{% endif %}
+          </label>
+          {% set _rfc_show = '' if (_rfc_default in ('PENDIENTE', None)) else _rfc_default %}
+          <input type="text" id="settings-rfc" name="rfc" value="{{ _rfc_show }}" class="form-input" style="width:100%;text-transform:uppercase;" maxlength="13" placeholder="Tu RFC con homoclave (ej. XXXX010101XX0)" />
+          <p class="muted u-text-xs" style="margin:4px 0 0;">Se completa automáticamente cuando subes tu FIEL. Puedes ponerlo manualmente también.</p>
+        </div>
+        <div>
           <label for="settings-razon" style="display:block; font-size:13px; font-weight:500; margin-bottom:4px;">
             Razón social
             {% if _from_fiel_razon %}<span class="muted u-text-xs">(del FIEL)</span>{% endif %}
           </label>
-          <input type="text" id="settings-razon" name="razon_social" value="{{ _razon_default }}" class="form-input" style="width:100%;" />
+          <input type="text" id="settings-razon" name="razon_social" value="{{ _razon_default }}" class="form-input" style="width:100%;" placeholder="Nombre completo como aparece en SAT" />
         </div>
         <div>
           <label for="settings-regimen" style="display:block; font-size:13px; font-weight:500; margin-bottom:4px;">Régimen fiscal</label>
@@ -137,6 +136,13 @@
             {% endfor %}
           </select>
           <p class="muted u-text-xs" style="margin:4px 0 0;">El régimen no se extrae del FIEL. Selecciónalo manualmente.</p>
+        </div>
+        <div>
+          <label for="settings-cp" style="display:block; font-size:13px; font-weight:500; margin-bottom:4px;">CP fiscal</label>
+          <input type="text" id="settings-cp" name="fiscal_zip" class="form-input"
+                 value="{{ issuer_fiscal_zip or '' }}" maxlength="5" pattern="\d{5}"
+                 inputmode="numeric" placeholder="00000" style="width:100%;" />
+          <p class="muted u-text-xs" style="margin:4px 0 0;">5 dígitos del domicilio fiscal registrado en SAT (lo encuentras en tu Constancia).</p>
         </div>
         <div>
           <button type="submit" class="btn btn--primary btn--sm">Guardar datos fiscales</button>
@@ -172,7 +178,7 @@
     Sube tus credenciales del SAT una sola vez. Cada una habilita una funcionalidad distinta.
   </p>
 
-  <div class="creds-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;">
+  <div class="creds-grid">
 
     {# ── FIEL card ── #}
     <div class="card p-20 creds-card" data-cred="fiel">

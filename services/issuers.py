@@ -74,7 +74,7 @@ def get_issuer_by_id(issuer_id: int):
         }
     conn = db()
     row = conn.execute(
-        "SELECT id, rfc, razon_social, regimen_fiscal, active, facturapi_org_id FROM issuers WHERE id = ? AND active = 1 LIMIT 1",
+        "SELECT id, rfc, razon_social, regimen_fiscal, fiscal_zip, active, facturapi_org_id FROM issuers WHERE id = ? AND active = 1 LIMIT 1",
         (issuer_id,),
     ).fetchone()
     conn.close()
@@ -89,6 +89,7 @@ def get_issuer_by_id(issuer_id: int):
         "rfc": d.get("rfc") or "",
         "alias": d.get("razon_social") or d.get("rfc") or "Emisor",
         "regimen_fiscal": regimen or None,
+        "fiscal_zip": (d.get("fiscal_zip") or "").strip() or None,
         "facturapi_org_id": d.get("facturapi_org_id"),
         "active": d.get("active", 1),
     }
@@ -138,13 +139,15 @@ def update_issuer_profile(
     issuer_id: int,
     razon_social: str | None = None,
     regimen_fiscal: str | None = None,
+    fiscal_zip: str | None = None,
 ) -> None:
-    """Update the issuer's razon_social and/or regimen_fiscal.
+    """Update the issuer's razon_social, regimen_fiscal and/or fiscal_zip.
 
     Args:
         issuer_id: Tenant ID.
         razon_social: New legal name (or None to skip).
         regimen_fiscal: New tax regime code (or None to skip).
+        fiscal_zip: New fiscal postal code (or None to skip).
     """
     set_parts: list[str] = []
     params: list = []
@@ -156,6 +159,10 @@ def update_issuer_profile(
         regimen_fiscal = regimen_fiscal.strip().upper() or None
         set_parts.append("regimen_fiscal = ?")
         params.append(regimen_fiscal)
+    if fiscal_zip is not None:
+        fiscal_zip = fiscal_zip.strip() or None
+        set_parts.append("fiscal_zip = ?")
+        params.append(fiscal_zip)
     if not set_parts:
         return
     set_parts.append("updated_at = datetime('now')")

@@ -552,11 +552,10 @@ def register_invoices_routes(router, templates):
             entity_id=uuid_clean[:36],
         )
         try:
-            from cfdi_pdf import build_pdf, parse_cfdi_xml
-            data = parse_cfdi_xml(abs_path)
-            pdf_bytes = build_pdf(data)
+            from services.pdf import render_cfdi_pdf
+            pdf_bytes = render_cfdi_pdf(abs_path)
         except ImportError:
-            portal_error_type("reportlab_missing", log_context={"issuer_id": issuer["id"], "uuid": uuid_clean[:36]})
+            portal_error_type("pdf_render_error", log_context={"issuer_id": issuer["id"], "uuid": uuid_clean[:36]})
         except Exception:
             logger.exception(
                 "portal: error generando PDF issuer_id=%s uuid=%s",
