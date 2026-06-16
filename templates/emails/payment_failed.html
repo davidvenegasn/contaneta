@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block email_content %}
+<h2>No pudimos procesar tu pago</h2>
+<p>Hubo un problema al cobrar tu suscripción a {{ brand_name|default('ContaNeta') }}.</p>
+<div class="card">
+  <p style="margin:0"><strong>Motivo:</strong> {{ failure_reason|default('Pago rechazado por el banco') }}</p>
+  <p style="margin:0"><strong>Monto:</strong> ${{ "{:,.2f}".format(amount|default(0)) }} MXN</p>
+</div>
+<p>Por favor actualiza tu método de pago para evitar interrupciones en el servicio.</p>
+{% if billing_url %}
+  <p><a href="{{ billing_url }}" class="button">Actualizar método de pago</a></p>
+{% endif %}
+{% endblock %}

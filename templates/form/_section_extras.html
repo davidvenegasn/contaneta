@@ -15,15 +15,7 @@
         <option value="03">03 — Temporal</option>
       </select>
     </div>
-    <div>
-      <label>Tipo de comprobante</label>
-      <select name="tipo_comprobante" id="tipo_comprobante" required>
-        <option value="I" selected>I — Ingreso</option>
-        <option value="E">E — Egreso</option>
-        <option value="P">P — Pago</option>
-      </select>
-      <p class="muted" style="margin:6px 0 0;">Por ahora el flujo está pensado para Ingreso. E/P se habilitan después.</p>
-    </div>
+    <div></div>
   </div>
 
   <div class="row">
@@ -43,8 +35,9 @@
       <input name="order_ref" placeholder="Ej. OC-4451" />
     </div>
     <div>
-      <label>Fecha de emisión (opcional)</label>
-      <input name="issue_date" type="datetime-local" />
+      <label>Fecha de emisión (opcional) <span class="tip" data-tip="SAT no acepta fechas con más de 72 horas de antigüedad. Deja vacío para usar la fecha y hora actuales.">?</span></label>
+      <input name="issue_date" id="issue_date" type="datetime-local" />
+      <p id="issueDateWarn" class="field-error-hint" style="display:none">⚠ Esta fecha tiene más de 72 horas — el SAT rechazará el CFDI.</p>
     </div>
   </div>
 
@@ -53,3 +46,23 @@
     <textarea name="notes" rows="3" placeholder="Información adicional para el cliente (opcional)"></textarea>
   </div>
 </details>
+
+<script>
+(function () {
+  var dateEl = document.getElementById('issue_date');
+  var warnEl = document.getElementById('issueDateWarn');
+  if (!dateEl || !warnEl) return;
+
+  function check() {
+    var val = dateEl.value;
+    if (!val) { warnEl.style.display = 'none'; return; }
+    var diff = Date.now() - new Date(val).getTime();
+    var tooOld = diff > 72 * 60 * 60 * 1000;
+    warnEl.style.display = tooOld ? 'block' : 'none';
+    dateEl.style.borderColor = tooOld ? 'var(--error, #dc2626)' : '';
+  }
+
+  dateEl.addEventListener('input', check);
+  dateEl.addEventListener('change', check);
+})();
+</script>

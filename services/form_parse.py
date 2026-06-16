@@ -51,13 +51,29 @@ def parse_items_from_form(form) -> List[dict]:
 
         qty_num = float(qty)
         price_base = float(price)
-        iva_rate = float(iva)
         isr_ret_rate = float(isr_ret) if isr_ret else 0.0
         iva_ret_rate = float(iva_ret) if iva_ret else 0.0
 
+        is_exento = iva.upper() == "EXENTO"
+        iva_rate = 0.0 if is_exento else float(iva)
+
+        # price sent to Facturapi includes IVA (tax_included=True)
         price_to_send = price_base * (1.0 + iva_rate) if iva_rate else price_base
         line_base = qty_num * price_to_send
         line_discount = (disc_pct_num / 100.0) * line_base
+
+        if is_exento:
+            iva_taxes = [{"type": "IVA", "factor": "Exempt"}]
+        else:
+            iva_taxes = [{"type": "IVA", "rate": iva_rate}]
+
+        # ObjetoImp (CFDI 4.0 c_ObjetoImp) — auto-detect per line.
+        # "02" = sí objeto de impuesto (cualquier IVA trasladado o exento, o retenciones)
+        # "01" = no objeto de impuesto (cero IVA y sin retenciones)
+        # Override via form field `objeto_imp_{i}` if user picked manually.
+        has_any_tax = is_exento or iva_rate > 0 or isr_ret_rate > 0 or iva_ret_rate > 0
+        objeto_imp_override = (form.get(f"objeto_imp_{i}") or "").strip()
+        objeto_imp = objeto_imp_override or ("02" if has_any_tax else "01")
 
         items.append(
             {
@@ -68,8 +84,9 @@ def parse_items_from_form(form) -> List[dict]:
                     "product_key": key,
                     "price": float(price_to_send),
                     "tax_included": True,
+                    "tax_objet": objeto_imp,  # Facturapi field for c_ObjetoImp
                     "taxes": (
-                        [{"type": "IVA", "rate": iva_rate}]
+                        iva_taxes
                         + ([{"type": "ISR", "rate": isr_ret_rate, "withholding": True}] if isr_ret_rate > 0 else [])
                         + ([{"type": "IVA", "rate": iva_ret_rate, "withholding": True}] if iva_ret_rate > 0 else [])
                     ),

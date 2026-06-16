@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block email_content %}
+<h2>Verifica tu correo</h2>
+<p>Da clic en el botón para confirmar tu dirección de correo:</p>
+<p><a href="{{ verification_url }}" class="button">Verificar correo</a></p>
+<p class="muted">Este link expira en 24 horas. Si no fuiste tú, ignora este correo.</p>
+{% endblock %}

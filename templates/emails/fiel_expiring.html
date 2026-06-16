@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block email_content %}
+<h2>Tu FIEL vence pronto</h2>
+<p>Tu Firma Electrónica Avanzada (FIEL) vence el <strong>{{ expires_at }}</strong> ({{ days_until_expiry }} días).</p>
+<p>Para no interrumpir la sincronización con el SAT:</p>
+<ol>
+  <li>Renueva tu FIEL en el portal del SAT</li>
+  <li>Sube los nuevos archivos (.cer, .key) en {{ brand_name|default('ContaNeta') }}</li>
+</ol>
+{% if settings_url %}
+  <p><a href="{{ settings_url }}" class="button">Ir a configuración</a></p>
+{% endif %}
+{% endblock %}

@@ -83,4 +83,5 @@ def register_password_routes(router, templates):
         if password != password_confirm:
             return RedirectResponse(url=f"/reset-password?token={token}&error=mismatch", status_code=302)
         users.update_user_password(user_id, users.hash_password(password))
+        # TODO: enqueue_send_email for password_reset confirmation
         return RedirectResponse(url="/login?msg=password_reset_ok", status_code=302)

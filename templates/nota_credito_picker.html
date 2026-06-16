@@ -1,0 +1,95 @@
+{% extends "base_portal.html" %}
+{% block title %}Nueva nota de crédito{% endblock %}
+
+{% block content %}
+<style>
+  .ncp-hero { padding: 2rem 2rem 1rem; border-bottom: 1px solid var(--border); }
+  .ncp-hero__back { font-size: .8rem; color: var(--text-muted); text-decoration: none; display: inline-flex; align-items: center; gap: .35rem; margin-bottom: .75rem; }
+  .ncp-hero__back:hover { color: var(--text); }
+  .ncp-hero__title { font-size: 1.25rem; font-weight: 700; color: var(--text); margin: 0 0 .25rem; }
+  .ncp-hero__sub { font-size: .85rem; color: var(--text-muted); margin: 0; }
+  .ncp-body { max-width: 920px; margin: 2rem auto; padding: 0 1.5rem 3rem; }
+  .ncp-search { position: sticky; top: 0; background: var(--surface); padding: .75rem 0 1rem; margin-bottom: 1rem; z-index: 5; border-bottom: 1px solid var(--border); }
+  .ncp-search input { width: 100%; font-size: .9rem; padding: .65rem 1rem; background: var(--surface-2); border: 1px solid var(--border); border-radius: .5rem; color: var(--text); }
+  .ncp-search input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .ncp-empty { text-align: center; padding: 3rem 2rem; color: var(--text-muted); font-size: .9rem; }
+  .ncp-list { display: flex; flex-direction: column; gap: .55rem; }
+  .ncp-row { display: grid; grid-template-columns: 92px 1fr auto auto; gap: 1rem; align-items: center; padding: .85rem 1rem; background: var(--surface-2); border: 1px solid var(--border); border-radius: .55rem; text-decoration: none; color: var(--text); transition: border-color .15s, transform .08s; }
+  .ncp-row:hover { border-color: var(--accent); transform: translateY(-1px); }
+  .ncp-row__date { font-size: .78rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+  .ncp-row__client { display: flex; flex-direction: column; gap: .15rem; min-width: 0; }
+  .ncp-row__client-name { font-weight: 600; font-size: .9rem; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ncp-row__client-meta { font-size: .73rem; color: var(--text-muted); font-family: var(--font-mono, monospace); }
+  .ncp-row__total { font-weight: 600; font-size: .9rem; color: var(--text); font-variant-numeric: tabular-nums; text-align: right; }
+  .ncp-row__cta { font-size: .78rem; color: var(--accent); font-weight: 600; }
+  .ncp-folio { font-size: .7rem; color: var(--text-muted); margin-top: .12rem; }
+  @media (max-width: 640px) {
+    .ncp-row { grid-template-columns: 1fr; gap: .3rem; }
+    .ncp-row__total, .ncp-row__date, .ncp-row__cta { text-align: left; }
+  }
+</style>
+
+<div class="ncp-hero">
+  <a href="/portal/dashboard" class="ncp-hero__back">← Volver al portal</a>
+  <h1 class="ncp-hero__title">Nueva nota de crédito</h1>
+  <p class="ncp-hero__sub">Elige la factura original (Ingreso) que vas a acreditar.</p>
+</div>
+
+<div class="ncp-body">
+  <div class="ncp-search">
+    <input type="search" id="ncpSearch" placeholder="Buscar por RFC, razón social o UUID…" autocomplete="off" />
+  </div>
+
+  {% if invoices %}
+    <div class="ncp-list" id="ncpList">
+      {% for inv in invoices %}
+        <a href="/portal/invoices/{{ inv.uuid }}/nota-credito"
+           class="ncp-row"
+           data-search="{{ (inv.rfc_receptor ~ ' ' ~ inv.nombre_receptor ~ ' ' ~ inv.uuid)|lower }}">
+          <div class="ncp-row__date">
+            {{ inv.fecha_emision[:10] if inv.fecha_emision else '—' }}
+            {% if inv.serie or inv.folio %}
+              <div class="ncp-folio">{{ inv.serie|default('') }}{{ inv.folio|default('') }}</div>
+            {% endif %}
+          </div>
+          <div class="ncp-row__client">
+            <span class="ncp-row__client-name">{{ inv.nombre_receptor or 'Sin nombre' }}</span>
+            <span class="ncp-row__client-meta">{{ inv.rfc_receptor or '—' }} · {{ inv.uuid[:13] }}…</span>
+          </div>
+          <div class="ncp-row__total">
+            ${{ "{:,.2f}".format(inv.total|float) }} {{ inv.moneda or 'MXN' }}
+          </div>
+          <div class="ncp-row__cta">Acreditar →</div>
+        </a>
+      {% endfor %}
+    </div>
+    <p class="ncp-empty" id="ncpNoResults" style="display:none">No hay facturas que coincidan con la búsqueda.</p>
+  {% else %}
+    <div class="ncp-empty">
+      <p>No tienes facturas tipo Ingreso vigentes para acreditar.</p>
+      <p style="margin-top:.5rem"><a href="/portal/create" style="color:var(--accent)">← Emitir una factura</a></p>
+    </div>
+  {% endif %}
+</div>
+
+<script>
+(function () {
+  var input = document.getElementById('ncpSearch');
+  var list  = document.getElementById('ncpList');
+  var empty = document.getElementById('ncpNoResults');
+  if (!input || !list) return;
+
+  input.addEventListener('input', function () {
+    var q = input.value.trim().toLowerCase();
+    var rows = list.querySelectorAll('.ncp-row');
+    var shown = 0;
+    rows.forEach(function (r) {
+      var match = !q || (r.dataset.search || '').indexOf(q) !== -1;
+      r.style.display = match ? '' : 'none';
+      if (match) shown++;
+    });
+    if (empty) empty.style.display = shown === 0 ? 'block' : 'none';
+  });
+})();
+</script>
+{% endblock %}

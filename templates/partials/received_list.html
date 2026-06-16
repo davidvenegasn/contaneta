@@ -11,25 +11,56 @@
       <span class="ym-card__toggle-icon" aria-hidden="true">−</span>
     </button>
   </div>
+  {% set st = stats|default({}) %}
   {% set mt = month_totals|default({}) %}
-  <div class="ym-card__resumen dashboard-metrics">
-    <div class="card metric-card">
-      <div class="metric-label">Total egresos</div>
-      <div class="metric-value">$<span data-count-to="{{ mt.total_base|default(0) }}" data-count-decimals="2" data-count-duration="250">{{ '{:,.2f}'.format(mt.total_base|default(0)) }}</span></div>
-      <div class="metric-sub">{{ ym_label }} (subtotal)</div>
+  <div class="ym-card__resumen">
+    {# Row 1: breakdown by tipo #}
+    <div class="dashboard-metrics">
+      <div class="card metric-card">
+        <div class="metric-label">Compras / Gastos</div>
+        <div class="metric-value">$<span data-count-to="{{ st.ingresos_total|default(mt.total_base|default(0)) }}" data-count-decimals="2" data-count-duration="250">{{ '{:,.2f}'.format(st.ingresos_total|default(mt.total_base|default(0))) }}</span></div>
+        <div class="metric-sub">{{ st.ingresos_n|default(0) }} CFDI · {{ ym_label }}</div>
+      </div>
+      {% if st.notas_n|default(0) > 0 %}
+      <div class="card metric-card metric-card--warn">
+        <div class="metric-label">NC / Devoluciones</div>
+        <div class="metric-value">−$<span data-count-to="{{ st.notas_total|default(0) }}" data-count-decimals="2" data-count-duration="250">{{ '{:,.2f}'.format(st.notas_total|default(0)) }}</span></div>
+        <div class="metric-sub">{{ st.notas_n }} CFDI</div>
+      </div>
+      {% endif %}
+      {% if st.anticipos_n|default(0) > 0 %}
+      <div class="card metric-card metric-card--accent">
+        <div class="metric-label">Anticipos aplicados</div>
+        <div class="metric-value">−$<span data-count-to="{{ st.anticipos_total|default(0) }}" data-count-decimals="2" data-count-duration="250">{{ '{:,.2f}'.format(st.anticipos_total|default(0)) }}</span></div>
+        <div class="metric-sub">{{ st.anticipos_n }} CFDI</div>
+      </div>
+      {% endif %}
     </div>
-    <div class="card metric-card">
-      <div class="metric-label">IVA pagado</div>
-      <div class="metric-value">$<span data-count-to="{{ mt.total_iva|default(0) }}" data-count-decimals="2" data-count-duration="250">{{ '{:,.2f}'.format(mt.total_iva|default(0)) }}</span></div>
-      <div class="metric-sub">{{ ym_label }}</div>
+    {# Row 2: net fiscal totals #}
+    <div class="dashboard-metrics u-mt-3">
+      <div class="card metric-card">
+        <div class="metric-label">Subtotal neto</div>
+        <div class="metric-value">$<span data-count-to="{{ st.subtotal|default(mt.total_base|default(0)) }}" data-count-decimals="2" data-count-duration="250">{{ '{:,.2f}'.format(st.subtotal|default(mt.total_base|default(0))) }}</span></div>
+        <div class="metric-sub">{{ ym_label }}</div>
+      </div>
+      <div class="card metric-card">
+        <div class="metric-label">IVA acreditable neto</div>
+        <div class="metric-value">$<span data-count-to="{{ st.iva|default(mt.total_iva|default(0)) }}" data-count-decimals="2" data-count-duration="250">{{ '{:,.2f}'.format(st.iva|default(mt.total_iva|default(0))) }}</span></div>
+        <div class="metric-sub">{{ ym_label }}</div>
+      </div>
+      {% if (st.retenciones|default(mt.total_retenciones|default(0))) > 0 %}
+      <div class="card metric-card">
+        <div class="metric-label">Retenciones</div>
+        <div class="metric-value">$<span data-count-to="{{ st.retenciones|default(mt.total_retenciones|default(0)) }}" data-count-decimals="2" data-count-duration="250">{{ '{:,.2f}'.format(st.retenciones|default(mt.total_retenciones|default(0))) }}</span></div>
+        <div class="metric-sub">{{ ym_label }}</div>
+      </div>
+      {% endif %}
+      <div class="card metric-card metric-card--highlight">
+        <div class="metric-label">Total neto deducible</div>
+        <div class="metric-value">$<span data-count-to="{{ st.total|default(mt.total_base|default(0)) }}" data-count-decimals="2" data-count-duration="250">{{ '{:,.2f}'.format(st.total|default(mt.total_base|default(0))) }}</span></div>
+        <div class="metric-sub">{{ ym_label }}</div>
+      </div>
     </div>
-    {% if (mt.total_retenciones|default(0)) > 0 %}
-    <div class="card metric-card">
-      <div class="metric-label">Retenciones IVA pagadas</div>
-      <div class="metric-value">$<span data-count-to="{{ mt.total_retenciones|default(0) }}" data-count-decimals="2" data-count-duration="250">{{ '{:,.2f}'.format(mt.total_retenciones|default(0)) }}</span></div>
-      <div class="metric-sub">{{ ym_label }}</div>
-    </div>
-    {% endif %}
   </div>
 </div>
 
@@ -100,6 +131,7 @@
             <th>Emisor</th>
             <th>Concepto</th>
             <th>UUID</th>
+            <th>Tipo</th>
             <th>Total</th>
             <th>IVA pagado</th>
             <th>Pago</th>
@@ -110,11 +142,11 @@
           </tr>
         </thead>
         <tbody id="tableBody" class="row-stagger">
-          <tr><td colspan="11"><div class="skeleton skeleton--row-46"></div></td></tr>
-          <tr><td colspan="11"><div class="skeleton skeleton--row-46"></div></td></tr>
-          <tr><td colspan="11"><div class="skeleton skeleton--row-46"></div></td></tr>
-          <tr><td colspan="11"><div class="skeleton skeleton--row-46"></div></td></tr>
-          <tr><td colspan="11"><div class="skeleton skeleton--row-46"></div></td></tr>
+          <tr><td colspan="12"><div class="skeleton skeleton--row-46"></div></td></tr>
+          <tr><td colspan="12"><div class="skeleton skeleton--row-46"></div></td></tr>
+          <tr><td colspan="12"><div class="skeleton skeleton--row-46"></div></td></tr>
+          <tr><td colspan="12"><div class="skeleton skeleton--row-46"></div></td></tr>
+          <tr><td colspan="12"><div class="skeleton skeleton--row-46"></div></td></tr>
         </tbody>
       </table>
     </div>
@@ -253,7 +285,7 @@
     const tableWrap = document.getElementById('tableWrap');
     const emptyState = document.getElementById('emptyState');
     const pagination = document.getElementById('pagination');
-    tableBody.innerHTML = (window.uiSkeletonTableRows && window.uiSkeletonTableRows(10, 5)) || '<tr><td colspan="11"><div class="skeleton skeleton-line"></div></td></tr>'.repeat(5);
+    tableBody.innerHTML = (window.uiSkeletonTableRows && window.uiSkeletonTableRows(10, 5)) || '<tr><td colspan="12"><div class="skeleton skeleton-line"></div></td></tr>'.repeat(5);
     tableWrap.style.display = '';
     var mobileList = document.getElementById('invoiceListMobile');
     if (mobileList) mobileList.innerHTML = (window.uiSkeletonCards && window.uiSkeletonCards(3)) || '<div class="invoice-card-mobile"><div class="skeleton skeleton-card"></div></div>'.repeat(3);
@@ -382,6 +414,12 @@
       const concepto = truncate(conceptoFull, 60);
       const uuid = row.uuid ? `${row.uuid.substring(0, 8)}…${row.uuid.substring(row.uuid.length - 4)}` : '—';
       const uuidCopyBtn = row.uuid ? `<button type="button" class="uuid-copy-btn" data-copy-uuid="${escapeHtml(row.uuid)}" aria-label="Copiar UUID" title="Copiar UUID"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>` : '';
+      const tipoLabel = row.tipo_label || '';
+      const tipoBadgeColor = row.badge_color || 'neutral';
+      const tipoBadge = tipoLabel ? `<span class="badge badge--${tipoBadgeColor} badge--xs">${escapeHtml(tipoLabel)}</span>` : '';
+      const signedTotal = row.signed_total != null ? parseFloat(row.signed_total) : parseFloat(row.total || 0);
+      const isNeg = signedTotal < 0;
+      const totalDisplay = isNeg ? `<span style="color:var(--danger,#dc2626)">−${formatMoney(Math.abs(signedTotal), row.moneda)}</span>` : formatMoney(row.total, row.moneda);
       const total = formatMoney(row.total, row.moneda);
       const iva = formatMoney(row.impuestos || 0, row.moneda);
       const metodoPago = row.metodo_pago ? `<span class="badge badge--neutral badge--xs">${escapeHtml(row.metodo_pago)}</span>` : '<span class="muted">—</span>';
@@ -418,7 +456,8 @@
         <td><div class="u-fw-semibold" title="${emisor}">${emisor}</div><div class="muted u-text-xs font-mono">${rfc}</div></td>
         <td class="concepto-cell" title="${conceptoFull}">${concepto}</td>
         <td><div class="uuid-copy-wrap"><span class="uuid-copy-wrap__text">${uuid}</span>${uuidCopyBtn}</div></td>
-        <td class="u-fw-semibold">${total}${pendingBadge ? ' ' + pendingBadge : ''}</td>
+        <td>${tipoBadge}</td>
+        <td class="u-fw-semibold">${totalDisplay}${pendingBadge ? ' ' + pendingBadge : ''}</td>
         <td class="muted">${iva}</td>
         <td>${metodoPago}</td>
         <td>${status}</td>

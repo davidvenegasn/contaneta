@@ -41,6 +41,44 @@ def _load_handlers() -> dict[str, JobHandler]:
     )
     from services.sat.sat_full_sync import handle_sat_full_sync
     from services.facturapi.provision import handle_facturapi_provision_org
+
+    def handle_send_email(job: dict, _ctx: JobContext) -> dict:
+        """Job handler that calls send_email synchronously inside the worker."""
+        import base64
+        from services.email.sender import send_email as _send_email_sync
+        from services.email.types import Attachment
+
+        payload = job.get("payload") or {}
+        _send_email_sync(
+            to_email=payload["to_email"],
+            template=payload["template"],
+            context=payload.get("context", {}),
+            to_name=payload.get("to_name"),
+            reply_to=payload.get("reply_to"),
+            issuer_id=payload.get("issuer_id"),
+            user_id=payload.get("user_id"),
+            email_type=payload.get("email_type"),
+            related_object_type=payload.get("related_object_type"),
+            related_object_id=payload.get("related_object_id"),
+            attachments=[
+                Attachment(
+                    filename=a["filename"],
+                    content_bytes=base64.b64decode(a["content_b64"]),
+                    mime_type=a.get("mime_type", "application/octet-stream"),
+                )
+                for a in payload.get("attachments", [])
+            ] if payload.get("attachments") else None,
+        )
+        return {"ok": True}
+
+    def handle_poll_cancellations(job: dict, _ctx: JobContext) -> dict:
+        """Poll Facturapi for pending cancellation status updates."""
+        from services.cancellation.status import poll_pending_cancellations
+        payload = job.get("payload") or {}
+        stats = poll_pending_cancellations(limit=payload.get("limit", 100))
+        logger.info("Cancellation polling stats: %s", stats)
+        return {"ok": True, "stats": stats}
+
     return {
         "sat_sync_month": handle_sat_sync_month,
         "sat_refresh_light": handle_sat_refresh_light,
@@ -49,6 +87,8 @@ def _load_handlers() -> dict[str, JobHandler]:
         "sat_verify_pending": handle_sat_verify_pending,
         "sat_full_sync": handle_sat_full_sync,
         "facturapi_provision_org": handle_facturapi_provision_org,
+        "send_email": handle_send_email,
+        "poll_cancellations": handle_poll_cancellations,
     }
 
 

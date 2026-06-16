@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block email_content %}
+<h2>Suscripción renovada</h2>
+<p>Tu suscripción a {{ brand_name|default('ContaNeta') }} ha sido renovada exitosamente.</p>
+<div class="card">
+  <p style="margin:0"><strong>Plan:</strong> {{ plan_name|default('Pro') }}</p>
+  <p style="margin:0"><strong>Próximo cobro:</strong> {{ next_billing_date|default('—') }}</p>
+</div>
+<p>Gracias por confiar en nosotros para tu facturación y contabilidad.</p>
+{% endblock %}

@@ -116,7 +116,8 @@ def register_invoices_issued_routes(router):
                 f"""
                 SELECT uuid, fecha_emision, rfc_receptor, nombre_receptor, concepto, total, moneda,
                        COALESCE(impuestos, 0) AS impuestos, COALESCE(retenciones, 0) AS retenciones,
-                       metodo_pago, status, xml_path, xml_status
+                       metodo_pago, forma_pago, tipo_comprobante, status, xml_path, xml_status,
+                       cancellation_status
                 FROM sat_cfdi
                 WHERE {where_clause}
                 ORDER BY fecha_emision DESC

@@ -184,6 +184,7 @@ def register_register_routes(router, templates):
             details=f"email={email[:50]} rfc={rfc or 'PENDIENTE'}",
             request=request,
         )
+        # TODO: enqueue_send_email for welcome template after registration
         try:
             token = verification_service.create_email_verification(user["id"], expires_hours=24)
             verify_url = f"{base_url(request)}/verify-email?token={token}"
@@ -260,6 +261,7 @@ def register_register_routes(router, templates):
             details=f"email={email[:50]} rfc={rfc}",
             request=request,
         )
+        # TODO: enqueue_send_email for email_verification template
         try:
             token = verification_service.create_email_verification(user["id"], expires_hours=24)
             verify_url = f"{base_url(request)}/verify-email?token={token}"

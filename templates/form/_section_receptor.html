@@ -45,6 +45,65 @@
     </div>
 
     {# ── Factura Global block — visible solo si receptor_type=publico_general ── #}
+    {# ── Extranjero extra fields — visible only when receptor_type=extranjero ── #}
+    <div id="extranjeroBlock" class="global-info-block extranjero-block" hidden>
+      <div class="global-info-block__head">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent,#6366f1);flex-shrink:0"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        <strong>Datos para factura al extranjero</strong>
+        <span class="muted">Requerido por CFDI 4.0 cuando RFC = XEXX010101000</span>
+      </div>
+      <div class="row">
+        <div>
+          <label>País de residencia fiscal <span class="tip" data-tip="ResidenciaFiscal: país donde está registrado fiscalmente tu cliente extranjero. Obligatorio para RFC XEXX.">?</span></label>
+          <select name="customer_residence" id="customer_residence">
+            <option value="">Selecciona país…</option>
+            <option value="USA">Estados Unidos (USA)</option>
+            <option value="CAN">Canadá (CAN)</option>
+            <option value="ESP">España (ESP)</option>
+            <option value="GBR">Reino Unido (GBR)</option>
+            <option value="DEU">Alemania (DEU)</option>
+            <option value="FRA">Francia (FRA)</option>
+            <option value="ITA">Italia (ITA)</option>
+            <option value="CHE">Suiza (CHE)</option>
+            <option value="NLD">Países Bajos (NLD)</option>
+            <option value="BEL">Bélgica (BEL)</option>
+            <option value="AUS">Australia (AUS)</option>
+            <option value="JPN">Japón (JPN)</option>
+            <option value="CHN">China (CHN)</option>
+            <option value="KOR">Corea del Sur (KOR)</option>
+            <option value="BRA">Brasil (BRA)</option>
+            <option value="ARG">Argentina (ARG)</option>
+            <option value="COL">Colombia (COL)</option>
+            <option value="CHL">Chile (CHL)</option>
+            <option value="PER">Perú (PER)</option>
+            <option value="GTM">Guatemala (GTM)</option>
+            <option value="CRI">Costa Rica (CRI)</option>
+            <option value="PAN">Panamá (PAN)</option>
+            <option value="HND">Honduras (HND)</option>
+            <option value="SLV">El Salvador (SLV)</option>
+            <option value="NIC">Nicaragua (NIC)</option>
+            <option value="DOM">República Dominicana (DOM)</option>
+            <option value="CUB">Cuba (CUB)</option>
+            <option value="VEN">Venezuela (VEN)</option>
+            <option value="ECU">Ecuador (ECU)</option>
+            <option value="URY">Uruguay (URY)</option>
+            <option value="PRY">Paraguay (PRY)</option>
+            <option value="BOL">Bolivia (BOL)</option>
+            <option value="ISR">Israel (ISR)</option>
+            <option value="IND">India (IND)</option>
+            <option value="SGP">Singapur (SGP)</option>
+            <option value="HKG">Hong Kong (HKG)</option>
+            <option value="ARE">Emiratos Árabes (ARE)</option>
+            <option value="ZAF">Sudáfrica (ZAF)</option>
+          </select>
+        </div>
+        <div>
+          <label>ID fiscal extranjero <span class="tip tip--left" data-tip="NumRegIdTrib: número de registro fiscal en su país (EIN, VAT, etc.). Si tu cliente lo proporcionó, captúralo aquí. Si no, déjalo en blanco.">?</span></label>
+          <input name="customer_foreign_id" id="customer_foreign_id" placeholder="EIN, VAT, NIF… (opcional)" />
+        </div>
+      </div>
+    </div>
+
     <div id="globalInfoBlock" class="global-info-block" hidden>
       <div class="global-info-block__head">
         <strong>Factura Global</strong>
@@ -81,7 +140,7 @@
 
     <div class="row">
       <div><label>RFC (cliente) <span class="tip" data-tip="RFC del cliente. Debe coincidir con su constancia de situación fiscal.">?</span></label><input name="customer_rfc" id="customer_rfc" required placeholder="XAXX010101000" value="{{ customer_prefill.customer_rfc | e if customer_prefill else '' }}" /></div>
-      <div><label>Razón social <span class="tip" data-tip="Nombre EXACTO como aparece en SAT.">?</span></label><input name="customer_legal_name" id="customer_legal_name" required placeholder="Nombre / Razón social" value="{{ customer_prefill.customer_legal_name | e if customer_prefill else '' }}" /></div>
+      <div><label id="lnLabel">Razón social <span class="tip" data-tip="Nombre EXACTO como aparece en SAT.">?</span></label><input name="customer_legal_name" id="customer_legal_name" required placeholder="Nombre / Razón social" value="{{ customer_prefill.customer_legal_name | e if customer_prefill else '' }}" /></div>
     </div>
 
     <div class="row">
@@ -215,6 +274,7 @@ html.nightmode .global-info-block { background: rgba(255,255,255,0.03); border-c
 (function () {
   var GRID = document.getElementById('receptorTypeGrid');
   var GLOBAL = document.getElementById('globalInfoBlock');
+  var EXTBLOCK = document.getElementById('extranjeroBlock');
   if (!GRID) return;
 
   var rfc = document.getElementById('customer_rfc');
@@ -222,16 +282,17 @@ html.nightmode .global-info-block { background: rgba(255,255,255,0.03); border-c
   var zip = document.getElementById('customer_zip');
   var ts  = document.getElementById('customer_tax_system');
   var cfdiUse = document.getElementById('cfdi_use');
+  var payMethod = document.getElementById('payment_method');
 
   var PRESETS = {
-    normal: { rfc: '', legal: '', zip: '', ts: '', use: 'G03', lock: false, global: false },
+    normal: { rfc: '', legal: '', zip: '', ts: '', use: 'G03', lock: false, global: false, ext: false },
     publico_general: {
       rfc: 'XAXX010101000', legal: 'PUBLICO EN GENERAL', zip: '64000',
-      ts: '616', use: 'S01', lock: true, global: true,
+      ts: '616', use: 'S01', lock: true, global: true, ext: false,
     },
     extranjero: {
-      rfc: 'XEXX010101000', legal: 'EXTRANJERO', zip: '64000',
-      ts: '616', use: 'S01', lock: true, global: false,
+      rfc: 'XEXX010101000', legal: '', zip: '00000',
+      ts: '616', use: 'S01', lock: false, global: false, ext: true,
     },
   };
 
@@ -254,13 +315,45 @@ html.nightmode .global-info-block { background: rgba(255,255,255,0.03); border-c
     }
   }
 
+  var lnLabel = document.getElementById('lnLabel');
+
+  var LN_META = {
+    normal:         { label: 'Razón social',           placeholder: 'Nombre / Razón social' },
+    publico_general:{ label: 'Razón social',           placeholder: 'PUBLICO EN GENERAL' },
+    extranjero:     { label: 'Nombre o razón social',  placeholder: 'Nombre de empresa o persona extranjera' },
+  };
+
+  function updateLnMeta(rt) {
+    var m = LN_META[rt] || LN_META.normal;
+    if (lnLabel) {
+      // Replace only the text node, keep the <span> tip child
+      var nodes = Array.from(lnLabel.childNodes);
+      for (var i = 0; i < nodes.length; i++) {
+        if (nodes[i].nodeType === 3) { nodes[i].textContent = m.label + ' '; break; }
+      }
+    }
+    if (ln) ln.placeholder = m.placeholder;
+  }
+
   function applyType(rt) {
     var p = PRESETS[rt] || PRESETS.normal;
     if (rfc) setVal(rfc, p.rfc || rfc.value);
-    if (ln) setVal(ln, p.legal || ln.value);
+
+    // Name field: explicit clear for extranjero; preset for publico_general; clear preset on normal
+    if (ln) {
+      if (rt === 'publico_general') {
+        setVal(ln, 'PUBLICO EN GENERAL');
+      } else if (rt === 'extranjero') {
+        setVal(ln, '');
+      } else {
+        // normal: clear if the field still has a preset value from another type
+        if ((ln.value || '').toUpperCase() === 'PUBLICO EN GENERAL') setVal(ln, '');
+      }
+    }
+    updateLnMeta(rt);
+
     if (zip && p.zip) setVal(zip, p.zip);
     if (ts && p.ts) {
-      // Wait for the select options to load if still empty
       var trySet = function() {
         if (ts.options.length <= 1) return setTimeout(trySet, 100);
         setVal(ts, p.ts);
@@ -275,10 +368,27 @@ html.nightmode .global-info-block { background: rgba(255,255,255,0.03); border-c
       tryUse();
     }
     setLocked(rfc, p.lock);
-    setLocked(ln, p.lock);
-    // zip stays editable so user can put their own issue point if needed
+    setLocked(ln, rt === 'publico_general');
 
     if (GLOBAL) GLOBAL.hidden = !p.global;
+    if (EXTBLOCK) EXTBLOCK.hidden = !p.ext;
+    if (rt === 'publico_general') setLocked(zip, true);
+    else { zip.readOnly = false; zip.classList.remove('is-locked'); zip.style.background = ''; zip.style.cursor = ''; }
+
+    // Extranjero: PPD/complemento de pago is a domestic SAT mechanism — lock to PUE
+    if (payMethod) {
+      if (rt === 'extranjero') {
+        var tryPue = function() {
+          if (payMethod.options.length <= 1) return setTimeout(tryPue, 100);
+          payMethod.value = 'PUE';
+          payMethod.dispatchEvent(new Event('change', { bubbles: true }));
+        };
+        tryPue();
+        setLocked(payMethod, true);
+      } else {
+        setLocked(payMethod, false);
+      }
+    }
   }
 
   GRID.querySelectorAll('.receptor-type-card').forEach(function (card) {
@@ -294,5 +404,124 @@ html.nightmode .global-info-block { background: rgba(255,255,255,0.03); border-c
       applyType(card.dataset.rt);
     });
   });
+})();
+</script>
+
+<script>
+// RFC format validation — PM=12 chars, PF=13 chars (CFDI40 requirement)
+(function () {
+  var rfcEl = document.getElementById('customer_rfc');
+  if (!rfcEl) return;
+
+  // Generic RFCs that bypass format validation
+  var GENERIC = new Set(['XAXX010101000', 'XEXX010101000']);
+
+  // SAT RFC regex: 3 letters (PM) or 4 letters (PF) + 6 digits YYMMDD + 3 homoclave
+  var RFC_PM = /^[A-ZÑ&]{3}[0-9]{6}[A-Z0-9]{3}$/;
+  var RFC_PF = /^[A-ZÑ&]{4}[0-9]{6}[A-Z0-9]{3}$/;
+
+  var warnEl = document.createElement('p');
+  warnEl.id = 'rfcFormatWarn';
+  warnEl.style.cssText = 'color:var(--error,#dc2626);font-size:12px;margin:4px 0 0;display:none;';
+  rfcEl.parentNode.appendChild(warnEl);
+
+  function validate() {
+    var val = (rfcEl.value || '').trim().toUpperCase();
+    if (!val || GENERIC.has(val)) {
+      warnEl.style.display = 'none';
+      rfcEl.style.borderColor = '';
+      return;
+    }
+    var ok = RFC_PM.test(val) || RFC_PF.test(val);
+    if (!ok) {
+      var len = val.length;
+      var msg = len < 12
+        ? 'RFC incompleto (' + len + ' caracteres). PM: 12, PF: 13.'
+        : len > 13
+        ? 'RFC demasiado largo (' + len + ' caracteres). PM: 12, PF: 13.'
+        : 'Formato de RFC inválido. Verifica con la constancia SAT.';
+      warnEl.textContent = '⚠ ' + msg;
+      warnEl.style.display = 'block';
+      rfcEl.style.borderColor = 'var(--error,#dc2626)';
+    } else {
+      warnEl.style.display = 'none';
+      rfcEl.style.borderColor = '';
+    }
+  }
+
+  rfcEl.addEventListener('input', validate);
+  rfcEl.addEventListener('blur', validate);
+  // Sync when receptor type changes (card click fires change on the radio)
+  document.addEventListener('change', function (e) {
+    if (e.target && e.target.name === 'receptor_type') validate();
+  });
+})();
+</script>
+
+<script>
+// UsoCFDI × Régimen Fiscal cross-validation (CFDI40161 / CFDI40173 prevention)
+(function () {
+  // D01-D10 = deducciones personales — only for personas físicas
+  var DEDUCCIONES_PERSONALES = new Set(['D01','D02','D03','D04','D05','D06','D07','D08','D09','D10']);
+  // Persona moral regimes
+  var PM_REGIMES = new Set(['601','603','607','608','609','620','623','624','628','630']);
+  // RESICO PF: simplified regime — no personal deductions allowed (SAT rule)
+  var RESICO_PF = '626';
+  // Sin obligaciones fiscales: only S01 / CP01 (and G02 tolerated by some PACs)
+  var SIN_OBLIGACIONES = '616';
+  var SIN_OBL_ALLOWED = new Set(['S01','CP01','G02']);
+
+  var cfdiUseEl = document.getElementById('cfdi_use');
+  var taxSysEl  = document.getElementById('customer_tax_system');
+  var warningEl = null;
+
+  function ensureWarning() {
+    if (warningEl) return warningEl;
+    warningEl = document.createElement('p');
+    warningEl.id = 'cfdiUseWarning';
+    warningEl.style.cssText = 'color:var(--error,#dc2626);font-size:12px;margin:4px 0 0;display:none;';
+    if (cfdiUseEl && cfdiUseEl.parentNode) cfdiUseEl.parentNode.appendChild(warningEl);
+    return warningEl;
+  }
+
+  function setError(msg) {
+    var w = ensureWarning();
+    if (msg) {
+      w.textContent = '⚠ ' + msg;
+      w.style.display = 'block';
+      if (cfdiUseEl) cfdiUseEl.style.borderColor = 'var(--error,#dc2626)';
+    } else {
+      w.style.display = 'none';
+      if (cfdiUseEl) cfdiUseEl.style.borderColor = '';
+    }
+  }
+
+  function validate() {
+    var use = (cfdiUseEl && cfdiUseEl.value || '').toUpperCase();
+    var ts  = (taxSysEl  && taxSysEl.value  || '').trim();
+    if (!use || !ts) return setError(null);
+
+    // Rule 1: D-series only for PF and forbidden in RESICO PF
+    if (DEDUCCIONES_PERSONALES.has(use)) {
+      if (PM_REGIMES.has(ts)) {
+        return setError('Uso "' + use + '" solo aplica para personas físicas. Este régimen es persona moral — usa G03 o S01.');
+      }
+      if (ts === RESICO_PF) {
+        return setError('Uso "' + use + '" no se permite en RESICO PF (régimen 626). RESICO no admite deducciones personales — usa G03, S01 o CP01.');
+      }
+    }
+
+    // Rule 2: Régimen 616 (Sin obligaciones) only allows S01 / CP01 (y G02 tolerado)
+    if (ts === SIN_OBLIGACIONES && !SIN_OBL_ALLOWED.has(use)) {
+      return setError('Régimen 616 (Sin obligaciones fiscales) solo permite S01, CP01 o G02.');
+    }
+
+    setError(null);
+  }
+
+  if (cfdiUseEl)  cfdiUseEl.addEventListener('change',  validate);
+  if (taxSysEl)   taxSysEl.addEventListener('change',   validate);
+  // Run once after catalogs load
+  setTimeout(validate, 800);
 })();
 </script>

@@ -336,12 +336,21 @@
   function escapeHtml(s) {
     return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   }
-  function renderStatus(s) {
+  function renderStatus(s, cancelStatus) {
     const st = String(s || '').toUpperCase();
-    if (st === 'V' || st === 'VIGENTE' || st === '1') return '<span class="badge badge--success">Vigente</span>';
-    if (st === 'C' || st === 'CANCELADO' || st === 'CANCELADA' || st === '0') return '<span class="badge badge--danger">Cancelada</span>';
-    if (st.includes('CANCELACION') || st.includes('CANCELACIÓN')) return '<span class="badge badge--warn">En cancelación</span>';
-    return '<span class="badge badge--neutral">' + escapeHtml(s || 'Sin estatus') + '</span>';
+    let badge = '';
+    if (st === 'V' || st === 'VIGENTE' || st === '1') badge = '<span class="badge badge--success">Vigente</span>';
+    else if (st === 'C' || st === 'CANCELADO' || st === 'CANCELADA' || st === '0') badge = '<span class="badge badge--danger">Cancelada</span>';
+    else if (st.includes('CANCELACION') || st.includes('CANCELACIÓN')) badge = '<span class="badge badge--warn">En cancelación</span>';
+    else badge = '<span class="badge badge--neutral">' + escapeHtml(s || 'Sin estatus') + '</span>';
+    // Cancellation status badge
+    const cs = (cancelStatus || '').toLowerCase();
+    const cancelBadge = {
+      'pending':  '<span class="badge badge--warn badge--xs" style="margin-left:4px">Cancelación pendiente</span>',
+      'rejected': '<span class="badge badge--info badge--xs" style="margin-left:4px">Cancelación rechazada</span>',
+      'expired':  '<span class="badge badge--danger badge--xs" style="margin-left:4px">Cancelada (72h)</span>',
+    }[cs] || '';
+    return badge + cancelBadge;
   }
 
   function renderTable(rows) {
@@ -362,8 +371,15 @@
       const uuidCopyBtn = row.uuid ? `<button type="button" class="uuid-copy-btn" data-copy-uuid="${escapeHtml(row.uuid)}" aria-label="Copiar UUID" title="Copiar UUID"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>` : '';
       const total = formatMoney(row.total, row.moneda);
       const iva = formatMoney((row.impuestos || 0) - (row.retenciones || 0), row.moneda);
-      const metodoPago = row.metodo_pago ? `<span class="badge badge--neutral badge--xs">${escapeHtml(row.metodo_pago)}</span>` : '<span class="muted">—</span>';
-      const status = renderStatus(row.status);
+      const tc = (row.tipo_comprobante || '').toUpperCase();
+      const tcLabel = { I: 'Ingreso', E: 'Egreso', P: 'Pago', N: 'Nómina', T: 'Traslado' }[tc] || tc;
+      const tcColor = { I: 'badge--info', E: 'badge--warn', P: 'badge--accent', N: 'badge--neutral', T: 'badge--neutral' }[tc] || 'badge--neutral';
+      const tipoBadge = tc ? `<span class="badge ${tcColor} badge--xs" title="Tipo de comprobante">${escapeHtml(tcLabel)}</span>` : '';
+      const isPPD = (row.metodo_pago || '').toUpperCase() === 'PPD';
+      const metodoPago = row.metodo_pago
+        ? `<span class="badge ${isPPD ? 'badge--ppd' : 'badge--neutral'} badge--xs">${escapeHtml(row.metodo_pago)}</span>${tipoBadge ? ' ' + tipoBadge : ''}`
+        : (tipoBadge || '<span class="muted">—</span>');
+      const status = renderStatus(row.status, row.cancellation_status);
       const xmlPending = row.xml_status !== 'parsed' && (row.total == null || parseFloat(row.total) < 0.01);
       const pendingBadge = xmlPending ? '<span class="badge badge--neutral badge--xs" title="Estamos descargando el detalle desde SAT">Procesando datos</span>' : '';
       const hasXML = row.xml_path && row.xml_path.trim();

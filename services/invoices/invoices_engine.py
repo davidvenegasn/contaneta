@@ -33,6 +33,26 @@ _RFC_PM_RE = re.compile(r"^[A-Z&Ñ]{3}\d{6}[A-Z0-9]{3}$")  # Persona Moral (12 c
 _RFC_GENERIC = "XAXX010101000"  # Público en general
 _RFC_EXTRANJERO = "XEXX010101000"  # Extranjero
 
+# UsoCFDI codes allowed only for personas físicas (régimen personal).
+# Using one of these with a persona moral (e.g. 601) triggers CFDI40173.
+_CFDI_USE_PF_ONLY = {
+    "D01", "D02", "D03", "D04", "D05", "D06", "D07", "D08", "D09", "D10",
+}
+# Régimen codes for personas morales
+_REGIMEN_PM = {"601", "603", "607", "608", "609", "620", "623", "624", "628", "630"}
+
+
+def validate_uso_cfdi_regimen(cfdi_use: str, tax_system: str) -> str | None:
+    """Return an error message if the UsoCFDI/régimen combo is invalid, else None."""
+    use = (cfdi_use or "").strip().upper()
+    ts = (tax_system or "").strip()
+    if use in _CFDI_USE_PF_ONLY and ts in _REGIMEN_PM:
+        return (
+            f"El uso de CFDI '{use}' es solo para personas físicas. "
+            f"Para el régimen {ts} (persona moral) usa G03 o S01."
+        )
+    return None
+
 
 # ---------- Receiver (customer) validation ----------
 
@@ -238,6 +258,8 @@ def build_facturapi_payload(
     zip_code = str(cust_in.get("zip") or cust_in.get("zip_code") or cust_in.get("customer_zip") or "")
     tax_system = str(cust_in.get("tax_system") or cust_in.get("customer_tax_system") or "")
     email = cust_in.get("email") or cust_in.get("customer_email") or None
+    foreign_id = cust_in.get("foreign_id") or cust_in.get("foreign_tax_id") or None
+    residence = cust_in.get("residence") or cust_in.get("residence_country_code") or None
 
     # Validate receiver if requested
     if validate_receiver:
@@ -253,6 +275,10 @@ def build_facturapi_payload(
                 code="INV_RECEIVER_INVALID",
                 public_message=" | ".join(errors),
             )
+        # UsoCFDI × régimen cross-validation (CFDI40173)
+        use_err = validate_uso_cfdi_regimen(cfdi_use, tax_system)
+        if use_err:
+            raise ValidationError(code="INV_CFDI_USE_REGIMEN", public_message=use_err)
 
     cust_payload = invoices_service.build_customer(
         rfc=rfc,
@@ -260,6 +286,8 @@ def build_facturapi_payload(
         zip_code=zip_code,
         tax_system=tax_system,
         email=email,
+        foreign_id=foreign_id or None,
+        residence=residence or None,
     )
 
     payload = invoices_service.build_invoice_payload(

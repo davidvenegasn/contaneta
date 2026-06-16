@@ -361,6 +361,18 @@ button.btn-sm {
   border-color: var(--info-border);
 }
 
+.badge--accent {
+  background: rgba(99,102,241,.1);
+  color: #4f46e5;
+  border-color: rgba(99,102,241,.25);
+}
+
+.badge--ppd {
+  background: rgba(234,179,8,.12);
+  color: #a16207;
+  border-color: rgba(234,179,8,.3);
+}
+
 /* ========== UI INPUT / SELECT / TEXTAREA (.ui-input + legacy .input) ========== */
 .ui-input,
 .ui-select,
@@ -1079,6 +1091,13 @@ html.nightmode .success-overlay--error .success-overlay__title {
   background: var(--error-hover, #b91c1c);
   color: #fff;
 }
+
+/* ========== METRIC CARD VARIANTS (resumen fiscal) ========== */
+.metric-card--warn .metric-value { color: var(--warn-text, #92400e); }
+.metric-card--accent .metric-value { color: #4f46e5; }
+.metric-card--highlight { border-left: 3px solid var(--primary, #6366f1); }
+.metric-card--highlight .metric-label { font-weight: var(--fw-semibold); }
+.u-mt-3 { margin-top: var(--space-3) !important; }
 
 /* ========== GOV: estilos globales movidos desde base_portal.html (sin inline <style>) ========== */
 .demo-banner { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: 10px 16px; margin-bottom: var(--space-3); background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%); border: 1px solid #7dd3fc; border-radius: 12px; font-size: var(--fs-sm); }

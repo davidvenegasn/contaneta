@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block email_content %}
+<h2>Recibiste una factura</h2>
+<p><strong>{{ from_name }}</strong> te emitió una factura por <strong>${{ "{:,.2f}".format(total) }} {{ currency|default('MXN') }}</strong>.</p>
+<div class="card">
+  <p style="margin:0"><strong>Folio:</strong> {{ serie|default('') }}{{ folio|default('—') }}</p>
+  <p style="margin:0"><strong>Fecha:</strong> {{ fecha_emision }}</p>
+  <p style="margin:0"><strong>UUID:</strong> <span style="font-family:monospace;font-size:11px">{{ uuid }}</span></p>
+</div>
+<p>Adjuntos encontrarás:</p>
+<ul>
+  <li>PDF de la factura</li>
+  <li>XML del CFDI (válido para tu contabilidad)</li>
+</ul>
+<p>Si tienes preguntas, responde este correo y le llegará directo a {{ from_name }}.</p>
+{% endblock %}

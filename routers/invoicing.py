@@ -376,6 +376,9 @@ def _submit_impl(templates, request: Request, issuer: dict, form):
     customer_tax_system = (form.get("customer_tax_system") or "").strip()
     cfdi_use_val = (form.get("cfdi_use") or "").strip().upper()
     customer_email = (form.get("customer_email") or "").strip()
+    # Extranjero fields (CFDI 4.0 — only relevant when RFC=XEXX010101000)
+    customer_residence = (form.get("customer_residence") or "").strip().upper() or None
+    customer_foreign_id = (form.get("customer_foreign_id") or "").strip() or None
     currency = (form.get("currency") or "MXN").strip()
     exchange_rate = (form.get("exchange_rate") or "").strip()
     payment_method = (form.get("payment_method") or "PUE").strip().upper()
@@ -383,6 +386,18 @@ def _submit_impl(templates, request: Request, issuer: dict, form):
 
     if tipo_comprobante == "P":
         cfdi_use_val = "P01"
+        payment_method = "PUE"
+        payment_form = "99"
+    elif tipo_comprobante == "T":
+        # SAT: MetodoPago and FormaPago must NOT exist on Traslado (CFDI40103/CFDI40125)
+        payment_method = "PUE"
+        payment_form = "99"
+    elif payment_method == "PPD":
+        # CFDI40105: PPD → FormaPago MUST be "99" (Por definir)
+        payment_form = "99"
+    elif payment_method == "PUE" and payment_form == "99":
+        # CFDI40105: PUE → FormaPago cannot be "99"
+        payment_form = "03"  # default to SPEI as safe fallback
 
     folio_number = None
     if folio:
@@ -461,6 +476,8 @@ def _submit_impl(templates, request: Request, issuer: dict, form):
             "zip": customer_zip,
             "tax_system": customer_tax_system,
             "email": customer_email or None,
+            "foreign_id": customer_foreign_id,
+            "residence": customer_residence,
         },
         items=items if items is not None else None,
         payments=payments_payload if payments_payload is not None else None,
@@ -558,6 +575,8 @@ def _submit_impl(templates, request: Request, issuer: dict, form):
     conn.close()
 
     log_action(request, "invoice_created", issuer_id=issuer["id"], invoice_id=fact_id, uuid=(uuid or "")[:36])
+
+    # TODO: enqueue_send_email for invoice_sent if customer.email and customer.auto_send_invoices and issuer.email_notifications_enabled
 
     return templates.TemplateResponse(
         request,

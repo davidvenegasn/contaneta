@@ -133,14 +133,26 @@ def download_invoice(issuer_id: int, org_id: str, invoice_id: str, fmt: str) -> 
     return r.content
 
 
-def cancel_invoice(issuer_id: int, org_id: str, invoice_id: str, motive: str) -> dict:
+def cancel_invoice(
+    issuer_id: int,
+    org_id: str,
+    invoice_id: str,
+    motive: str,
+    substitution: str | None = None,
+) -> dict:
     """Cancel a stamped invoice via DELETE /v2/invoices/{id}?motive={code}.
+
+    Args:
+        substitution: UUID of the substitute CFDI (required for motive 01).
 
     Returns the updated invoice object from Facturapi.
     """
+    params = {"motive": motive}
+    if substitution:
+        params["substitution"] = substitution
     r = requests.delete(
         f"{BASE_URL}/invoices/{invoice_id}",
-        params={"motive": motive},
+        params=params,
         headers=_emit_headers(issuer_id, org_id),
         timeout=60,
     )

@@ -7,6 +7,7 @@ from fastapi import Depends, HTTPException, Query
 from database import db, db_rows
 from routers.api._helpers import DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT, _load_fixture
 from routers.deps import get_portal_issuer
+from services.sat.cfdi_relacion_labels import label_for_received, badge_color, signed_amount
 from services.ym_helpers import sanitize_ym, ym_sql_filter
 
 logger = logging.getLogger(__name__)
@@ -152,6 +153,7 @@ def register_invoices_received_routes(router):
                 SELECT uuid, fecha_emision, rfc_emisor, nombre_emisor, concepto, total, moneda,
                        COALESCE(impuestos, 0) AS impuestos, COALESCE(retenciones, 0) AS retenciones,
                        metodo_pago, status, xml_path, xml_status,
+                       tipo_comprobante, tipo_relacion,
                        (
                          SELECT bm.id
                          FROM bank_invoice_matches bim
@@ -236,6 +238,14 @@ def register_invoices_received_routes(router):
             rows = enriched
         except Exception:
             logger.debug("Could not enrich deductibility", exc_info=True)
+
+        # Enrich with TipoRelacion labels and signed amounts
+        for r in rows:
+            tc = r.get("tipo_comprobante") or "I"
+            tr = r.get("tipo_relacion")
+            r["tipo_label"] = label_for_received(tc, tr)
+            r["badge_color"] = badge_color(tc, tr)
+            r["signed_total"] = signed_amount(float(r.get("total") or 0), tc, tr)
 
         return {
             "data": rows,

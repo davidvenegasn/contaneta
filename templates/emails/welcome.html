@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block email_content %}
+<h2>Bienvenido a {{ brand_name|default('ContaNeta') }}, {{ user_name }}</h2>
+<p>Gracias por registrarte. Ya puedes empezar a emitir facturas y administrar tu contabilidad fiscal.</p>
+{% if onboarding_url %}
+  <p><a href="{{ onboarding_url }}" class="button">Empezar configuración</a></p>
+{% endif %}
+<p>Lo primero que tienes que hacer es subir tu FIEL y CSD para timbrar tus primeras facturas.</p>
+{% endblock %}

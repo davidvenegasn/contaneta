@@ -12,27 +12,40 @@ def build_customer(
     zip_code: str,
     tax_system: str,
     email: str | None = None,
+    foreign_id: str | None = None,
+    residence: str | None = None,
 ) -> dict[str, Any]:
     rfc_n = (rfc or "").strip().upper()
     name_n = (legal_name or "").strip()
     zip_n = (zip_code or "").strip()
     tax_n = (tax_system or "").strip()
+    is_extranjero = rfc_n == "XEXX010101000"
     if not rfc_n:
         raise ValidationError(code="INV_CUSTOMER_RFC_REQUIRED", public_message="RFC requerido.")
     if not name_n:
         raise ValidationError(code="INV_CUSTOMER_NAME_REQUIRED", public_message="Razón social requerida.")
-    if not zip_n:
+    if not zip_n and not is_extranjero:
         raise ValidationError(code="INV_CUSTOMER_ZIP_REQUIRED", public_message="Código postal requerido.")
     if not tax_n:
         raise ValidationError(code="INV_CUSTOMER_TAX_SYSTEM_REQUIRED", public_message="Régimen fiscal requerido.")
+    if is_extranjero and not residence:
+        raise ValidationError(
+            code="INV_CUSTOMER_RESIDENCE_REQUIRED",
+            public_message="País de residencia fiscal requerido para facturas al extranjero.",
+        )
     email_n = (email or "").strip() or None
-    return {
+    payload: dict[str, Any] = {
         "legal_name": name_n,
         "email": email_n,
         "tax_id": rfc_n,
         "tax_system": tax_n,
-        "address": {"zip": zip_n},
+        "address": {"zip": zip_n or "00000"},
     }
+    if is_extranjero and residence:
+        payload["residence_country_code"] = (residence or "").strip().upper()
+    if is_extranjero and foreign_id:
+        payload["foreign_tax_id"] = (foreign_id or "").strip()
+    return payload
 
 
 def build_invoice_payload(

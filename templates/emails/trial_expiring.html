@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block email_content %}
+<h2>Tu trial termina en {{ days_until_expiry }} día{{ 's' if days_until_expiry != 1 else '' }}</h2>
+<p>Para no perder acceso a la plataforma, suscríbete antes del <strong>{{ trial_expires_at }}</strong>.</p>
+{% if pricing_url %}
+  <p><a href="{{ pricing_url }}" class="button">Ver planes</a></p>
+{% endif %}
+{% endblock %}

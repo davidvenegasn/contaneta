@@ -15,6 +15,91 @@
   </div>
 </header>
 
+{# ── FIEL/CSD expiry warning banner — sticky, prominent ── #}
+{% set _expiry_days = fiel_data.days_until_expiry if fiel_data and fiel_data.days_until_expiry is defined else None %}
+{% if _expiry_days is not none and _expiry_days <= 30 %}
+<div class="cert-expiry-banner cert-expiry-banner--{% if _expiry_days < 0 %}danger{% elif _expiry_days <= 7 %}danger{% else %}warn{% endif %} u-mb-14" role="alert">
+  <div class="cert-expiry-banner__icon" aria-hidden="true">
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+      <path d="M12 9v4M12 17h.01"/>
+    </svg>
+  </div>
+  <div class="cert-expiry-banner__body">
+    <strong class="cert-expiry-banner__title">
+      {% if _expiry_days < 0 %}
+        Tu certificado FIEL/CSD venció hace {{ (-_expiry_days)|int }} día{{ 's' if _expiry_days != -1 else '' }}
+      {% elif _expiry_days == 0 %}
+        Tu certificado FIEL/CSD vence HOY
+      {% else %}
+        Tu certificado FIEL/CSD vence en {{ _expiry_days }} día{{ 's' if _expiry_days != 1 else '' }}
+      {% endif %}
+    </strong>
+    <p class="cert-expiry-banner__text">
+      {% if _expiry_days < 0 %}
+        No puedes emitir facturas hasta que renueves el sello digital con el SAT y subas el nuevo CSD aquí.
+      {% else %}
+        Renueva tu CSD en el SAT antes de la fecha límite y súbelo aquí para no interrumpir tu facturación.
+      {% endif %}
+    </p>
+  </div>
+  <a href="#" class="cert-expiry-banner__cta" data-go-to-tab="sat">Ir a Sellos SAT →</a>
+</div>
+<style>
+.cert-expiry-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid;
+}
+.cert-expiry-banner--warn {
+  background: rgba(245, 158, 11, .08);
+  border-color: rgba(245, 158, 11, .3);
+  color: #92400e;
+}
+.cert-expiry-banner--danger {
+  background: rgba(239, 68, 68, .08);
+  border-color: rgba(239, 68, 68, .3);
+  color: #991b1b;
+}
+.cert-expiry-banner__icon { flex-shrink: 0; margin-top: 1px; }
+.cert-expiry-banner__body { flex: 1; min-width: 0; }
+.cert-expiry-banner__title { display: block; font-size: 14px; font-weight: 600; margin-bottom: 3px; }
+.cert-expiry-banner__text { margin: 0; font-size: 12.5px; line-height: 1.45; opacity: .9; }
+.cert-expiry-banner__cta {
+  flex-shrink: 0;
+  align-self: center;
+  font-size: 12.5px;
+  font-weight: 600;
+  text-decoration: none;
+  color: inherit;
+  border: 1px solid currentColor;
+  padding: 6px 12px;
+  border-radius: 6px;
+  background: rgba(255,255,255,.5);
+}
+.cert-expiry-banner__cta:hover { background: rgba(255,255,255,.9); }
+html.nightmode .cert-expiry-banner--warn { color: #fbbf24; background: rgba(245, 158, 11, .12); }
+html.nightmode .cert-expiry-banner--danger { color: #fca5a5; background: rgba(239, 68, 68, .14); }
+html.nightmode .cert-expiry-banner__cta { background: rgba(0,0,0,.25); }
+</style>
+<script>
+(function(){
+  var cta = document.querySelector('.cert-expiry-banner__cta[data-go-to-tab]');
+  if (!cta) return;
+  cta.addEventListener('click', function(e){
+    e.preventDefault();
+    var tab = document.querySelector('.settings-tab[data-tab="sat"]');
+    if (tab) tab.click();
+    var panel = document.getElementById('panel-sat');
+    if (panel) panel.scrollIntoView({behavior:'smooth', block:'start'});
+  });
+})();
+</script>
+{% endif %}
+
 {% if success_msg %}
 <div class="inline-alert inline-alert--success u-mb-14" role="status">
   <span class="inline-alert__icon" aria-hidden="true">
@@ -196,12 +281,12 @@
       {% if _fiel.days_until_expiry is defined %}
         <p class="u-text-sm" style="margin:0 0 6px;"><strong>RFC:</strong> {{ issuer_rfc }}</p>
         <p class="u-text-sm" style="margin:0 0 6px;"><strong>Vigencia:</strong>
-          {% if _fiel.days_until_expiry > 30 %}
-            <span style="color:var(--success, #22c55e);">{{ _fiel.expires_at[:10] }} ({{ _fiel.days_until_expiry }} días)</span>
+          {% if _fiel.days_until_expiry > 60 %}
+            <span class="badge badge--success">{{ _fiel.expires_at[:10] }} ({{ _fiel.days_until_expiry }} días)</span>
           {% elif _fiel.days_until_expiry > 0 %}
-            <span style="color:var(--warn, #f59e0b);">Expira en {{ _fiel.days_until_expiry }} días</span>
+            <span class="badge badge--warn">Expira pronto — en {{ _fiel.days_until_expiry }} días</span>
           {% else %}
-            <span style="color:var(--danger, #ef4444);">EXPIRADA hace {{ (-_fiel.days_until_expiry)|int }} días</span>
+            <span class="badge badge--danger">EXPIRADA hace {{ (-_fiel.days_until_expiry)|int }} días</span>
           {% endif %}
         </p>
       {% endif %}
@@ -236,7 +321,16 @@
       </p>
       {% if _fpi.csd_uploaded_at %}
         <p class="u-text-sm" style="margin:0 0 6px;"><strong>Cargado:</strong> {{ _fpi.csd_uploaded_at[:10] }}</p>
-        <p class="u-text-sm muted" style="margin:0 0 12px;">Activo y listo para timbrar.</p>
+        {% set _csd_days = fiel_data.days_until_expiry if fiel_data and fiel_data.days_until_expiry is defined else None %}
+        {% if _csd_days is not none and _csd_days <= 30 %}
+          {% if _csd_days < 0 %}
+            <p class="u-text-sm" style="margin:0 0 12px;color:var(--danger,#ef4444);font-weight:600;">⚠ El certificado venció hace {{ (-_csd_days)|int }} día{{ 's' if _csd_days != -1 else '' }}. Renueva en el SAT y vuelve a subirlo.</p>
+          {% else %}
+            <p class="u-text-sm" style="margin:0 0 12px;color:var(--warn,#f59e0b);font-weight:600;">⚠ Vence en {{ _csd_days }} día{{ 's' if _csd_days != 1 else '' }}. Renueva pronto para no interrumpir tu facturación.</p>
+          {% endif %}
+        {% else %}
+          <p class="u-text-sm muted" style="margin:0 0 12px;">Activo y listo para timbrar.</p>
+        {% endif %}
       {% else %}
         <p class="u-text-sm" style="margin:0 0 12px;color:var(--muted, #6b7280);">Sin configurar — no puedes emitir facturas todavía.</p>
       {% endif %}

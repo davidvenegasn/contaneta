@@ -1,0 +1,211 @@
+{% extends "base_portal.html" %}
+{% block title %}Nota de crédito — {{ inv.uuid[:8] }}…{% endblock %}
+
+{% block content %}
+<style>
+  .nc-hero { padding: 2rem 2rem 1rem; border-bottom: 1px solid var(--border); }
+  .nc-hero__back { font-size: .8rem; color: var(--text-muted); text-decoration: none; display: inline-flex; align-items: center; gap: .35rem; margin-bottom: .75rem; }
+  .nc-hero__back:hover { color: var(--text); }
+  .nc-hero__title { font-size: 1.25rem; font-weight: 700; color: var(--text); margin: 0 0 .25rem; }
+  .nc-hero__sub { font-size: .85rem; color: var(--text-muted); margin: 0; }
+  .nc-body { max-width: 760px; margin: 2rem auto; padding: 0 1.5rem 3rem; }
+  .orig-card { background: var(--surface-2); border: 1px solid var(--border); border-radius: .75rem; padding: 1.25rem 1.5rem; margin-bottom: 2rem; }
+  .orig-card__row { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; flex-wrap: wrap; }
+  .orig-card__label { font-size: .75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; }
+  .orig-card__value { font-size: .9rem; color: var(--text); font-weight: 600; }
+  .orig-card__uuid { font-size: .75rem; color: var(--text-muted); font-family: var(--font-mono, monospace); word-break: break-all; }
+  .orig-card__tag { display: inline-block; background: var(--warning-bg, #fef3c7); color: var(--warning-text, #92400e); border-radius: .3rem; padding: .1rem .5rem; font-size: .7rem; font-weight: 600; }
+  .section-title { font-size: .95rem; font-weight: 700; color: var(--text); margin: 1.5rem 0 .75rem; padding-bottom: .4rem; border-bottom: 1px solid var(--border); }
+  .items-list { display: flex; flex-direction: column; gap: .75rem; margin-bottom: 1rem; }
+  .item-row { background: var(--surface-2); border: 1px solid var(--border); border-radius: .5rem; padding: .9rem 1rem; display: grid; grid-template-columns: 1fr 90px 90px 90px 36px; gap: .6rem; align-items: end; }
+  .item-row label { font-size: .72rem; color: var(--text-muted); display: block; margin-bottom: .2rem; }
+  .item-row input, .item-row select { width: 100%; font-size: .85rem; padding: .4rem .6rem; background: var(--surface); border: 1px solid var(--border); border-radius: .35rem; color: var(--text); }
+  .item-row input:focus, .item-row select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+  .item-row .remove-btn { background: transparent; border: 1px solid var(--border); border-radius: .35rem; cursor: pointer; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 1rem; }
+  .item-row .remove-btn:hover { background: var(--danger-bg, #fee2e2); color: var(--danger, #dc2626); border-color: var(--danger, #dc2626); }
+  .add-item-btn { font-size: .82rem; color: var(--accent); background: transparent; border: 1px dashed var(--accent); border-radius: .4rem; padding: .45rem 1rem; cursor: pointer; width: 100%; }
+  .add-item-btn:hover { background: var(--accent-soft); }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+  .form-group { display: flex; flex-direction: column; gap: .3rem; }
+  .form-group label { font-size: .75rem; color: var(--text-muted); font-weight: 600; }
+  .form-group input, .form-group select, .form-group textarea { font-size: .85rem; padding: .5rem .75rem; background: var(--surface); border: 1px solid var(--border); border-radius: .4rem; color: var(--text); }
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+  .totals-preview { background: var(--surface-2); border: 1px solid var(--border); border-radius: .5rem; padding: 1rem 1.25rem; margin: 1rem 0 1.5rem; }
+  .totals-preview__row { display: flex; justify-content: space-between; font-size: .85rem; padding: .2rem 0; color: var(--text-muted); }
+  .totals-preview__row--total { font-weight: 700; font-size: .95rem; color: var(--text); border-top: 1px solid var(--border); margin-top: .4rem; padding-top: .4rem; }
+  .submit-row { display: flex; gap: 1rem; align-items: center; margin-top: 1.5rem; }
+  .btn-primary { padding: .65rem 1.5rem; background: var(--accent); color: #fff; border: none; border-radius: .5rem; font-size: .9rem; font-weight: 600; cursor: pointer; }
+  .btn-primary:hover { opacity: .9; }
+  .btn-secondary { padding: .65rem 1.2rem; background: transparent; color: var(--text-muted); border: 1px solid var(--border); border-radius: .5rem; font-size: .9rem; cursor: pointer; text-decoration: none; }
+  .btn-secondary:hover { background: var(--surface-2); }
+  .warn-box { background: var(--warning-bg, #fef9c3); border: 1px solid var(--warning-border, #fde68a); border-radius: .5rem; padding: .75rem 1rem; font-size: .82rem; color: var(--warning-text, #92400e); margin-bottom: 1.5rem; }
+  @media (max-width: 600px) {
+    .item-row { grid-template-columns: 1fr 1fr; }
+    .form-row { grid-template-columns: 1fr; }
+  }
+</style>
+
+<div class="nc-hero">
+  <a href="/portal/cfdi/issued/{{ inv.uuid }}" class="nc-hero__back">
+    ← Regresar a la factura
+  </a>
+  <h1 class="nc-hero__title">Nota de crédito (CFDI Egreso)</h1>
+  <p class="nc-hero__sub">Genera un CFDI tipo E relacionado con la factura original</p>
+</div>
+
+<div class="nc-body">
+  <!-- Original invoice summary -->
+  <div class="orig-card">
+    <div class="orig-card__row">
+      <div>
+        <div class="orig-card__label">Receptor</div>
+        <div class="orig-card__value">{{ inv.customer_legal_name }}</div>
+        <div class="orig-card__uuid">{{ inv.uuid }}</div>
+      </div>
+      <div style="text-align:right">
+        <div class="orig-card__label">Total original</div>
+        <div class="orig-card__value">${{ "%.2f"|format(inv.total) }} {{ inv.currency }}</div>
+        <span class="orig-card__tag">Factura Ingreso</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="warn-box">
+    <strong>Nota:</strong> Este CFDI tipo E se relacionará con la factura original con <strong>TipoRelacion 01</strong> (Nota de crédito). Registrará una devolución, descuento o bonificación.
+  </div>
+
+  <form method="POST" action="/portal/invoices/{{ inv.uuid }}/nota-credito" id="ncForm">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+
+    <p class="section-title">Conceptos a acreditar</p>
+    <div class="items-list" id="itemsList">
+      <!-- Item rows injected by JS -->
+    </div>
+    <button type="button" class="add-item-btn" onclick="addItem()">+ Agregar concepto</button>
+
+    <p class="section-title">Datos del comprobante</p>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Fecha de emisión</label>
+        <input type="date" name="issue_date" id="issue_date" value="{{ today }}" required />
+      </div>
+      <div class="form-group">
+        <label>Uso CFDI</label>
+        <select name="cfdi_use">
+          <option value="G02">G02 — Devoluciones, descuentos o bonificaciones</option>
+          <option value="G01">G01 — Adquisición de mercancias</option>
+          <option value="G03">G03 — Gastos en general</option>
+          <option value="S01">S01 — Sin efectos fiscales</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Forma de pago</label>
+        <select name="payment_form">
+          <option value="30">30 — Aplicación de anticipos</option>
+          <option value="17">17 — Compensación</option>
+          <option value="03">03 — Transferencia electrónica</option>
+          <option value="01">01 — Efectivo</option>
+          <option value="99">99 — Por definir</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Moneda</label>
+        <select name="currency">
+          <option value="{{ inv.currency }}" selected>{{ inv.currency }}</option>
+          {% if inv.currency != 'MXN' %}<option value="MXN">MXN</option>{% endif %}
+        </select>
+      </div>
+    </div>
+    <div class="form-group" style="margin-bottom:1rem">
+      <label>Notas (opcional)</label>
+      <textarea name="notes" rows="2" placeholder="Descripción adicional de la nota de crédito…" style="resize:vertical"></textarea>
+    </div>
+
+    <div class="totals-preview" id="totalsPreview">
+      <div class="totals-preview__row"><span>Subtotal</span><span id="prevSubtotal">$0.00</span></div>
+      <div class="totals-preview__row"><span>IVA</span><span id="prevIva">$0.00</span></div>
+      <div class="totals-preview__row totals-preview__row--total"><span>Total nota de crédito</span><span id="prevTotal">$0.00</span></div>
+    </div>
+
+    <div class="submit-row">
+      <button type="submit" class="btn-primary" id="submitBtn">Emitir nota de crédito</button>
+      <a href="/portal/cfdi/issued/{{ inv.uuid }}" class="btn-secondary">Cancelar</a>
+    </div>
+  </form>
+</div>
+
+<script>
+(function () {
+  var itemCount = 0;
+
+  window.addItem = function (desc, qty, price, iva) {
+    itemCount++;
+    var idx = itemCount;
+    var html = '<div class="item-row" id="item_' + idx + '">'
+      + '<div><label>Descripción</label><input type="text" name="item_' + idx + '_desc" value="' + (desc || '') + '" required placeholder="Concepto de la nota de crédito" /></div>'
+      + '<div><label>Cantidad</label><input type="number" name="item_' + idx + '_qty" value="' + (qty || 1) + '" min="0.001" step="any" required onchange="recalc()" oninput="recalc()" /></div>'
+      + '<div><label>Precio unit.</label><input type="number" name="item_' + idx + '_price" value="' + (price || '') + '" min="0" step="any" required onchange="recalc()" oninput="recalc()" /></div>'
+      + '<div><label>IVA %</label><select name="item_' + idx + '_iva" onchange="recalc()">'
+      + '<option value="0.16"' + ((!iva || iva === '0.16') ? ' selected' : '') + '>16%</option>'
+      + '<option value="0"' + (iva === '0' ? ' selected' : '') + '>0%</option>'
+      + '<option value="EXENTO"' + (iva === 'EXENTO' ? ' selected' : '') + '>Exento</option>'
+      + '</select></div>'
+      + '<button type="button" class="remove-btn" onclick="removeItem(' + idx + ')" title="Eliminar">✕</button>'
+      + '</div>';
+    document.getElementById('itemsList').insertAdjacentHTML('beforeend', html);
+    recalc();
+  };
+
+  window.removeItem = function (idx) {
+    var el = document.getElementById('item_' + idx);
+    if (el) el.remove();
+    recalc();
+  };
+
+  window.recalc = function () {
+    var items = document.querySelectorAll('#itemsList .item-row');
+    var subtotal = 0, ivaTotal = 0;
+    items.forEach(function (row) {
+      var id = row.id.replace('item_', '');
+      var qtyEl = row.querySelector('[name="item_' + id + '_qty"]');
+      var priceEl = row.querySelector('[name="item_' + id + '_price"]');
+      var ivaEl = row.querySelector('[name="item_' + id + '_iva"]');
+      if (!qtyEl || !priceEl) return;
+      var qty = parseFloat(qtyEl.value) || 0;
+      var price = parseFloat(priceEl.value) || 0;
+      var ivaVal = (ivaEl ? ivaEl.value : '0.16');
+      var ivaRate = ivaVal === 'EXENTO' ? 0 : parseFloat(ivaVal) || 0;
+      var lineBase = qty * price;
+      subtotal += lineBase;
+      ivaTotal += lineBase * ivaRate;
+    });
+    var total = subtotal + ivaTotal;
+    document.getElementById('prevSubtotal').textContent = '$' + subtotal.toFixed(2);
+    document.getElementById('prevIva').textContent = '$' + ivaTotal.toFixed(2);
+    document.getElementById('prevTotal').textContent = '$' + total.toFixed(2);
+    document.getElementById('item_count').value = String(itemCount);
+  };
+
+  // Inject hidden counter
+  var form = document.getElementById('ncForm');
+  var inp = document.createElement('input');
+  inp.type = 'hidden';
+  inp.name = 'item_count';
+  inp.id = 'item_count';
+  inp.value = '0';
+  form.appendChild(inp);
+
+  // Seed with one item row
+  addItem('Nota de crédito', 1, '', '0.16');
+
+  // Prevent double-submit
+  form.addEventListener('submit', function () {
+    var btn = document.getElementById('submitBtn');
+    btn.disabled = true;
+    btn.textContent = 'Emitiendo…';
+  });
+})();
+</script>
+{% endblock %}

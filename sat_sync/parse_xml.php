@@ -144,6 +144,8 @@ $updateStmt = $pdo->prepare("
         condiciones_pago = :condiciones_pago,
         tipo_comprobante = COALESCE(:tipo_comprobante, tipo_comprobante),
         concepto = :concepto,
+        tipo_relacion = :tipo_relacion,
+        related_uuids = :related_uuids,
         xml_status = :xml_status,
         status = COALESCE(NULLIF(TRIM(COALESCE(status, '')), ''), 'V'),
         parsed_at = datetime('now'),
@@ -181,6 +183,8 @@ foreach ($rows as $row) {
             ':condiciones_pago' => null,
             ':tipo_comprobante' => null,
             ':concepto' => null,
+            ':tipo_relacion' => null,
+            ':related_uuids' => null,
             ':xml_status' => 'error',
             ':total' => null,
         ]);
@@ -291,6 +295,24 @@ foreach ($rows as $row) {
             $concepto = (string) ($primerConcepto['Descripcion'] ?? '');
         }
 
+        // CfdiRelacionados: TipoRelacion + UUIDs de CFDI vinculados
+        $tipoRelacion = null;
+        $relatedUuids = null;
+        $relNode = $comprobante->CfdiRelacionados ?? null;
+        if ($relNode !== null) {
+            $tipoRelacion = (string) ($relNode['TipoRelacion'] ?? '') ?: null;
+            $uuids = [];
+            if (isset($relNode->CfdiRelacionado)) {
+                foreach ($relNode->CfdiRelacionado as $rel) {
+                    $u = (string) ($rel['UUID'] ?? '');
+                    if ($u !== '') {
+                        $uuids[] = strtolower($u);
+                    }
+                }
+            }
+            $relatedUuids = !empty($uuids) ? json_encode($uuids) : null;
+        }
+
         // Actualizar DB (incluye fecha, emisor, receptor para filas creadas solo por verify)
         $updateStmt->execute([
             ':fecha_emision' => $fechaEmision ?: null,
@@ -313,6 +335,8 @@ foreach ($rows as $row) {
             ':condiciones_pago' => $condicionesPago ?: null,
             ':tipo_comprobante' => $tipoComprobante ?: null,
             ':concepto' => $concepto ?: null,
+            ':tipo_relacion' => $tipoRelacion,
+            ':related_uuids' => $relatedUuids,
             ':xml_status' => 'parsed',
             ':total' => $total > 0 ? $total : null,
         ]);
@@ -343,6 +367,8 @@ foreach ($rows as $row) {
             ':condiciones_pago' => null,
             ':tipo_comprobante' => null,
             ':concepto' => null,
+            ':tipo_relacion' => null,
+            ':related_uuids' => null,
             ':xml_status' => 'error',
             ':total' => null,
         ]);

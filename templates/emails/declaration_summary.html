@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block email_content %}
+<h2>Tu declaración de {{ periodo }} está lista</h2>
+<p>Hola {{ user_name|default('') }}, tu contador acaba de presentar tu declaración.</p>
+<div class="card">
+  <p style="margin:0;font-size:16px"><strong>Tipo:</strong> {{ tipo_declaracion }}</p>
+  <p style="margin:8px 0 0"><strong>Resultado:</strong>
+    {% if saldo_a_cargo and saldo_a_cargo > 0 %}
+      Saldo a pagar <strong style="color:#dc2626">${{ "{:,.2f}".format(saldo_a_cargo) }}</strong>
+    {% elif saldo_a_favor and saldo_a_favor > 0 %}
+      Saldo a favor <strong style="color:#16a34a">${{ "{:,.2f}".format(saldo_a_favor) }}</strong>
+    {% else %}
+      Sin saldo
+    {% endif %}
+  </p>
+  {% if linea_captura %}
+    <p style="margin:8px 0 0"><strong>Línea de captura:</strong> <span style="font-family:monospace">{{ linea_captura }}</span></p>
+  {% endif %}
+  {% if fecha_vencimiento %}
+    <p style="margin:8px 0 0"><strong>Vence:</strong> {{ fecha_vencimiento }}</p>
+  {% endif %}
+  {% if folio_acuse %}
+    <p style="margin:8px 0 0;font-size:11px;color:#6b7280">Folio acuse SAT: {{ folio_acuse }}</p>
+  {% endif %}
+</div>
+{% if portal_url %}
+  <p><a href="{{ portal_url }}" class="button">Ver detalle en {{ brand_name|default('ContaNeta') }}</a></p>
+{% endif %}
+<p class="muted">Adjunto encontrarás el acuse oficial del SAT en PDF.</p>
+{% endblock %}

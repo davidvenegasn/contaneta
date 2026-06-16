@@ -4,7 +4,7 @@ import logging
 import os
 from typing import Optional
 
-from fastapi import Depends, HTTPException, Query, Request
+from fastapi import Depends, Form, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 
 from database import db, db_rows
@@ -21,6 +21,7 @@ from services.auth import csrf as csrf_service
 from services.auth import session as session_service
 from services.billing import subscription as subscription_service
 from services.portal_errors import portal_error_type
+from services.sat.cfdi_relacion_labels import compute_net_totals
 from services.sat.sat_sync import get_month_totals, get_sat_sync_status
 from services.ym_helpers import is_annual, sanitize_ym, shift_ym, ym_sql_filter, ym_to_label
 
@@ -348,8 +349,9 @@ def register_invoices_routes(router, templates):
                 # received y ppd usan los mismos datos (recibidas); PPD se filtra en front con metodo_pago
                 rows = db_rows(f"""
                     SELECT uuid, fecha_emision, rfc_emisor, nombre_emisor, concepto, total, moneda,
+                           COALESCE(subtotal, total) AS subtotal,
                            COALESCE(impuestos, 0) AS impuestos, COALESCE(retenciones, 0) AS retenciones,
-                           metodo_pago, status, xml_path
+                           tipo_comprobante, tipo_relacion, metodo_pago, status, xml_path
                     FROM sat_cfdi
                     WHERE issuer_id = ? AND direction = 'received' AND fecha_emision IS NOT NULL
                       AND {_ym_filt} AND total IS NOT NULL AND total >= 0.01
@@ -382,10 +384,18 @@ def register_invoices_routes(router, templates):
                     m["label"] = ym_to_label(m["ym"])
                 _ppd_filter = "PPD" if tab == "ppd" else None
                 month_totals = _get_month_totals(issuer_id, ym, "received", metodo_pago=_ppd_filter)
+                # Vigente rows only for net stats (exclude cancelled)
+                vigente = [
+                    r for r in rows
+                    if (r.get("status") or "").upper().strip() not in ("C", "CANCELADO", "CANCELADA", "0")
+                    and not (r.get("status") or "").upper().strip().startswith("CANCEL")
+                ]
+                stats = compute_net_totals(vigente)
                 base_extra.update({
                     "rows": rows,
                     "months": months,
                     "month_totals": month_totals,
+                    "stats": stats,
                     "default_metodo_pago": "PPD" if tab == "ppd" else "",
                     "list_title": "Facturas recibidas (PPD)" if tab == "ppd" else "Facturas recibidas",
                 })
@@ -739,4 +749,516 @@ def register_invoices_routes(router, templates):
             media_type="text/csv; charset=utf-8",
             headers={"Content-Disposition": f'attachment; filename="{fname}"'},
         )
+
+    # ── Egreso (Nota de crédito) ──────────────────────────────────────────────
+
+    def _parse_nc_items(form) -> list[dict]:
+        """Parse item_N_* fields from nota de crédito form into Facturapi items."""
+        count = int(form.get("item_count") or 0)
+        items = []
+        for i in range(1, count + 1):
+            desc = (form.get(f"item_{i}_desc") or "").strip()
+            qty_s = (form.get(f"item_{i}_qty") or "1").strip()
+            price_s = (form.get(f"item_{i}_price") or "0").strip()
+            iva_s = (form.get(f"item_{i}_iva") or "0.16").strip()
+            if not desc or not price_s:
+                continue
+            qty_n = float(qty_s)
+            price_n = float(price_s)
+            is_exento = iva_s.upper() == "EXENTO"
+            iva_rate = 0.0 if is_exento else float(iva_s)
+            price_to_send = price_n * (1.0 + iva_rate) if iva_rate else price_n
+            taxes = [{"type": "IVA", "factor": "Exempt"}] if is_exento else [{"type": "IVA", "rate": iva_rate}]
+            # ObjetoImp (CFDI 4.0): "02" = sí objeto (cualquier IVA, incluso exento), "01" = no objeto
+            objeto_imp = "02" if (is_exento or iva_rate > 0) else "01"
+            items.append({
+                "quantity": qty_n,
+                "product": {
+                    "description": desc,
+                    "product_key": "84111506",
+                    "price": float(price_to_send),
+                    "tax_included": True,
+                    "tax_objet": objeto_imp,
+                    "taxes": taxes,
+                    "unit_key": "ACT",
+                },
+            })
+        if not items:
+            raise ValueError("Debes capturar al menos un concepto.")
+        return items
+
+    @router.get("/invoices/nota-credito/nueva", response_class=HTMLResponse)
+    def portal_nota_credito_picker(
+        request: Request,
+        issuer: dict = Depends(get_portal_issuer),
+    ):
+        """Picker: lists recent Ingreso (tipo I) CFDI so user can pick the original
+        invoice for a nota de crédito. After picking, redirects to the standard
+        /invoices/{uuid}/nota-credito form."""
+        issuer_id = issuer["id"]
+        conn = db()
+        rows = conn.execute(
+            """SELECT uuid, fecha_emision, rfc_receptor, nombre_receptor,
+                      total, moneda, serie, folio
+                 FROM sat_cfdi
+                WHERE issuer_id = ?
+                  AND direction = 'issued'
+                  AND UPPER(COALESCE(tipo_comprobante,'')) = 'I'
+                  AND COALESCE(status,'') NOT IN ('0','C','cancelled','Cancelado')
+                ORDER BY fecha_emision DESC
+                LIMIT 100""",
+            (issuer_id,),
+        ).fetchall()
+        conn.close()
+        invoices = [dict(r) for r in rows]
+        return _render_portal(
+            request, issuer=issuer,
+            template_name="nota_credito_picker.html",
+            active_page="issued",
+            title="Nueva nota de crédito",
+            extra={"invoices": invoices},
+        )
+
+    @router.get("/invoices/{uuid}/nota-credito", response_class=HTMLResponse)
+    def portal_nota_credito_get(
+        request: Request,
+        uuid: str,
+        issuer: dict = Depends(get_portal_issuer),
+    ):
+        """Render Egreso (nota de crédito) form for an Ingreso invoice."""
+        from datetime import date
+
+        issuer_id = issuer["id"]
+        conn = db()
+        inv_row = conn.execute(
+            """SELECT id, uuid, total, currency, payment_method,
+                      customer_rfc, customer_legal_name, customer_zip, customer_tax_system
+               FROM invoices
+               WHERE issuer_id = ? AND LOWER(TRIM(uuid)) = LOWER(?) LIMIT 1""",
+            (issuer_id, uuid.strip()),
+        ).fetchone()
+        conn.close()
+        if not inv_row:
+            raise HTTPException(status_code=404, detail="Factura no encontrada")
+        inv = dict(inv_row)
+        csrf_token = csrf_service.generate_csrf_token()
+        return _render_portal(
+            request, issuer=issuer,
+            template_name="nota_credito.html",
+            active_page="issued",
+            title="Nota de crédito",
+            extra={"inv": inv, "csrf_token": csrf_token, "today": date.today().isoformat()},
+        )
+
+    @router.post("/invoices/{uuid}/nota-credito", response_class=HTMLResponse)
+    async def portal_nota_credito_post(
+        request: Request,
+        uuid: str,
+        issuer: dict = Depends(get_portal_issuer),
+    ):
+        """Process Egreso form: emit CFDI tipo E referencing original Ingreso."""
+        from facturapi_client import create_invoice, FacturapiError
+
+        form = await request.form()
+
+        if not csrf_service.verify_csrf_token(form.get("csrf_token", "")):
+            raise HTTPException(status_code=403, detail="Token CSRF inválido")
+
+        issuer_id = issuer["id"]
+        if not issuer.get("facturapi_org_id"):
+            raise HTTPException(status_code=400, detail="El emisor no tiene organización Facturapi configurada.")
+
+        conn = db()
+        inv_row = conn.execute(
+            """SELECT id, uuid, total, currency, payment_method,
+                      customer_rfc, customer_legal_name, customer_zip, customer_tax_system
+               FROM invoices
+               WHERE issuer_id = ? AND LOWER(TRIM(uuid)) = LOWER(?) LIMIT 1""",
+            (issuer_id, uuid.strip()),
+        ).fetchone()
+        if not inv_row:
+            conn.close()
+            raise HTTPException(status_code=404, detail="Factura no encontrada")
+        inv = dict(inv_row)
+
+        try:
+            items = _parse_nc_items(form)
+        except ValueError as exc:
+            conn.close()
+            raise HTTPException(status_code=400, detail=str(exc))
+
+        cfdi_use = (form.get("cfdi_use") or "G02").strip()
+        payment_form = (form.get("payment_form") or "30").strip()
+        currency = (form.get("currency") or inv.get("currency") or "MXN").strip().upper()
+        issue_date = (form.get("issue_date") or "").strip() or None
+        notes = (form.get("notes") or "").strip() or None
+
+        customer = {
+            "tax_id": inv["customer_rfc"],
+            "legal_name": inv["customer_legal_name"],
+            "tax_system": inv.get("customer_tax_system") or "601",
+            "address": {"zip": inv.get("customer_zip") or "00000"},
+        }
+
+        payload = {
+            "type": "E",
+            "customer": customer,
+            "items": items,
+            "use": cfdi_use,
+            "payment_form": payment_form,
+            "payment_method": "PUE",
+            "currency": currency,
+            "export": "01",  # CFDI 4.0 ExportCode — "01" No aplica (NC domésticas)
+            "related_documents": [
+                {
+                    "relationship": "01",
+                    "documents": [{"uuid": inv["uuid"]}],
+                }
+            ],
+        }
+        if issue_date:
+            payload["date"] = issue_date
+        if notes:
+            payload["pdf_custom_section"] = notes
+
+        try:
+            nc_invoice = create_invoice(issuer_id, issuer["facturapi_org_id"], payload)
+        except FacturapiError as exc:
+            conn.close()
+            logger.error("Facturapi Egreso error issuer_id=%s: %s", issuer_id, exc)
+            raise HTTPException(status_code=422, detail=f"Error al timbrar nota de crédito: {exc}")
+
+        nc_fact_id = nc_invoice.get("id")
+        nc_uuid = nc_invoice.get("uuid")
+        nc_total = nc_invoice.get("total")
+
+        try:
+            conn.execute(
+                """INSERT INTO invoices (
+                    issuer_id, facturapi_invoice_id, uuid, total, currency,
+                    payment_method, tipo_comprobante, cfdi_use,
+                    customer_rfc, customer_legal_name, customer_zip, customer_tax_system
+                ) VALUES (?, ?, ?, ?, ?, 'PUE', 'E', ?, ?, ?, ?, ?)""",
+                (
+                    issuer_id, nc_fact_id, nc_uuid, nc_total, currency,
+                    cfdi_use,
+                    inv["customer_rfc"], inv["customer_legal_name"],
+                    inv.get("customer_zip") or "00000", inv.get("customer_tax_system") or "",
+                ),
+            )
+            conn.commit()
+        except Exception:
+            logger.exception("Egreso DB persist error issuer_id=%s", issuer_id)
+        finally:
+            conn.close()
+
+        log_action(request, "egreso_created", issuer_id=issuer_id, invoice_id=nc_fact_id, uuid=(nc_uuid or "")[:36])
+        return RedirectResponse(url=f"/portal/cfdi/issued/{nc_uuid}", status_code=302)
+
+    # ── REP: Complemento de Pago ──────────────────────────────────────────────
+
+    @router.get("/invoices/{uuid}/registrar-pago", response_class=HTMLResponse)
+    def portal_registrar_pago_get(
+        request: Request,
+        uuid: str,
+        issuer: dict = Depends(get_portal_issuer),
+    ):
+        """Render the REP (Complemento de Pago) form for a PPD invoice."""
+        from services.invoices.rep import get_ppd_state
+        from services.errors import ValidationError
+
+        issuer_id = issuer["id"]
+        conn = db()
+        inv = conn.execute(
+            """SELECT id, uuid, total, currency, payment_method,
+                      customer_rfc, customer_legal_name, customer_zip, customer_tax_system
+               FROM invoices
+               WHERE issuer_id = ? AND LOWER(TRIM(uuid)) = LOWER(?) LIMIT 1""",
+            (issuer_id, uuid.strip()),
+        ).fetchone()
+        conn.close()
+        if not inv:
+            raise HTTPException(status_code=404, detail="Factura no encontrada")
+        inv = dict(inv)
+        if inv.get("payment_method") != "PPD":
+            raise HTTPException(status_code=400, detail="Solo se puede registrar pago en facturas con método PPD.")
+        try:
+            state = get_ppd_state(issuer_id, inv["id"])
+        except ValidationError as exc:
+            raise HTTPException(status_code=400, detail=exc.public_message)
+
+        csrf_token = csrf_service.generate_csrf_token()
+        return _render_portal(
+            request, issuer=issuer,
+            template_name="registrar_pago.html",
+            active_page="issued",
+            title="Registrar pago",
+            extra={"inv": inv, "state": state, "csrf_token": csrf_token},
+        )
+
+    @router.post("/invoices/{uuid}/registrar-pago", response_class=HTMLResponse)
+    async def portal_registrar_pago_post(
+        request: Request,
+        uuid: str,
+        issuer: dict = Depends(get_portal_issuer),
+        csrf_token: str = Form(...),
+        fecha_pago: str = Form(...),
+        forma_pago: str = Form(...),
+        moneda_pago: str = Form("MXN"),
+        tipo_cambio_pago: str = Form(""),
+        monto_pagado: str = Form(...),
+        importe_abonado: str = Form(...),
+        num_operacion: str = Form(""),
+    ):
+        """Process REP form: emit CFDI tipo P via Facturapi + persist payment record."""
+        from decimal import Decimal
+        from services.invoices.rep import build_rep_payload, get_ppd_state, record_payment
+        from services.errors import ValidationError
+        from facturapi_client import create_invoice, FacturapiError
+
+        # CSRF check
+        if not csrf_service.verify_csrf_token(csrf_token):
+            raise HTTPException(status_code=403, detail="Token CSRF inválido")
+
+        issuer_id = issuer["id"]
+        if not issuer.get("facturapi_org_id"):
+            raise HTTPException(status_code=400, detail="El emisor no tiene organización Facturapi configurada.")
+
+        conn = db()
+        inv_row = conn.execute(
+            """SELECT id, uuid, total, currency, payment_method,
+                      customer_rfc, customer_legal_name, customer_zip, customer_tax_system
+               FROM invoices
+               WHERE issuer_id = ? AND LOWER(TRIM(uuid)) = LOWER(?) LIMIT 1""",
+            (issuer_id, uuid.strip()),
+        ).fetchone()
+        if not inv_row:
+            conn.close()
+            raise HTTPException(status_code=404, detail="Factura no encontrada")
+        inv = dict(inv_row)
+        if inv.get("payment_method") != "PPD":
+            conn.close()
+            raise HTTPException(status_code=400, detail="Solo facturas PPD pueden recibir complemento de pago.")
+
+        try:
+            state = get_ppd_state(issuer_id, inv["id"])
+        except ValidationError as exc:
+            conn.close()
+            raise HTTPException(status_code=400, detail=exc.public_message)
+
+        # Parse numeric inputs
+        try:
+            monto_pagado_f = float(monto_pagado.replace(",", "").strip())
+            importe_abonado_f = float(importe_abonado.replace(",", "").strip())
+        except ValueError:
+            conn.close()
+            raise HTTPException(status_code=400, detail="Monto inválido")
+
+        saldo_anterior_f = state["saldo_insoluto"]
+        parcialidad = state["next_parcialidad"]
+        saldo_insoluto_f = float(
+            max(Decimal(str(saldo_anterior_f)) - Decimal(str(importe_abonado_f)), Decimal("0"))
+        )
+
+        try:
+            payload = build_rep_payload(
+                invoice=inv,
+                fecha_pago=fecha_pago,
+                forma_pago=forma_pago,
+                moneda_pago=moneda_pago,
+                tipo_cambio_pago=tipo_cambio_pago.strip() or None,
+                monto_pagado=monto_pagado_f,
+                importe_abonado=importe_abonado_f,
+                saldo_anterior=saldo_anterior_f,
+                num_operacion=num_operacion.strip() or None,
+                parcialidad=parcialidad,
+            )
+        except Exception as exc:
+            conn.close()
+            logger.exception("REP build_rep_payload error issuer_id=%s uuid=%s", issuer_id, uuid)
+            raise HTTPException(status_code=400, detail=str(exc))
+
+        # Emit via Facturapi
+        try:
+            rep_invoice = create_invoice(issuer_id, issuer["facturapi_org_id"], payload)
+        except FacturapiError as exc:
+            conn.close()
+            logger.error("Facturapi REP error issuer_id=%s: %s", issuer_id, exc)
+            raise HTTPException(status_code=422, detail=f"Error al timbrar complemento: {exc}")
+
+        rep_fact_id = rep_invoice.get("id")
+        rep_uuid = rep_invoice.get("uuid")
+
+        # Persist locally
+        try:
+            # Insert REP invoice record in invoices table so downloads work
+            conn.execute(
+                """INSERT INTO invoices (
+                    issuer_id, facturapi_invoice_id, uuid, total, currency,
+                    payment_method, tipo_comprobante,
+                    customer_rfc, customer_legal_name, customer_zip, customer_tax_system
+                ) VALUES (?, ?, ?, ?, ?, ?, 'P', ?, ?, ?, ?)""",
+                (
+                    issuer_id, rep_fact_id, rep_uuid,
+                    monto_pagado_f, moneda_pago,
+                    "NA",
+                    inv["customer_rfc"], inv["customer_legal_name"],
+                    inv.get("customer_zip") or "00000", inv.get("customer_tax_system") or "",
+                ),
+            )
+            rep_invoice_local_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+
+            record_payment(
+                conn,
+                issuer_id=issuer_id,
+                invoice_id=inv["id"],
+                rep_invoice_id=rep_invoice_local_id,
+                rep_uuid=rep_uuid,
+                parcialidad=parcialidad,
+                fecha_pago=fecha_pago,
+                forma_pago=forma_pago,
+                moneda_pago=moneda_pago,
+                tipo_cambio_pago=tipo_cambio_pago.strip() or None,
+                monto_pagado=monto_pagado_f,
+                importe_abonado=importe_abonado_f,
+                saldo_anterior=saldo_anterior_f,
+                saldo_insoluto=saldo_insoluto_f,
+                num_operacion=num_operacion.strip() or None,
+            )
+            conn.commit()
+        except Exception:
+            logger.exception("REP DB persist error issuer_id=%s", issuer_id)
+            conn.close()
+            # REP was emitted — redirect to success even if local persist failed
+            log_action(request, "rep_created", issuer_id=issuer_id, invoice_id=rep_fact_id, uuid=(rep_uuid or "")[:36])
+            return RedirectResponse(url=f"/portal/cfdi/issued/{rep_uuid}", status_code=302)
+        finally:
+            conn.close()
+
+        log_action(request, "rep_created", issuer_id=issuer_id, invoice_id=rep_fact_id, uuid=(rep_uuid or "")[:36])
+        return RedirectResponse(url=f"/portal/cfdi/issued/{rep_uuid}", status_code=302)
+
+    # ===== Cancellation routes =====
+
+    @router.post("/invoices/{uuid}/cancel")
+    async def portal_cancel_invoice(
+        request: Request,
+        uuid: str,
+        issuer: dict = Depends(get_portal_issuer),
+    ):
+        """Cancel an existing CFDI via the cancellation service."""
+        from fastapi.responses import JSONResponse
+        from services.cancellation.service import cancel_invoice as svc_cancel
+        from services.cancellation.types import Motivo
+
+        form = await request.form()
+        csrf_token = form.get("csrf_token", "")
+        if not csrf_service.verify_csrf_token(csrf_token):
+            return JSONResponse({"ok": False, "detail": "CSRF inválido"}, status_code=403)
+
+        motivo_raw = (form.get("motivo") or "").strip()
+        substitute_uuid = (form.get("substitute_uuid") or "").strip() or None
+        try:
+            motivo = Motivo(motivo_raw)
+        except ValueError:
+            return JSONResponse({"ok": False, "detail": f"Motivo inválido: {motivo_raw}"}, status_code=400)
+
+        try:
+            result = svc_cancel(
+                issuer_id=issuer["id"],
+                user_id=getattr(request.state, "user_id", 0),
+                cfdi_uuid=uuid,
+                motivo=motivo,
+                substitute_uuid=substitute_uuid,
+            )
+        except ValueError as exc:
+            return JSONResponse({"ok": False, "detail": str(exc)}, status_code=400)
+        except Exception as exc:
+            logger.exception("Cancel failed uuid=%s", uuid)
+            return JSONResponse({"ok": False, "detail": f"Error al cancelar: {exc}"}, status_code=502)
+
+        log_action(request, "invoice_cancelled", issuer_id=issuer["id"], uuid=uuid[:36], motive=motivo_raw, cancel_status=result["status"])
+        return JSONResponse({"ok": True, **result})
+
+    @router.get("/invoices/{uuid}/substitute", response_class=HTMLResponse)
+    def portal_substitute_form(
+        request: Request, uuid: str, issuer: dict = Depends(get_portal_issuer),
+    ):
+        """Render the invoice creation form prefilled with the original invoice data."""
+        issuer_id = issuer["id"]
+        conn = db()
+        try:
+            inv = conn.execute(
+                """SELECT * FROM invoices WHERE issuer_id = ? AND LOWER(TRIM(uuid)) = LOWER(?) LIMIT 1""",
+                (issuer_id, uuid.strip()),
+            ).fetchone()
+            if not inv:
+                raise HTTPException(status_code=404, detail="Factura no encontrada")
+            inv = dict(inv)
+            items_rows = conn.execute(
+                "SELECT * FROM invoice_items WHERE invoice_id = ? ORDER BY id", (inv["id"],),
+            ).fetchall()
+        finally:
+            conn.close()
+
+        return _render_portal(
+            request, issuer=issuer,
+            template_name="portal_create_invoice.html",
+            active_page="create",
+            title="Emitir reemplazo",
+            extra={
+                "csrf_token": csrf_service.generate_csrf_token(),
+                "substitute_for_uuid": inv["uuid"],
+                "customer_prefill": {
+                    "customer_rfc": inv.get("customer_rfc") or "",
+                    "customer_legal_name": inv.get("customer_legal_name") or "",
+                    "customer_zip": inv.get("customer_zip") or "",
+                    "customer_tax_system": inv.get("customer_tax_system") or "",
+                    "customer_email": inv.get("customer_email") or "",
+                },
+                "items_prefill": [dict(r) for r in items_rows],
+                "comprobante_prefill": {
+                    "tipo_comprobante": inv.get("tipo_comprobante") or "",
+                    "currency": inv.get("currency") or "MXN",
+                    "payment_method": inv.get("payment_method") or "",
+                    "payment_form": inv.get("payment_form") or "",
+                    "cfdi_use": inv.get("cfdi_use") or "",
+                },
+            },
+        )
+
+    @router.get("/api/invoices/search-substitute-candidates")
+    def search_substitute_candidates(
+        request: Request,
+        q: str = Query(""),
+        exclude: str = Query(""),
+        issuer: dict = Depends(get_portal_issuer),
+    ):
+        """Search issued Ingreso invoices suitable as substitution candidates."""
+        from fastapi.responses import JSONResponse
+        issuer_id = issuer["id"]
+        conn = db()
+        try:
+            rows = conn.execute(
+                """SELECT uuid, serie, folio, fecha_emision, rfc_receptor, nombre_receptor, total, moneda
+                     FROM sat_cfdi
+                    WHERE issuer_id = ?
+                      AND direction = 'issued'
+                      AND UPPER(COALESCE(tipo_comprobante,'')) = 'I'
+                      AND COALESCE(status,'') NOT IN ('0','C','cancelled','Cancelado')
+                      AND COALESCE(cancellation_status,'none') = 'none'
+                      AND LOWER(TRIM(uuid)) != LOWER(?)
+                      AND (
+                        ? = ''
+                        OR LOWER(COALESCE(uuid,'')) LIKE '%' || LOWER(?) || '%'
+                        OR LOWER(COALESCE(rfc_receptor,'')) LIKE '%' || LOWER(?) || '%'
+                        OR LOWER(COALESCE(nombre_receptor,'')) LIKE '%' || LOWER(?) || '%'
+                      )
+                    ORDER BY fecha_emision DESC
+                    LIMIT 50""",
+                (issuer_id, exclude.strip(), q, q, q, q),
+            ).fetchall()
+        finally:
+            conn.close()
+        return JSONResponse({"items": [dict(r) for r in rows]})
 

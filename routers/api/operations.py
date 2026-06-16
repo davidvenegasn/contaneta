@@ -591,6 +591,22 @@ def register_operations_routes(router):
 
 
 
+    @router.get("/banxico-rate")
+    def api_banxico_rate(
+        request: Request,
+        issuer: dict = Depends(get_portal_issuer),
+        date: str = Query(None, description="YYYY-MM-DD; defaults to today"),
+        currency: str = Query("USD"),
+    ):
+        """Fetch Banxico FIX exchange rate for a specific date (daily, for REP/TipoCambio)."""
+        from services.invoices.banxico_client import get_rate
+        fecha = (date or "").strip() or datetime.now().strftime("%Y-%m-%d")
+        rate = get_rate(fecha, currency.upper())
+        if rate is None:
+            raise HTTPException(status_code=404, detail="Tipo de cambio no disponible para esa fecha")
+        return ok({"currency": currency.upper(), "date": fecha, "rate": rate, "source": "banxico_dof"})
+
+
     @router.get("/metrics/trend")
     def api_metrics_trend(
         request: Request,

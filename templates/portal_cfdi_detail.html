@@ -86,6 +86,14 @@
         <button type="button" class="btn btn--sm btn--ghost" id="copyUuidBtn" data-uuid="{{ cfdi.uuid or '' }}" title="Copiar UUID">Copiar UUID</button>
         <a href="{{ request.url }}" class="btn btn--sm btn--ghost" target="_blank" rel="noopener" title="Abrir en nueva pestaña">Abrir en nueva pestaña</a>
         {% if direction == 'issued' and invoice_record and cfdi.status|default('')|upper in ['V','VIGENTE','1'] and not invoice_record.cancelled %}
+          {% set _tc = cfdi.tipo_comprobante|default('')|upper %}
+          {% set _mp = cfdi.metodo_pago|default('')|upper %}
+          {% if _mp == 'PPD' and _tc in ['I', ''] %}
+            <a href="/portal/invoices/{{ cfdi.uuid }}/registrar-pago" class="btn btn--sm btn--primary">Registrar pago</a>
+          {% endif %}
+          {% if _tc == 'I' %}
+            <a href="/portal/invoices/{{ cfdi.uuid }}/nota-credito" class="btn btn--sm btn--secondary">Nota de crédito</a>
+          {% endif %}
           <button type="button" class="btn btn--sm btn--danger-outline" id="cancelInvoiceBtn">Cancelar factura</button>
         {% endif %}
       </div>
@@ -219,34 +227,105 @@
     </div>
   </div>
 
-  {# ===== Cancel Invoice Modal ===== #}
+  {# ===== Cancel Invoice Modal (3-option flow) ===== #}
   {% if direction == 'issued' and invoice_record and cfdi.status|default('')|upper in ['V','VIGENTE','1'] and not invoice_record.cancelled %}
-  <div class="confirm-modal" id="cancelModal" hidden aria-modal="true" role="dialog" aria-labelledby="cancelModalTitle">
-    <div class="confirm-modal__card" style="max-width:480px">
-      <h2 class="confirm-modal__title" id="cancelModalTitle">Cancelar factura</h2>
-      <p class="confirm-modal__text">¿Por qué cancelas esta factura?</p>
-      <div id="cancelMotiveStep" style="display:flex;flex-direction:column;gap:10px">
-        <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer">
-          <input type="radio" name="cancelMotive" value="01" style="margin-top:3px">
-          <span><strong>Error en los datos</strong> — voy a crear una nueva</span>
-        </label>
-        <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer">
-          <input type="radio" name="cancelMotive" value="02" checked style="margin-top:3px">
-          <span><strong>Error en los datos</strong> — sin reemplazo</span>
-        </label>
-        <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer">
-          <input type="radio" name="cancelMotive" value="03" style="margin-top:3px">
-          <span><strong>No se realizó</strong> la operación</span>
-        </label>
-        <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer">
-          <input type="radio" name="cancelMotive" value="04" style="margin-top:3px">
-          <span>Relacionada a <strong>factura global</strong></span>
-        </label>
+
+  {# Cancellation pending banner #}
+  {% if invoice_record.cancel_status == 'pending' %}
+  <div style="margin:1rem 0;padding:.75rem 1rem;background:var(--warning-bg,#fef9c3);border:1px solid var(--warning-border,#fde68a);border-radius:.5rem;font-size:.85rem;color:var(--warning-text,#92400e);">
+    &#9203; Cancelacion enviada al SAT — esperando respuesta del receptor (hasta 72 horas).
+  </div>
+  {% endif %}
+
+  <style>
+    .cancel-modal { position:fixed; inset:0; z-index:900; display:flex; align-items:center; justify-content:center; padding:1rem; }
+    .cancel-modal[hidden] { display:none !important; }
+    .cancel-modal__backdrop { position:absolute; inset:0; background:rgba(0,0,0,.45); cursor:pointer; }
+    .cancel-modal__panel { position:relative; background:var(--surface); border:1px solid var(--border); border-radius:1rem; max-width:520px; width:100%; box-shadow:0 16px 48px rgba(0,0,0,.18); overflow:hidden; padding:1.5rem; }
+    .cancel-modal__panel--large { max-width:640px; }
+    .cancel-modal__close { position:absolute; top:.75rem; right:.75rem; background:none; border:none; cursor:pointer; color:var(--text-muted); font-size:1.3rem; line-height:1; padding:.2rem .4rem; border-radius:.3rem; }
+    .cancel-modal__close:hover { background:var(--surface-2); color:var(--text); }
+    .cancel-modal__title { font-size:1rem; font-weight:700; color:var(--text); margin:0 0 .25rem; }
+    .cancel-modal__subtitle { font-size:.8rem; color:var(--text-muted); margin:0 0 1rem; }
+    .cancel-modal__warn { background:var(--warning-bg,#fef9c3); border:1px solid var(--warning-border,#fde68a); border-radius:.45rem; padding:.65rem .85rem; font-size:.78rem; color:var(--warning-text,#92400e); margin:.75rem 0 0; }
+    .cancel-modal__actions { display:flex; gap:.65rem; justify-content:flex-end; margin-top:1rem; }
+    .cancel-options { display:flex; flex-direction:column; gap:.5rem; }
+    .cancel-option { display:flex; gap:.85rem; align-items:flex-start; border:1.5px solid var(--border); border-radius:.6rem; padding:.85rem 1rem; cursor:pointer; transition:border-color .15s, background .15s; background:var(--surface); text-decoration:none; color:inherit; font:inherit; text-align:left; width:100%; }
+    .cancel-option:hover { border-color:var(--accent); background:var(--accent-soft,rgba(99,102,241,.06)); }
+    .cancel-option__icon { font-size:1.5rem; line-height:1; flex-shrink:0; }
+    .cancel-option__body { flex:1; min-width:0; }
+    .cancel-option__title { font-size:.85rem; font-weight:700; color:var(--text); line-height:1.2; }
+    .cancel-option__hint { font-size:.75rem; color:var(--text-muted); margin-top:.15rem; }
+    .substitute-list { max-height:320px; overflow-y:auto; margin:.75rem 0; }
+    .substitute-row { display:block; width:100%; text-align:left; border:1px solid var(--border); border-radius:.4rem; padding:.6rem .8rem; margin-bottom:.35rem; cursor:pointer; background:var(--surface); font:inherit; color:inherit; }
+    .substitute-row:hover { border-color:var(--accent); background:var(--accent-soft,rgba(99,102,241,.06)); }
+    .substitute-row__client { font-size:.75rem; color:var(--text-muted); margin-top:.15rem; }
+    .substitute-row__total { font-size:.85rem; font-weight:600; margin-top:.2rem; }
+    #substituteSearch { width:100%; padding:.5rem .75rem; border:1px solid var(--border); border-radius:.4rem; font-size:.85rem; margin-bottom:.5rem; }
+  </style>
+
+  {# Main cancel modal: 3 options #}
+  <div id="cancelModal" class="cancel-modal" hidden>
+    <div class="cancel-modal__backdrop" data-close-cancel="1"></div>
+    <div class="cancel-modal__panel" role="dialog" aria-modal="true">
+      <button type="button" class="cancel-modal__close" data-close-cancel="1" aria-label="Cerrar">&times;</button>
+      <h2 class="cancel-modal__title">¿Qué quieres hacer con esta factura?</h2>
+      <p class="cancel-modal__subtitle">
+        Folio {{ cfdi.serie|default('') }}{{ cfdi.folio|default('—') }} &middot; ${{ '{:,.2f}'.format(cfdi.total|float) }} {{ cfdi.moneda|default('MXN') }}
+      </p>
+      <div class="cancel-options">
+        <a href="/portal/invoices/{{ cfdi.uuid }}/substitute" class="cancel-option">
+          <div class="cancel-option__icon">&#128260;</div>
+          <div class="cancel-option__body">
+            <div class="cancel-option__title">Cancelar y emitir una nueva</div>
+            <div class="cancel-option__hint">Para corregir errores. Motivo 01.</div>
+          </div>
+        </a>
+        <button type="button" class="cancel-option" data-action="cancel-no-replace">
+          <div class="cancel-option__icon">&#128683;</div>
+          <div class="cancel-option__body">
+            <div class="cancel-option__title">Cancelar sin reemplazo</div>
+            <div class="cancel-option__hint">La operación no se llevó a cabo.</div>
+          </div>
+        </button>
+        <button type="button" class="cancel-option" data-action="cancel-existing-replace">
+          <div class="cancel-option__icon">&#128203;</div>
+          <div class="cancel-option__body">
+            <div class="cancel-option__title">Cancelar y sustituir con otra ya emitida</div>
+            <div class="cancel-option__hint">Ya tengo el reemplazo timbrado.</div>
+          </div>
+        </button>
       </div>
-      <p id="cancelError" class="confirm-modal__text" style="color:var(--error,#dc2626);display:none"></p>
-      <div class="confirm-modal__actions" style="margin-top:20px">
-        <button type="button" class="btn btn--sm confirm-modal__btn--cancel" id="cancelModalClose">Volver</button>
-        <button type="button" class="btn btn--sm confirm-modal__btn--danger" id="cancelModalConfirm">Continuar</button>
+    </div>
+  </div>
+
+  {# Confirm no-replace sub-modal #}
+  <div id="cancelConfirmModal" class="cancel-modal" hidden>
+    <div class="cancel-modal__backdrop" data-close-cancel="1"></div>
+    <div class="cancel-modal__panel" role="dialog" aria-modal="true">
+      <h2 class="cancel-modal__title">¿Seguro que quieres cancelar sin reemplazo?</h2>
+      <p class="cancel-modal__subtitle">Esto cancela la factura definitivamente.</p>
+      {% if cfdi.total|float > 5000 %}
+        <div class="cancel-modal__warn">&#9888; Esta factura supera $5,000 MXN. El receptor tiene 72h para aceptar o rechazar la cancelación.</div>
+      {% endif %}
+      <div class="cancel-modal__actions">
+        <button type="button" class="btn btn--ghost" data-close-cancel="1">Volver</button>
+        <button type="button" class="btn btn--danger" id="cancelConfirmBtn">Sí, cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  {# Picker for existing substitute #}
+  <div id="substitutePickerModal" class="cancel-modal" hidden>
+    <div class="cancel-modal__backdrop" data-close-cancel="1"></div>
+    <div class="cancel-modal__panel cancel-modal__panel--large" role="dialog" aria-modal="true">
+      <button type="button" class="cancel-modal__close" data-close-cancel="1" aria-label="Cerrar">&times;</button>
+      <h2 class="cancel-modal__title">Elige la factura que sustituye a esta</h2>
+      <p class="cancel-modal__subtitle">Solo se muestran tus facturas tipo Ingreso vigentes.</p>
+      <input type="search" id="substituteSearch" placeholder="Buscar por UUID, RFC o nombre..." />
+      <div id="substituteList" class="substitute-list"></div>
+      <div class="cancel-modal__actions">
+        <button type="button" class="btn btn--ghost" data-close-cancel="1">Cerrar</button>
       </div>
     </div>
   </div>
@@ -289,125 +368,125 @@
       if (dl && window.portalToast) window.portalToast({ type: 'success', title: 'Descargado', message: 'El archivo se está descargando.' });
     });
 
-    // ===== Cancel Invoice Logic =====
+    // ===== Cancel Invoice Logic (3-option flow) =====
     var cancelBtn = document.getElementById('cancelInvoiceBtn');
-    var cancelModal = document.getElementById('cancelModal');
-    var cancelClose = document.getElementById('cancelModalClose');
-    var cancelConfirm = document.getElementById('cancelModalConfirm');
-    var cancelError = document.getElementById('cancelError');
-    var invoiceUuid = {{ (cfdi.uuid or '')|tojson }};
-
-    function showCancelModal() {
-      if (cancelModal) { cancelModal.hidden = false; }
-    }
-    function hideCancelModal() {
-      if (cancelModal) { cancelModal.hidden = true; }
-      if (cancelError) { cancelError.style.display = 'none'; cancelError.textContent = ''; }
-    }
-
-    if (cancelBtn) cancelBtn.addEventListener('click', showCancelModal);
-    if (cancelClose) cancelClose.addEventListener('click', hideCancelModal);
-    if (cancelModal) cancelModal.addEventListener('click', function(e) {
-      if (e.target === cancelModal) hideCancelModal();
-    });
-
-    function getSelectedMotive() {
-      var radios = document.querySelectorAll('input[name="cancelMotive"]');
-      for (var i = 0; i < radios.length; i++) {
-        if (radios[i].checked) return radios[i].value;
-      }
-      return '02';
-    }
+    var modal = document.getElementById('cancelModal');
+    var confirmModal = document.getElementById('cancelConfirmModal');
+    var pickerModal = document.getElementById('substitutePickerModal');
+    var cfdiUuid = {{ (cfdi.uuid or '')|tojson }};
 
     function getCsrf() {
       var el = document.querySelector('meta[name="csrf-token"]');
       return el ? el.getAttribute('content') : '';
     }
+    function openM(m) { if (m) m.hidden = false; }
+    function closeM(m) { if (m) m.hidden = true; }
+    function closeAll() { [modal, confirmModal, pickerModal].forEach(closeM); }
 
-    if (cancelConfirm) cancelConfirm.addEventListener('click', function() {
-      var motive = getSelectedMotive();
+    // Open main modal
+    if (cancelBtn) cancelBtn.addEventListener('click', function() { openM(modal); });
 
-      if (motive === '01') {
-        // Replacement flow: fetch original data, then open Quick Invoice
-        hideCancelModal();
-        if (window.uiToast) window.uiToast({ type: 'info', title: 'Cargando datos de la factura…', timeout: 3000 });
-        fetch('/api/invoices/' + encodeURIComponent(invoiceUuid) + '/data', { credentials: 'same-origin' })
-          .then(function(r) { return r.json(); })
-          .then(function(res) {
-            if (!res || !res.ok) {
-              if (window.uiToast) window.uiToast({ type: 'danger', title: 'Error', message: res.detail || 'No se pudo cargar la factura.' });
-              return;
-            }
-            var d = res.data || res;
-            var items = d.items || [];
-            var presetLines = items.filter(function(it) { return it.product_id; }).map(function(it) {
-              return { product_id: it.product_id, quantity: it.quantity || 1 };
-            });
-            var openOpts = {
-              replaces_uuid: invoiceUuid,
-              prefillCfdiUse: d.cfdi_use,
-              prefillPaymentForm: d.payment_form,
-              prefillPaymentMethod: d.payment_method,
-              prefillCurrency: d.currency,
-              allowPartial: true
-            };
-            if (d.customer_id) openOpts.preselectedCustomerId = d.customer_id;
-            if (presetLines.length) {
-              openOpts.presetLines = presetLines;
-            } else if (items.length && items[0].product_id) {
-              openOpts.preselectedProductId = items[0].product_id;
-            }
-            if (window.QuickInvoice && window.QuickInvoice.open) {
-              window.QuickInvoice.open(openOpts);
-            } else {
-              if (window.uiToast) window.uiToast({ type: 'danger', title: 'Error', message: 'Factura rápida no disponible en esta página.' });
-            }
-          })
-          .catch(function(err) {
-            if (window.uiToast) window.uiToast({ type: 'danger', title: 'Error', message: (err && err.message) || 'Error de conexión.' });
-          });
-        return;
-      }
+    // Close handlers (backdrop + close buttons)
+    document.querySelectorAll('[data-close-cancel="1"]').forEach(function(el) {
+      el.addEventListener('click', closeAll);
+    });
 
-      // Motives 02/03/04: direct cancel
-      cancelConfirm.disabled = true;
-      cancelConfirm.textContent = 'Cancelando…';
-      if (cancelError) { cancelError.style.display = 'none'; }
+    // Option 2: cancel without replacement → confirm sub-modal
+    var noReplaceBtn = modal ? modal.querySelector('[data-action="cancel-no-replace"]') : null;
+    if (noReplaceBtn) noReplaceBtn.addEventListener('click', function() {
+      closeM(modal);
+      openM(confirmModal);
+    });
 
-      var csrf = getCsrf();
-      var headers = { 'Content-Type': 'application/json' };
-      if (csrf) headers['X-CSRF-Token'] = csrf;
-
-      fetch('/api/invoices/' + encodeURIComponent(invoiceUuid) + '/cancel', {
+    // Confirm cancel no-replace
+    var confirmBtn = document.getElementById('cancelConfirmBtn');
+    if (confirmBtn) confirmBtn.addEventListener('click', function() {
+      confirmBtn.disabled = true; confirmBtn.textContent = 'Cancelando…';
+      fetch('/portal/invoices/' + encodeURIComponent(cfdiUuid) + '/cancel', {
         method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
         credentials: 'same-origin',
-        headers: headers,
-        body: JSON.stringify({ motive: motive })
-      })
-      .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
-      .then(function(res) {
-        cancelConfirm.disabled = false;
-        cancelConfirm.textContent = 'Continuar';
-        if (res.ok && res.data && res.data.ok !== false) {
-          hideCancelModal();
-          var cs = (res.data.data && res.data.data.cancel_status) || res.data.cancel_status || 'accepted';
-          if (cs === 'pending') {
-            if (window.uiToast) window.uiToast({ type: 'info', title: 'Cancelación en proceso', message: 'El receptor tiene 72 horas para aceptar o rechazar.', timeout: 6000 });
+        body: 'csrf_token=' + encodeURIComponent(getCsrf()) + '&motivo=02',
+      }).then(function(r) { return r.json(); }).then(function(j) {
+        if (j.ok) {
+          closeAll();
+          if (j.status === 'pending') {
+            var t = window.portalToast || window.uiToast;
+            if (t) t({ type: 'info', title: 'Cancelación enviada', message: 'El receptor tiene 72h para aceptar la cancelación.', timeout: 6000 });
           } else {
-            if (window.uiToast) window.uiToast({ type: 'success', title: 'Factura cancelada', message: '' });
+            var t2 = window.portalToast || window.uiToast;
+            if (t2) t2({ type: 'success', title: 'Factura cancelada' });
           }
           setTimeout(function() { window.location.reload(); }, 1500);
         } else {
-          var msg = (res.data && res.data.detail) || 'Error al cancelar.';
-          if (cancelError) { cancelError.textContent = msg; cancelError.style.display = 'block'; }
+          alert('Error: ' + (j.detail || 'no se pudo cancelar'));
+          confirmBtn.disabled = false; confirmBtn.textContent = 'Sí, cancelar';
         }
-      })
-      .catch(function(err) {
-        cancelConfirm.disabled = false;
-        cancelConfirm.textContent = 'Continuar';
-        if (cancelError) { cancelError.textContent = (err && err.message) || 'Error de conexión.'; cancelError.style.display = 'block'; }
+      }).catch(function(err) {
+        alert('Error de conexión: ' + (err.message || ''));
+        confirmBtn.disabled = false; confirmBtn.textContent = 'Sí, cancelar';
       });
     });
+
+    // Option 3: cancel with existing substitute
+    var existingBtn = modal ? modal.querySelector('[data-action="cancel-existing-replace"]') : null;
+    if (existingBtn) existingBtn.addEventListener('click', function() {
+      closeM(modal);
+      openM(pickerModal);
+      loadSubstituteCandidates('');
+    });
+
+    function escapeHtml(s) {
+      return String(s || '').replace(/[&<>"']/g, function(c) {
+        return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+      });
+    }
+
+    function loadSubstituteCandidates(q) {
+      fetch('/portal/api/invoices/search-substitute-candidates?q=' + encodeURIComponent(q) + '&exclude=' + encodeURIComponent(cfdiUuid), { credentials: 'same-origin' })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          var list = document.getElementById('substituteList');
+          list.innerHTML = '';
+          (data.items || []).forEach(function(inv) {
+            var row = document.createElement('button');
+            row.type = 'button';
+            row.className = 'substitute-row';
+            row.innerHTML = '<div><strong>' + escapeHtml(inv.serie || '') + escapeHtml(inv.folio || '') + '</strong> · ' + escapeHtml((inv.fecha_emision || '').slice(0,10)) +
+                            '</div><div class="substitute-row__client">' + escapeHtml(inv.nombre_receptor || '') + ' · ' + escapeHtml(inv.uuid) + '</div>' +
+                            '<div class="substitute-row__total">$' + Number(inv.total || 0).toFixed(2) + '</div>';
+            row.addEventListener('click', function() { confirmSubstitute(inv.uuid); });
+            list.appendChild(row);
+          });
+          if ((data.items || []).length === 0) {
+            list.innerHTML = '<p class="muted">No hay facturas que coincidan.</p>';
+          }
+        });
+    }
+
+    var searchInput = document.getElementById('substituteSearch');
+    if (searchInput) searchInput.addEventListener('input', function(e) {
+      loadSubstituteCandidates(e.target.value);
+    });
+
+    function confirmSubstitute(substituteUuid) {
+      if (!confirm('Esto cancela la factura actual y la sustituye con ' + substituteUuid.slice(0,8) + '… ¿Continuar?')) return;
+      fetch('/portal/invoices/' + encodeURIComponent(cfdiUuid) + '/cancel', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        credentials: 'same-origin',
+        body: 'csrf_token=' + encodeURIComponent(getCsrf()) + '&motivo=01&substitute_uuid=' + encodeURIComponent(substituteUuid),
+      }).then(function(r) { return r.json(); }).then(function(j) {
+        if (j.ok) {
+          closeAll();
+          var t = window.portalToast || window.uiToast;
+          if (t) t({ type: 'success', title: 'Factura cancelada y sustituida' });
+          setTimeout(function() { window.location.reload(); }, 1500);
+        } else {
+          alert('Error: ' + (j.detail || 'falló'));
+        }
+      });
+    }
   })();
   </script>
   {% endif %}

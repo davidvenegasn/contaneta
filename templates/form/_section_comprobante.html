@@ -2,6 +2,14 @@
   <div class="card-title-row mb-14"><h3 class="section-title">02 — Pago y condiciones</h3></div>
   <div class="row">
     <div>
+      <label>Tipo de comprobante</label>
+      <select name="tipo_comprobante" id="tipo_comprobante" required>
+        <option value="I" selected>I — Ingreso</option>
+        <option value="E">E — Egreso (nota de crédito)</option>
+        <option value="P">P — Pago (complemento de pago)</option>
+      </select>
+    </div>
+    <div>
       <label>Moneda <span class="tip" data-tip="Moneda en la que cobras. Si no es MXN, se requiere tipo de cambio.">?</span></label>
       <select name="currency" id="currency" required>
         <option value="">Cargando…</option>
@@ -13,18 +21,130 @@
     </div>
   </div>
 
-  <div class="row">
+  {# MetodoPago + FormaP — hidden for tipo P and T (not valid at header level for those types) #}
+  <div id="metodoPagoRow" class="row">
     <div>
-      <label>Método de pago <span class="tip" data-tip="PUE: si te pagan en una sola exhibición. PPD: si te pagan en parcialidades (luego se emite complemento de pago).">?</span></label>
+      <label>Método de pago <span class="tip" data-tip="PUE: el cliente paga en una sola exhibición. PPD: pagará después o en parcialidades — deberás emitir un complemento de pago al recibir cada cobro.">?</span></label>
       <select name="payment_method" id="payment_method" required>
         <option value="">Cargando…</option>
       </select>
     </div>
-    <div>
-      <label>Forma de pago <span class="tip" data-tip="Cómo te pagaron: transferencia, efectivo, tarjeta, etc.">?</span></label>
+    <div id="formaPagoWrapper">
+      <label>Forma de pago <span class="tip" data-tip="Cómo te pagaron: transferencia, efectivo, tarjeta, etc. Con PPD siempre es Por definir (99).">?</span></label>
       <select name="payment_form" id="payment_form" required>
         <option value="">Cargando…</option>
       </select>
+      <p id="formaPagoHint" class="muted" style="font-size:11px;margin:4px 0 0;display:none">
+        Con PPD la forma de pago es siempre <strong>Por definir (99)</strong> — se especifica al registrar cada cobro.
+      </p>
     </div>
   </div>
+
+  {# Info note for tipo P and T #}
+  <div id="tipoPNote" class="tipo-p-note" hidden>
+    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+    <span id="tipoPNoteText">Para el complemento de pago, la forma de cobro se captura dentro del complemento. El uso CFDI se establece automáticamente como <strong>P01</strong>.</span>
+  </div>
 </div>
+
+<script>
+(function () {
+  var tcSel      = document.getElementById('tipo_comprobante');
+  var methodRow  = document.getElementById('metodoPagoRow');
+  var tipoPNote  = document.getElementById('tipoPNote');
+  var tipoPNoteT = document.getElementById('tipoPNoteText');
+  var payMethod  = document.getElementById('payment_method');
+  var payForm    = document.getElementById('payment_form');
+  var formHint   = document.getElementById('formaPagoHint');
+  if (!tcSel) return;
+
+  // ── FormaPago ↔ MetodoPago coupling (CFDI40105) ─────────────────────────
+  // PPD → FormaP MUST be "99". PUE → FormaP MUST NOT be "99".
+  function syncFormaWithMetodo(metodo) {
+    if (!payForm || payForm.options.length <= 1) return;
+    if (metodo === 'PPD') {
+      payForm.value = '99';
+      payForm.disabled = true;
+      payForm.style.background = 'var(--surface-2,#f3f4f6)';
+      payForm.style.cursor = 'not-allowed';
+      if (formHint) formHint.style.display = 'block';
+    } else {
+      payForm.disabled = false;
+      payForm.style.background = '';
+      payForm.style.cursor = '';
+      if (formHint) formHint.style.display = 'none';
+      // Remove "99 — Por definir" option when PUE so user can't pick it
+      Array.from(payForm.options).forEach(function (opt) {
+        opt.hidden = (opt.value === '99');
+      });
+      // If current value is "99", reset to empty so user must pick
+      if (payForm.value === '99') payForm.value = '';
+    }
+  }
+
+  // Re-apply coupling after catalog options load
+  function trySyncForma() {
+    if (!payForm || payForm.options.length <= 1) return setTimeout(trySyncForma, 100);
+    syncFormaWithMetodo((payMethod && payMethod.value) || 'PUE');
+  }
+
+  if (payMethod) {
+    payMethod.addEventListener('change', function () { syncFormaWithMetodo(payMethod.value); });
+    // Watch for catalog options loading
+    new MutationObserver(trySyncForma).observe(payMethod, { childList: true });
+  }
+  if (payForm) {
+    new MutationObserver(trySyncForma).observe(payForm, { childList: true });
+  }
+
+  // ── TipoComprobante changes ───────────────────────────────────────────────
+  function applyTipoComprobante(tc) {
+    var hideMetodo = (tc === 'P' || tc === 'T'); // SAT: not valid at header for P/T
+    if (methodRow)  methodRow.hidden  = hideMetodo;
+    if (tipoPNote)  tipoPNote.hidden  = !hideMetodo;
+
+    if (tipoPNoteT) {
+      tipoPNoteT.innerHTML = tc === 'T'
+        ? 'Para traslados, método y forma de pago no aplican en el encabezado.'
+        : 'Para el complemento de pago, la forma de cobro se captura dentro del complemento. El uso CFDI se establece automáticamente como <strong>P01</strong>.';
+    }
+
+    // Remove/restore required so form doesn't block submission for P/T
+    [payMethod, payForm].forEach(function (el) {
+      if (!el) return;
+      if (hideMetodo) { el.removeAttribute('required'); el.disabled = true; }
+      else            { el.setAttribute('required', ''); el.disabled = false; trySyncForma(); }
+    });
+
+    // tipo E: MetodoPago must be PUE (credit notes are always single payment)
+    if (tc === 'E' && payMethod) {
+      var tryPue = function () {
+        if (payMethod.options.length <= 1) return setTimeout(tryPue, 100);
+        payMethod.value = 'PUE';
+        payMethod.dispatchEvent(new Event('change', { bubbles: true }));
+      };
+      tryPue();
+    }
+  }
+
+  tcSel.addEventListener('change', function () { applyTipoComprobante(tcSel.value); });
+  applyTipoComprobante(tcSel.value);
+})();
+</script>
+
+<style>
+.tipo-p-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin-top: 4px;
+  padding: 8px 11px;
+  background: var(--info-bg, rgba(59,130,246,.08));
+  border: 1px solid var(--info-border, rgba(59,130,246,.2));
+  border-radius: 7px;
+  font-size: 12px;
+  color: var(--info-text, #1e40af);
+  line-height: 1.45;
+}
+.tipo-p-note svg { flex-shrink: 0; margin-top: 1px; }
+</style>
