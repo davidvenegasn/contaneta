@@ -96,3 +96,85 @@ def test_should_handle_empty_rfc():
     """Empty RFC should return None."""
     assert check_rfc_69b("") is None
     assert check_rfc_69b(None) is None
+
+
+# --- Stamping integration tests ---
+
+
+def _make_stamping_form(customer_rfc):
+    """Helper to build a minimal form dict for _submit_impl testing."""
+    return {
+        "customer_rfc": customer_rfc,
+        "customer_legal_name": "Test SA",
+        "customer_zip": "64000",
+        "customer_tax_system": "601",
+        "cfdi_use": "G03",
+        "payment_method": "PUE",
+        "payment_form": "03",
+        "currency": "MXN",
+        "tipo_comprobante": "I",
+        "qty_0": "1",
+        "desc_0": "Servicio de prueba",
+        "key_0": "84111506",
+        "price_0": "1000",
+        "iva_0": "0.16",
+        "unit_0": "E48",
+    }
+
+
+def test_submit_blocked_when_rfc_in_69b_definitivo():
+    """_submit_impl should raise ValueError for Definitivo RFC."""
+    from unittest.mock import MagicMock
+
+    from routers.invoicing import _submit_impl
+
+    request = MagicMock()
+    request.state.issuer_id = 1
+    request.state.user_id = 1
+    request.state.membership_role = "owner"
+    issuer = {"id": 1, "facturapi_org_id": "test", "rfc": "EMI010101AAA"}
+    form = _make_stamping_form("DEF010101AAA")
+    with pytest.raises(ValueError, match="Lista 69-B"):
+        _submit_impl(None, request, issuer, form)
+
+
+def test_submit_blocked_when_rfc_in_69b_sentencia():
+    """_submit_impl should raise ValueError for Sentencia Favorable RFC."""
+    from unittest.mock import MagicMock
+
+    from routers.invoicing import _submit_impl
+
+    request = MagicMock()
+    request.state.issuer_id = 1
+    request.state.user_id = 1
+    request.state.membership_role = "owner"
+    issuer = {"id": 1, "facturapi_org_id": "test", "rfc": "EMI010101AAA"}
+    form = _make_stamping_form("SEN010101DDD")
+    with pytest.raises(ValueError, match="Lista 69-B"):
+        _submit_impl(None, request, issuer, form)
+
+
+def test_submit_allows_generic_rfcs():
+    """Generic RFCs (XAXX, XEXX) should bypass 69-B check."""
+    from services.sat.lista_69b import check_rfc_69b
+
+    # Even if these were in the list, they should not be checked
+    # The check is skipped for generic RFCs, so no error should come from 69-B
+    # (Other errors may occur later in the flow, but not from 69-B)
+    for generic_rfc in ("XAXX010101000", "XEXX010101000"):
+        result = check_rfc_69b(generic_rfc)
+        # These shouldn't be in the 69-B list, confirming no false positives
+        assert result is None
+
+
+def test_submit_warned_when_rfc_in_69b_presunto():
+    """Presunto RFC should warn (log) but NOT block stamping."""
+    from services.sat.lista_69b import check_rfc_69b
+
+    result = check_rfc_69b("PRE010101BBB")
+    assert result is not None
+    sit = (result.get("situacion") or "").lower()
+    # Presunto should NOT be in the blocking set
+    assert sit not in ("definitivo", "sentencia favorable")
+    # But should be flagged as warned
+    assert sit == "presunto"

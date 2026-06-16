@@ -92,10 +92,13 @@ def test_admin_stats_returns_all_required_keys(admin_client):
     assert "cfdis" in data
     assert "subscriptions" in data
     assert "errors" in data
+    assert "declarations" in data
     # Verify key fields
     assert "total" in data["users"]
     assert "active_last_7d" in data["users"]
     assert "mrr_mxn" in data["subscriptions"]
+    assert "total" in data["declarations"]
+    assert "last_30d" in data["declarations"]
 
 
 def test_admin_stats_calculates_mrr_correctly():
@@ -111,8 +114,10 @@ def test_admin_stats_handles_zero_users_gracefully():
     """Stats should return valid data even with empty tables."""
     from services.admin_stats import get_dashboard_stats
     stats = get_dashboard_stats()
-    # All values should be non-negative integers or floats
+    # All scalar values should be non-negative integers or floats
     for section in stats.values():
         for key, val in section.items():
+            if isinstance(val, dict):
+                continue  # skip nested dicts (e.g. by_status, by_tipo)
             assert isinstance(val, (int, float)), f"{key} is {type(val)}: {val}"
             assert val >= 0, f"{key} is negative: {val}"

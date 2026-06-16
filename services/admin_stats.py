@@ -17,6 +17,7 @@ def get_dashboard_stats() -> dict:
         "cfdis": _cfdi_stats(),
         "subscriptions": _subscription_stats(),
         "errors": _error_stats(),
+        "declarations": _declaration_stats(),
     }
     return stats
 
@@ -120,6 +121,34 @@ def _subscription_stats() -> dict:
         "trialing": trialing,
         "canceled_last_30d": canceled_30d,
         "mrr_mxn": mrr_mxn,
+    }
+
+
+def _declaration_stats() -> dict:
+    """Stats on uploaded declarations."""
+    try:
+        total = _scalar("SELECT COUNT(*) AS n FROM declarations")
+        last_30d = _scalar(
+            "SELECT COUNT(*) AS n FROM declarations "
+            "WHERE created_at >= datetime('now', '-30 days')"
+        )
+        by_status = {}
+        for row in db_rows("SELECT status, COUNT(*) AS n FROM declarations GROUP BY status"):
+            by_status[row["status"]] = row["n"]
+        by_tipo = {}
+        for row in db_rows("SELECT tipo, COUNT(*) AS n FROM declarations GROUP BY tipo ORDER BY n DESC LIMIT 10"):
+            by_tipo[row["tipo"]] = row["n"]
+        uploaders = _scalar("SELECT COUNT(DISTINCT uploaded_by_user_id) AS n FROM declarations")
+    except Exception:
+        total = last_30d = uploaders = 0
+        by_status = {}
+        by_tipo = {}
+    return {
+        "total": total,
+        "last_30d": last_30d,
+        "by_status": by_status,
+        "by_tipo": by_tipo,
+        "unique_uploaders": uploaders,
     }
 
 

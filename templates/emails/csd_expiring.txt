@@ -1,0 +1,8 @@
+Tu CSD está por vencer
+
+Tu Certificado de Sello Digital (CSD) vence el {{ expires_at }}.
+Días restantes: {{ days_until_expiry }}
+
+Sin un CSD vigente no podrás timbrar facturas. Renuévalo en el portal del SAT y sube el nuevo certificado.
+
+{% if settings_url %}Actualizar CSD: {{ settings_url }}{% endif %}

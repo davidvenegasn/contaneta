@@ -1,0 +1,7 @@
+Verifica tu correo electrónico
+
+Para confirmar tu dirección de correo, visita este enlace:
+
+{{ verification_url }}
+
+Este link expira en 24 horas. Si no fuiste tú quien se registró, ignora este correo.

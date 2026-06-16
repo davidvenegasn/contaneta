@@ -1910,6 +1910,40 @@ button:hover, button:focus, button:active, button:focus-visible,
   border-color: rgba(239, 68, 68, 0.5);
   color: #b91c1c;
 }
+.portal-banner--info {
+  background: rgba(239, 246, 255, 0.98);
+  border-color: rgba(99, 102, 241, 0.3);
+  color: #3730a3;
+}
+.portal-banner__cta {
+  flex-shrink: 0;
+  font-size: var(--fs-xs, 12px);
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 6px;
+  text-decoration: none;
+  color: inherit;
+  border: 1px solid currentColor;
+  background: rgba(255,255,255,.5);
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+.portal-banner__cta:hover {
+  background: rgba(255,255,255,.8);
+}
+
+/* Help links */
+.help-link {
+  font-size: 12px; color: var(--accent, #2563eb); text-decoration: none; font-weight: 500;
+}
+.help-link:hover { text-decoration: underline; }
+.help-link--topbar {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid currentColor;
+  font-size: 12px; font-weight: 700; margin-left: 8px; flex-shrink: 0;
+  color: var(--text-muted, #6b7280); text-decoration: none;
+}
+.help-link--topbar:hover { color: var(--accent, #2563eb); border-color: currentColor; }
 
 @keyframes toastIn{
   from{ opacity: 0; transform: translateX(12px) translateY(-4px) scale(0.97); }

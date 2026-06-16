@@ -1,0 +1,13 @@
+Resumen de declaración — {{ periodo|default('') }}
+
+Hola {{ user_name|default('') }},
+
+Se procesó tu declaración {{ tipo_declaracion|default('') }} del periodo {{ periodo|default('') }}.
+
+{% if saldo_a_cargo %}Saldo a cargo: ${{ "{:,.2f}".format(saldo_a_cargo) }}{% endif %}
+{% if saldo_a_favor %}Saldo a favor: ${{ "{:,.2f}".format(saldo_a_favor) }}{% endif %}
+{% if linea_captura %}Línea de captura: {{ linea_captura }}{% endif %}
+{% if fecha_vencimiento %}Fecha de vencimiento: {{ fecha_vencimiento }}{% endif %}
+{% if folio_acuse %}Folio de acuse: {{ folio_acuse }}{% endif %}
+
+{% if portal_url %}Ver detalles en la plataforma: {{ portal_url }}{% endif %}

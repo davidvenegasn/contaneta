@@ -358,6 +358,9 @@
               <span class="portal-topbar__icon" aria-hidden="true">{{ (page_icon if page_icon else _auto_icon)|safe }}</span>
             {% endif %}
             <span class="portal-topbar__text">{{ title|default('Portal') }}</span>
+            {% if page_help_url is defined and page_help_url %}
+              <a href="{{ page_help_url }}" class="help-link help-link--topbar" target="_blank" title="Ver guía de ayuda">?</a>
+            {% endif %}
           </div>
         </div>
 
@@ -437,7 +440,27 @@
              hecha (cambiaba de issuer sin claridad). Se rehará después con un
              diseño explícito de "datos demo / cuenta de prueba". #}
           {# {% if is_demo_view %} ... {% endif %} #}
-          <!-- Banners persistentes: éxito / aviso / error (no se ocultan solos; usar toasts para feedback inmediato) -->
+          <!-- Banners persistentes: trial / uso / onboarding -->
+          {% if portal_banners is defined and portal_banners %}
+          {% for b in portal_banners %}
+          {% set variant_class = {'danger': 'error', 'warn': 'warning', 'info': 'info'}.get(b.variant, b.variant) %}
+          <div class="portal-banner portal-banner--{{ variant_class }}" role="alert" data-banner-key="{{ b.key }}">
+            <div class="portal-banner__content">
+              <p class="portal-banner__title">{{ b.title }}</p>
+              <p class="portal-banner__msg">{{ b.message }}</p>
+            </div>
+            {% if b.cta_url %}
+              <a href="{{ b.cta_url }}" class="portal-banner__cta">{{ b.cta_label }}</a>
+            {% endif %}
+            {% if b.dismissable %}
+              <button class="portal-banner__dismiss" data-dismiss-banner="{{ b.key }}" aria-label="Cerrar">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M18 6 6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              </button>
+            {% endif %}
+          </div>
+          {% endfor %}
+          {% endif %}
+          <!-- Banners dinámicos JS (éxito / aviso / error) -->
           <div id="portalBanners" class="portal-banners" aria-live="polite" aria-relevant="additions"></div>
           <!-- P25: contenedor único para toasts (success/error/info); máx 3 visibles; no usar en carga de listas -->
           <div id="toastStack" class="toast-stack" aria-live="polite" aria-relevant="additions"></div>
@@ -2428,5 +2451,35 @@
 })();
 </script>
 {% endif %}
+<script>
+/* Banner dismiss: hides banner and persists via localStorage */
+(function(){
+  var STORAGE_KEY = 'portal_dismissed_banners';
+  function getDismissed() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch(e) { return {}; }
+  }
+  function setDismissed(key) {
+    var d = getDismissed();
+    d[key] = Date.now();
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(d)); } catch(e) {}
+  }
+  // Hide already-dismissed banners on load
+  var dismissed = getDismissed();
+  document.querySelectorAll('[data-banner-key]').forEach(function(el) {
+    var key = el.getAttribute('data-banner-key');
+    if (key && dismissed[key]) el.style.display = 'none';
+  });
+  // Click handler for dismiss buttons
+  document.addEventListener('click', function(e) {
+    var btn = e.target.closest('[data-dismiss-banner]');
+    if (!btn) return;
+    var key = btn.getAttribute('data-dismiss-banner');
+    if (!key) return;
+    var banner = btn.closest('.portal-banner');
+    if (banner) banner.style.display = 'none';
+    setDismissed(key);
+  });
+})();
+</script>
   </body>
 </html>

@@ -89,7 +89,7 @@ def register_quotations_routes(router, templates):
     def portal_quotation_detail(request: Request, qid: int, issuer: dict = Depends(get_portal_issuer)):
         conn = db()
         row = conn.execute(
-            "SELECT id, public_token, folio, customer_rfc, customer_legal_name, customer_email, status, notes, responded_at, created_at FROM quotations WHERE issuer_id = ? AND id = ?",
+            "SELECT id, public_token, folio, customer_rfc, customer_legal_name, customer_email, status, notes, responded_at, created_at, converted_invoice_id, converted_at FROM quotations WHERE issuer_id = ? AND id = ?",
             (issuer["id"], qid),
         ).fetchone()
         conn.close()

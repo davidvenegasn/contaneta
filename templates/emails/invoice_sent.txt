@@ -1,0 +1,10 @@
+Factura emitida
+
+{{ from_name|default('') }} te envió una factura.
+
+{% if serie and folio %}Serie/Folio: {{ serie }}-{{ folio }}{% endif %}
+{% if total %}Total: ${{ "{:,.2f}".format(total) }} {{ currency|default('MXN') }}{% endif %}
+{% if fecha_emision %}Fecha de emisión: {{ fecha_emision }}{% endif %}
+{% if uuid %}UUID: {{ uuid }}{% endif %}
+
+Los archivos XML y PDF están adjuntos a este correo.

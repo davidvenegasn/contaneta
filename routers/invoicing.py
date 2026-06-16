@@ -516,6 +516,25 @@ def _submit_impl(templates, request: Request, issuer: dict, form):
             "year": year_int,
         }
 
+    # Validate against Lista 69-B before stamping (skip generic RFCs)
+    if customer_rfc and customer_rfc.upper() not in ("XAXX010101000", "XEXX010101000"):
+        from services.sat.lista_69b import check_rfc_69b
+        rfc_69b = check_rfc_69b(customer_rfc.upper())
+        if rfc_69b:
+            sit = (rfc_69b.get("situacion") or "").lower()
+            if sit in ("definitivo", "sentencia favorable"):
+                log_action(request, "stamp_blocked_69b",
+                           issuer_id=issuer["id"], customer_rfc=customer_rfc,
+                           situacion=rfc_69b.get("situacion"))
+                raise ValueError(
+                    f"El RFC {customer_rfc} está en la Lista 69-B del SAT como "
+                    f"'{rfc_69b['situacion']}'. No se puede emitir CFDI a este receptor."
+                )
+            elif sit == "presunto":
+                log_action(request, "stamp_warned_69b",
+                           issuer_id=issuer["id"], customer_rfc=customer_rfc,
+                           situacion=rfc_69b.get("situacion"))
+
     if issuer.get("facturapi_org_id") in (None, "", 0) or issuer.get("id") == -1:
         raise ValueError("DEV_MODE activo: token de prueba. Configura un token real/issuer para timbrar.")
     invoice = create_invoice(issuer["id"], issuer["facturapi_org_id"], payload)
@@ -576,7 +595,21 @@ def _submit_impl(templates, request: Request, issuer: dict, form):
 
     log_action(request, "invoice_created", issuer_id=issuer["id"], invoice_id=fact_id, uuid=(uuid or "")[:36])
 
-    # TODO: enqueue_send_email for invoice_sent if customer.email and customer.auto_send_invoices and issuer.email_notifications_enabled
+    # Mark quotation as converted if this invoice came from one
+    quote_id = (form.get("quote_id") or "").strip()
+    if quote_id:
+        try:
+            conn2 = db()
+            conn2.execute(
+                """UPDATE quotations SET status = 'converted',
+                   converted_invoice_id = ?, converted_at = datetime('now')
+                   WHERE id = ? AND issuer_id = ?""",
+                (invoice_local_id, int(quote_id), issuer["id"]),
+            )
+            conn2.commit()
+            conn2.close()
+        except Exception as e:
+            logger.warning("mark quotation converted failed: %s", e)
 
     return templates.TemplateResponse(
         request,

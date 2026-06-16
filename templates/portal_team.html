@@ -1,0 +1,231 @@
+{% extends "base_portal.html" %}
+{% block main %}
+<div class="card ui-card">
+  <div class="card-header card-header--with-tools ui-card__header">
+    <div class="card-header__left">
+      <h3 class="section-title u-m0">Miembros del equipo</h3>
+    </div>
+    {% if user_role in ('owner', 'admin') %}
+    <div class="card-header__right">
+      <button type="button" class="btn btn-primary" id="inviteBtn">+ Invitar</button>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="card-list-sep">
+    <div class="table-wrap">
+      <table class="table ui-table ui-table--zebra">
+        <thead>
+          <tr>
+            <th>Email</th>
+            <th>Rol</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for m in members %}
+          <tr>
+            <td class="u-fw-650">{{ m.email }}</td>
+            <td>
+              <span class="badge badge--{{ 'primary' if m.role == 'owner' else 'secondary' }}">
+                {{ role_labels.get(m.role, m.role) }}
+              </span>
+            </td>
+            <td>
+              {% if m.role != 'owner' and user_role == 'owner' %}
+              <div class="u-flex u-gap-2 u-items-center">
+                <select class="input input--sm js-role-select" data-user-id="{{ m.user_id }}" style="width:auto;font-size:12px;">
+                  <option value="viewer" {{ 'selected' if m.role == 'viewer' }}>Solo lectura</option>
+                  <option value="accountant" {{ 'selected' if m.role == 'accountant' }}>Contador</option>
+                  <option value="admin" {{ 'selected' if m.role == 'admin' }}>Administrador</option>
+                </select>
+                <button type="button" class="icon-btn js-remove-member" data-user-id="{{ m.user_id }}" data-email="{{ m.email }}" title="Eliminar">
+                  <svg class="icon" viewBox="0 0 24 24" fill="none"><path d="M3 6h18M8 6V4h8v2M6.5 6l1 15h9l1-15" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 11v6M14 11v6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
+                </button>
+              </div>
+              {% else %}
+              <span class="muted">—</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{% if invites and invites|length > 0 %}
+<div class="card ui-card u-mt-4">
+  <div class="card-header ui-card__header">
+    <h3 class="section-title u-m0">Invitaciones pendientes</h3>
+  </div>
+  <div class="card-list-sep">
+    <div class="table-wrap">
+      <table class="table ui-table">
+        <thead>
+          <tr>
+            <th>Email</th>
+            <th>Rol</th>
+            <th>Enviada</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for inv in invites %}
+          <tr id="invite-row-{{ inv.id }}">
+            <td>{{ inv.email }}</td>
+            <td><span class="badge badge--secondary">{{ role_labels.get(inv.role, inv.role) }}</span></td>
+            <td class="muted">{{ inv.created_at[:10] if inv.created_at else '' }}</td>
+            <td>
+              <button type="button" class="btn btn--sm btn-ghost js-revoke-invite" data-id="{{ inv.id }}">Revocar</button>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Invite modal -->
+<div class="modal" id="inviteModal" role="dialog" aria-modal="true" hidden>
+  <div class="modal__backdrop" data-close="true"></div>
+  <div class="modal__panel">
+    <div class="modal__head">
+      <div class="modal__title">Invitar miembro</div>
+      <button type="button" class="icon-btn" data-close="true" aria-label="Cerrar">
+        <svg class="icon" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <div class="modal__body">
+      <div class="field">
+        <label class="label">Email</label>
+        <input id="inviteEmail" class="input" type="email" placeholder="correo@ejemplo.com" autocomplete="off" />
+      </div>
+      <div class="field">
+        <label class="label">Rol</label>
+        <select id="inviteRole" class="input">
+          <option value="accountant">Contador</option>
+          <option value="viewer">Solo lectura</option>
+          <option value="admin">Administrador</option>
+        </select>
+      </div>
+      <div id="inviteError" class="modal__note modal__note--danger" hidden></div>
+    </div>
+    <div class="modal__foot">
+      <button type="button" class="btn btn-ghost" data-close="true">Cancelar</button>
+      <button type="button" class="btn btn-primary" id="inviteSendBtn">Enviar invitación</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var inviteBtn = document.getElementById('inviteBtn');
+  var inviteModal = document.getElementById('inviteModal');
+  var inviteSendBtn = document.getElementById('inviteSendBtn');
+  var inviteError = document.getElementById('inviteError');
+
+  function openModal() { if (inviteModal) { inviteModal.hidden = false; } }
+  function closeModal() { if (inviteModal) { inviteModal.hidden = true; if (inviteError) inviteError.hidden = true; } }
+  if (inviteBtn) inviteBtn.addEventListener('click', openModal);
+  if (inviteModal) inviteModal.addEventListener('click', function(e){
+    if (e.target.dataset.close === 'true') closeModal();
+  });
+
+  if (inviteSendBtn) inviteSendBtn.addEventListener('click', async function(){
+    var email = (document.getElementById('inviteEmail').value || '').trim();
+    var role = document.getElementById('inviteRole').value;
+    if (!email) { if (inviteError) { inviteError.textContent = 'Escribe un email.'; inviteError.hidden = false; } return; }
+    inviteSendBtn.disabled = true;
+    if (inviteError) inviteError.hidden = true;
+    try {
+      var res = await (window.portalFetchJSON
+        ? window.portalFetchJSON('/portal/team/invite', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({email:email,role:role}) }, {timeoutMs:15000,retry:0})
+        : Promise.resolve({ok:false,detail:'Helper no disponible'})
+      );
+      inviteSendBtn.disabled = false;
+      if (res && res.ok && res.data && res.data.ok) {
+        closeModal();
+        if (window.uiToast) window.uiToast({type:'success',title:'Invitación enviada',message:'Se envió la invitación a '+email});
+        setTimeout(function(){ window.location.reload(); }, 400);
+      } else {
+        var msg = (res && res.data && res.data.detail) || 'Error al enviar.';
+        if (inviteError) { inviteError.textContent = msg; inviteError.hidden = false; }
+      }
+    } catch(e) {
+      inviteSendBtn.disabled = false;
+      if (inviteError) { inviteError.textContent = (e&&e.message)||'Error de red.'; inviteError.hidden = false; }
+    }
+  });
+
+  // Role change
+  document.querySelectorAll('.js-role-select').forEach(function(sel){
+    sel.addEventListener('change', async function(){
+      var userId = sel.dataset.userId;
+      var newRole = sel.value;
+      try {
+        var res = await (window.portalFetchJSON
+          ? window.portalFetchJSON('/portal/team/members/'+userId+'/role', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({role:newRole}) }, {timeoutMs:10000,retry:0})
+          : Promise.resolve({ok:false})
+        );
+        if (res && res.ok && res.data && res.data.ok) {
+          if (window.uiToast) window.uiToast({type:'success',title:'Rol actualizado'});
+        } else {
+          if (window.uiToast) window.uiToast({type:'danger',title:'Error',message:(res&&res.data&&res.data.detail)||'No se pudo cambiar.'});
+          window.location.reload();
+        }
+      } catch(e) {
+        if (window.uiToast) window.uiToast({type:'danger',title:'Error',message:'Error de red.'});
+      }
+    });
+  });
+
+  // Remove member
+  document.querySelectorAll('.js-remove-member').forEach(function(btn){
+    btn.addEventListener('click', async function(){
+      var userId = btn.dataset.userId;
+      var email = btn.dataset.email || 'este miembro';
+      var ok = (typeof window.portalConfirm === 'function')
+        ? await window.portalConfirm({title:'Eliminar miembro',message:'¿Seguro que quieres eliminar a '+email+'?',confirmLabel:'Sí, eliminar'})
+        : confirm('¿Eliminar a '+email+'?');
+      if (!ok) return;
+      try {
+        var res = await (window.portalFetchJSON
+          ? window.portalFetchJSON('/portal/team/members/'+userId+'/remove', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' }, {timeoutMs:10000,retry:0})
+          : Promise.resolve({ok:false})
+        );
+        if (res && res.ok && res.data && res.data.ok) {
+          if (window.uiToast) window.uiToast({type:'success',title:'Eliminado'});
+          setTimeout(function(){ window.location.reload(); }, 300);
+        } else {
+          if (window.uiToast) window.uiToast({type:'danger',title:'Error',message:(res&&res.data&&res.data.detail)||'No se pudo eliminar.'});
+        }
+      } catch(e) {
+        if (window.uiToast) window.uiToast({type:'danger',title:'Error',message:'Error de red.'});
+      }
+    });
+  });
+
+  // Revoke invite
+  document.querySelectorAll('.js-revoke-invite').forEach(function(btn){
+    btn.addEventListener('click', async function(){
+      var id = btn.dataset.id;
+      try {
+        var res = await (window.portalFetchJSON
+          ? window.portalFetchJSON('/portal/team/invites/'+id+'/revoke', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' }, {timeoutMs:10000,retry:0})
+          : Promise.resolve({ok:false})
+        );
+        if (res && res.ok && res.data && res.data.ok) {
+          var row = document.getElementById('invite-row-'+id);
+          if (row) row.remove();
+          if (window.uiToast) window.uiToast({type:'success',title:'Invitación revocada'});
+        }
+      } catch(e) {}
+    });
+  });
+})();
+</script>
+{% endblock %}

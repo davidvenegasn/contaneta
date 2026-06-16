@@ -1,8 +1,22 @@
 {% extends "base.html" %}
 {% block email_content %}
-<h2>Tu trial termina en {{ days_until_expiry }} día{{ 's' if days_until_expiry != 1 else '' }}</h2>
-<p>Para no perder acceso a la plataforma, suscríbete antes del <strong>{{ trial_expires_at }}</strong>.</p>
+<h2>Tu periodo de prueba termina pronto</h2>
+<div class="card">
+  <p style="margin:0 0 4px"><strong>Días restantes:</strong> {{ days_until_expiry }} día{{ 's' if days_until_expiry != 1 else '' }}</p>
+  <p style="margin:0"><strong>Vence el:</strong> {{ trial_expires_at }}</p>
+</div>
+
+<p>Cuando termine tu periodo de prueba, no podrás:</p>
+<ul style="margin:8px 0 16px;padding-left:20px;color:#374151">
+  <li>Emitir ni cancelar facturas (CFDI)</li>
+  <li>Sincronizar con el SAT</li>
+  <li>Generar reportes fiscales</li>
+</ul>
+<p>Tu información y configuración se conservarán. Solo necesitas suscribirte para reactivar todo.</p>
+
 {% if pricing_url %}
-  <p><a href="{{ pricing_url }}" class="button">Ver planes</a></p>
+  <p style="margin-top:20px"><a href="{{ pricing_url }}" class="button">Ver planes y suscribirse</a></p>
 {% endif %}
+
+<p class="muted" style="margin-top:24px">Si tienes dudas sobre los planes, responde a este correo. Estamos para ayudarte.</p>
 {% endblock %}

@@ -1,0 +1,15 @@
+Tu periodo de prueba termina pronto
+
+Días restantes: {{ days_until_expiry }}
+Vence el: {{ trial_expires_at }}
+
+Cuando termine tu periodo de prueba, no podrás:
+- Emitir ni cancelar facturas (CFDI)
+- Sincronizar con el SAT
+- Generar reportes fiscales
+
+Tu información se conservará. Solo necesitas suscribirte para reactivar todo.
+
+{% if pricing_url %}Ver planes: {{ pricing_url }}{% endif %}
+
+Si tienes dudas sobre los planes, responde a este correo.

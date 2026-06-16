@@ -419,11 +419,11 @@
           }
           setTimeout(function() { window.location.reload(); }, 1500);
         } else {
-          alert('Error: ' + (j.detail || 'no se pudo cancelar'));
+          if (window.uiToast) window.uiToast({type:'danger',title:'Error',message:j.detail||'No se pudo cancelar.'}); else alert('Error: ' + (j.detail || 'no se pudo cancelar'));
           confirmBtn.disabled = false; confirmBtn.textContent = 'Sí, cancelar';
         }
       }).catch(function(err) {
-        alert('Error de conexión: ' + (err.message || ''));
+        if (window.uiToast) window.uiToast({type:'danger',title:'Error de conexión',message:err.message||'No se pudo conectar al servidor.'}); else alert('Error de conexión: ' + (err.message || ''));
         confirmBtn.disabled = false; confirmBtn.textContent = 'Sí, cancelar';
       });
     });
@@ -483,7 +483,7 @@
           if (t) t({ type: 'success', title: 'Factura cancelada y sustituida' });
           setTimeout(function() { window.location.reload(); }, 1500);
         } else {
-          alert('Error: ' + (j.detail || 'falló'));
+          if (window.uiToast) window.uiToast({type:'danger',title:'Error',message:j.detail||'No se pudo completar la operación.'}); else alert('Error: ' + (j.detail || 'falló'));
         }
       });
     }

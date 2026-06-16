@@ -1,0 +1,15 @@
+No pudimos procesar tu pago
+
+Hubo un problema al cobrar tu suscripción a {{ brand_name|default('ContaNeta') }}.
+
+Motivo: {{ failure_reason|default('Pago rechazado por el banco') }}
+{% if amount %}Monto: ${{ "{:,.2f}".format(amount) }} MXN{% endif %}
+
+¿Qué puedes hacer?
+- Verifica que tu tarjeta esté vigente y tenga fondos suficientes
+- Actualiza tu método de pago en la plataforma
+- Si usas tarjeta de débito, confirma que tu banco no haya bloqueado el cargo
+
+Intentaremos cobrar de nuevo en las próximas 48 horas.
+
+{% if billing_url %}Actualizar método de pago: {{ billing_url }}{% endif %}

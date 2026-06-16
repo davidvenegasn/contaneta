@@ -1,0 +1,12 @@
+Bienvenido a {{ brand_name|default('ContaNeta') }}, {{ user_name|default('') }}
+
+Gracias por registrarte. Tu cuenta está lista para empezar a administrar tu facturación electrónica y contabilidad fiscal.
+
+PRIMEROS PASOS
+1. Sube tu FIEL — necesaria para sincronizar con el SAT.
+2. Sube tu CSD — para timbrar facturas electrónicas (CFDI).
+3. Emite tu primera factura — en menos de 2 minutos.
+
+{% if onboarding_url %}Empezar configuración: {{ onboarding_url }}{% endif %}
+
+Si tienes dudas, responde a este correo o visita nuestra sección de ayuda dentro de la plataforma.

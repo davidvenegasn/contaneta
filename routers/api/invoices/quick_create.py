@@ -135,6 +135,28 @@ def register_invoices_quick_routes(router):
             currency=currency,
             validate_receiver=True,
         )
+        # Validate against Lista 69-B before stamping (skip generic RFCs)
+        if customer_rfc and customer_rfc not in ("XAXX010101000", "XEXX010101000"):
+            from services.sat.lista_69b import check_rfc_69b
+            rfc_69b = check_rfc_69b(customer_rfc)
+            if rfc_69b:
+                sit = (rfc_69b.get("situacion") or "").lower()
+                if sit in ("definitivo", "sentencia favorable"):
+                    log_action(request, "stamp_blocked_69b",
+                               issuer_id=issuer_id, customer_rfc=customer_rfc,
+                               situacion=rfc_69b.get("situacion"))
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            f"El RFC {customer_rfc} está en la Lista 69-B del SAT como "
+                            f"'{rfc_69b['situacion']}'. No se puede emitir CFDI a este receptor."
+                        ),
+                    )
+                elif sit == "presunto":
+                    log_action(request, "stamp_warned_69b",
+                               issuer_id=issuer_id, customer_rfc=customer_rfc,
+                               situacion=rfc_69b.get("situacion"))
+
         if issuer.get("facturapi_org_id") in (None, "", 0) or issuer.get("id") == -1:
             raise HTTPException(status_code=400, detail="Configuracion de facturacion no disponible.")
         conn = db()

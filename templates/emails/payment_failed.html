@@ -2,12 +2,26 @@
 {% block email_content %}
 <h2>No pudimos procesar tu pago</h2>
 <p>Hubo un problema al cobrar tu suscripción a {{ brand_name|default('ContaNeta') }}.</p>
+
 <div class="card">
-  <p style="margin:0"><strong>Motivo:</strong> {{ failure_reason|default('Pago rechazado por el banco') }}</p>
-  <p style="margin:0"><strong>Monto:</strong> ${{ "{:,.2f}".format(amount|default(0)) }} MXN</p>
+  <p style="margin:0 0 6px"><strong>Motivo:</strong> {{ failure_reason|default('Pago rechazado por el banco') }}</p>
+  {% if amount %}
+  <p style="margin:0"><strong>Monto:</strong> ${{ "{:,.2f}".format(amount) }} MXN</p>
+  {% endif %}
 </div>
-<p>Por favor actualiza tu método de pago para evitar interrupciones en el servicio.</p>
+
+<h3>¿Qué puedes hacer?</h3>
+<ul style="margin:8px 0 16px;padding-left:20px;color:#374151">
+  <li>Verifica que tu tarjeta esté vigente y tenga fondos suficientes</li>
+  <li>Actualiza tu método de pago en la plataforma</li>
+  <li>Si usas tarjeta de débito, confirma que tu banco no haya bloqueado el cargo</li>
+</ul>
+
+<p>Intentaremos cobrar de nuevo en las próximas 48 horas. Si el pago sigue fallando, tu acceso al timbrado podría suspenderse.</p>
+
 {% if billing_url %}
-  <p><a href="{{ billing_url }}" class="button">Actualizar método de pago</a></p>
+  <p style="margin-top:20px"><a href="{{ billing_url }}" class="button">Actualizar método de pago</a></p>
 {% endif %}
+
+<p class="muted" style="margin-top:24px">Si ya resolviste el problema, no necesitas hacer nada más. El cobro se reintentará automáticamente.</p>
 {% endblock %}

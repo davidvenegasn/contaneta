@@ -620,6 +620,67 @@
   }
 }
 
+/* ── Responsive-stack tables: convert to cards on mobile ── */
+@media (max-width: 768px) {
+  table.responsive-stack thead { display: none; }
+  table.responsive-stack tr {
+    display: block;
+    padding: 12px;
+    border: 1px solid var(--border, #e5e7eb);
+    border-radius: 8px;
+    margin-bottom: 8px;
+    background: var(--surface, #fff);
+  }
+  table.responsive-stack td {
+    display: flex;
+    justify-content: space-between;
+    padding: 4px 0;
+    border: 0;
+  }
+  table.responsive-stack td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: var(--text-muted, #6b7280);
+    font-size: 12px;
+    flex-shrink: 0;
+    margin-right: 8px;
+  }
+}
+
+/* ── Generic modal fullscreen on small phones ── */
+@media (max-width: 480px) {
+  .modal__panel,
+  .form-modal__panel {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    height: 100vh !important;
+    max-height: 100vh !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+  }
+}
+
+/* ── Summary cards: 2-col on small screens ── */
+@media (max-width: 480px) {
+  .resumen-cards,
+  .dashboard-cards,
+  .metric-cards {
+    grid-template-columns: 1fr 1fr !important;
+  }
+}
+
+/* ── Portal banners: stack vertically on mobile ── */
+@media (max-width: 640px) {
+  .portal-banner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .portal-banner__cta {
+    align-self: flex-start;
+  }
+}
+
 /* ── Print: hide mobile-only elements ── */
 @media print {
   .mobile-tab-bar,

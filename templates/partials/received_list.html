@@ -673,7 +673,7 @@
       var input = prompt('Porcentaje deducible (0-100):');
       if (input == null || input.trim() === '') { sel.value = sel.getAttribute('data-prev') || '100'; return; }
       var num = parseFloat(input);
-      if (isNaN(num) || num < 0 || num > 100) { alert('Valor inválido (0-100)'); sel.value = sel.getAttribute('data-prev') || '100'; return; }
+      if (isNaN(num) || num < 0 || num > 100) { if (window.uiToast) window.uiToast({type:'danger',title:'Valor inválido',message:'Ingresa un valor entre 0 y 100.'}); else alert('Valor inválido (0-100)'); sel.value = sel.getAttribute('data-prev') || '100'; return; }
       val = num;
       // Add custom option if needed
       var opt = document.createElement('option');

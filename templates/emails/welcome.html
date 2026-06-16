@@ -1,9 +1,32 @@
 {% extends "base.html" %}
 {% block email_content %}
-<h2>Bienvenido a {{ brand_name|default('ContaNeta') }}, {{ user_name }}</h2>
-<p>Gracias por registrarte. Ya puedes empezar a emitir facturas y administrar tu contabilidad fiscal.</p>
+<h2>Bienvenido a {{ brand_name|default('ContaNeta') }}, {{ user_name|default('') }}</h2>
+<p>Gracias por registrarte. Tu cuenta está lista para empezar a administrar tu facturación electrónica y contabilidad fiscal.</p>
+
+<div class="card">
+  <p style="margin:0 0 8px"><strong>Tu periodo de prueba</strong></p>
+  <p style="margin:0">Tienes acceso completo a todas las funciones durante tu periodo de prueba. Emite facturas, sincroniza con el SAT y genera reportes sin límite.</p>
+</div>
+
+<h3>Primeros pasos</h3>
+<table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">
+  <tr>
+    <td style="padding:8px 12px;vertical-align:top;color:#6366f1;font-weight:700;width:28px">1.</td>
+    <td style="padding:8px 0"><strong>Sube tu FIEL</strong> — necesaria para sincronizar con el SAT y firmar documentos.</td>
+  </tr>
+  <tr>
+    <td style="padding:8px 12px;vertical-align:top;color:#6366f1;font-weight:700">2.</td>
+    <td style="padding:8px 0"><strong>Sube tu CSD</strong> — para timbrar facturas electrónicas (CFDI).</td>
+  </tr>
+  <tr>
+    <td style="padding:8px 12px;vertical-align:top;color:#6366f1;font-weight:700">3.</td>
+    <td style="padding:8px 0"><strong>Emite tu primera factura</strong> — en menos de 2 minutos.</td>
+  </tr>
+</table>
+
 {% if onboarding_url %}
-  <p><a href="{{ onboarding_url }}" class="button">Empezar configuración</a></p>
+  <p style="margin-top:20px"><a href="{{ onboarding_url }}" class="button">Empezar configuración</a></p>
 {% endif %}
-<p>Lo primero que tienes que hacer es subir tu FIEL y CSD para timbrar tus primeras facturas.</p>
+
+<p class="muted" style="margin-top:24px">Si tienes dudas, responde a este correo o visita nuestra sección de ayuda dentro de la plataforma.</p>
 {% endblock %}

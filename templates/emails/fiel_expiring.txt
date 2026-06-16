@@ -1,0 +1,8 @@
+Tu FIEL está por vencer
+
+Tu Firma Electrónica Avanzada (FIEL) vence el {{ expires_at }}.
+Días restantes: {{ days_until_expiry }}
+
+Sin una FIEL vigente no podrás sincronizar con el SAT ni firmar documentos. Renuévala en el portal del SAT y sube los nuevos archivos.
+
+{% if settings_url %}Actualizar FIEL: {{ settings_url }}{% endif %}

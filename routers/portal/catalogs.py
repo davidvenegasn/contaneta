@@ -98,6 +98,18 @@ def register_catalogs_routes(router, templates):
                             ).fetchall()
                         rows = [_db_row_to_dict(r) for r in rows]
                         pages = (total + per_page - 1) // per_page if total > 0 else 0
+                        # Enrich with 69-B status for displayed clients
+                        if rows and table_exists(conn, "sat_lista_69b"):
+                            rfcs = [r.get("rfc") for r in rows if r.get("rfc")]
+                            if rfcs:
+                                placeholders = ",".join("?" for _ in rfcs)
+                                flagged = conn.execute(
+                                    f"SELECT rfc, situacion FROM sat_lista_69b WHERE rfc IN ({placeholders})",
+                                    [r.upper() for r in rfcs],
+                                ).fetchall()
+                                flag_map = {r["rfc"]: r["situacion"] for r in flagged}
+                                for r in rows:
+                                    r["lista_69b"] = flag_map.get((r.get("rfc") or "").upper())
                 finally:
                     conn.close()
             elif tab == "productos" and issuer_id > 0:

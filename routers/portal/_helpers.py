@@ -188,6 +188,13 @@ def render_portal(
         "dev_debug_panel": DEV_MODE,
         "portal_shell_v2": PORTAL_SHELL_V2,
     }
+    # Inject persistent banners (trial, usage, onboarding)
+    try:
+        from services.banners import get_portal_banners
+        payload["portal_banners"] = get_portal_banners(issuer_id)
+    except Exception:
+        payload["portal_banners"] = []
+
     if extra:
         payload.update(extra)
     if extra_context:

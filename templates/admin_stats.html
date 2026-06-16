@@ -46,6 +46,23 @@
   </div>
 </div>
 
+{# ── Declarations ── #}
+<div class="card">
+  <h2>Declarations</h2>
+  <div class="stats">
+    <div class="stat"><div class="n">{{ stats.declarations.total }}</div><div class="label">Total</div></div>
+    <div class="stat"><div class="n">{{ stats.declarations.last_30d }}</div><div class="label">Last 30d</div></div>
+    <div class="stat"><div class="n">{{ stats.declarations.unique_uploaders }}</div><div class="label">Uploaders</div></div>
+  </div>
+  {% if stats.declarations.by_status %}
+  <div style="margin-top:8px;">
+    <small class="muted">
+      {% for st, cnt in stats.declarations.by_status.items() %}{{ st }}: {{ cnt }}{% if not loop.last %} · {% endif %}{% endfor %}
+    </small>
+  </div>
+  {% endif %}
+</div>
+
 {# ── Errors ── #}
 <div class="card">
   <h2>Errors</h2>

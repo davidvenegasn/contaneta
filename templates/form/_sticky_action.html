@@ -7,7 +7,8 @@
   </div>
   <div class="row sac-row">
     <div>
-      <p class="muted m-0">Se calcula con tu captura. El timbrado final depende del PAC/Facturapi.</p>
+      <p class="muted m-0">Se calcula con tu captura. El timbrado final depende del PAC/Facturapi.
+        <a href="/portal/guides#secFacturacion" class="help-link" target="_blank">¿Necesitas ayuda?</a></p>
     </div>
     <div class="sac-actions">
       <button type="button" class="btn-primary" id="emitirFacturaBtn">Emitir factura</button>
@@ -87,7 +88,7 @@
       } else if (window.portalToast) {
         window.portalToast({ type: 'error', title: title, message: msg });
       } else {
-        alert(title + '\n\n' + msg);
+        if (window.uiToast) window.uiToast({type:'danger',title:title,message:msg}); else alert(title + '\n\n' + msg);
       }
     } catch (e) {
       btn.classList.remove('btn-loading');

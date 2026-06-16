@@ -30,6 +30,7 @@
 
   <form method="POST" action="/submit">
     <input type="hidden" name="csrf_token" value="{{ csrf_token or '' }}" />
+    {% if from_quote_id %}<input type="hidden" name="quote_id" value="{{ from_quote_id }}" />{% endif %}
     {% include "form/_section_receptor.html" %}
     {% include "form/_section_comprobante.html" %}
     {% include "form/_section_conceptos.html" %}

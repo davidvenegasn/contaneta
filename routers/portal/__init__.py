@@ -23,6 +23,7 @@ def get_portal_router(templates):
     from routers.portal.onboarding_wizard import register_onboarding_wizard_routes
     from routers.portal.reports import register_reports_routes
     from routers.portal.statements import register_statements_routes
+    from routers.portal.team import register_team_routes
 
     register_dashboard_routes(router, templates)
     register_quotations_routes(router, templates)
@@ -40,6 +41,7 @@ def get_portal_router(templates):
     register_onboarding_wizard_routes(router, templates)
     register_audit_log_routes(router, templates)
     register_constancia_routes(router, templates)
+    register_team_routes(router, templates)
     register_misc_routes(router, templates)
 
     return router

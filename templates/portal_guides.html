@@ -494,6 +494,111 @@
     </div>
   </section>
 
+  <!-- Section F: Situaciones especiales -->
+  <section class="guides-section" id="secEspeciales">
+    <h2 class="guides-section__title">Situaciones especiales</h2>
+    <div class="guides-accordion-list">
+
+      <div class="guide-item" data-tags="facturación">
+        <button class="guide-accordion__toggle" aria-expanded="false">
+          <span>Nota de crédito: cuándo y cómo emitirla</span>
+          <svg class="guide-accordion__chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="guide-accordion__body" hidden>
+          <p>Una <strong>nota de crédito</strong> es un CFDI de tipo "E" (Egreso) que se emite para aplicar descuentos, devoluciones o bonificaciones sobre una factura ya timbrada.</p>
+          <p><strong>Cuándo usarla:</strong></p>
+          <ul>
+            <li>El cliente devolvió mercancía (parcial o total).</li>
+            <li>Se aplicó un descuento posterior a la factura.</li>
+            <li>Hubo una bonificación comercial.</li>
+          </ul>
+          <p><strong>Cómo emitirla:</strong></p>
+          <ol>
+            <li>Crea una factura de tipo <strong>Egreso</strong>.</li>
+            <li>Relacónala con la factura original usando tipo de relación "01" (Nota de crédito de los documentos relacionados).</li>
+            <li>Los conceptos deben coincidir con los de la factura original (misma clave de producto/servicio).</li>
+            <li>El monto es el descuento o devolución aplicada, no el total original.</li>
+          </ol>
+          <p><strong>Diferencia con cancelación:</strong> la cancelación anula toda la factura; la nota de crédito ajusta parcialmente.</p>
+        </div>
+      </div>
+
+      <div class="guide-item" data-tags="facturación sat">
+        <button class="guide-accordion__toggle" aria-expanded="false">
+          <span>Facturar a cliente extranjero</span>
+          <svg class="guide-accordion__chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="guide-accordion__body" hidden>
+          <p>Para facturar a un cliente en el extranjero:</p>
+          <ul>
+            <li><strong>RFC genérico:</strong> usa <code>XEXX010101000</code> (RFC genérico para extranjeros).</li>
+            <li><strong>Razón social:</strong> nombre completo del cliente o empresa extranjera.</li>
+            <li><strong>Régimen fiscal:</strong> 616 &mdash; Sin obligaciones fiscales.</li>
+            <li><strong>Código postal:</strong> el de tu domicilio fiscal (el emisor).</li>
+            <li><strong>Uso CFDI:</strong> S01 &mdash; Sin efectos fiscales.</li>
+            <li><strong>IVA:</strong> generalmente tasa 0% si es exportación de servicios. Tasa 16% si el servicio se aprovecha en México.</li>
+          </ul>
+          <p><strong>Importante:</strong> conserva evidencia de que el servicio se prestó o el bien se exportó fuera de México para justificar la tasa 0%.</p>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Section G: Glosario fiscal -->
+  <section class="guides-section" id="secGlosario">
+    <h2 class="guides-section__title">Glosario fiscal</h2>
+    <div class="guides-accordion-list">
+
+      <div class="guide-item" data-tags="sat facturación impuestos">
+        <button class="guide-accordion__toggle" aria-expanded="false">
+          <span>Glosario: PUE, PPD, CFDI, REP, RFC, CSD, FIEL</span>
+          <svg class="guide-accordion__chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="guide-accordion__body" hidden>
+          <dl style="margin:0;">
+            <dt><strong>CFDI</strong></dt>
+            <dd>Comprobante Fiscal Digital por Internet. La factura electrónica oficial en México, validada por el SAT.</dd>
+
+            <dt><strong>RFC</strong></dt>
+            <dd>Registro Federal de Contribuyentes. Clave única de 12 caracteres (personas morales) o 13 (personas físicas).</dd>
+
+            <dt><strong>PUE</strong></dt>
+            <dd>Pago en Una sola Exhibición. Método de pago donde el cliente paga el total en el acto o dentro del mismo mes.</dd>
+
+            <dt><strong>PPD</strong></dt>
+            <dd>Pago en Parcialidades o Diferido. Método para cuando el pago se hará después o en varias partes.</dd>
+
+            <dt><strong>REP</strong></dt>
+            <dd>Recibo Electrónico de Pago (Complemento de Pago). CFDI que documenta un pago recibido sobre una factura PPD.</dd>
+
+            <dt><strong>CSD</strong></dt>
+            <dd>Certificado de Sello Digital. Archivo (.cer + .key) expedido por el SAT para firmar facturas electrónicas. Válido por 4 años.</dd>
+
+            <dt><strong>FIEL / e.firma</strong></dt>
+            <dd>Firma Electrónica Avanzada. Identidad digital ante el SAT. Se usa para trámites, declaraciones y descarga de facturas. Válida por 4 años.</dd>
+
+            <dt><strong>PAC</strong></dt>
+            <dd>Proveedor Autorizado de Certificación. Empresa autorizada por el SAT para timbrar (certificar) facturas electrónicas.</dd>
+
+            <dt><strong>UUID</strong></dt>
+            <dd>Identificador único universal del CFDI. Folio fiscal de 36 caracteres asignado por el PAC al timbrar.</dd>
+
+            <dt><strong>ISR</strong></dt>
+            <dd>Impuesto Sobre la Renta. Grava los ingresos netos (ganancias). Se declara mensual y anualmente.</dd>
+
+            <dt><strong>IVA</strong></dt>
+            <dd>Impuesto al Valor Agregado. Tasa general del 16% sobre venta de bienes y servicios.</dd>
+
+            <dt><strong>RESICO</strong></dt>
+            <dd>Régimen Simplificado de Confianza. Régimen fiscal con tasas reducidas (1%-2.5%) para PF con ingresos hasta $3.5M anuales.</dd>
+          </dl>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
 </div>
 
 <script src="/static/js/guides.js"></script>

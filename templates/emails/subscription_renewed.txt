@@ -1,0 +1,8 @@
+Suscripción renovada
+
+Tu suscripción a {{ brand_name|default('ContaNeta') }} fue renovada exitosamente.
+
+Plan: {{ plan_name|default('') }}
+Próximo cobro: {{ next_billing_date|default('') }}
+
+Gracias por confiar en {{ brand_name|default('ContaNeta') }} para tu facturación.

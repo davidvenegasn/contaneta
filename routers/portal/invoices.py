@@ -126,6 +126,7 @@ def register_invoices_routes(router, templates):
                     "customer_prefill": customer_prefill,
                     "concept_prefill": concept_prefill,
                     "quote_items": quote_items,
+                    "from_quote_id": quote_id,
                     "csrf_token": csrf_service.generate_csrf_token(),
                 },
             )
