@@ -104,6 +104,10 @@
         <span class="psb-nav-link__rail">{{ icon_summary() }}<span class="rail-tooltip">Impuestos</span></span>
         <span class="psb-nav-link__txt">Impuestos</span>
       </a>
+      <a class="psb-nav-link {{ 'is-active' if (active_page == 'reports' or (nav_is_active is defined and nav_is_active('/portal/reports'))) else '' }}" href="/portal/reports/monthly">
+        <span class="psb-nav-link__rail"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 17V9"/><path d="M18 17V5"/><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M8 17v-3"/></svg><span class="rail-tooltip">Reportes</span></span>
+        <span class="psb-nav-link__txt">Reportes</span>
+      </a>
 
       <div class="psb-section">
         <div class="psb-section__rail"><div class="psb-section__rule" aria-hidden="true"></div></div>
@@ -120,6 +124,11 @@
       <a class="psb-nav-link {{ 'is-active' if (active_page == 'settings' or (nav_is_active is defined and nav_is_active('/portal/settings'))) else '' }}" href="/portal/settings">
         <span class="psb-nav-link__rail"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span class="rail-tooltip">Configuración</span></span>
         <span class="psb-nav-link__txt">Configuración</span>
+      </a>
+
+      <a class="psb-nav-link {{ 'is-active' if (active_page == 'audit_log' or (nav_is_active is defined and nav_is_active('/portal/audit-log'))) else '' }}" href="/portal/audit-log">
+        <span class="psb-nav-link__rail"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="10"/></svg><span class="rail-tooltip">Actividad</span></span>
+        <span class="psb-nav-link__txt">Actividad</span>
       </a>
 
       <a class="psb-nav-link {{ 'is-active' if (active_page == 'guides' or (nav_is_active is defined and nav_is_active('/portal/guides'))) else '' }}" href="/portal/guides">

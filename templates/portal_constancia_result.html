@@ -1,0 +1,133 @@
+{% extends "base_portal.html" %}
+
+{% set title = title or 'Constancia de Situación Fiscal' %}
+
+{% block content %}
+<header class="app-header app-header--with-back" style="margin-bottom:14px;">
+  <div class="app-header__left">
+    <a href="/portal/settings" class="btn btn--ghost btn--sm app-header__back" style="text-decoration:none;">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" width="18" height="18"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+      Configuración
+    </a>
+    <div>
+      <h1 class="app-title">Constancia de Situación Fiscal</h1>
+      <p class="app-subtitle muted">Resultado del análisis del PDF.</p>
+    </div>
+  </div>
+</header>
+
+{% if not result.ok %}
+  {# ── Error state ── #}
+  <div class="card" style="padding:24px; text-align:center;">
+    <svg viewBox="0 0 24 24" fill="none" style="width:48px; height:48px; margin:0 auto 12px; color:#ef4444;">
+      <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.75"/>
+      <path d="M15 9l-6 6M9 9l6 6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+    </svg>
+    <h3 style="margin:0 0 8px; font-size:16px;">Error al procesar</h3>
+    <p style="color:var(--text-muted, #6b7280); font-size:14px;">{{ result.error }}</p>
+    <a href="/portal/settings" class="btn btn-small" style="margin-top:16px;">Volver a Configuración</a>
+  </div>
+{% else %}
+  {# ── Success: show extracted data ── #}
+  {% if result.verified %}
+  <div class="card" style="padding:16px; margin-bottom:14px; background:var(--green-50, #f0fdf4); border:1px solid var(--green-200, #bbf7d0);">
+    <div style="display:flex; align-items:center; gap:10px;">
+      <svg viewBox="0 0 24 24" fill="none" style="width:24px; height:24px; color:#16a34a; flex-shrink:0;">
+        <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.75"/>
+        <path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <div>
+        <strong style="color:#15803d;">Datos verificados</strong>
+        <p style="margin:0; font-size:13px; color:#166534;">Los datos fiscales de tu constancia coinciden con tu perfil registrado.</p>
+      </div>
+    </div>
+  </div>
+  {% elif result.diff %}
+  <div class="card" style="padding:16px; margin-bottom:14px; background:var(--yellow-50, #fefce8); border:1px solid var(--yellow-200, #fef08a);">
+    <div style="display:flex; align-items:center; gap:10px;">
+      <svg viewBox="0 0 24 24" fill="none" style="width:24px; height:24px; color:#ca8a04; flex-shrink:0;">
+        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" stroke="currentColor" stroke-width="1.75"/>
+        <line x1="12" y1="9" x2="12" y2="13" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+        <line x1="12" y1="17" x2="12.01" y2="17" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+      </svg>
+      <div>
+        <strong style="color:#92400e;">Diferencias encontradas</strong>
+        <p style="margin:0; font-size:13px; color:#78350f;">Algunos datos de tu constancia difieren de tu perfil registrado.</p>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {# ── Extracted data card ── #}
+  <div class="card" style="margin-bottom:14px;">
+    <div style="padding:16px 16px 8px; border-bottom:1px solid var(--border, #e5e7eb);">
+      <h3 style="margin:0; font-size:15px;">Datos extraídos</h3>
+      <p style="margin:4px 0 0; font-size:12px; color:var(--text-muted, #6b7280);">
+        Confianza: {{ (result.extracted.confidence * 100)|int }}%
+      </p>
+    </div>
+    <table style="width:100%; font-size:13px; border-collapse:collapse;">
+      <tbody>
+        {% for label, key in [('RFC', 'rfc'), ('CURP', 'curp'), ('Razón Social', 'razon_social'), ('Régimen Fiscal', 'regimen_fiscal'), ('Código Postal', 'codigo_postal'), ('Domicilio', 'domicilio')] %}
+        {% set val = result.extracted.get(key) %}
+        <tr style="border-bottom:1px solid var(--border, #e5e7eb);">
+          <td style="padding:10px 16px; font-weight:500; width:160px; color:var(--text-muted, #6b7280);">{{ label }}</td>
+          <td style="padding:10px 16px;">{{ val or '—' }}</td>
+        </tr>
+        {% endfor %}
+        {% if result.extracted.obligaciones %}
+        <tr>
+          <td style="padding:10px 16px; font-weight:500; vertical-align:top; color:var(--text-muted, #6b7280);">Obligaciones</td>
+          <td style="padding:10px 16px;">
+            <ul style="margin:0; padding-left:16px;">
+              {% for ob in result.extracted.obligaciones %}
+                <li style="margin-bottom:4px;">{{ ob }}</li>
+              {% endfor %}
+            </ul>
+          </td>
+        </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+
+  {# ── Diff table (if differences found) ── #}
+  {% if result.diff %}
+  <div class="card" style="margin-bottom:14px;">
+    <div style="padding:16px 16px 8px; border-bottom:1px solid var(--border, #e5e7eb);">
+      <h3 style="margin:0; font-size:15px;">Diferencias con tu perfil</h3>
+    </div>
+    <table style="width:100%; font-size:13px; border-collapse:collapse;">
+      <thead>
+        <tr style="border-bottom:1px solid var(--border, #e5e7eb);">
+          <th style="padding:10px 16px; text-align:left;">Campo</th>
+          <th style="padding:10px 16px; text-align:left;">Perfil actual</th>
+          <th style="padding:10px 16px; text-align:left;">Constancia</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for d in result.diff %}
+        <tr style="border-bottom:1px solid var(--border, #e5e7eb);">
+          <td style="padding:10px 16px; font-weight:500;">{{ d.field }}</td>
+          <td style="padding:10px 16px; color:#ef4444; text-decoration:line-through;">{{ d.current or '(vacío)' }}</td>
+          <td style="padding:10px 16px; color:#16a34a; font-weight:500;">{{ d.extracted }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <div style="padding:12px 16px; text-align:right;">
+      <form method="post" action="/portal/settings/constancia/apply" style="display:inline;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button type="submit" class="btn btn-small" onclick="return confirm('¿Actualizar datos fiscales con los de la constancia?')">
+          Aplicar datos de la constancia
+        </button>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+
+  <div style="text-align:center; margin-top:16px;">
+    <a href="/portal/settings" class="btn btn-small btn-ghost">Volver a Configuración</a>
+  </div>
+{% endif %}
+{% endblock %}

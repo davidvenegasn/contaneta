@@ -1,0 +1,98 @@
+{% extends "base_portal.html" %}
+
+{% set title = title or 'Detalle de declaracion' %}
+
+{% block content %}
+  <header class="app-header" style="margin-bottom:14px;">
+    <div class="app-header__left">
+      <div class="app-subtitle muted">Detalle de tu declaraci&oacute;n fiscal.</div>
+    </div>
+    <div class="app-header__right">
+      <a href="/portal/declaraciones" class="btn btn-small btn-ghost">&larr; Volver</a>
+    </div>
+  </header>
+
+  <div class="card p-20" style="margin-bottom:14px;">
+    <div style="display:flex; justify-content:space-between; align-items:start; flex-wrap:wrap; gap:12px;">
+      <div>
+        <div style="font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em;">Tipo</div>
+        <div style="font-size:18px; font-weight:600; text-transform:capitalize;">{{ decl.tipo or 'Declaracion' }}</div>
+      </div>
+      <div>
+        <div style="font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em;">Periodo</div>
+        <div style="font-size:18px; font-weight:600;">{{ decl.periodo_ym or '—' }}</div>
+      </div>
+      <div>
+        <div style="font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em;">Estado</div>
+        <div style="font-size:14px;">
+          {% if decl.status == 'validated' %}
+          <span class="badge badge--success">Validada</span>
+          {% elif decl.status == 'pending_review' %}
+          <span class="badge badge--warning">En revision</span>
+          {% elif decl.status == 'pagada' %}
+          <span class="badge badge--success">Pagada</span>
+          {% elif decl.status == 'vencida' %}
+          <span class="badge badge--danger">Vencida</span>
+          {% else %}
+          <span class="badge">{{ decl.status }}</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card p-20" style="margin-bottom:14px;">
+    <div class="table-wrap">
+      <table class="data-table" style="width:100%;">
+        <tbody>
+          {% if decl.saldo_a_cargo %}
+          <tr>
+            <td class="muted">Saldo a cargo</td>
+            <td style="text-align:right; font-weight:600; color:var(--danger,#ef4444);">${{ '{:,.2f}'.format(decl.saldo_a_cargo) }}</td>
+          </tr>
+          {% endif %}
+          {% if decl.saldo_a_favor %}
+          <tr>
+            <td class="muted">Saldo a favor</td>
+            <td style="text-align:right; font-weight:600; color:var(--success,#22c55e);">${{ '{:,.2f}'.format(decl.saldo_a_favor) }}</td>
+          </tr>
+          {% endif %}
+          {% if decl.linea_captura %}
+          <tr>
+            <td class="muted">L&iacute;nea de captura</td>
+            <td style="text-align:right; font-family:monospace;">{{ decl.linea_captura }}</td>
+          </tr>
+          {% endif %}
+          {% if decl.folio_acuse %}
+          <tr>
+            <td class="muted">Folio de acuse</td>
+            <td style="text-align:right;">{{ decl.folio_acuse }}</td>
+          </tr>
+          {% endif %}
+          {% if decl.fecha_presentacion %}
+          <tr>
+            <td class="muted">Fecha de presentaci&oacute;n</td>
+            <td style="text-align:right;">{{ decl.fecha_presentacion }}</td>
+          </tr>
+          {% endif %}
+          {% if decl.fecha_vencimiento %}
+          <tr>
+            <td class="muted">Fecha l&iacute;mite de pago</td>
+            <td style="text-align:right;">{{ decl.fecha_vencimiento }}</td>
+          </tr>
+          {% endif %}
+          <tr>
+            <td class="muted">Subido el</td>
+            <td style="text-align:right;">{{ (decl.created_at or '')[:16] }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <style>
+  .badge--success { background: rgba(34,197,94,.1); color: #16a34a; font-size: 11px; padding: 2px 8px; border-radius: 4px; }
+  .badge--warning { background: rgba(245,158,11,.1); color: #d97706; font-size: 11px; padding: 2px 8px; border-radius: 4px; }
+  .badge--danger { background: rgba(239,68,68,.1); color: #dc2626; font-size: 11px; padding: 2px 8px; border-radius: 4px; }
+  </style>
+{% endblock %}

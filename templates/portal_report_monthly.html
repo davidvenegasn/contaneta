@@ -1,0 +1,207 @@
+{% extends "base_portal.html" %}
+
+{% set title = title or 'Reporte Mensual' %}
+{% set page_icon = '<svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M13 17V9" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/><path d="M18 17V5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/><path d="M3 3v16a2 2 0 0 0 2 2h16" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 17v-3" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>' %}
+
+{% block content %}
+  <header class="app-header" style="margin-bottom:14px;">
+    <div class="app-header__left">
+      <div class="app-subtitle muted">Reporte fiscal mensual con ingresos, gastos, IVA e ISR estimado.</div>
+    </div>
+  </header>
+
+  <div class="card ym-card" style="margin-bottom:14px;">
+    <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
+      <div class="ym-selector" style="margin-bottom:0;">
+        {{ month_picker('/portal/reports/monthly', token, ym, ym_label) }}
+      </div>
+      <a href="/portal/reports/monthly/excel?ym={{ ym }}" class="btn btn-small btn-ghost" style="margin-left:auto; white-space:nowrap;" title="Descargar Excel">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" style="width:16px; height:16px; margin-right:4px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/><polyline points="7 10 12 15 17 10" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/><line x1="12" y1="15" x2="12" y2="3" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Descargar Excel
+      </a>
+    </div>
+  </div>
+
+  {# ── Metric cards ── #}
+  <div class="dashboard-metrics fade-in mb-20">
+    <div class="card metric-card">
+      <div class="metric-label">
+        <svg class="icon" viewBox="0 0 24 24" fill="none"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Ingresos
+      </div>
+      <div class="metric-value">$<span data-count-to="{{ report.ingresos.subtotal }}" data-count-decimals="2" data-count-duration="250">{{ '{:,.2f}'.format(report.ingresos.subtotal) }}</span></div>
+      <div class="metric-sub">{{ report.ingresos.n }} facturas emitidas</div>
+    </div>
+
+    <div class="card metric-card">
+      <div class="metric-label">
+        <svg class="icon" viewBox="0 0 24 24" fill="none"><path d="M12 22v-20M7 19h5a3.5 3.5 0 0 0 0-7H7M14 5H9.5a3.5 3.5 0 0 0 0 7H6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Gastos deducibles
+      </div>
+      <div class="metric-value">$<span data-count-to="{{ report.gastos_neto.subtotal }}" data-count-decimals="2" data-count-duration="250">{{ '{:,.2f}'.format(report.gastos_neto.subtotal) }}</span></div>
+      <div class="metric-sub">{{ report.gastos_neto.n }} facturas recibidas</div>
+    </div>
+
+    <div class="card metric-card">
+      <div class="metric-label">
+        <svg class="icon" viewBox="0 0 24 24" fill="none"><path d="M22 12h-4l-3 9L9 3l-3 9H2" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Utilidad fiscal
+      </div>
+      <div class="metric-value">$<span data-count-to="{{ report.utilidad_fiscal }}" data-count-decimals="2" data-count-duration="250">{{ '{:,.2f}'.format(report.utilidad_fiscal) }}</span></div>
+      <div class="metric-sub">Ingresos &minus; Gastos</div>
+    </div>
+
+    <div class="card metric-card">
+      <div class="metric-label">
+        <svg class="icon" viewBox="0 0 24 24" fill="none"><path d="M21 12a9 9 0 1 1-9-9" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/><path d="M21 3v6h-6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        IVA neto
+      </div>
+      <div class="metric-value {% if report.iva_neto > 0 %}text-danger{% else %}text-success{% endif %}">$<span data-count-to="{{ report.iva_neto }}" data-count-decimals="2" data-count-duration="250">{{ '{:,.2f}'.format(report.iva_neto) }}</span></div>
+      <div class="metric-sub">{% if report.iva_neto > 0 %}A pagar{% else %}Saldo a favor{% endif %}</div>
+    </div>
+  </div>
+
+  {# ── ISR estimate ── #}
+  <div class="card p-20" style="margin-bottom:14px;">
+    <div class="card-title-row mb-14">
+      <h3 class="section-title">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="1.75"/><path d="M9 9h6M9 13h4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
+        Resumen fiscal
+      </h3>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table" style="width:100%;">
+        <tbody>
+          <tr>
+            <td class="muted">Ingresos (subtotal)</td>
+            <td style="text-align:right;">${{ '{:,.2f}'.format(report.ingresos.subtotal) }}</td>
+          </tr>
+          <tr>
+            <td class="muted">IVA cobrado</td>
+            <td style="text-align:right;">${{ '{:,.2f}'.format(report.ingresos.iva) }}</td>
+          </tr>
+          <tr>
+            <td class="muted">Retenciones</td>
+            <td style="text-align:right;">${{ '{:,.2f}'.format(report.ingresos.retenciones) }}</td>
+          </tr>
+          <tr>
+            <td class="muted">Gastos deducibles (subtotal)</td>
+            <td style="text-align:right;">${{ '{:,.2f}'.format(report.gastos_neto.subtotal) }}</td>
+          </tr>
+          <tr>
+            <td class="muted">IVA acreditable</td>
+            <td style="text-align:right;">${{ '{:,.2f}'.format(report.gastos_neto.iva_acreditable) }}</td>
+          </tr>
+          {% if report.notas_credito.n > 0 %}
+          <tr>
+            <td class="muted">Notas de cr&eacute;dito recibidas ({{ report.notas_credito.n }})</td>
+            <td style="text-align:right;">${{ '{:,.2f}'.format(report.notas_credito.total) }}</td>
+          </tr>
+          {% endif %}
+          <tr style="border-top:2px solid var(--border-color, #e5e7eb);">
+            <td><strong>Utilidad fiscal</strong></td>
+            <td style="text-align:right; font-weight:600;">${{ '{:,.2f}'.format(report.utilidad_fiscal) }}</td>
+          </tr>
+          <tr>
+            <td><strong>IVA neto</strong></td>
+            <td style="text-align:right; font-weight:600;">${{ '{:,.2f}'.format(report.iva_neto) }}</td>
+          </tr>
+          <tr>
+            <td><strong>ISR estimado</strong></td>
+            <td style="text-align:right; font-weight:600;">${{ '{:,.2f}'.format(report.isr_estimado) }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {# ── Emitidas table ── #}
+  {% if report.cfdi_emitidos %}
+  <details class="fiscal-detail-section" style="margin-bottom:14px;" open>
+    <summary class="fiscal-detail-summary">Facturas emitidas ({{ report.cfdi_emitidos|length }})</summary>
+    <div class="fiscal-detail-table-wrap">
+      <table class="table table--zebra" style="width:100%; font-size:13px;">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Receptor</th>
+            <th>RFC</th>
+            <th>Tipo</th>
+            <th class="text-right">Subtotal</th>
+            <th class="text-right">IVA</th>
+            <th class="text-right">Ret.</th>
+            <th class="text-right">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for e in report.cfdi_emitidos %}
+          <tr>
+            <td class="muted">{{ (e.fecha_emision or '')[:10] }}</td>
+            <td>{{ e.nombre_receptor or '' }}</td>
+            <td class="muted">{{ e.rfc_receptor or '' }}</td>
+            <td><span class="badge badge--{{ e.tipo_comprobante|lower if e.tipo_comprobante else 'i' }}">{{ e.tipo_comprobante or 'I' }}</span></td>
+            <td class="text-right">${{ '{:,.2f}'.format(e.subtotal|default(0)|float) }}</td>
+            <td class="text-right">${{ '{:,.2f}'.format(e.impuestos|default(0)|float) }}</td>
+            <td class="text-right">${{ '{:,.2f}'.format(e.retenciones|default(0)|float) }}</td>
+            <td class="text-right"><strong>${{ '{:,.2f}'.format(e.total|default(0)|float) }}</strong></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </details>
+  {% endif %}
+
+  {# ── Recibidas table ── #}
+  {% if report.cfdi_recibidos %}
+  <details class="fiscal-detail-section" style="margin-bottom:14px;">
+    <summary class="fiscal-detail-summary">Facturas recibidas ({{ report.cfdi_recibidos|length }})</summary>
+    <div class="fiscal-detail-table-wrap">
+      <table class="table table--zebra" style="width:100%; font-size:13px;">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Emisor</th>
+            <th>RFC</th>
+            <th>Tipo</th>
+            <th class="text-right">Subtotal</th>
+            <th class="text-right">IVA</th>
+            <th class="text-right">Ret.</th>
+            <th class="text-right">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in report.cfdi_recibidos %}
+          <tr>
+            <td class="muted">{{ (r.fecha_emision or '')[:10] }}</td>
+            <td>{{ r.nombre_emisor or '' }}</td>
+            <td class="muted">{{ r.rfc_emisor or '' }}</td>
+            <td><span class="badge badge--{{ r.tipo_comprobante|lower if r.tipo_comprobante else 'i' }}">{{ r.tipo_comprobante or 'I' }}</span></td>
+            <td class="text-right">${{ '{:,.2f}'.format(r.subtotal|default(0)|float) }}</td>
+            <td class="text-right">${{ '{:,.2f}'.format(r.impuestos|default(0)|float) }}</td>
+            <td class="text-right">${{ '{:,.2f}'.format(r.retenciones|default(0)|float) }}</td>
+            <td class="text-right"><strong>${{ '{:,.2f}'.format(r.total|default(0)|float) }}</strong></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </details>
+  {% endif %}
+
+  {# ── Disclaimer ── #}
+  <div class="card p-20" style="background:var(--warning-bg, #fffbeb); border:1px solid var(--warning-border, #fde68a);">
+    <p style="margin:0; font-size:13px; color:var(--warning-text, #92400e);">
+      <strong>Aviso:</strong> Este reporte es una estimaci&oacute;n basada en tus CFDI sincronizados. Para c&aacute;lculos definitivos consulta a tu contador.
+    </p>
+  </div>
+
+  <style>
+  .fiscal-detail-section { border: 1px solid var(--border, #e5e7eb); border-radius: 8px; background: var(--surface, #fff); }
+  .fiscal-detail-summary { padding: 12px 16px; cursor: pointer; font-weight: 500; font-size: 14px; user-select: none; }
+  .fiscal-detail-summary:hover { background: var(--surface-hover, rgba(0,0,0,.02)); }
+  .fiscal-detail-table-wrap { padding: 0 16px 16px; overflow-x: auto; }
+  .text-danger { color: var(--danger, #ef4444); }
+  .text-success { color: var(--success, #22c55e); }
+  </style>
+{% endblock %}

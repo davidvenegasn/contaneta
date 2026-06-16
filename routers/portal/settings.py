@@ -78,6 +78,14 @@ def register_settings_routes(router, templates):
         )
         if ciec_rows and ciec_rows[0].get("ciec_password_encrypted"):
             facturapi_state["ciec_configured"] = True
+        # Constancia de situación fiscal status
+        constancia_status = None
+        try:
+            from services.constancia.service import get_constancia_status
+            constancia_status = get_constancia_status(issuer_id)
+        except Exception:
+            pass
+
         # Check for pending deletion request
         deletion_pending = None
         if user_id:
@@ -102,6 +110,7 @@ def register_settings_routes(router, templates):
                 "sat_status": sat_status,
                 "fiel_data": fiel_data,
                 "facturapi_state": facturapi_state,
+                "constancia_status": constancia_status,
                 "deletion_pending": deletion_pending,
             },
         )

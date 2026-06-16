@@ -250,6 +250,38 @@ html.nightmode .cert-expiry-banner__cta { background: rgba(0,0,0,.25); }
     </dl>
     <p class="muted u-text-sm">Solo el dueño o administrador puede editar estos datos.</p>
     {% endif %}
+
+    {# ── Constancia de Situación Fiscal ── #}
+    {% if membership_role in ('owner', 'admin') %}
+    <div style="margin-top:20px; padding-top:16px; border-top:1px solid var(--border, #e5e7eb);">
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" style="width:18px; height:18px;">
+          <path d="M9 12l2 2 4-4"/>
+          <path d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"/>
+        </svg>
+        <h3 class="u-m0 u-text-base">Constancia de Situación Fiscal</h3>
+        {% if constancia_status and constancia_status.verified %}
+          <span class="badge badge--success" style="margin-left:8px; font-size:11px;">Verificada</span>
+        {% elif constancia_status %}
+          <span class="badge badge--warn" style="margin-left:8px; font-size:11px;">Subida</span>
+        {% endif %}
+      </div>
+      <p class="muted u-text-sm" style="margin:0 0 12px;">
+        Sube tu constancia en PDF para validar que tus datos fiscales coinciden con el SAT.
+        {% if constancia_status and constancia_status.uploaded_at %}
+          <br><span style="font-size:12px;">Última carga: {{ constancia_status.uploaded_at[:10] }}</span>
+        {% endif %}
+      </p>
+      <form method="post" action="/portal/settings/constancia/upload" enctype="multipart/form-data">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token or '' }}">
+        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+          <input type="file" name="pdf_file" accept=".pdf" required
+                 style="font-size:13px; max-width:300px;">
+          <button type="submit" class="btn btn--ghost btn--sm">Subir y analizar</button>
+        </div>
+      </form>
+    </div>
+    {% endif %}
   </div>
 </div>
 

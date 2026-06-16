@@ -135,6 +135,20 @@ async def webhook_stripe(
         _mark_subscription_by_stripe_id(sub.get("id"), "canceled")
         log_action(request, "plan_changed", status="canceled", stripe_subscription_id=sub.get("id"))
 
+    elif event["type"] == "invoice.payment_failed":
+        invoice = event["data"]["object"]
+        stripe_sub_id = invoice.get("subscription")
+        if stripe_sub_id:
+            _notify_payment_failed(stripe_sub_id)
+            log_action(request, "payment_failed", stripe_subscription_id=stripe_sub_id)
+
+    elif event["type"] == "customer.subscription.trial_will_end":
+        sub = event["data"]["object"]
+        stripe_sub_id = sub.get("id")
+        if stripe_sub_id:
+            _notify_trial_ending(stripe_sub_id)
+            log_action(request, "trial_will_end", stripe_subscription_id=stripe_sub_id)
+
     return JSONResponse(content={"received": True})
 
 
@@ -164,3 +178,64 @@ def _update_subscription_period_by_stripe_id(stripe_subscription_id: str, curren
         conn.commit()
     finally:
         conn.close()
+
+
+def _get_user_for_stripe_sub(stripe_subscription_id: str) -> Optional[dict]:
+    """Find the user associated with a Stripe subscription."""
+    from database import db_rows
+    rows = db_rows(
+        """SELECT u.email, u.id AS user_id, s.id AS sub_id,
+                  m.issuer_id
+           FROM subscriptions s
+           JOIN users u ON u.id = s.user_id
+           LEFT JOIN memberships m ON m.user_id = u.id
+           WHERE s.stripe_subscription_id = ?
+           LIMIT 1""",
+        (stripe_subscription_id,),
+    )
+    return rows[0] if rows else None
+
+
+def _notify_payment_failed(stripe_subscription_id: str) -> None:
+    """Enqueue a payment_failed email to the subscription owner."""
+    user = _get_user_for_stripe_sub(stripe_subscription_id)
+    if not user:
+        return
+    try:
+        from services.email.queue import enqueue_send_email
+        enqueue_send_email(
+            to_email=user["email"],
+            template="payment_failed",
+            context={
+                "brand_name": "ContaNeta",
+                "billing_url": "/portal/plan",
+            },
+            email_type="payment_failed",
+            issuer_id=user.get("issuer_id"),
+            user_id=user["user_id"],
+        )
+    except Exception as exc:
+        logger.warning("Failed to enqueue payment_failed email: %s", exc)
+
+
+def _notify_trial_ending(stripe_subscription_id: str) -> None:
+    """Enqueue a trial_expiring email when Stripe notifies trial will end."""
+    user = _get_user_for_stripe_sub(stripe_subscription_id)
+    if not user:
+        return
+    try:
+        from services.email.queue import enqueue_send_email
+        enqueue_send_email(
+            to_email=user["email"],
+            template="trial_expiring",
+            context={
+                "days_left": 3,
+                "brand_name": "ContaNeta",
+                "billing_url": "/portal/plan",
+            },
+            email_type="trial_expiring",
+            issuer_id=user.get("issuer_id"),
+            user_id=user["user_id"],
+        )
+    except Exception as exc:
+        logger.warning("Failed to enqueue trial_expiring email: %s", exc)

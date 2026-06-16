@@ -1,0 +1,149 @@
+{% extends "base_portal.html" %}
+
+{% set title = 'Declaraciones' %}
+{% set page_icon = '<svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 2v6h6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 13H8M16 17H8M10 9H8" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>' %}
+
+{% block content %}
+  <header class="app-header" style="margin-bottom:14px;">
+    <div class="app-header__left">
+      <div class="app-subtitle muted">Sube acuses de declaraciones SAT (PDF). El sistema extrae datos autom&aacute;ticamente.</div>
+    </div>
+  </header>
+
+  {# ── Upload zone ── #}
+  <div class="card p-20" style="margin-bottom:14px;">
+    <div id="dropZone" class="decl-dropzone">
+      <svg class="decl-dropzone__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      <p class="decl-dropzone__text">Arrastra archivos PDF aqu&iacute; o <label for="fileInput" class="decl-dropzone__link">selecciona archivos</label></p>
+      <input type="file" id="fileInput" accept=".pdf" multiple hidden>
+      <p class="decl-dropzone__hint muted">M&aacute;x 10 MB por archivo. Se acepta m&uacute;ltiples archivos.</p>
+    </div>
+    <div id="uploadResults" style="margin-top:12px;" hidden></div>
+  </div>
+
+  {# ── Declarations list ── #}
+  <div class="card p-20">
+    <div class="card-title-row mb-14">
+      <h3 class="section-title">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="1.75"/><path d="M9 9h6M9 13h4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
+        Declaraciones recientes
+      </h3>
+    </div>
+
+    {% if declarations %}
+    <div class="table-wrap">
+      <table class="data-table" style="width:100%; font-size:13px;">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>RFC</th>
+            <th>Contribuyente</th>
+            <th>Tipo</th>
+            <th>Periodo</th>
+            <th class="text-right">Saldo</th>
+            <th>Confianza</th>
+            <th>Estado</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for d in declarations %}
+          <tr>
+            <td class="muted">{{ (d.created_at or '')[:10] }}</td>
+            <td>{{ d.issuer_rfc or '' }}</td>
+            <td>{{ d.issuer_name or '' }}</td>
+            <td>{{ d.tipo or 'desconocido' }}</td>
+            <td>{{ d.periodo_ym or '' }}</td>
+            <td class="text-right">
+              {% if d.saldo_a_cargo %}${{ '{:,.2f}'.format(d.saldo_a_cargo) }}{% elif d.saldo_a_favor %}<span style="color:var(--success)">${{ '{:,.2f}'.format(d.saldo_a_favor) }} a favor</span>{% else %}&mdash;{% endif %}
+            </td>
+            <td>
+              {% set conf = (d.parse_confidence or 0) * 100 %}
+              <span class="decl-conf decl-conf--{{ 'high' if conf >= 70 else 'low' }}">{{ '{:.0f}'.format(conf) }}%</span>
+            </td>
+            <td>
+              {% if d.status == 'validated' %}
+              <span class="badge badge--success">Validada</span>
+              {% elif d.status == 'pending_review' %}
+              <span class="badge badge--warning">Revisar</span>
+              {% elif d.status == 'rejected' %}
+              <span class="badge badge--danger">Rechazada</span>
+              {% else %}
+              <span class="badge">{{ d.status }}</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if d.status == 'pending_review' %}
+              <a href="/portal/contador/declaraciones/{{ d.id }}/review" class="btn btn-small btn-ghost">Revisar</a>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="muted" style="margin:0; text-align:center;">No hay declaraciones. Sube un PDF para comenzar.</p>
+    {% endif %}
+  </div>
+
+  <style>
+  .decl-dropzone { border: 2px dashed var(--border, #e5e7eb); border-radius: 12px; padding: 40px 20px; text-align: center; transition: border-color 0.2s, background 0.2s; cursor: pointer; }
+  .decl-dropzone.drag-over { border-color: var(--accent, #6366f1); background: rgba(99,102,241,.04); }
+  .decl-dropzone__icon { width: 40px; height: 40px; color: var(--muted, #6b7280); margin-bottom: 8px; }
+  .decl-dropzone__text { margin: 0 0 4px; font-size: 14px; }
+  .decl-dropzone__link { color: var(--accent, #6366f1); cursor: pointer; text-decoration: underline; }
+  .decl-dropzone__hint { font-size: 12px; margin: 0; }
+  .decl-conf { font-size: 11px; font-weight: 500; padding: 2px 6px; border-radius: 4px; }
+  .decl-conf--high { background: rgba(34,197,94,.1); color: #16a34a; }
+  .decl-conf--low { background: rgba(245,158,11,.1); color: #d97706; }
+  .badge--success { background: rgba(34,197,94,.1); color: #16a34a; }
+  .badge--warning { background: rgba(245,158,11,.1); color: #d97706; }
+  .badge--danger { background: rgba(239,68,68,.1); color: #dc2626; }
+  </style>
+
+  <script>
+  (function() {
+    var zone = document.getElementById('dropZone');
+    var input = document.getElementById('fileInput');
+    var results = document.getElementById('uploadResults');
+    if (!zone || !input) return;
+
+    zone.addEventListener('click', function() { input.click(); });
+    zone.addEventListener('dragover', function(e) { e.preventDefault(); zone.classList.add('drag-over'); });
+    zone.addEventListener('dragleave', function() { zone.classList.remove('drag-over'); });
+    zone.addEventListener('drop', function(e) {
+      e.preventDefault(); zone.classList.remove('drag-over');
+      if (e.dataTransfer.files.length) uploadFiles(e.dataTransfer.files);
+    });
+    input.addEventListener('change', function() { if (input.files.length) uploadFiles(input.files); });
+
+    function uploadFiles(files) {
+      var fd = new FormData();
+      for (var i = 0; i < files.length; i++) fd.append('files', files[i]);
+      results.hidden = false;
+      results.innerHTML = '<p class="muted">Procesando ' + files.length + ' archivo(s)...</p>';
+
+      fetch('/portal/contador/declaraciones/upload', { method: 'POST', body: fd })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (!data.ok) { results.innerHTML = '<p style="color:var(--danger)">Error al procesar</p>'; return; }
+          var html = '';
+          data.results.forEach(function(r) {
+            var icon = r.status === 'saved' ? '&#10003;' : r.status === 'duplicate' ? '&#x21BB;' : '&#10007;';
+            var color = r.status === 'saved' ? 'var(--success,#22c55e)' : r.status === 'duplicate' ? 'var(--warning,#f59e0b)' : 'var(--danger,#ef4444)';
+            html += '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:13px;">';
+            html += '<span style="color:' + color + ';font-weight:600;">' + icon + '</span>';
+            html += '<span>' + (r.filename || '') + '</span>';
+            html += '<span class="muted"> &mdash; ' + (r.status || '') + (r.reason ? ': ' + r.reason : '') + '</span>';
+            if (r.parse_confidence) html += '<span class="muted"> (confianza: ' + Math.round(r.parse_confidence * 100) + '%)</span>';
+            html += '</div>';
+          });
+          results.innerHTML = html;
+          setTimeout(function() { location.reload(); }, 2000);
+        })
+        .catch(function() { results.innerHTML = '<p style="color:var(--danger)">Error de red</p>'; });
+    }
+  })();
+  </script>
+{% endblock %}

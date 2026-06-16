@@ -1,0 +1,66 @@
+{% extends "base_portal.html" %}
+
+{% set title = 'Mis declaraciones' %}
+{% set page_icon = '<svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 2v6h6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>' %}
+
+{% block content %}
+  <header class="app-header" style="margin-bottom:14px;">
+    <div class="app-header__left">
+      <div class="app-subtitle muted">Declaraciones fiscales procesadas por tu contador.</div>
+    </div>
+  </header>
+
+  {% if declarations %}
+  <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(300px, 1fr)); gap:14px;">
+    {% for d in declarations %}
+    <a href="/portal/declaraciones/{{ d.id }}" class="card decl-card" style="text-decoration:none; color:inherit;">
+      <div class="decl-card__header">
+        <span class="decl-card__tipo">{{ d.tipo or 'Declaracion' }}</span>
+        {% if d.status == 'validated' %}
+        <span class="badge badge--success">Validada</span>
+        {% elif d.status == 'pending_review' %}
+        <span class="badge badge--warning">En revision</span>
+        {% elif d.status == 'pagada' %}
+        <span class="badge badge--success">Pagada</span>
+        {% elif d.status == 'vencida' %}
+        <span class="badge badge--danger">Vencida</span>
+        {% else %}
+        <span class="badge">{{ d.status }}</span>
+        {% endif %}
+      </div>
+      <div class="decl-card__periodo">{{ d.periodo_ym or 'Sin periodo' }}</div>
+      {% if d.saldo_a_cargo %}
+      <div class="decl-card__monto text-danger">${{ '{:,.2f}'.format(d.saldo_a_cargo) }} a cargo</div>
+      {% elif d.saldo_a_favor %}
+      <div class="decl-card__monto text-success">${{ '{:,.2f}'.format(d.saldo_a_favor) }} a favor</div>
+      {% endif %}
+      {% if d.linea_captura %}
+      <div class="decl-card__lc muted">L&iacute;nea de captura: {{ d.linea_captura }}</div>
+      {% endif %}
+      {% if d.fecha_vencimiento %}
+      <div class="decl-card__venc muted">Vence: {{ d.fecha_vencimiento }}</div>
+      {% endif %}
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="card p-20">
+    <p class="muted" style="margin:0; text-align:center;">No hay declaraciones registradas a&uacute;n. Tu contador podr&aacute; subir los acuses desde su panel.</p>
+  </div>
+  {% endif %}
+
+  <style>
+  .decl-card { padding: 16px; transition: box-shadow 0.2s; }
+  .decl-card:hover { box-shadow: var(--shadow-card-hover, 0 4px 12px rgba(0,0,0,.08)); }
+  .decl-card__header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .decl-card__tipo { font-weight: 500; font-size: 13px; text-transform: capitalize; }
+  .decl-card__periodo { font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; margin-bottom: 4px; }
+  .decl-card__monto { font-size: 15px; font-weight: 500; margin-bottom: 4px; }
+  .decl-card__lc, .decl-card__venc { font-size: 12px; }
+  .text-danger { color: var(--danger, #ef4444); }
+  .text-success { color: var(--success, #22c55e); }
+  .badge--success { background: rgba(34,197,94,.1); color: #16a34a; font-size: 11px; padding: 2px 8px; border-radius: 4px; }
+  .badge--warning { background: rgba(245,158,11,.1); color: #d97706; font-size: 11px; padding: 2px 8px; border-radius: 4px; }
+  .badge--danger { background: rgba(239,68,68,.1); color: #dc2626; font-size: 11px; padding: 2px 8px; border-radius: 4px; }
+  </style>
+{% endblock %}

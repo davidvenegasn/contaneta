@@ -79,6 +79,18 @@ def _load_handlers() -> dict[str, JobHandler]:
         logger.info("Cancellation polling stats: %s", stats)
         return {"ok": True, "stats": stats}
 
+    def handle_check_trial_expiring(job: dict, _ctx: JobContext) -> dict:
+        """Check and notify users whose trial is about to expire."""
+        from services.trial_checker import check_and_notify_trial_expiring
+        count = check_and_notify_trial_expiring()
+        return {"ok": True, "notified": count}
+
+    def handle_refresh_lista_69b(job: dict, _ctx: JobContext) -> dict:
+        """Download and refresh the SAT 69-B list."""
+        from services.sat.lista_69b import fetch_and_update_lista
+        result = fetch_and_update_lista()
+        return {"ok": True, **result}
+
     return {
         "sat_sync_month": handle_sat_sync_month,
         "sat_refresh_light": handle_sat_refresh_light,
@@ -89,6 +101,8 @@ def _load_handlers() -> dict[str, JobHandler]:
         "facturapi_provision_org": handle_facturapi_provision_org,
         "send_email": handle_send_email,
         "poll_cancellations": handle_poll_cancellations,
+        "check_trial_expiring": handle_check_trial_expiring,
+        "refresh_lista_69b": handle_refresh_lista_69b,
     }
 
 

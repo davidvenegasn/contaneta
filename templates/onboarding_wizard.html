@@ -1,0 +1,107 @@
+{% extends "base_portal.html" %}
+
+{% set title = 'Configuracion inicial' %}
+
+{% block content %}
+  <div style="max-width:700px; margin:0 auto;">
+    <header class="app-header" style="margin-bottom:20px; text-align:center;">
+      <div class="app-header__left" style="flex-direction:column; align-items:center;">
+        <h2 style="margin:0 0 4px; font-size:22px;">Bienvenido a ContaNeta</h2>
+        <div class="app-subtitle muted">Completa estos pasos para comenzar a facturar.</div>
+      </div>
+    </header>
+
+    {# ── Progress bar ── #}
+    <div class="onb-progress">
+      {% for s in steps %}
+      <div class="onb-progress__step {{ 'is-done' if step_status[s.id] == 'done' else ('is-current' if step_status[s.id] == 'current' else '') }}">
+        <div class="onb-progress__dot">
+          {% if step_status[s.id] == 'done' %}
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          {% else %}
+          {{ s.id }}
+          {% endif %}
+        </div>
+        <div class="onb-progress__label">{{ s.label }}</div>
+      </div>
+      {% if not loop.last %}
+      <div class="onb-progress__line {{ 'is-done' if step_status[s.id] == 'done' else '' }}"></div>
+      {% endif %}
+      {% endfor %}
+    </div>
+
+    {# ── Step cards ── #}
+    {% for s in steps %}
+    <div class="card onb-step {{ 'onb-step--done' if step_status[s.id] == 'done' else ('onb-step--current' if step_status[s.id] == 'current' else 'onb-step--pending') }}" {% if step_status[s.id] == 'pending' %}style="opacity:0.5;"{% endif %}>
+      <div class="onb-step__header">
+        <div>
+          <div class="onb-step__title">{{ s.id }}. {{ s.label }}</div>
+          <div class="onb-step__desc muted">{{ s.description }}</div>
+        </div>
+        <div class="onb-step__badge">
+          {% if step_status[s.id] == 'done' %}
+          <span style="color:var(--success,#22c55e); font-weight:600;">&#10003; Completado</span>
+          {% elif step_status[s.id] == 'current' %}
+          <span style="color:var(--accent,#6366f1); font-weight:500;">Pendiente</span>
+          {% endif %}
+        </div>
+      </div>
+      {% if step_status[s.id] == 'current' %}
+      <div class="onb-step__action">
+        {% if s.key == 'perfil' %}
+        <a href="/portal/settings" class="btn btn-primary btn-small">Configurar perfil</a>
+        {% elif s.key == 'fiel' %}
+        <a href="/portal/sat-config" class="btn btn-primary btn-small">Subir FIEL</a>
+        {% elif s.key == 'manifesto' %}
+        <a href="/portal/facturapi-setup" class="btn btn-primary btn-small">Firmar manifesto</a>
+        {% elif s.key == 'csd' %}
+        <a href="/portal/sat-config" class="btn btn-primary btn-small">Subir CSD</a>
+        {% elif s.key == 'factura' %}
+        <a href="/portal/create" class="btn btn-primary btn-small">Crear factura</a>
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+
+    {% if current_step >= 6 %}
+    <div class="card p-20" style="text-align:center; background:rgba(34,197,94,.05); border:1px solid rgba(34,197,94,.2);">
+      <h3 style="margin:0 0 4px; color:var(--success,#22c55e);">&#127881; Configuracion completa</h3>
+      <p class="muted" style="margin:0;">Ya puedes usar todas las funciones de ContaNeta.</p>
+    </div>
+    {% else %}
+    <div style="text-align:center; margin-top:14px;">
+      <button type="button" class="btn btn-ghost btn-small" id="skipBtn">Saltar por ahora</button>
+    </div>
+    {% endif %}
+  </div>
+
+  <style>
+  .onb-progress { display: flex; align-items: center; justify-content: center; gap: 0; margin-bottom: 24px; padding: 0 20px; }
+  .onb-progress__step { display: flex; flex-direction: column; align-items: center; min-width: 60px; }
+  .onb-progress__dot { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; border: 2px solid var(--border, #e5e7eb); color: var(--muted, #6b7280); background: var(--surface, #fff); }
+  .onb-progress__step.is-done .onb-progress__dot { background: var(--success, #22c55e); border-color: var(--success); color: #fff; }
+  .onb-progress__step.is-done .onb-progress__dot svg { width: 16px; height: 16px; }
+  .onb-progress__step.is-current .onb-progress__dot { border-color: var(--accent, #6366f1); color: var(--accent); background: rgba(99,102,241,.08); }
+  .onb-progress__label { font-size: 11px; margin-top: 4px; color: var(--muted); }
+  .onb-progress__line { flex: 1; height: 2px; background: var(--border, #e5e7eb); min-width: 20px; margin: 0 -4px; margin-bottom: 18px; }
+  .onb-progress__line.is-done { background: var(--success, #22c55e); }
+  .onb-step { padding: 16px; margin-bottom: 8px; }
+  .onb-step__header { display: flex; justify-content: space-between; align-items: center; }
+  .onb-step__title { font-weight: 600; font-size: 14px; }
+  .onb-step__desc { font-size: 12px; }
+  .onb-step__action { margin-top: 12px; }
+  .onb-step--done { border-left: 3px solid var(--success, #22c55e); }
+  .onb-step--current { border-left: 3px solid var(--accent, #6366f1); }
+  </style>
+
+  <script>
+  var skipBtn = document.getElementById('skipBtn');
+  if (skipBtn) {
+    skipBtn.addEventListener('click', function() {
+      fetch('/portal/onboarding/skip', { method: 'POST' })
+        .then(function() { location.href = '/portal/home'; });
+    });
+  }
+  </script>
+{% endblock %}

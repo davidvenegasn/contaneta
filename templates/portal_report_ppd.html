@@ -1,0 +1,116 @@
+{% extends "base_portal.html" %}
+
+{% set title = 'Cobranza PPD' %}
+{% set page_icon = '<svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>' %}
+
+{% block content %}
+  <header class="app-header" style="margin-bottom:14px;">
+    <div class="app-header__left">
+      <div class="app-subtitle muted">Facturas PPD emitidas con saldo pendiente de cobro.</div>
+    </div>
+  </header>
+
+  {# ── Summary cards ── #}
+  <div class="dashboard-metrics fade-in mb-20">
+    <div class="card metric-card">
+      <div class="metric-label">
+        <svg class="icon" viewBox="0 0 24 24" fill="none"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Total pendiente
+      </div>
+      <div class="metric-value text-danger">$<span data-count-to="{{ report.total_pendiente }}" data-count-decimals="2" data-count-duration="250">{{ '{:,.2f}'.format(report.total_pendiente) }}</span></div>
+      <div class="metric-sub">{{ report.count }} factura{{ 's' if report.count != 1 else '' }} con saldo</div>
+    </div>
+  </div>
+
+  {# ── Items table ── #}
+  {% if report.invoices %}
+  <div class="card p-20">
+    <div class="card-title-row mb-14">
+      <h3 class="section-title">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="1.75"/><path d="M9 9h6M9 13h4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
+        Facturas con saldo pendiente
+      </h3>
+    </div>
+
+    <div class="ppd-filter-row" style="margin-bottom:12px;">
+      <input type="text" id="ppdFilter" class="form-control" placeholder="Filtrar por cliente o RFC..." style="max-width:300px; font-size:13px;">
+    </div>
+
+    <div class="table-wrap">
+      <table class="data-table" style="width:100%; font-size:13px;" id="ppdTable">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Cliente</th>
+            <th>RFC</th>
+            <th class="text-right">Total original</th>
+            <th class="text-right">Saldo pendiente</th>
+            <th class="text-center">Pagos</th>
+            <th class="text-center">D&iacute;as</th>
+            <th>Antig&uuml;edad</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in report.invoices %}
+          <tr data-searchable="{{ (item.customer_name or '')|lower }} {{ (item.customer_rfc or '')|lower }}">
+            <td class="muted">{{ item.fecha_emision }}</td>
+            <td>{{ item.customer_name or '' }}</td>
+            <td class="muted">{{ item.customer_rfc or '' }}</td>
+            <td class="text-right">${{ '{:,.2f}'.format(item.total_original) }} {{ item.currency }}</td>
+            <td class="text-right"><strong>${{ '{:,.2f}'.format(item.saldo_insoluto) }}</strong></td>
+            <td class="text-center">{{ item.parcialidades_pagadas }}</td>
+            <td class="text-center">{{ item.dias_desde_emision }}</td>
+            <td>
+              {% if item.dias_desde_emision > 90 %}
+                <span class="ppd-age ppd-age--critical">+90 d&iacute;as</span>
+              {% elif item.dias_desde_emision > 60 %}
+                <span class="ppd-age ppd-age--warning">+60 d&iacute;as</span>
+              {% elif item.dias_desde_emision > 30 %}
+                <span class="ppd-age ppd-age--caution">+30 d&iacute;as</span>
+              {% else %}
+                <span class="ppd-age ppd-age--ok">Reciente</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr style="border-top:2px solid var(--border-color, #e5e7eb); font-weight:600;">
+            <td colspan="4">Total</td>
+            <td class="text-right">${{ '{:,.2f}'.format(report.total_pendiente) }}</td>
+            <td colspan="3"></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+  {% else %}
+  <div class="card p-20">
+    <p class="muted" style="margin:0; text-align:center;">No hay facturas PPD con saldo pendiente.</p>
+  </div>
+  {% endif %}
+
+  <style>
+  .text-danger { color: var(--danger, #ef4444); }
+  .ppd-age { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; }
+  .ppd-age--critical { background: rgba(239,68,68,.1); color: #dc2626; }
+  .ppd-age--warning { background: rgba(245,158,11,.1); color: #d97706; }
+  .ppd-age--caution { background: rgba(234,179,8,.1); color: #ca8a04; }
+  .ppd-age--ok { background: rgba(34,197,94,.1); color: #16a34a; }
+  </style>
+
+  <script>
+  document.addEventListener('DOMContentLoaded', function() {
+    var filter = document.getElementById('ppdFilter');
+    if (!filter) return;
+    filter.addEventListener('input', function() {
+      var q = this.value.toLowerCase();
+      var rows = document.querySelectorAll('#ppdTable tbody tr');
+      rows.forEach(function(row) {
+        var text = row.getAttribute('data-searchable') || '';
+        row.style.display = text.indexOf(q) !== -1 ? '' : 'none';
+      });
+    });
+  });
+  </script>
+{% endblock %}
